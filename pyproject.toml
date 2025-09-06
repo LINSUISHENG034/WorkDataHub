@@ -1,0 +1,37 @@
+[project]
+name = "WorkDataHub"
+version = "0.1.0"
+description = "A modernized data processing platform for WorkDataHub."
+authors = [{ name = "Cline", email = "cline@example.com" }]
+requires-python = ">=3.10"
+dependencies = [
+    "dagster",
+    "dagster-webserver",
+    "pandas",
+    "pydantic",
+    "psycopg2-binary",
+    "openpyxl",
+    "PyYAML",
+    "pydantic-settings>=2.10.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+    "mypy",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12.12",
+]
