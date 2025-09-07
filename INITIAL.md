@@ -1,178 +1,134 @@
-# INITIAL.md — Dagster Wiring + CLI for Vertical Slice (Connector → Domain → Loader)
+# INITIAL.md — Orchestration Follow‑Up (Multi‑File, Flag Normalization, DB Conn Context, Display Consistency)
 
-Purpose: Implement Dagster ops and a small in‑process job to wire the existing vertical slice end‑to‑end (file discovery → Excel read → trustee_performance transform → loader). Provide a thin CLI to run locally. Favor a DB‑optional path (plan‑only load) so tests don’t require PostgreSQL.
+Purpose: Implement the suggested next steps for the Dagster orchestration layer. Add practical multi‑file processing, normalize execution flags, ensure DB connection cleanup via context managers, and make CLI output consistent with the effective execution mode. Keep plan‑only as the default; don’t introduce advanced Dagster features (e.g., DynamicOutput) yet.
 
-Read these first for context and constraints:
-- docs/DoR/INITIAL_00.md (end‑to‑end slice intent and examples)
-- docs/project/04_dependency_and_priority_analysis.md (pseudo‑code for ops/job composition)
-- src/work_data_hub/config/settings.py (env config)
-- src/work_data_hub/io/connectors/file_connector.py, io/readers/excel_reader.py
-- src/work_data_hub/domain/trustee_performance/service.py
-- src/work_data_hub/io/loader/warehouse_loader.py
+Note for Claude: Activate PowerShell venv with `.\.venv\Scripts\Activate.ps1` (not `.venv_linux/bin/activate`). Use uv: `uv venv && uv sync`, run via `uv run ...`.
 
 ## FEATURE
-Create Dagster ops and a job that composes: discover → read → process → load for the `trustee_performance` domain, plus a CLI that executes the job in‑process with DB‑optional execution (plan‑only when no DB).
+- Multi‑file: Process up to N discovered files in one run and load once.
+- Flag normalization: Unify execution mode under one source of truth; avoid conflicting `--plan-only` vs `--execute` signals.
+- DB connection context: Open psycopg2 connections with a context manager to ensure proper closure.
+- Display consistency: CLI output (plan/execution and SQL plans) matches the effective execution mode.
 
 ## SCOPE
 - In‑scope:
-  - New package `src/work_data_hub/orchestration/` with:
-    - `ops.py`: `discover_files_op`, `read_excel_op`, `process_trustee_performance_op`, `load_op` (thin wrappers calling existing modules)
-    - `jobs.py`: `trustee_performance_job()` and a `main()` to run via CLI (in‑process)
-  - Extend `config/data_sources.yml` for `trustee_performance` with `table` and `pk` used by `load_op`.
-  - Ensure ops exchange simple, JSON‑serializable payloads (paths, lists of dicts) to avoid Dagster type friction.
+  - Add a combined op or adjust existing ops to support multi‑file processing without Dagster dynamic mapping. Recommended: a new `read_and_process_trustee_files_op(file_paths: list[str], sheet: int, max_files: int) -> list[dict]` that iterates paths, calls `read_excel_rows(path, sheet)` and `process(rows, data_source=path)` per file, and accumulates results.
+  - In `load_op`, when executing (not plan‑only), use `with psycopg2.connect(dsn) as conn:` before calling `load(...)`.
+  - Normalize flags in `jobs.py`: derive a single `effective_plan_only` boolean (e.g., from `--execute`) and use it for both run_config and display. Either:
+    - Deprecate `--plan-only` (keep for compatibility but ignore if `--execute` present), or
+    - Remove `--plan-only` and rely solely on `--execute` as the user‑facing flag.
+  - Update help text to document precedence/behavior.
+  - Tests: multi‑file accumulation; CLI display consistency; DB context path smoke (mocked connect); keep existing tests green.
 - Non‑goals:
-  - Additional domains, schedules/sensors, resources, or deployment.
-  - Airflow/other orchestrators or asset‑based refactors.
-  - Real DB requirement in unit tests (keep plan‑only default).
+  - Dagster dynamic mapping or assets; new domains; scheduler/resources.
 
 ## CONTEXT SNAPSHOT
 ```
-src/work_data_hub/
-  config/{settings.py, data_sources.yml}
-  io/connectors/file_connector.py
-  io/readers/excel_reader.py
-  io/loader/warehouse_loader.py
-  domain/trustee_performance/{models.py, service.py}
-tests/
-  io/{test_file_connector.py, test_excel_reader.py, test_warehouse_loader.py}
-  test_integration.py  # E2E without Dagster
-
-# Missing now: src/work_data_hub/orchestration/{ops.py, jobs.py}
+src/work_data_hub/orchestration/
+  ops.py                      # existing ops (add new op or enhance)
+  jobs.py                     # CLI + job wiring (normalize flags; multi‑file path)
+src/work_data_hub/io/readers/excel_reader.py
+src/work_data_hub/domain/trustee_performance/service.py
+src/work_data_hub/io/loader/warehouse_loader.py
+tests/orchestration/{test_ops.py,test_jobs.py}
 ```
 
-## EXAMPLES (mirror these patterns)
-- Path: `docs/project/04_dependency_and_priority_analysis.md` — sample ops/job composition to adapt
-- Path: `tests/test_integration.py` — end‑to‑end flow without Dagster; replicate the same steps within Dagster ops
-- Snippet (skeleton ops):
+## EXAMPLES
+- New op (preferred) to avoid dynamic mapping:
 ```python
-from dagster import op, job
-from ..config.settings import get_settings
-from ..io.connectors.file_connector import DataSourceConnector
+from typing import List, Dict
+from dagster import op, Config, OpExecutionContext
 from ..io.readers.excel_reader import read_excel_rows
 from ..domain.trustee_performance.service import process
-from ..io.loader.warehouse_loader import load
+
+class ReadProcessConfig(Config):
+    sheet: int = 0
+    max_files: int = 1
 
 @op
-def discover_files_op(domain: str) -> list[str]:
-    settings = get_settings()
-    connector = DataSourceConnector(settings.data_sources_config)
-    files = connector.discover(domain)
-    return [f.path for f in files]
+def read_and_process_trustee_files_op(
+    context: OpExecutionContext, config: ReadProcessConfig, file_paths: List[str]
+) -> List[Dict]:
+    paths = (file_paths or [])[: max(1, config.max_files)]
+    all_processed: List[Dict] = []
+    for p in paths:
+        rows = read_excel_rows(p, sheet=config.sheet)
+        models = process(rows, data_source=p)
+        all_processed.extend([m.model_dump() for m in models])
+    context.log.info(f"Processed {len(paths)} files, produced {len(all_processed)} records")
+    return all_processed
+```
 
-@op
-def read_excel_op(path: str, sheet: int | str = 0) -> list[dict]:
-    return read_excel_rows(path, sheet=sheet)
+- DB connection context in load_op:
+```python
+if not config.plan_only:
+    import psycopg2
+    dsn = get_settings().database.get_connection_string()
+    with psycopg2.connect(dsn) as conn:
+        return load(table=config.table, rows=processed_rows, mode=config.mode, pk=config.pk, conn=conn)
+return load(table=config.table, rows=processed_rows, mode=config.mode, pk=config.pk, conn=None)
+```
 
-@op
-def process_trustee_performance_op(rows: list[dict]) -> list[dict]:
-    models = process(rows, data_source="dagster")
-    return [m.model_dump() for m in models]
-
-@op
-def load_op(table: str, rows: list[dict], mode: str = "delete_insert", pk: list[str] | None = None, plan_only: bool = True) -> dict:
-    conn = None if plan_only else ...  # look up real connection when enabled
-    return load(table=table, rows=rows, mode=mode, pk=pk, conn=conn)
-
-@job
-def trustee_performance_job():
-    # Wire a single file for simplicity; expand as needed
-    discovered = discover_files_op.alias("discover_trustee_files")("trustee_performance")
-    # In a full job, map over discovered; for now assume one file
-    rows = read_excel_op(discovered[0])
-    processed = process_trustee_performance_op(rows)
-    load_op("trustee_performance", processed, pk=["report_date", "plan_code", "company_code"], plan_only=True)
+- Flag normalization in jobs.py:
+```python
+effective_plan_only = not args.execute if hasattr(args, "execute") else getattr(args, "plan_only", True)
+# Use effective_plan_only for run_config and for display/printing logic
+run_config["ops"]["load_op"]["config"]["plan_only"] = effective_plan_only
+if effective_plan_only:
+    # show SQL plans if available
 ```
 
 ## DOCUMENTATION
-- Dagster ops & jobs: https://docs.dagster.io/concepts/ops-jobs-graphs/ops
-- Dagster execution (in‑process): https://docs.dagster.io/guides/dagster/run-a-job
-- Pydantic v2: https://docs.pydantic.dev/latest/
-- Internal constraints: `CLAUDE.md`, `AGENTS.md`, and `docs/DoR/INITIAL_00.md`
+- Dagster ops: https://docs.dagster.io/concepts/ops-jobs-graphs/ops
+- Dagster in‑process execution: https://docs.dagster.io/guides/dagster/run-a-job
+- Pydantic v2 validators: https://docs.pydantic.dev/latest/concepts/validators/
+- Psycopg2 connection: https://www.psycopg.org/docs/module.html#psycopg2.connect
 
 ## INTEGRATION POINTS
-- Config/ENV:
-  - Use `get_settings()` for `data_base_dir` and `data_sources_config`.
-  - Add to `data_sources.yml` under `trustee_performance`:
-    ```yaml
-    table: trustee_performance
-    pk: [report_date, plan_code, company_code]
-    ```
-- File discovery: `DataSourceConnector.discover(domain)` → pick one latest file (already implemented).
-- Excel read: `read_excel_rows(path, sheet)`.
-- Domain process: `process(rows) -> list[TrusteePerformanceOut]` → convert to `list[dict]` for loader.
-- Loader: `load(table, rows, mode, pk, conn=None)` → plan‑only by default (no DB during tests).
-- CLI: A `main()` in `jobs.py` that parses `--domain`, `--plan-only`, `--mode`, and runs `execute_in_process()`.
+- `jobs.py`: parse `--execute`, `--max-files`; compute `effective_plan_only`; wire new combined op or adjust sequence to produce a single accumulated list for `load_op`.
+- `ops.py`: implement `read_and_process_trustee_files_op` (or enhance existing ops accordingly); keep existing ops for backward‑compatibility.
+- `load_op`: adopt connection context manager; maintain plan‑only default.
 
-## DATA CONTRACTS (op I/O)
-- `discover_files_op(domain: str) -> list[str]` (paths)
-- `read_excel_op(path: str, sheet: int|str=0) -> list[dict]` (rows)
-- `process_trustee_performance_op(rows: list[dict]) -> list[dict]` (validated rows suitable for loader)
-- `load_op(table: str, rows: list[dict], mode: str, pk: list[str], plan_only: bool) -> dict` (loader result/plan)
+## GOTCHAS & QUIRKS
+- Without dynamic mapping, iteration must occur inside an op or via a fixed slice. Prefer the new combined op to keep the graph static.
+- Preserve JSON‑serializable data contracts between ops.
+- Maintain safe default (plan‑only) and guard execution behind `--execute`.
+- Ensure tests do not require a live DB; mock psycopg2 in execute path tests.
 
-## GOTCHAS & LIBRARY QUIRKS
-- Keep op inputs/outputs JSON‑serializable; don’t pass Pydantic models directly between ops.
-- Avoid importing psycopg2 in default code paths used by tests; keep `plan_only=True` by default.
-- Use small, single‑purpose ops; no global state.
-- If multiple files are discovered, either select latest (existing logic) or iterate later; for MVP, a single file is fine.
-
-## IMPLEMENTATION NOTES
-```
-src/work_data_hub/orchestration/
-  __init__.py
-  ops.py      # four ops above
-  jobs.py     # job + CLI (main)
-```
-- CLI patterns (choose one):
-  - Simple module entry: `uv run python -m src.work_data_hub.orchestration.jobs --domain trustee_performance --plan-only`
-  - Or add a `console_scripts` entry later (out of scope here).
-- `jobs.py::main()`:
-  - Parse args: `--domain`, `--mode {delete_insert,append}`, `--plan-only`, `--sheet`.
-  - Build run config if needed; call `trustee_performance_job.execute_in_process()` and print result/plan.
-- Add minimal smoke test invoking `execute_in_process()` with a tmp data directory + config.
-
-## VALIDATION GATES (must pass)
+## VALIDATION GATES
 ```bash
 uv run ruff check src/ --fix
 uv run mypy src/
 uv run pytest -v
 ```
-Optional local run examples (no DB):
-```bash
-uv run python -m src.work_data_hub.orchestration.jobs --domain trustee_performance --plan-only
+Optional (local):
+```powershell
+.\.venv\Scripts\Activate.ps1
+uv run python -m src.work_data_hub.orchestration.jobs --execute --max-files 1  # requires DB env
+uv run python -m src.work_data_hub.orchestration.jobs --max-files 2            # plan‑only
 ```
 
 ## ACCEPTANCE CRITERIA
-- [ ] `src/work_data_hub/orchestration/{ops.py,jobs.py}` created with four ops and a job wiring the slice
-- [ ] Ops exchange JSON‑serializable payloads; no Pydantic models across op boundaries
-- [ ] `data_sources.yml` extended with `table` and `pk` for trustee_performance
-- [ ] CLI runs the job in‑process and prints loader plan (DELETE then INSERT) without DB
-- [ ] Add smoke test covering in‑process execution path (plan‑only)
-- [ ] Ruff, mypy, and pytest all green
+- [ ] Multi‑file: job processes up to N files and loads once; records are accumulated correctly.
+- [ ] Flags: one source of truth for execution mode; help text documents behavior; display reflects effective mode.
+- [ ] DB connection uses a context manager; no persistent open connection on errors.
+- [ ] Tests: multi‑file accumulation (mocked), CLI display consistency, execute path (psycopg2 mocked).
+- [ ] Ruff, mypy, pytest all pass.
 
 ## ROLLOUT & RISK
-- Start with `plan_only=True` default to avoid DB coupling; enable DB execution via a flag later.
-- Keep CLI and ops small; future work can add resources/schedules.
-- If config is missing `table`/`pk`, `load_op` should raise a clear error.
+- Keeps safe defaults; explicit `--execute` prevents accidental DB writes.
+- No DAG structure changes beyond a new combined op; minimal risk.
+- Future: can replace combined op with DynamicOutput mapping when scaling.
 
 ## APPENDICES
-Minimal `jobs.py` main skeleton:
-```python
-import argparse
-from dagster import execute_job
-from .ops import discover_files_op, read_excel_op, process_trustee_performance_op, load_op
-from .jobs import trustee_performance_job
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--domain", default="trustee_performance")
-    parser.add_argument("--mode", default="delete_insert", choices=["delete_insert", "append"])
-    parser.add_argument("--plan-only", action="store_true")
-    args = parser.parse_args()
-
-    # For MVP, rely on default job config and plan-only behavior.
-    result = trustee_performance_job.execute_in_process()
-    print({"success": result.success})
-
-if __name__ == "__main__":
-    main()
+Sample env (do not commit secrets):
+```powershell
+$env:WDH_DATABASE__HOST = "localhost"
+$env:WDH_DATABASE__PORT = "5432"
+$env:WDH_DATABASE__USER = "wdh_user"
+$env:WDH_DATABASE__PASSWORD = "secret"
+$env:WDH_DATABASE__DB = "wdh"
+# Or URI:
+$env:WDH_DATABASE__URI = "postgresql://wdh_user:secret@localhost:5432/wdh"
 ```
+

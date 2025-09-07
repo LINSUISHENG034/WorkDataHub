@@ -7,18 +7,59 @@ and proper error handling.
 """
 
 import logging
+from pathlib import Path
 from typing import Any, Dict, List
 
+import yaml
 from dagster import Config, OpExecutionContext, op
 from pydantic import field_validator, model_validator
 
 from ..config.settings import get_settings
 from ..domain.trustee_performance.service import process
 from ..io.connectors.file_connector import DataSourceConnector
-from ..io.loader.warehouse_loader import load
+from ..io.loader.warehouse_loader import DataWarehouseLoaderError, load
 from ..io.readers.excel_reader import read_excel_rows
 
 logger = logging.getLogger(__name__)
+
+
+def _load_valid_domains() -> List[str]:
+    """
+    Load valid domain names from data_sources.yml configuration.
+
+    Returns:
+        List of valid domain names sorted alphabetically
+
+    Notes:
+        - Returns fallback ["trustee_performance"] if config cannot be loaded
+        - Logs warnings for missing config or empty domains
+        - Handles exceptions gracefully to prevent complete failure
+    """
+    try:
+        settings = get_settings()
+        config_path = Path(settings.data_sources_config)
+
+        if not config_path.exists():
+            logger.warning(f"Data sources config not found: {config_path}")
+            return ["trustee_performance"]  # Fallback to current default
+
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+
+        domains = data.get("domains") or {}
+        valid_domains = sorted(domains.keys())
+
+        if not valid_domains:
+            logger.warning("No domains found in configuration, using default")
+            return ["trustee_performance"]
+
+        logger.debug(f"Loaded {len(valid_domains)} valid domains: {valid_domains}")
+        return valid_domains
+
+    except Exception as e:
+        logger.error(f"Failed to load domains from configuration: {e}")
+        # Fallback to prevent complete failure
+        return ["trustee_performance"]
 
 
 class DiscoverFilesConfig(Config):
@@ -29,8 +70,8 @@ class DiscoverFilesConfig(Config):
     @field_validator("domain")
     @classmethod
     def validate_domain(cls, v: str) -> str:
-        """Validate domain exists in configuration."""
-        valid_domains = ["trustee_performance"]  # Could load from settings
+        """Validate domain exists in data_sources.yml configuration."""
+        valid_domains = _load_valid_domains()
         if v not in valid_domains:
             raise ValueError(f"Domain '{v}' not supported. Valid: {valid_domains}")
         return v
@@ -54,9 +95,12 @@ def discover_files_op(context: OpExecutionContext, config: DiscoverFilesConfig) 
     try:
         discovered = connector.discover(config.domain)
 
-        # Simple logging 
+        # Enhanced logging with metadata
+        settings = get_settings()
         context.log.info(
-            f"File discovery completed for domain '{config.domain}' - found {len(discovered)} files"
+            f"File discovery completed - domain: {config.domain}, "
+            f"found: {len(discovered)} files, "
+            f"config: {settings.data_sources_config}"
         )
 
         # CRITICAL: Return JSON-serializable paths, not DiscoveredFile objects
@@ -99,15 +143,17 @@ def read_excel_op(
     if not file_paths:
         context.log.warning("No file paths provided to read_excel_op")
         return []
-    
+
     # For MVP: process first file only
     file_path = file_paths[0]
-    
+
     try:
         rows = read_excel_rows(file_path, sheet=config.sheet)
 
         context.log.info(
-            f"Excel reading completed - {len(rows)} rows from {file_path}"
+            f"Excel reading completed - file: {file_path}, "
+            f"sheet: {config.sheet}, rows: {len(rows)}, "
+            f"columns: {list(rows[0].keys()) if rows else []}"
         )
 
         return rows
@@ -134,7 +180,7 @@ def process_trustee_performance_op(
     """
     # Use first file path for data_source metadata
     file_path = file_paths[0] if file_paths else "unknown"
-    
+
     try:
         # Process using existing domain service
         processed_models = process(excel_rows, data_source=file_path)
@@ -143,7 +189,9 @@ def process_trustee_performance_op(
         result_dicts = [model.model_dump() for model in processed_models]
 
         context.log.info(
-            f"Domain processing completed - {len(result_dicts)} records from {file_path}"
+            f"Domain processing completed - source: {file_path}, "
+            f"input_rows: {len(excel_rows)}, output_records: {len(result_dicts)}, "
+            f"domain: trustee_performance"
         )
 
         return result_dicts
@@ -196,8 +244,26 @@ def load_op(
         Dictionary with execution metadata or SQL plans
     """
     try:
-        # Connection is None for plan_only mode (testing)
-        conn = None if config.plan_only else None  # TODO: get DB connection when needed
+        conn = None  # Default: plan-only mode
+        if not config.plan_only:
+            try:
+                import psycopg2
+                settings = get_settings()
+                dsn = settings.database.get_connection_string()
+
+                context.log.info(f"Connecting to database for execution (table: {config.table})")
+                conn = psycopg2.connect(dsn)
+
+            except ImportError as e:
+                raise DataWarehouseLoaderError(
+                    "psycopg2 not available for database execution. "
+                    "Install with: uv sync"
+                ) from e
+            except Exception as e:
+                raise DataWarehouseLoaderError(
+                    f"Database connection failed: {e}. "
+                    "Check WDH_DATABASE__* environment variables."
+                ) from e
 
         result = load(
             table=config.table,
@@ -207,10 +273,13 @@ def load_op(
             conn=conn,
         )
 
-        # Simple logging
-        mode_text = "PLAN-ONLY" if config.plan_only else "EXECUTED"
+        # Enhanced logging with execution mode
+        mode_text = "EXECUTED" if not config.plan_only else "PLAN-ONLY"
         context.log.info(
-            f"Load operation completed ({mode_text}) - {result.get('inserted', 0)} rows to {config.table}"
+            f"Load operation completed ({mode_text}) - "
+            f"table: {config.table}, mode: {config.mode}, "
+            f"deleted: {result.get('deleted', 0)}, inserted: {result.get('inserted', 0)}, "
+            f"batches: {result.get('batches', 0)}"
         )
 
         return result

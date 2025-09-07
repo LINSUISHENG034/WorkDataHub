@@ -22,6 +22,7 @@ from src.work_data_hub.orchestration.ops import (
     DiscoverFilesConfig,
     LoadConfig,
     ReadExcelConfig,
+    _load_valid_domains,
     discover_files_op,
     load_op,
     process_trustee_performance_op,
@@ -333,3 +334,149 @@ class TestLoadOp:
 
             assert result["mode"] == "append"
             assert result["deleted"] == 0
+
+    def test_load_valid_domains_from_yaml(self, tmp_path):
+        """Test _load_valid_domains loads from YAML correctly."""
+        config_data = {
+            "domains": {
+                "trustee_performance": {"table": "trustee_performance"},
+                "annuity_performance": {"table": "annuity_performance"}
+            }
+        }
+        config_file = tmp_path / "test_config.yml"
+        with open(config_file, "w", encoding="utf-8") as f:
+            yaml.dump(config_data, f)
+            
+        with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
+            mock_settings.return_value.data_sources_config = str(config_file)
+            
+            domains = _load_valid_domains()
+            
+            assert domains == ["annuity_performance", "trustee_performance"]
+
+    def test_load_valid_domains_missing_file(self, tmp_path):
+        """Test _load_valid_domains handles missing config file gracefully."""
+        missing_file = tmp_path / "nonexistent.yml"
+        
+        with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
+            mock_settings.return_value.data_sources_config = str(missing_file)
+            
+            domains = _load_valid_domains()
+            
+            # Should fallback to default
+            assert domains == ["trustee_performance"]
+
+    def test_load_valid_domains_empty_config(self, tmp_path):
+        """Test _load_valid_domains handles empty domains gracefully."""
+        config_data = {"domains": {}}
+        config_file = tmp_path / "empty_config.yml"
+        with open(config_file, "w", encoding="utf-8") as f:
+            yaml.dump(config_data, f)
+            
+        with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
+            mock_settings.return_value.data_sources_config = str(config_file)
+            
+            domains = _load_valid_domains()
+            
+            # Should fallback to default when no domains found
+            assert domains == ["trustee_performance"]
+
+    def test_load_valid_domains_invalid_yaml(self, tmp_path):
+        """Test _load_valid_domains handles invalid YAML gracefully."""
+        config_file = tmp_path / "invalid.yml"
+        with open(config_file, "w", encoding="utf-8") as f:
+            f.write("invalid: yaml: content: [")
+            
+        with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
+            mock_settings.return_value.data_sources_config = str(config_file)
+            
+            domains = _load_valid_domains()
+            
+            # Should fallback to default on YAML parse error
+            assert domains == ["trustee_performance"]
+
+    def test_load_op_execute_mode_mocked(self):
+        """Test load_op with execute=True using mocked psycopg2."""
+        processed_rows = [{"col": "value"}]
+        
+        mock_conn = Mock()
+        mock_result = {
+            "mode": "delete_insert", 
+            "table": "test_table",
+            "deleted": 1,
+            "inserted": 1,
+            "batches": 1
+        }
+        
+        # Mock the dynamic import and psycopg2.connect
+        mock_psycopg2 = Mock()
+        mock_psycopg2.connect.return_value = mock_conn
+        
+        def mock_import(name, *args, **kwargs):
+            if name == "psycopg2":
+                return mock_psycopg2
+            return __import__(name, *args, **kwargs)
+        
+        with patch("builtins.__import__", side_effect=mock_import):
+            with patch("src.work_data_hub.orchestration.ops.load") as mock_load:
+                mock_load.return_value = mock_result
+                
+                with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
+                    mock_db = Mock()
+                    mock_db.get_connection_string.return_value = "postgresql://test"
+                    mock_settings.return_value.database = mock_db
+                    
+                    context = build_op_context()
+                    config = LoadConfig(plan_only=False, table="test_table", pk=["id"])
+                    result = load_op(context, config, processed_rows)
+                    
+                    # Verify connection was created and passed to load()
+                    mock_psycopg2.connect.assert_called_once_with("postgresql://test")
+                    mock_load.assert_called_once_with(
+                        table="test_table",
+                        rows=processed_rows,
+                        mode="delete_insert",
+                        pk=["id"],
+                        conn=mock_conn
+                    )
+                    assert result == mock_result
+
+    def test_load_op_execute_mode_psycopg2_not_available(self):
+        """Test load_op with execute=True when psycopg2 is not available."""
+        processed_rows = [{"col": "value"}]
+        
+        # Mock import to raise ImportError for psycopg2
+        def mock_import(name, *args, **kwargs):
+            if name == "psycopg2":
+                raise ImportError("No module named 'psycopg2'")
+            return __import__(name, *args, **kwargs)
+        
+        with patch("builtins.__import__", side_effect=mock_import):
+            context = build_op_context()
+            config = LoadConfig(plan_only=False, table="test_table", pk=["id"])
+            
+            with pytest.raises(Exception) as exc_info:
+                load_op(context, config, processed_rows)
+                
+            assert "psycopg2 not available for database execution" in str(exc_info.value)
+
+    def test_load_op_execute_mode_connection_failed(self):
+        """Test load_op with execute=True when database connection fails."""
+        processed_rows = [{"col": "value"}]
+        
+        with patch("src.work_data_hub.orchestration.ops.psycopg2", create=True) as mock_psycopg2:
+            mock_psycopg2.connect.side_effect = Exception("Connection refused")
+            
+            with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
+                mock_db = Mock()
+                mock_db.get_connection_string.return_value = "postgresql://test"
+                mock_settings.return_value.database = mock_db
+                
+                context = build_op_context()
+                config = LoadConfig(plan_only=False, table="test_table", pk=["id"])
+                
+                with pytest.raises(Exception) as exc_info:
+                    load_op(context, config, processed_rows)
+                    
+                assert "Database connection failed" in str(exc_info.value)
+                assert "Check WDH_DATABASE__* environment variables" in str(exc_info.value)

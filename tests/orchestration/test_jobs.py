@@ -129,7 +129,7 @@ class TestBuildRunConfig:
         args = Mock()
         args.domain = "trustee_performance"
         args.mode = "delete_insert"
-        args.plan_only = True
+        args.execute = False  # Changed from plan_only=True to execute=False 
         args.sheet = 0
 
         with patch("src.work_data_hub.orchestration.jobs.get_settings") as mock_settings:
@@ -199,6 +199,41 @@ class TestBuildRunConfig:
             load_config = result["ops"]["load_op"]["config"]
             assert load_config["table"] == "trustee_performance"
             assert load_config["pk"] == []
+            
+    def test_build_run_config_execute_flag_inversion(self, tmp_path):
+        """Test that execute flag is properly inverted to plan_only."""
+        config_data = {
+            "domains": {
+                "trustee_performance": {
+                    "table": "trustee_performance", 
+                    "pk": ["id"]
+                }
+            }
+        }
+        
+        config_file = tmp_path / "test_config.yml"
+        with open(config_file, "w", encoding="utf-8") as f:
+            yaml.dump(config_data, f)
+            
+        with patch("src.work_data_hub.orchestration.jobs.get_settings") as mock_settings:
+            mock_settings.return_value.data_sources_config = str(config_file)
+            
+            # Test execute=True -> plan_only=False
+            args = Mock()
+            args.domain = "trustee_performance"
+            args.mode = "delete_insert"
+            args.execute = True  # Execute mode
+            args.sheet = 0
+            
+            result = build_run_config(args)
+            load_config = result["ops"]["load_op"]["config"]
+            assert load_config["plan_only"] is False
+            
+            # Test execute=False -> plan_only=True  
+            args.execute = False  # Plan-only mode
+            result = build_run_config(args)
+            load_config = result["ops"]["load_op"]["config"]
+            assert load_config["plan_only"] is True
 
 
 class TestCLIMain:
@@ -348,3 +383,98 @@ class TestCLIMain:
                     assert "2. INSERT:" in output
                     assert "Parameters: 1 values" in output
                     assert "Parameters: 2 values" in output
+                    
+    def test_cli_execute_flag(self):
+        """Test CLI --execute flag sets plan_only=False."""
+        test_args = ["jobs.py", "--execute", "--domain", "trustee_performance"]
+        
+        with patch("sys.argv", test_args):
+            with patch("src.work_data_hub.orchestration.jobs.build_run_config") as mock_build:
+                mock_build.return_value = {}
+                
+                # Mock job execution to avoid complexity
+                with patch("src.work_data_hub.orchestration.jobs.trustee_performance_job.execute_in_process") as mock_execute:
+                    mock_result = Mock()
+                    mock_result.success = True
+                    mock_result.output_for_node.return_value = {
+                        "mode": "delete_insert",
+                        "table": "trustee_performance",
+                        "deleted": 0,
+                        "inserted": 0,
+                        "batches": 0,
+                    }
+                    mock_execute.return_value = mock_result
+                    
+                    captured_output = io.StringIO()
+                    with patch("sys.stdout", captured_output):
+                        result = main()
+                        
+                    assert result == 0
+                    output = captured_output.getvalue()
+                    assert "Execute: True" in output
+                    assert "Plan-only: False" in output
+                    
+    def test_cli_max_files_flag(self):
+        """Test CLI --max-files flag is parsed correctly."""
+        test_args = ["jobs.py", "--max-files", "5", "--domain", "trustee_performance"]
+        
+        with patch("sys.argv", test_args):
+            with patch("src.work_data_hub.orchestration.jobs.build_run_config") as mock_build:
+                mock_build.return_value = {}
+                
+                with patch("src.work_data_hub.orchestration.jobs.trustee_performance_job.execute_in_process") as mock_execute:
+                    mock_result = Mock()
+                    mock_result.success = True
+                    mock_result.output_for_node.return_value = {
+                        "mode": "delete_insert",
+                        "table": "trustee_performance",
+                        "deleted": 0,
+                        "inserted": 0,
+                        "batches": 0,
+                    }
+                    mock_execute.return_value = mock_result
+                    
+                    captured_output = io.StringIO()
+                    with patch("sys.stdout", captured_output):
+                        result = main()
+                        
+                    assert result == 0
+                    output = captured_output.getvalue()
+                    assert "Max files: 5" in output
+                    
+    def test_cli_execute_and_max_files_together(self):
+        """Test CLI --execute and --max-files flags work together."""
+        test_args = [
+            "jobs.py", 
+            "--execute", 
+            "--max-files", "3",
+            "--domain", "trustee_performance",
+            "--mode", "append"
+        ]
+        
+        with patch("sys.argv", test_args):
+            with patch("src.work_data_hub.orchestration.jobs.build_run_config") as mock_build:
+                mock_build.return_value = {}
+                
+                with patch("src.work_data_hub.orchestration.jobs.trustee_performance_job.execute_in_process") as mock_execute:
+                    mock_result = Mock()
+                    mock_result.success = True
+                    mock_result.output_for_node.return_value = {
+                        "mode": "append",
+                        "table": "trustee_performance", 
+                        "deleted": 0,
+                        "inserted": 10,
+                        "batches": 1,
+                    }
+                    mock_execute.return_value = mock_result
+                    
+                    captured_output = io.StringIO()
+                    with patch("sys.stdout", captured_output):
+                        result = main()
+                        
+                    assert result == 0
+                    output = captured_output.getvalue()
+                    assert "Execute: True" in output
+                    assert "Plan-only: False" in output
+                    assert "Max files: 3" in output
+                    assert "Mode: append" in output

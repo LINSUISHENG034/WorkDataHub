@@ -24,13 +24,13 @@ def trustee_performance_job():
 
     This job orchestrates the complete ETL pipeline:
     1. Discover files matching domain patterns
-    2. Read Excel data from discovered files  
+    2. Read Excel data from discovered files
     3. Process data through domain service validation
     4. Load data to database or generate execution plan
     """
     # Wire ops together - Dagster handles dependency graph
     discovered_paths = discover_files_op()
-    
+
     # Note: For MVP, we'll modify the ops to handle the first file selection
     # The read_excel_op will internally select the first file from the list
     excel_rows = read_excel_op(discovered_paths)
@@ -74,7 +74,7 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
                     "table": table,
                     "mode": args.mode,
                     "pk": pk,
-                    "plan_only": args.plan_only,
+                    "plan_only": not args.execute,  # Invert execute flag
                 }
             },
         }
@@ -115,6 +115,20 @@ def main():
         "--sheet", type=int, default=0, help="Excel sheet index to process"
     )
 
+    parser.add_argument(
+        "--execute",
+        action="store_true",
+        default=False,
+        help="Execute against database (default: plan-only mode for safety)"
+    )
+
+    parser.add_argument(
+        "--max-files",
+        type=int,
+        default=1,
+        help="Maximum number of discovered files to process (default: 1)"
+    )
+
     # Advanced options
     parser.add_argument(
         "--debug",
@@ -135,8 +149,10 @@ def main():
     print("🚀 Starting trustee performance job...")
     print(f"   Domain: {args.domain}")
     print(f"   Mode: {args.mode}")
-    print(f"   Plan-only: {args.plan_only}")
+    print(f"   Execute: {args.execute}")
+    print(f"   Plan-only: {not args.execute}")
     print(f"   Sheet: {args.sheet}")
+    print(f"   Max files: {args.max_files}")
     print("=" * 50)
 
     # Execute job with appropriate settings
