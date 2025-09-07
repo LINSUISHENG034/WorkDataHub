@@ -10,32 +10,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic_settings import BaseSettings
-
-
-class DatabaseSettings(BaseModel):
-    """Database connection configuration."""
-
-    model_config = ConfigDict(
-        env_prefix="WDH_DATABASE__",
-        case_sensitive=False,
-    )
-
-    host: str = Field(default="localhost", description="Database host")
-    port: int = Field(default=5432, description="Database port")
-    user: str = Field(default="user", description="Database user")
-    password: str = Field(default="password", description="Database password")
-    db: str = Field(default="database", description="Database name")
-
-    # Optional URI override
-    uri: Optional[str] = Field(None, description="Complete database URI")
-
-    def get_connection_string(self) -> str:
-        """Get PostgreSQL connection string."""
-        if self.uri:
-            return self.uri
-        return f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.db}"
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -79,17 +55,27 @@ class Settings(BaseSettings):
         default=None, description="Limit processing to N rows for development (None = no limit)"
     )
 
-    # Database configuration
-    database: DatabaseSettings = Field(
-        default_factory=DatabaseSettings,
-        description="Database connection settings"
-    )
+    # Database configuration - nested settings with WDH_DATABASE__ prefix
+    database_host: str = Field(default="localhost", description="Database host")
+    database_port: int = Field(default=5432, description="Database port")
+    database_user: str = Field(default="user", description="Database user")
+    database_password: str = Field(default="password", description="Database password")
+    database_db: str = Field(default="database", description="Database name")
+    database_uri: Optional[str] = Field(None, description="Complete database URI")
 
-    model_config = ConfigDict(
+    def get_database_connection_string(self) -> str:
+        """Get PostgreSQL connection string."""
+        if self.database_uri:
+            return self.database_uri
+        return f"postgresql://{self.database_user}:{self.database_password}@{self.database_host}:{self.database_port}/{self.database_db}"
+
+    model_config = SettingsConfigDict(
         env_prefix="WDH_",
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        # Nested settings using double underscore
+        env_nested_delimiter="__",
     )
 
 

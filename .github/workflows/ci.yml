@@ -1,0 +1,149 @@
+name: CI
+
+# Run on pushes to main branch and all pull requests
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+# Restrict GITHUB_TOKEN permissions for security
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint with Ruff
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v1
+        with:
+          enable-cache: true
+      
+      - name: Install dependencies
+        run: uv sync --dev
+      
+      - name: Run Ruff linter
+        uses: astral-sh/ruff-action@v0.4.6
+        with:
+          src: "./src"
+          args: "check"
+
+  type-check:
+    name: Type Check with MyPy
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v1
+        with:
+          enable-cache: true
+      
+      - name: Install dependencies
+        run: uv sync --dev
+      
+      - name: Run MyPy type checking
+        run: uv run mypy src/
+
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v1
+        with:
+          enable-cache: true
+      
+      - name: Install dependencies
+        run: uv sync --dev
+      
+      - name: Run tests (excluding postgres)
+        run: uv run pytest -v -m "not postgres" --cov=src --cov-report=xml
+      
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        if: matrix.python-version == '3.12'
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  security-scan:
+    name: Security Scan (Gitleaks)
+    runs-on: ubuntu-latest
+    continue-on-error: true  # Non-blocking to avoid disruption initially
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for comprehensive scanning
+      
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Combined job that depends on all checks passing
+  ci-complete:
+    name: CI Complete
+    runs-on: ubuntu-latest
+    needs: [lint, type-check, test, security-scan]
+    if: always()
+    
+    steps:
+      - name: Check all jobs succeeded
+        run: |
+          echo "=== CI Job Results ==="
+          echo "Lint: ${{ needs.lint.result }}"
+          echo "Type Check: ${{ needs.type-check.result }}"
+          echo "Test: ${{ needs.test.result }}"
+          echo "Security Scan: ${{ needs.security-scan.result }} (non-blocking)"
+          
+          if [[ "${{ needs.lint.result }}" != "success" || \
+                "${{ needs.type-check.result }}" != "success" || \
+                "${{ needs.test.result }}" != "success" ]]; then
+            echo "❌ One or more critical CI jobs failed"
+            exit 1
+          else
+            echo "✅ All critical CI jobs passed successfully"
+            if [[ "${{ needs.security-scan.result }}" == "success" ]]; then
+              echo "✅ Security scan also passed"
+            else
+              echo "⚠️  Security scan failed (non-blocking)"
+            fi
+          fi

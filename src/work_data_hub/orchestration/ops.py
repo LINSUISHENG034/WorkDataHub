@@ -324,7 +324,7 @@ def load_op(
             try:
                 import psycopg2
                 settings = get_settings()
-                dsn = settings.database.get_connection_string()
+                dsn = settings.get_database_connection_string()
 
                 context.log.info(f"Connecting to database for execution (table: {config.table})")
 

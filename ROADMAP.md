@@ -8,10 +8,10 @@ Build a reliable, declarative, and testable data processing platform that replac
 
 | ID | Epic | Feature/Task | Status | Dependencies | PRP_Link |
 | :---- | :---- | :---- | :---- | :---- | :---- |
-| R-001 | M0 | Research and document secrets policy (env vars, .env.example, scanning) | READY_FOR_PRP | - | - |
-| C-001 | M0 | Add `.env.example` with `WDH_*` vars and docs on secrets handling | PENDING | R-001 | - |
-| C-002 | M0 | Set up GitHub Actions CI (ruff, mypy, pytest) | READY_FOR_PRP | - | - |
-| C-003 | M0 | Add optional secret scanning (e.g., pre-commit/gitleaks) | PENDING | R-001 | - |
+| R-001 | M0 | Research and document secrets policy (env vars, .env.example, scanning) | COMPLETED | - | P-006 |
+| C-001 | M0 | Add `.env.example` with `WDH_*` vars and docs on secrets handling | COMPLETED | R-001 | P-006 |
+| C-002 | M0 | Set up GitHub Actions CI (ruff, mypy, pytest) | COMPLETED | - | P-006 |
+| C-003 | M0 | Add optional secret scanning (e.g., pre-commit/gitleaks) | COMPLETED | R-001 | P-006 |
 | F-001 | M0 | Establish end-to-end test baseline (plan-only path) | COMPLETED | - | P-001 |
 
 <!--

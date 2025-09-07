@@ -11,11 +11,11 @@ legacy/
 archive/
 .kiro/
 .claude/
-.github/
 .serena/
 .trae/
 .ruff_cache/
 .devcontainer/
+sample_data/
 
 # Python
 __pycache__/
