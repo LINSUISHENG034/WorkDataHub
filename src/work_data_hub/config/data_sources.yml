@@ -27,6 +27,10 @@ domains:
     # Excel sheet to process (0 = first sheet)
     sheet: 0
     
+    # Database table configuration for loader
+    table: "trustee_performance"
+    pk: ["report_date", "plan_code", "company_code"]
+    
     # Data quality requirements
     required_columns:
       - "年"           # Year column

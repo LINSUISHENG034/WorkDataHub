@@ -1,0 +1,197 @@
+"""
+Dagster jobs and CLI interface for WorkDataHub ETL orchestration.
+
+This module provides the main trustee_performance_job that composes the four ops
+into an end-to-end workflow, plus a CLI interface for local execution with
+comprehensive argument support and structured output.
+"""
+
+import argparse
+import sys
+from typing import Any, Dict
+
+import yaml
+from dagster import DagsterInstance, job
+
+from ..config.settings import get_settings
+from .ops import discover_files_op, load_op, process_trustee_performance_op, read_excel_op
+
+
+@job
+def trustee_performance_job():
+    """
+    End-to-end trustee performance processing job.
+
+    This job orchestrates the complete ETL pipeline:
+    1. Discover files matching domain patterns
+    2. Read Excel data from discovered files  
+    3. Process data through domain service validation
+    4. Load data to database or generate execution plan
+    """
+    # Wire ops together - Dagster handles dependency graph
+    discovered_paths = discover_files_op()
+    
+    # Note: For MVP, we'll modify the ops to handle the first file selection
+    # The read_excel_op will internally select the first file from the list
+    excel_rows = read_excel_op(discovered_paths)
+    processed_data = process_trustee_performance_op(excel_rows, discovered_paths)
+    load_op(processed_data)  # No return needed
+
+
+def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
+    """
+    Build Dagster run_config from CLI arguments.
+
+    Args:
+        args: Parsed command line arguments
+
+    Returns:
+        Dictionary with nested configuration for all ops
+    """
+    # Load table/pk from data_sources.yml if needed
+    settings = get_settings()
+
+    try:
+        with open(settings.data_sources_config, "r", encoding="utf-8") as f:
+            data_sources = yaml.safe_load(f)
+
+        domain_config = data_sources.get("domains", {}).get(args.domain, {})
+        table = domain_config.get("table", args.domain)  # Fallback to domain name
+        pk = domain_config.get("pk", [])  # Empty list if not defined
+
+    except Exception as e:
+        print(f"Warning: Could not load data sources config: {e}")
+        table = args.domain
+        pk = []
+
+    run_config = {
+        "ops": {
+            "discover_files_op": {"config": {"domain": args.domain}},
+            "read_excel_op": {"config": {"sheet": args.sheet}},
+            # process_trustee_performance_op has no config
+            "load_op": {
+                "config": {
+                    "table": table,
+                    "mode": args.mode,
+                    "pk": pk,
+                    "plan_only": args.plan_only,
+                }
+            },
+        }
+    }
+
+    return run_config
+
+
+def main():
+    """
+    CLI entry point for local execution.
+
+    Provides comprehensive argument parsing and execution with structured output,
+    error handling, and support for both testing and production modes.
+    """
+    parser = argparse.ArgumentParser(
+        description="Run WorkDataHub trustee performance job",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+
+    # Core arguments
+    parser.add_argument(
+        "--domain", default="trustee_performance", help="Domain to process"
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["delete_insert", "append"],
+        default="delete_insert",
+        help="Load mode for database operations",
+    )
+    parser.add_argument(
+        "--plan-only",
+        action="store_true",
+        default=True,
+        help="Generate execution plan without database connection",
+    )
+    parser.add_argument(
+        "--sheet", type=int, default=0, help="Excel sheet index to process"
+    )
+
+    # Advanced options
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug logging and persist run in Dagster UI",
+    )
+    parser.add_argument(
+        "--raise-on-error",
+        action="store_true",
+        help="Raise exceptions immediately (useful for testing)",
+    )
+
+    args = parser.parse_args()
+
+    # Build run configuration from CLI arguments
+    run_config = build_run_config(args)
+
+    print("🚀 Starting trustee performance job...")
+    print(f"   Domain: {args.domain}")
+    print(f"   Mode: {args.mode}")
+    print(f"   Plan-only: {args.plan_only}")
+    print(f"   Sheet: {args.sheet}")
+    print("=" * 50)
+
+    # Execute job with appropriate settings
+    try:
+        # Use ephemeral instance for debug mode to avoid DAGSTER_HOME requirement
+        instance = DagsterInstance.ephemeral() if args.debug else None
+
+        result = trustee_performance_job.execute_in_process(
+            run_config=run_config, instance=instance, raise_on_error=args.raise_on_error
+        )
+
+        # Report results
+        print(f"✅ Job completed successfully: {result.success}")
+
+        if result.success:
+            # Extract and display execution summary
+            load_result = result.output_for_node("load_op")
+
+            if args.plan_only and "sql_plans" in load_result:
+                print("\n📋 SQL Execution Plan:")
+                print("-" * 30)
+                for i, (op_type, sql, params) in enumerate(load_result["sql_plans"], 1):
+                    print(f"{i}. {op_type}:")
+                    print(f"   {sql}")
+                    if params:
+                        print(f"   Parameters: {len(params)} values")
+                    print()
+
+            # Display execution statistics
+            print("\n📊 Execution Summary:")
+            print(f"   Table: {load_result.get('table', 'N/A')}")
+            print(f"   Mode: {load_result.get('mode', 'N/A')}")
+            print(f"   Deleted: {load_result.get('deleted', 0)} rows")
+            print(f"   Inserted: {load_result.get('inserted', 0)} rows")
+            print(f"   Batches: {load_result.get('batches', 0)}")
+
+        else:
+            print("❌ Job completed with failures")
+            if not args.raise_on_error:
+                # Print error details when not raising
+                for event in result.all_node_events:
+                    if event.is_failure:
+                        print(f"   Error in {event.node_name}: {event.event_specific_data}")
+
+    except Exception as e:
+        print(f"💥 Job execution failed: {e}")
+        if args.debug:
+            import traceback
+
+            print("\n🐛 Full traceback:")
+            traceback.print_exc()
+        return 1  # Exit code for failure
+
+    return 0  # Exit code for success
+
+
+if __name__ == "__main__":
+    sys.exit(main())

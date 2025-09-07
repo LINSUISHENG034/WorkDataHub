@@ -4,8 +4,10 @@ This file is a README for agents. It gives any AI coding assistant a predictable
 
 ## Development Tips
 
+- **Package Management:** `uv` for all dependency and virtual environment management.
+- **WSL**: `source .venv_linux/bin/activate`; **PowerShell**: `.\.venv\Scripts\Activate.ps1`; **CMD**: `.\.venv\Scripts\activate.bat`.
 - Use `uv` for everything: `uv venv && uv sync` to set up; run tools via `uv run ...`.
-- Search fast: prefer `rg` (ripgrep) over `grep/find` for code and files.
+- Search fast: prioritize using MCP Serena. As an alternative, prefer `rg` (ripgrep) over `grep/find` for code and files.
 - Keep changes small and focused; follow existing patterns and conventions.
 
 ## PRP Workflow (Plan → Execute → Prove)
@@ -16,6 +18,7 @@ We use a PRP (Product Requirements Prompt) workflow to produce high‑quality, r
    - Define the feature and boundaries (non‑goals).
    - Add concrete examples: existing files, code snippets, or patterns to follow.
    - Link precise external docs (URLs, sections) and internal standards (file paths).
+   - Do more web searches and codebase exploration as needed; Use `gemini -p "your requirements"` for web searches. You should express your requirements clearly in natural language, for example: `gemini -p "Please search online for 'best practices for python dependency injection'."`
    - Note integration points: data models, APIs, migrations, configs.
    - Call out gotchas: library quirks, rate limits, concurrency/timeouts, version traps.
    - Include validation commands and expected outcomes.

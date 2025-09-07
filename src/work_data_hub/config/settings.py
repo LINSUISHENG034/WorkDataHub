@@ -10,8 +10,32 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-from pydantic import ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings
+
+
+class DatabaseSettings(BaseModel):
+    """Database connection configuration."""
+
+    model_config = ConfigDict(
+        env_prefix="WDH_DATABASE__",
+        case_sensitive=False,
+    )
+
+    host: str = Field(default="localhost", description="Database host")
+    port: int = Field(default=5432, description="Database port")
+    user: str = Field(default="user", description="Database user")
+    password: str = Field(default="password", description="Database password")
+    db: str = Field(default="database", description="Database name")
+
+    # Optional URI override
+    uri: Optional[str] = Field(None, description="Complete database URI")
+
+    def get_connection_string(self) -> str:
+        """Get PostgreSQL connection string."""
+        if self.uri:
+            return self.uri
+        return f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.db}"
 
 
 class Settings(BaseSettings):
@@ -53,6 +77,12 @@ class Settings(BaseSettings):
     # Development settings
     dev_sample_size: Optional[int] = Field(
         default=None, description="Limit processing to N rows for development (None = no limit)"
+    )
+
+    # Database configuration
+    database: DatabaseSettings = Field(
+        default_factory=DatabaseSettings,
+        description="Database connection settings"
     )
 
     model_config = ConfigDict(
