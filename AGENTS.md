@@ -1,4 +1,4 @@
-# AGENTS.md
+# AGENTS.md v1.01
 
 This file is a README for agents. It gives any AI coding assistant a predictable, minimal set of rules and commands to work effectively in this repository.
 
