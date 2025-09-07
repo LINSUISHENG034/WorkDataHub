@@ -201,6 +201,81 @@ def process_trustee_performance_op(
         raise
 
 
+class ReadProcessConfig(Config):
+    """Configuration for reading and processing multiple trustee files."""
+
+    sheet: int = 0
+    max_files: int = 1
+
+    @field_validator("sheet")
+    @classmethod
+    def validate_sheet(cls, v: int) -> int:
+        """Validate sheet index is non-negative."""
+        if v < 0:
+            raise ValueError("Sheet index must be non-negative")
+        return v
+
+    @field_validator("max_files")
+    @classmethod
+    def validate_max_files(cls, v: int) -> int:
+        """Validate max_files is positive and reasonable."""
+        if v < 1:
+            raise ValueError("max_files must be at least 1")
+        if v > 20:  # Reasonable upper bound
+            raise ValueError("max_files cannot exceed 20")
+        return v
+
+
+@op
+def read_and_process_trustee_files_op(
+    context: OpExecutionContext,
+    config: ReadProcessConfig,
+    file_paths: List[str]
+) -> List[Dict]:
+    """
+    Process multiple trustee files and return accumulated results.
+
+    Args:
+        context: Dagster execution context
+        config: Configuration with sheet and max_files parameters
+        file_paths: List of discovered file paths
+
+    Returns:
+        List of processed record dictionaries (JSON-serializable)
+    """
+    # Limit files like existing MVP approach
+    paths_to_process = (file_paths or [])[: min(len(file_paths), config.max_files)]
+    all_processed: List[Dict] = []
+
+    for file_path in paths_to_process:
+        try:
+            # Follow existing read_excel_op approach
+            rows = read_excel_rows(file_path, sheet=config.sheet)
+
+            # Follow existing process_trustee_performance_op approach
+            models = process(rows, data_source=file_path)
+
+            # JSON-serializable accumulation
+            processed_dicts = [model.model_dump() for model in models]
+            all_processed.extend(processed_dicts)
+
+            # Structured logging like existing ops
+            context.log.info(
+                f"Processed {file_path}: {len(rows)} rows -> "
+                f"{len(processed_dicts)} records"
+            )
+
+        except Exception as e:
+            context.log.error(f"Failed to process file {file_path}: {e}")
+            raise
+
+    context.log.info(
+        f"Multi-file processing completed: {len(paths_to_process)} files, "
+        f"{len(all_processed)} total records"
+    )
+    return all_processed
+
+
 class LoadConfig(Config):
     """Configuration for data loading operation."""
 
@@ -244,7 +319,7 @@ def load_op(
         Dictionary with execution metadata or SQL plans
     """
     try:
-        conn = None  # Default: plan-only mode
+        conn = None
         if not config.plan_only:
             try:
                 import psycopg2
@@ -252,7 +327,16 @@ def load_op(
                 dsn = settings.database.get_connection_string()
 
                 context.log.info(f"Connecting to database for execution (table: {config.table})")
-                conn = psycopg2.connect(dsn)
+
+                # Use context manager for automatic connection cleanup
+                with psycopg2.connect(dsn) as conn:
+                    result = load(
+                        table=config.table,
+                        rows=processed_rows,
+                        mode=config.mode,
+                        pk=config.pk,
+                        conn=conn,
+                    )
 
             except ImportError as e:
                 raise DataWarehouseLoaderError(
@@ -264,14 +348,15 @@ def load_op(
                     f"Database connection failed: {e}. "
                     "Check WDH_DATABASE__* environment variables."
                 ) from e
-
-        result = load(
-            table=config.table,
-            rows=processed_rows,
-            mode=config.mode,
-            pk=config.pk,
-            conn=conn,
-        )
+        else:
+            # Plan-only path unchanged
+            result = load(
+                table=config.table,
+                rows=processed_rows,
+                mode=config.mode,
+                pk=config.pk,
+                conn=None,
+            )
 
         # Enhanced logging with execution mode
         mode_text = "EXECUTED" if not config.plan_only else "PLAN-ONLY"

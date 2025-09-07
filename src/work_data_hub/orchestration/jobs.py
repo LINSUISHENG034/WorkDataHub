@@ -14,7 +14,13 @@ import yaml
 from dagster import DagsterInstance, job
 
 from ..config.settings import get_settings
-from .ops import discover_files_op, load_op, process_trustee_performance_op, read_excel_op
+from .ops import (
+    discover_files_op,
+    load_op,
+    process_trustee_performance_op,
+    read_and_process_trustee_files_op,
+    read_excel_op,
+)
 
 
 @job
@@ -38,6 +44,24 @@ def trustee_performance_job():
     load_op(processed_data)  # No return needed
 
 
+@job
+def trustee_performance_multi_file_job():
+    """
+    End-to-end trustee performance processing job for multi-file scenarios.
+
+    This job orchestrates the complete ETL pipeline for multiple files:
+    1. Discover files matching domain patterns
+    2. Read and process multiple Excel files in combined operation
+    3. Load accumulated data to database or generate execution plan
+    """
+    # Wire ops together - Dagster handles dependency graph
+    discovered_paths = discover_files_op()
+
+    # Use combined op for multi-file processing
+    processed_data = read_and_process_trustee_files_op(discovered_paths)
+    load_op(processed_data)  # No return needed
+
+
 def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
     """
     Build Dagster run_config from CLI arguments.
@@ -48,6 +72,13 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
     Returns:
         Dictionary with nested configuration for all ops
     """
+    # Single source of truth calculation - execute takes precedence over plan-only
+    effective_plan_only = (
+        not args.execute
+        if hasattr(args, "execute")
+        else getattr(args, "plan_only", True)
+    )
+
     # Load table/pk from data_sources.yml if needed
     settings = get_settings()
 
@@ -67,18 +98,32 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
     run_config = {
         "ops": {
             "discover_files_op": {"config": {"domain": args.domain}},
-            "read_excel_op": {"config": {"sheet": args.sheet}},
-            # process_trustee_performance_op has no config
             "load_op": {
                 "config": {
                     "table": table,
                     "mode": args.mode,
                     "pk": pk,
-                    "plan_only": not args.execute,  # Invert execute flag
+                    "plan_only": effective_plan_only,  # Use effective flag
                 }
             },
         }
     }
+
+    # Add max_files parameter and conditionally configure ops
+    max_files = getattr(args, "max_files", 1)
+
+    if max_files > 1:
+        # Use new combined op for multi-file processing
+        run_config["ops"]["read_and_process_trustee_files_op"] = {
+            "config": {
+                "sheet": args.sheet,
+                "max_files": max_files
+            }
+        }
+    else:
+        # Use existing separate ops for single-file processing (backward compatibility)
+        run_config["ops"]["read_excel_op"] = {"config": {"sheet": args.sheet}}
+        # process_trustee_performance_op has no config
 
     return run_config
 
@@ -143,6 +188,13 @@ def main():
 
     args = parser.parse_args()
 
+    # Calculate effective execution mode for consistent display and logic
+    effective_plan_only = (
+        not args.execute
+        if hasattr(args, "execute")
+        else getattr(args, "plan_only", True)
+    )
+
     # Build run configuration from CLI arguments
     run_config = build_run_config(args)
 
@@ -150,17 +202,21 @@ def main():
     print(f"   Domain: {args.domain}")
     print(f"   Mode: {args.mode}")
     print(f"   Execute: {args.execute}")
-    print(f"   Plan-only: {not args.execute}")
+    print(f"   Plan-only: {effective_plan_only}")
     print(f"   Sheet: {args.sheet}")
     print(f"   Max files: {args.max_files}")
     print("=" * 50)
+
+    # Select appropriate job based on max_files parameter
+    max_files = getattr(args, "max_files", 1)
+    selected_job = trustee_performance_multi_file_job if max_files > 1 else trustee_performance_job
 
     # Execute job with appropriate settings
     try:
         # Use ephemeral instance for debug mode to avoid DAGSTER_HOME requirement
         instance = DagsterInstance.ephemeral() if args.debug else None
 
-        result = trustee_performance_job.execute_in_process(
+        result = selected_job.execute_in_process(
             run_config=run_config, instance=instance, raise_on_error=args.raise_on_error
         )
 
@@ -171,7 +227,7 @@ def main():
             # Extract and display execution summary
             load_result = result.output_for_node("load_op")
 
-            if args.plan_only and "sql_plans" in load_result:
+            if effective_plan_only and "sql_plans" in load_result:
                 print("\n📋 SQL Execution Plan:")
                 print("-" * 30)
                 for i, (op_type, sql, params) in enumerate(load_result["sql_plans"], 1):

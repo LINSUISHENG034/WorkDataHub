@@ -15,6 +15,7 @@ This file is a README for agents. It gives any AI coding assistant a predictable
 We use a PRP (Product Requirements Prompt) workflow to produce high‑quality, repeatable changes.
 
 1) Prepare INITIAL.md (Definition of Ready)
+   - **Select a Task**: A planning agent identifies a task in `ROADMAP.md` with the status READY_FOR_PRP
    - Define the feature and boundaries (non‑goals).
    - Add concrete examples: existing files, code snippets, or patterns to follow.
    - Link precise external docs (URLs, sections) and internal standards (file paths).
@@ -23,6 +24,10 @@ We use a PRP (Product Requirements Prompt) workflow to produce high‑quality, r
    - Call out gotchas: library quirks, rate limits, concurrency/timeouts, version traps.
    - Include validation commands and expected outcomes.
    - Start from template: `PRPs/templates/INITIAL.template.md`
+
+*** CRITICAL AFTER YOU ARE DONE RESEARCHING AND EXPLORING THE CODEBASE BEFORE YOU START WRITING THE INITIAL ***
+
+*** ULTRATHINK ABOUT THE INITIAL AND ROADMAP THEN START WRITING THE INITIAL ***
 
 2) Generate PRP
    - If your assistant supports slash commands: `/generate-prp INITIAL.md` (see `.claude/commands/generate-prp.md`).
@@ -57,6 +62,7 @@ We use a PRP (Product Requirements Prompt) workflow to produce high‑quality, r
 
 ## Files to Know
 
+- `ROADMAP.md`: The project's master plan. It defines the vision, milestones, and the dependency graph of all features. **This is the single source of truth for project status.**
 - `INITIAL.md`: Seed file for PRP with feature, examples, docs, gotchas, validation.
 - `PRPs/`: Stores generated PRP files (implementation blueprints).
 - `.claude/commands/generate-prp.md`: How to generate a PRP from INITIAL.md.
@@ -68,3 +74,5 @@ We use a PRP (Product Requirements Prompt) workflow to produce high‑quality, r
 - If your assistant supports custom commands, prefer the commands above; otherwise copy the command file contents into your prompt with the appropriate arguments.
 - Keep instructions concrete and runnable; prefer the shortest viable commands.
 - Ask for clarification when requirements are ambiguous; do not guess.
+
+Remember: Before conducting any code review, you must first cross-reference the code changes with their corresponding task(s) in `ROADMAP.md`. Your review should validate alignment with the task's stated goals. If the review reveals discrepancies—such as new tasks, completed work, or scope changes—you are required to perform the necessary updates (add, modify, or change status) to the `ROADMAP.md` immediately. This ensures the roadmap is perpetually maintained as the single source of truth for project status.

@@ -1,134 +1,188 @@
-# INITIAL.md — Orchestration Follow‑Up (Multi‑File, Flag Normalization, DB Conn Context, Display Consistency)
+# INITIAL.md — Milestone 0: Security & Quality Baseline (CI + Secrets Hygiene)
 
-Purpose: Implement the suggested next steps for the Dagster orchestration layer. Add practical multi‑file processing, normalize execution flags, ensure DB connection cleanup via context managers, and make CLI output consistent with the effective execution mode. Keep plan‑only as the default; don’t introduce advanced Dagster features (e.g., DynamicOutput) yet.
+Purpose: Deliver the Security & Quality Baseline per ROADMAP.md Milestone 0. Implement CI (ruff, mypy, pytest), establish a clear secrets policy with environment-based configuration, and provide a `.env.example`. Keep scope tightly focused and non-invasive.
 
-Note for Claude: Activate PowerShell venv with `.\.venv\Scripts\Activate.ps1` (not `.venv_linux/bin/activate`). Use uv: `uv venv && uv sync`, run via `uv run ...`.
+ROADMAP alignment:
+- R-001: Research and document secrets policy (env vars, patterns, scanning)
+- C-001: Add `.env.example` with required `WDH_*` variables and usage docs
+- C-002: Set up GitHub Actions CI (ruff, mypy, pytest)
+- C-003: Optional secret scanning (pre-commit/gitleaks) — optional deliverable
+
+Note for Claude: Use uv for environment and tooling — `uv venv && uv sync`; run tools as `uv run ...`.
 
 ## FEATURE
-- Multi‑file: Process up to N discovered files in one run and load once.
-- Flag normalization: Unify execution mode under one source of truth; avoid conflicting `--plan-only` vs `--execute` signals.
-- DB connection context: Open psycopg2 connections with a context manager to ensure proper closure.
-- Display consistency: CLI output (plan/execution and SQL plans) matches the effective execution mode.
+Provide a robust CI pipeline and secrets hygiene baseline that: (1) runs ruff, mypy, and tests on PRs/pushes; (2) documents secrets handling with environment variables; (3) supplies a safe `.env.example` for local development; (4) optionally integrates a lightweight secrets scan.
 
 ## SCOPE
-- In‑scope:
-  - Add a combined op or adjust existing ops to support multi‑file processing without Dagster dynamic mapping. Recommended: a new `read_and_process_trustee_files_op(file_paths: list[str], sheet: int, max_files: int) -> list[dict]` that iterates paths, calls `read_excel_rows(path, sheet)` and `process(rows, data_source=path)` per file, and accumulates results.
-  - In `load_op`, when executing (not plan‑only), use `with psycopg2.connect(dsn) as conn:` before calling `load(...)`.
-  - Normalize flags in `jobs.py`: derive a single `effective_plan_only` boolean (e.g., from `--execute`) and use it for both run_config and display. Either:
-    - Deprecate `--plan-only` (keep for compatibility but ignore if `--execute` present), or
-    - Remove `--plan-only` and rely solely on `--execute` as the user‑facing flag.
-  - Update help text to document precedence/behavior.
-  - Tests: multi‑file accumulation; CLI display consistency; DB context path smoke (mocked connect); keep existing tests green.
-- Non‑goals:
-  - Dagster dynamic mapping or assets; new domains; scheduler/resources.
+- In-scope:
+  - Add CI workflow at `.github/workflows/ci.yml` with jobs for ruff, mypy, pytest.
+  - Ensure CI uses uv to install and run tooling; keep runs fast and deterministic.
+  - Create `docs/security/SECRETS_POLICY.md` summarizing env var strategy and do/don’t rules.
+  - Add `.env.example` with all required variables and safe defaults; cross-link from docs.
+  - Ensure `.env` is ignored by git (confirm/augment `.gitignore`).
+  - Tests in CI: run unit/integration tests excluding DB-required tests via marker (`-m "not postgres"`).
+  - Optional: add a secrets scanning job (e.g., gitleaks) gated as non-blocking or separate workflow.
+- Non-goals:
+  - No changes to runtime application logic, database schemas, Dagster assets, or deployment.
+  - No production alerting/schedules; those belong to later milestones.
 
 ## CONTEXT SNAPSHOT
-```
-src/work_data_hub/orchestration/
-  ops.py                      # existing ops (add new op or enhance)
-  jobs.py                     # CLI + job wiring (normalize flags; multi‑file path)
-src/work_data_hub/io/readers/excel_reader.py
-src/work_data_hub/domain/trustee_performance/service.py
-src/work_data_hub/io/loader/warehouse_loader.py
-tests/orchestration/{test_ops.py,test_jobs.py}
+```bash
+ROADMAP.md
+.gitignore
+pyproject.toml
+src/work_data_hub/config/settings.py   # Pydantic BaseSettings with WDH_ prefix
+tests/                                 # contains "postgres" marker for DB-required tests
 ```
 
 ## EXAMPLES
-- New op (preferred) to avoid dynamic mapping:
-```python
-from typing import List, Dict
-from dagster import op, Config, OpExecutionContext
-from ..io.readers.excel_reader import read_excel_rows
-from ..domain.trustee_performance.service import process
+- GitHub Actions (uv-based CI) — `.github/workflows/ci.yml`:
+```yaml
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [ main, master ]
 
-class ReadProcessConfig(Config):
-    sheet: int = 0
-    max_files: int = 1
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install uv
+        run: pipx install uv
+      - name: Set up venv and sync deps
+        run: |
+          uv venv
+          uv sync
+      - name: Ruff
+        run: uv run ruff check src/
+      - name: Mypy
+        run: uv run mypy src/
+      - name: Pytest (skip DB-required tests)
+        run: uv run pytest -v -m "not postgres"
 
-@op
-def read_and_process_trustee_files_op(
-    context: OpExecutionContext, config: ReadProcessConfig, file_paths: List[str]
-) -> List[Dict]:
-    paths = (file_paths or [])[: max(1, config.max_files)]
-    all_processed: List[Dict] = []
-    for p in paths:
-        rows = read_excel_rows(p, sheet=config.sheet)
-        models = process(rows, data_source=p)
-        all_processed.extend([m.model_dump() for m in models])
-    context.log.info(f"Processed {len(paths)} files, produced {len(all_processed)} records")
-    return all_processed
+  # Optional non-blocking secrets scan (enable when desired)
+  secrets-scan:
+    if: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: "detect --no-git --redact --source=."
 ```
 
-- DB connection context in load_op:
-```python
-if not config.plan_only:
-    import psycopg2
-    dsn = get_settings().database.get_connection_string()
-    with psycopg2.connect(dsn) as conn:
-        return load(table=config.table, rows=processed_rows, mode=config.mode, pk=config.pk, conn=conn)
-return load(table=config.table, rows=processed_rows, mode=config.mode, pk=config.pk, conn=None)
+- `.env.example` (do not include real secrets):
+```env
+# WorkDataHub — Local development example env (do not commit real secrets)
+
+# Core app
+WDH_APP_NAME=WorkDataHub
+WDH_DEBUG=false
+WDH_LOG_LEVEL=INFO
+
+# Data directories
+WDH_DATA_BASE_DIR=./data
+WDH_DATA_SOURCES_CONFIG=./src/work_data_hub/config/data_sources.yml
+
+# Database (prefer URI if available)
+WDH_DATABASE__HOST=localhost
+WDH_DATABASE__PORT=5432
+WDH_DATABASE__USER=wdh_user
+WDH_DATABASE__PASSWORD=changeme
+WDH_DATABASE__DB=wdh
+# Alternatively provide a full URI (overrides discrete fields)
+# WDH_DATABASE__URI=postgresql://wdh_user:changeme@localhost:5432/wdh
 ```
 
-- Flag normalization in jobs.py:
-```python
-effective_plan_only = not args.execute if hasattr(args, "execute") else getattr(args, "plan_only", True)
-# Use effective_plan_only for run_config and for display/printing logic
-run_config["ops"]["load_op"]["config"]["plan_only"] = effective_plan_only
-if effective_plan_only:
-    # show SQL plans if available
+- Secrets Policy — `docs/security/SECRETS_POLICY.md` (skeleton):
+```md
+# Secrets Policy (WorkDataHub)
+
+## Principles
+- No plaintext secrets in code, commits, or CI logs.
+- Use environment variables with prefix `WDH_` (see `.env.example`).
+- Treat `.env` as local-only; keep `.env` git-ignored.
+
+## Storage & Loading
+- Local: `.env` managed by developers; never commit.
+- CI: Provide secrets via repository/environment secrets; avoid printing values.
+- App: Load via Pydantic Settings (`src/work_data_hub/config/settings.py`).
+
+## Reviews & Scans
+- Mandatory review for changes touching config or connection strings.
+- Optional: run gitleaks locally (`gitleaks detect --redact`) before PR.
+
+## Incident Handling
+- If a secret leaks, rotate immediately; purge from history if necessary; document in a short incident note.
 ```
 
 ## DOCUMENTATION
-- Dagster ops: https://docs.dagster.io/concepts/ops-jobs-graphs/ops
-- Dagster in‑process execution: https://docs.dagster.io/guides/dagster/run-a-job
-- Pydantic v2 validators: https://docs.pydantic.dev/latest/concepts/validators/
-- Psycopg2 connection: https://www.psycopg.org/docs/module.html#psycopg2.connect
+- Pydantic v2 Settings: ensure env prefix `WDH_` is used — `src/work_data_hub/config/settings.py`.
+- Ruff CLI: https://docs.astral.sh/ruff/cli/
+- Mypy CLI: https://mypy.readthedocs.io/en/stable/command_line.html
+- Pytest markers: https://docs.pytest.org/en/stable/example/markers.html
+- uv: https://docs.astral.sh/uv/
+- Gitleaks (optional): https://github.com/gitleaks/gitleaks
 
 ## INTEGRATION POINTS
-- `jobs.py`: parse `--execute`, `--max-files`; compute `effective_plan_only`; wire new combined op or adjust sequence to produce a single accumulated list for `load_op`.
-- `ops.py`: implement `read_and_process_trustee_files_op` (or enhance existing ops accordingly); keep existing ops for backward‑compatibility.
-- `load_op`: adopt connection context manager; maintain plan‑only default.
+- `src/work_data_hub/config/settings.py`: Confirm env var names align with `.env.example` (WDH_ prefix; nested `WDH_DATABASE__*`). No code changes required.
+- `.gitignore`: Ensure `.env` and other secret files are ignored (add if missing).
+- GitHub Actions: Create `.github/workflows/ci.yml` as shown; use `pipx install uv` for portability.
+- Tests: Use marker to skip DB-required tests in CI (`-m "not postgres"`).
 
-## GOTCHAS & QUIRKS
-- Without dynamic mapping, iteration must occur inside an op or via a fixed slice. Prefer the new combined op to keep the graph static.
-- Preserve JSON‑serializable data contracts between ops.
-- Maintain safe default (plan‑only) and guard execution behind `--execute`.
-- Ensure tests do not require a live DB; mock psycopg2 in execute path tests.
+## DATA CONTRACTS
+N/A (no runtime payload changes). Environment contract defined by `.env.example` keys and `Settings` model.
 
-## VALIDATION GATES
+## GOTCHAS & LIBRARY QUIRKS
+- Do not run `ruff --fix` in CI (read-only CI); run plain `ruff check`. Use `--fix` locally only.
+- Ensure uv installs dev tooling: `uv sync` is already the project standard; do not introduce pip/poetry.
+- Some tests depend on a live Postgres DB (marked `postgres`); skip them in CI to avoid flaky runs.
+- Avoid echoing secrets in CI logs; never print connection strings.
+
+## IMPLEMENTATION NOTES
+- Follow repository conventions in AGENTS.md and CLAUDE.md (short commands, vertical slices, tests green).
+- Keep workflow small and fast; a single job for style/type/test is acceptable at this stage.
+- Make the secrets scan job optional/non-blocking initially to avoid false positive disruptions.
+
+## VALIDATION GATES (must pass locally and in CI)
 ```bash
-uv run ruff check src/ --fix
+uv run ruff check src/
 uv run mypy src/
-uv run pytest -v
+uv run pytest -v -m "not postgres"
 ```
-Optional (local):
-```powershell
-.\.venv\Scripts\Activate.ps1
-uv run python -m src.work_data_hub.orchestration.jobs --execute --max-files 1  # requires DB env
-uv run python -m src.work_data_hub.orchestration.jobs --max-files 2            # plan‑only
+Optional coverage:
+```bash
+uv run pytest --cov=src --cov-report=term-missing -m "not postgres"
 ```
 
 ## ACCEPTANCE CRITERIA
-- [ ] Multi‑file: job processes up to N files and loads once; records are accumulated correctly.
-- [ ] Flags: one source of truth for execution mode; help text documents behavior; display reflects effective mode.
-- [ ] DB connection uses a context manager; no persistent open connection on errors.
-- [ ] Tests: multi‑file accumulation (mocked), CLI display consistency, execute path (psycopg2 mocked).
-- [ ] Ruff, mypy, pytest all pass.
+- [ ] CI workflow exists at `.github/workflows/ci.yml` and runs on PRs and pushes to main/master.
+- [ ] CI runs ruff, mypy, and pytest; fails the build on violations/failures.
+- [ ] `.env.example` contains all relevant `WDH_*` keys and safe defaults; `.env` is git-ignored.
+- [ ] `docs/security/SECRETS_POLICY.md` created and referenced from ROADMAP or README.
+- [ ] Local validation gates pass on a clean checkout.
 
 ## ROLLOUT & RISK
-- Keeps safe defaults; explicit `--execute` prevents accidental DB writes.
-- No DAG structure changes beyond a new combined op; minimal risk.
-- Future: can replace combined op with DynamicOutput mapping when scaling.
+- Low risk; only adds CI and documentation.
+- No behavior change to application runtime.
+- If CI speed is a concern later, add caches or split jobs; initial version prioritizes correctness and clarity.
 
 ## APPENDICES
-Sample env (do not commit secrets):
-```powershell
-$env:WDH_DATABASE__HOST = "localhost"
-$env:WDH_DATABASE__PORT = "5432"
-$env:WDH_DATABASE__USER = "wdh_user"
-$env:WDH_DATABASE__PASSWORD = "secret"
-$env:WDH_DATABASE__DB = "wdh"
-# Or URI:
-$env:WDH_DATABASE__URI = "postgresql://wdh_user:secret@localhost:5432/wdh"
+- Useful ripgrep checks:
+```bash
+rg -n "(password|api_key|secret|URI=postgresql)" -S -g '!uv.lock'
 ```
 
+- Sample local usage:
+```bash
+uv venv && uv sync
+uv run ruff check src/ --fix
+uv run mypy src/
+uv run pytest -v -m "not postgres"
+```
