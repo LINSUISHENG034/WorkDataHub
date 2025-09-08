@@ -100,9 +100,9 @@ class TestProcessFunction:
         """Test processing rows with missing required data."""
         rows = [invalid_row]
 
-        # Should return empty list since row cannot be processed
-        result = process(rows, data_source="test")
-        assert result == []
+        # Should raise TrusteePerformanceTransformationError due to 100% failure rate
+        with pytest.raises(TrusteePerformanceTransformationError, match="Too many processing errors"):
+            process(rows, data_source="test")
 
     def test_process_mixed_valid_invalid_rows(self, valid_row_chinese, invalid_row):
         """Test processing mix of valid and invalid rows."""
@@ -165,7 +165,7 @@ class TestSingleRowTransformation:
         assert result is None
 
     def test_transform_row_invalid_output_validation(self):
-        """Test row that passes input validation but fails output validation."""
+        """Test row that passes input validation but has invalid date (now returns None)."""
         row = {
             "年": "2024",
             "月": "13",  # Invalid month
@@ -173,8 +173,9 @@ class TestSingleRowTransformation:
             "公司代码": "COMP001",
         }
 
-        with pytest.raises(ValidationError):
-            _transform_single_row(row, "test_source", 0)
+        # After bug fix: invalid dates cause the row to be filtered out (return None)
+        result = _transform_single_row(row, "test_source", 0)
+        assert result is None
 
 
 class TestDateExtraction:

@@ -13,6 +13,7 @@ Build a reliable, declarative, and testable data processing platform that replac
 | C-002 | M0 | Set up GitHub Actions CI (ruff, mypy, pytest) | COMPLETED | - | P-006 |
 | C-003 | M0 | Add optional secret scanning (e.g., pre-commit/gitleaks) | COMPLETED | R-001 | P-006 |
 | F-001 | M0 | Establish end-to-end test baseline (plan-only path) | COMPLETED | - | P-001 |
+| C-004 | M0 | Optional local dev via docker-compose (PostgreSQL + Dagster) | READY_FOR_PRP | C-002 | - |
 
 <!--
 PHILOSOPHY: Front-load uncertainty (R-001), then implement atomic chores/features with explicit dependencies. CI and secret policy enable fast, safe iteration for later milestones.
@@ -30,6 +31,9 @@ PHILOSOPHY: Front-load uncertainty (R-001), then implement atomic chores/feature
 | F-014 | M1 | Implement Dagster ops (discover/read/process/load) with dynamic domain validation | COMPLETED | F-010, F-011, F-012, F-013 | P-004 |
 | F-015 | M1 | Implement Dagster jobs + CLI (`--execute`, multi-file accumulation) | COMPLETED | F-014 | P-003, P-005 |
 | C-010 | M1 | Provide domain config (`data_sources.yml`) with table + pk | COMPLETED | - | P-003 |
+| C-016 | M1 | Fix Pydantic v2 ValidationError misuse in trustee_performance.service | COMPLETED | F-012 | P-007 |
+| C-011 | M1 | Validate local Dagster "hello-world" pipeline + runbook | READY_FOR_PRP | F-014, F-015 | - |
+| C-012 | M1 | Convert legacy handler mappings (DB) to YAML config seeds | READY_FOR_PRP | F-010 | - |
 
 <!--
 TASK BREAKDOWN PHILOSOPHY:
@@ -42,12 +46,25 @@ TASK BREAKDOWN PHILOSOPHY:
 
 | ID | Epic | Feature/Task | Status | Dependencies | PRP_Link |
 | :---- | :---- | :---- | :---- | :---- | :---- |
+| R-015 | M2 | Inventory legacy cleaners/domains and produce migration plan | READY_FOR_PRP | - | - |
 | R-020 | M2 | Profile Domain B inputs; define data contract strategy | READY_FOR_PRP | - | - |
 | F-020 | M2 | Add Pydantic models for Domain B | PENDING | R-020 | - |
 | F-021 | M2 | Implement Domain B transformation service (pure, validated) | PENDING | F-020 | - |
 | F-022 | M2 | Extend `data_sources.yml` with Domain B patterns/table/pk | PENDING | R-020 | - |
 | F-023 | M2 | Unit/integration tests for Domain B models + service | PENDING | F-020, F-021 | - |
 | F-024 | M2 | Execute Domain B via existing Dagster job + CLI example | PENDING | F-021, F-022 | - |
+| F-025 | M2 | Migrate Annuity Income domain (收入明细) to new stack | PENDING | R-015 | - |
+| F-026 | M2 | Migrate Group Retirement domain (团养缴费) | PENDING | R-015 | - |
+| F-027 | M2 | Migrate Awards/Losses ledger (受托/投资 中标/流失) | PENDING | R-015 | - |
+| F-028 | M2 | Migrate Health Coverage domains (企康/JK) | PENDING | R-015 | - |
+| F-029 | M2 | Migrate Revenue Details/Budget (收入明细/预算) | PENDING | R-015 | - |
+| R-016 | M2 | Research ingestion connectors (HTTP/SFTP) and auth strategy | READY_FOR_PRP | - | - |
+| F-032 | M2 | Implement HTTP crawler connector + retries/auth + CLI | PENDING | R-016 | - |
+| F-033 | M2 | Implement SFTP/FTP downloader connector | PENDING | R-016 | - |
+| R-017 | M2 | Assess legacy MongoDB usage; propose deprecation/migration | READY_FOR_PRP | - | - |
+| C-020 | M2 | Mongo→Postgres export utility and decommission plan | PENDING | R-017 | - |
+| C-021 | M2 | Replace Flask API with read-only export/report script | PENDING | R-017 | - |
+| R-025 | M2 | Evaluate Polars adoption for transform/loader performance | READY_FOR_PRP | F-012, F-013 | - |
 
 <!--
 Uncertainty segregation: R-020 precedes implementation to de-risk modeling and discovery patterns for the new domain.

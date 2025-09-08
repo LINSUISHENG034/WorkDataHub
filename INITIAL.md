@@ -1,188 +1,138 @@
-# INITIAL.md — Milestone 0: Security & Quality Baseline (CI + Secrets Hygiene)
+# INITIAL.md — Bugfix PRP: Pydantic v2 ValidationError Misuse (trustee_performance)
 
-Purpose: Deliver the Security & Quality Baseline per ROADMAP.md Milestone 0. Implement CI (ruff, mypy, pytest), establish a clear secrets policy with environment-based configuration, and provide a `.env.example`. Keep scope tightly focused and non-invasive.
+Selected task: ROADMAP.md → Milestone 1 → C-016 (READY_FOR_PRP)
 
-ROADMAP alignment:
-- R-001: Research and document secrets policy (env vars, patterns, scanning)
-- C-001: Add `.env.example` with required `WDH_*` variables and usage docs
-- C-002: Set up GitHub Actions CI (ruff, mypy, pytest)
-- C-003: Optional secret scanning (pre-commit/gitleaks) — optional deliverable
-
-Note for Claude: Use uv for environment and tooling — `uv venv && uv sync`; run tools as `uv run ...`.
+Purpose: Fix incorrect usage of pydantic.ValidationError in trustee_performance service that leads to a TypeError crash when encountering invalid input (e.g., month == 13). Restore graceful validation behavior and align error semantics with existing tests and design.
 
 ## FEATURE
-Provide a robust CI pipeline and secrets hygiene baseline that: (1) runs ruff, mypy, and tests on PRs/pushes; (2) documents secrets handling with environment variables; (3) supplies a safe `.env.example` for local development; (4) optionally integrates a lightweight secrets scan.
+Correct exception handling and validation flow in `src/work_data_hub/domain/trustee_performance/service.py` so that:
+- Invalid date parts (e.g., month 13) do not crash; they are treated as non-processable rows (return None) or as clean validation failures that are logged/accumulated.
+- Do not construct new `pydantic.ValidationError` instances manually in v2; either let the original Pydantic ValidationError bubble or raise a standard `ValueError` where appropriate.
 
 ## SCOPE
-- In-scope:
-  - Add CI workflow at `.github/workflows/ci.yml` with jobs for ruff, mypy, pytest.
-  - Ensure CI uses uv to install and run tooling; keep runs fast and deterministic.
-  - Create `docs/security/SECRETS_POLICY.md` summarizing env var strategy and do/don’t rules.
-  - Add `.env.example` with all required variables and safe defaults; cross-link from docs.
-  - Ensure `.env` is ignored by git (confirm/augment `.gitignore`).
-  - Tests in CI: run unit/integration tests excluding DB-required tests via marker (`-m "not postgres"`).
-  - Optional: add a secrets scanning job (e.g., gitleaks) gated as non-blocking or separate workflow.
+- In-scope changes:
+  - Replace manual `ValidationError(...)` constructions with correct handling:
+    - In `_transform_single_row`: let original `ValidationError` bubble (don’t wrap/recreate).
+    - In `_extract_report_date`: do not raise `ValidationError` for invalid year/month; log and return `None` per function contract.
+  - Ensure `process()` continues to record filtered rows and does not crash.
+  - Adjust/extend tests to cover the bug and the corrected behaviors.
 - Non-goals:
-  - No changes to runtime application logic, database schemas, Dagster assets, or deployment.
-  - No production alerting/schedules; those belong to later milestones.
+  - No changes to schema of `TrusteePerformanceIn/Out` models.
+  - No changes to orchestration logic or loader semantics beyond exception behavior.
 
 ## CONTEXT SNAPSHOT
+Key files and lines to fix (confirmed in repo):
+- `src/work_data_hub/domain/trustee_performance/service.py`
+  - L119–121: `except ValidationError as e: raise ValidationError(f"Input validation failed: {e}")`
+  - L153–154: `except ValidationError as e: raise ValidationError(f"Output validation failed: {e}")`
+  - L203–215: in `_extract_report_date`, multiple `raise ValidationError(...)` when year/month invalid
+- Failing repro test (added): `tests/domain/trustee_performance/test_service_bug.py`
+- Existing tests expecting date extraction to return None on invalid data: `tests/domain/trustee_performance/test_service.py` (see `test_extract_date_invalid_month` and `test_extract_date_invalid_year`).
+
+Environment:
+- Pydantic v2.x (uv.lock shows `pydantic==2.11.7`)
+- Run tools via `uv run ...`
+
+## ROOT CAUSE
+Pydantic v2 `ValidationError` should generally not be manually constructed. The current code creates `ValidationError` with a string (e.g., `raise ValidationError("Invalid month ...")`), which is invalid and triggers `TypeError`. Proper patterns:
+- Let Pydantic raise its own `ValidationError` during model parsing and validation; do not wrap or reconstruct.
+- For domain-level checks (e.g., invalid month/year while extracting fields), return `None` per function contract or raise a standard `ValueError` depending on the design. Here, `_extract_report_date` contract already supports `None` for “cannot determine date”.
+
+## PROPOSED CHANGES
+1) `_transform_single_row`:
+   - Replace both wrappers with a bare re-raise of the original ValidationError for clarity and correct type:
+   - From:
+     - `except ValidationError as e: raise ValidationError(f"Input validation failed: {e}")`
+   - To:
+     - `except ValidationError:
+            raise`
+
+2) `_extract_report_date`:
+   - Treat invalid ranges (year not in 2000..2030, month not in 1..12) as “cannot determine date”: log debug and return `None` instead of raising `ValidationError`.
+   - If `date(year, month, 1)` raises `ValueError`, also log and return `None` (not `ValidationError`).
+
+3) Tests:
+   - Keep `tests/domain/trustee_performance/test_service.py` expectations: invalid year/month → `_extract_report_date(...) is None`.
+   - Update the new reproducer test `tests/domain/trustee_performance/test_service_bug.py` to validate the corrected behavior (no `TypeError`). Two viable options:
+     - Assert `_transform_single_row(...) is None` for invalid month, or
+     - Wrap call in `try/except` to assert no `TypeError` and (optionally) that a validation path was taken.
+
+## CODE EXAMPLES (targeted diffs)
+Use these patterns when editing `service.py`:
+
+- Do not wrap Pydantic errors:
+```python
+# Before
+except ValidationError as e:
+    raise ValidationError(f"Input validation failed: {e}")
+
+# After
+except ValidationError:
+    raise
+```
+
+- In `_extract_report_date` return None on invalid ranges:
+```python
+# Before
+if not (1 <= month <= 12):
+    raise ValidationError(f"Invalid month {month} in row {row_index}")
+
+# After
+if not (1 <= month <= 12):
+    logger.debug(f"Row {row_index}: Invalid month {month}; returning None")
+    return None
+
+# Also, if date(...) raises ValueError:
+try:
+    return date(year, month, 1)
+except ValueError as e:
+    logger.debug(
+        f"Row {row_index}: Cannot construct date from year={year}, month={month}: {e}"
+    )
+    return None
+```
+
+## VALIDATION GATES (Definition of Done)
+Run locally (use `-m "not postgres"` if needed to skip DB-marked tests):
 ```bash
-ROADMAP.md
-.gitignore
-pyproject.toml
-src/work_data_hub/config/settings.py   # Pydantic BaseSettings with WDH_ prefix
-tests/                                 # contains "postgres" marker for DB-required tests
-```
-
-## EXAMPLES
-- GitHub Actions (uv-based CI) — `.github/workflows/ci.yml`:
-```yaml
-name: CI
-on:
-  pull_request:
-  push:
-    branches: [ main, master ]
-
-jobs:
-  build-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install uv
-        run: pipx install uv
-      - name: Set up venv and sync deps
-        run: |
-          uv venv
-          uv sync
-      - name: Ruff
-        run: uv run ruff check src/
-      - name: Mypy
-        run: uv run mypy src/
-      - name: Pytest (skip DB-required tests)
-        run: uv run pytest -v -m "not postgres"
-
-  # Optional non-blocking secrets scan (enable when desired)
-  secrets-scan:
-    if: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Gitleaks scan
-        uses: gitleaks/gitleaks-action@v2
-        with:
-          args: "detect --no-git --redact --source=."
-```
-
-- `.env.example` (do not include real secrets):
-```env
-# WorkDataHub — Local development example env (do not commit real secrets)
-
-# Core app
-WDH_APP_NAME=WorkDataHub
-WDH_DEBUG=false
-WDH_LOG_LEVEL=INFO
-
-# Data directories
-WDH_DATA_BASE_DIR=./data
-WDH_DATA_SOURCES_CONFIG=./src/work_data_hub/config/data_sources.yml
-
-# Database (prefer URI if available)
-WDH_DATABASE__HOST=localhost
-WDH_DATABASE__PORT=5432
-WDH_DATABASE__USER=wdh_user
-WDH_DATABASE__PASSWORD=changeme
-WDH_DATABASE__DB=wdh
-# Alternatively provide a full URI (overrides discrete fields)
-# WDH_DATABASE__URI=postgresql://wdh_user:changeme@localhost:5432/wdh
-```
-
-- Secrets Policy — `docs/security/SECRETS_POLICY.md` (skeleton):
-```md
-# Secrets Policy (WorkDataHub)
-
-## Principles
-- No plaintext secrets in code, commits, or CI logs.
-- Use environment variables with prefix `WDH_` (see `.env.example`).
-- Treat `.env` as local-only; keep `.env` git-ignored.
-
-## Storage & Loading
-- Local: `.env` managed by developers; never commit.
-- CI: Provide secrets via repository/environment secrets; avoid printing values.
-- App: Load via Pydantic Settings (`src/work_data_hub/config/settings.py`).
-
-## Reviews & Scans
-- Mandatory review for changes touching config or connection strings.
-- Optional: run gitleaks locally (`gitleaks detect --redact`) before PR.
-
-## Incident Handling
-- If a secret leaks, rotate immediately; purge from history if necessary; document in a short incident note.
-```
-
-## DOCUMENTATION
-- Pydantic v2 Settings: ensure env prefix `WDH_` is used — `src/work_data_hub/config/settings.py`.
-- Ruff CLI: https://docs.astral.sh/ruff/cli/
-- Mypy CLI: https://mypy.readthedocs.io/en/stable/command_line.html
-- Pytest markers: https://docs.pytest.org/en/stable/example/markers.html
-- uv: https://docs.astral.sh/uv/
-- Gitleaks (optional): https://github.com/gitleaks/gitleaks
-
-## INTEGRATION POINTS
-- `src/work_data_hub/config/settings.py`: Confirm env var names align with `.env.example` (WDH_ prefix; nested `WDH_DATABASE__*`). No code changes required.
-- `.gitignore`: Ensure `.env` and other secret files are ignored (add if missing).
-- GitHub Actions: Create `.github/workflows/ci.yml` as shown; use `pipx install uv` for portability.
-- Tests: Use marker to skip DB-required tests in CI (`-m "not postgres"`).
-
-## DATA CONTRACTS
-N/A (no runtime payload changes). Environment contract defined by `.env.example` keys and `Settings` model.
-
-## GOTCHAS & LIBRARY QUIRKS
-- Do not run `ruff --fix` in CI (read-only CI); run plain `ruff check`. Use `--fix` locally only.
-- Ensure uv installs dev tooling: `uv sync` is already the project standard; do not introduce pip/poetry.
-- Some tests depend on a live Postgres DB (marked `postgres`); skip them in CI to avoid flaky runs.
-- Avoid echoing secrets in CI logs; never print connection strings.
-
-## IMPLEMENTATION NOTES
-- Follow repository conventions in AGENTS.md and CLAUDE.md (short commands, vertical slices, tests green).
-- Keep workflow small and fast; a single job for style/type/test is acceptable at this stage.
-- Make the secrets scan job optional/non-blocking initially to avoid false positive disruptions.
-
-## VALIDATION GATES (must pass locally and in CI)
-```bash
-uv run ruff check src/
-uv run mypy src/
-uv run pytest -v -m "not postgres"
-```
-Optional coverage:
-```bash
-uv run pytest --cov=src --cov-report=term-missing -m "not postgres"
-```
-
-## ACCEPTANCE CRITERIA
-- [ ] CI workflow exists at `.github/workflows/ci.yml` and runs on PRs and pushes to main/master.
-- [ ] CI runs ruff, mypy, and pytest; fails the build on violations/failures.
-- [ ] `.env.example` contains all relevant `WDH_*` keys and safe defaults; `.env` is git-ignored.
-- [ ] `docs/security/SECRETS_POLICY.md` created and referenced from ROADMAP or README.
-- [ ] Local validation gates pass on a clean checkout.
-
-## ROLLOUT & RISK
-- Low risk; only adds CI and documentation.
-- No behavior change to application runtime.
-- If CI speed is a concern later, add caches or split jobs; initial version prioritizes correctness and clarity.
-
-## APPENDICES
-- Useful ripgrep checks:
-```bash
-rg -n "(password|api_key|secret|URI=postgresql)" -S -g '!uv.lock'
-```
-
-- Sample local usage:
-```bash
-uv venv && uv sync
 uv run ruff check src/ --fix
 uv run mypy src/
-uv run pytest -v -m "not postgres"
+uv run pytest -v -k "trustee_performance"
 ```
+Focused checks while iterating:
+```bash
+uv run pytest -q tests/domain/trustee_performance/test_service_bug.py
+uv run pytest -q -k test_extract_date_invalid_month
+```
+
+Expected outcomes:
+- No `TypeError` anywhere in trustee_performance service for invalid month input.
+- `_extract_report_date` returns `None` for invalid month/year.
+- `_transform_single_row` either returns `None` for non-processable rows or raises a clean Pydantic `ValidationError` when model-level validation fails.
+- All existing domain tests for trustee_performance pass.
+
+## GOTCHAS
+- Pydantic v2 `ValidationError` is not intended to be constructed with arbitrary strings; rely on Pydantic to raise it or raise standard exceptions yourself.
+- Ensure logging remains informative when returning `None` from `_extract_report_date` so operators can diagnose data issues.
+- Keep behavior consistent with existing tests: invalid date parts → filtered row (`None`).
+
+## INTEGRATION POINTS
+- `src/work_data_hub/domain/trustee_performance/service.py`: implement the changes above.
+- `tests/domain/trustee_performance/test_service_bug.py`: convert from a crashing reproducer to an assertion of expected behavior.
+- Orchestration ops/jobs remain unchanged; they already handle filtered rows and error logging.
+
+## REFERENCES
+- Pydantic v2 error handling and validators:
+  - https://docs.pydantic.dev/latest/usage/validators/
+  - https://docs.pydantic.dev/latest/errors/
+- Project guidelines: `AGENTS.md`, `CLAUDE.md`
+
+## ACCEPTANCE CRITERIA
+- [ ] C-016 updated to PRP_GENERATED with link to PRP after generation.
+- [ ] No `TypeError` is raised for invalid date inputs; rows are filtered or raise clean `ValidationError` only where appropriate.
+- [ ] All validation gates pass: ruff, mypy, pytest.
+
+## NEXT STEPS FOR CLAUDE
+1) Generate PRP from this INITIAL: `.claude/commands/generate-prp.md` using this file as context.
+2) Execute PRP step-by-step and run validation gates.
+3) Update ROADMAP.md task C-016 status and PRP link.

@@ -116,8 +116,8 @@ def _transform_single_row(
     # Step 1: Parse raw row into input model for initial validation
     try:
         input_model = TrusteePerformanceIn(**raw_row)
-    except ValidationError as e:
-        raise ValidationError(f"Input validation failed: {e}")
+    except ValidationError:
+        raise
 
     # Step 2: Extract and validate core date information
     report_date = _extract_report_date(input_model, row_index)
@@ -150,8 +150,8 @@ def _transform_single_row(
     try:
         output_model = TrusteePerformanceOut(**output_data)
         return output_model
-    except ValidationError as e:
-        raise ValidationError(f"Output validation failed: {e}")
+    except ValidationError:
+        raise
 
 
 def _extract_report_date(input_model: TrusteePerformanceIn, row_index: int) -> Optional[date]:
@@ -201,18 +201,20 @@ def _extract_report_date(input_model: TrusteePerformanceIn, row_index: int) -> O
     if year is not None and month is not None:
         # Treat explicitly provided but invalid values as validation errors
         if not (2000 <= year <= 2030):
-            raise ValidationError(
-                f"Invalid year {year} in row {row_index}")
+            logger.debug(f"Row {row_index}: Invalid year {year}; returning None")
+            return None
         if not (1 <= month <= 12):
-            raise ValidationError(
-                f"Invalid month {month} in row {row_index}")
+            logger.debug(f"Row {row_index}: Invalid month {month}; returning None")
+            return None
 
         try:
             return date(year, month, 1)
         except ValueError as e:
-            raise ValidationError(
-                f"Cannot construct date from year={year}, month={month}: {e}"
+            logger.debug(
+                f"Row {row_index}: Cannot construct date from year={year}, "
+                f"month={month}: {e}; returning None"
             )
+            return None
 
     logger.debug(f"Row {row_index}: Could not extract valid year/month")
     return None

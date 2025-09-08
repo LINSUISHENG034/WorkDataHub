@@ -26,6 +26,10 @@ def test_transform_row_with_invalid_month_reproduces_bug():
         "公司代码": "TECH-DEBT",
     }
 
-    # We expect this call to crash with a TypeError due to the bug,
-    # instead of raising a clean, expected pydantic.ValidationError.
-    _transform_single_row(bug_trigger_row, data_source="bug_test", row_index=0)
+    # After the bug fix, this should no longer crash with TypeError.
+    # Instead, the invalid month should cause _extract_report_date to return None,
+    # which means the entire row gets filtered out (returns None).
+    result = _transform_single_row(bug_trigger_row, data_source="bug_test", row_index=0)
+    
+    # Verify that the row is filtered out due to invalid date
+    assert result is None, "Row with invalid month=13 should be filtered out (return None)"
