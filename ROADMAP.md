@@ -50,18 +50,21 @@ TASK BREAKDOWN PHILOSOPHY:
 
 | ID | Epic | Feature/Task | Status | Dependencies | PRP_Link |
 | :---- | :---- | :---- | :---- | :---- | :---- |
-| R-015 | M2 | Inventory legacy cleaners/domains and produce migration plan | READY_FOR_PRP | - | - |
-| R-020 | M2 | Profile Domain B inputs; define data contract strategy | READY_FOR_PRP | - | - |
-| F-020 | M2 | Add Pydantic models for Domain B | PENDING | R-020 | - |
-| F-021 | M2 | Implement Domain B transformation service (pure, validated) | PENDING | F-020 | - |
-| F-022 | M2 | Extend `data_sources.yml` with Domain B patterns/table/pk | PENDING | R-020 | - |
-| F-023 | M2 | Unit/integration tests for Domain B models + service | PENDING | F-020, F-021 | - |
-| F-024 | M2 | Execute Domain B via existing Dagster job + CLI example | PENDING | F-021, F-022 | - |
-| F-025 | M2 | Migrate Annuity Income domain (收入明细) to new stack | PENDING | R-015 | - |
-| F-026 | M2 | Migrate Group Retirement domain (团养缴费) | PENDING | R-015 | - |
-| F-027 | M2 | Migrate Awards/Losses ledger (受托/投资 中标/流失) | PENDING | R-015 | - |
-| F-028 | M2 | Migrate Health Coverage domains (企康/JK) | PENDING | R-015 | - |
-| F-029 | M2 | Migrate Revenue Details/Budget (收入明细/预算) | PENDING | R-015 | - |
+| R-015 | M2 | Inventory legacy cleaners/domains and produce migration plan | COMPLETED | - | P-015 |
+| C-014 | M2 | Build intelligent MappingService with DB-driven rules engine | READY_FOR_PRP | R-015 | - |
+| F-018 | M2 | Create BaseDomainService framework and utilities | READY_FOR_PRP | R-015 | - |
+| F-019 | M2 | Migrate AnnuityPerformance domain (规模明细) - HIGH complexity | PENDING | C-014, F-018 | - |
+| F-025 | M2 | Migrate AnnuityIncome domain (收入明细) - HIGH complexity | PENDING | C-014, F-018 | - |
+| F-026 | M2 | Migrate GroupRetirement domain (团养缴费) - MEDIUM complexity | PENDING | C-014, F-018 | - |
+| F-027 | M2 | Migrate TrusteeAward/Loss domains (受托中标/流失) - LOW complexity | PENDING | C-014, F-018 | - |
+| F-028 | M2 | Migrate InvesteeAward/Loss domains (投资中标/流失) - LOW complexity | PENDING | C-014, F-018 | - |
+| F-029 | M2 | Migrate 3 Health Coverage domains (企康/养老险/健康险) - MEDIUM | PENDING | C-014, F-018 | - |
+| F-034 | M2 | Migrate RevenueDetails/Budget domains (利润达成/预算) - HIGH | PENDING | C-014, F-018 | - |
+| F-035 | M2 | Migrate Manual Adjustment domains (提费扩面/手工调整) - MEDIUM | PENDING | C-014, F-018 | - |
+| F-036 | M2 | Migrate Portfolio Management domains (组合业绩/职年新增) - LOW | PENDING | C-014, F-018 | - |
+| F-037 | M2 | Migrate Financial domains (风准金/历史浮费/减值计提) - MEDIUM | PENDING | C-014, F-018 | - |
+| F-038 | M2 | Migrate GRAward and RenewalPending domains (团养中标/续签) - LOW | PENDING | C-014, F-018 | - |
+| C-015 | M2 | Create regression test suite comparing legacy vs new outputs | PENDING | F-019 | - |
 | R-016 | M2 | Research ingestion connectors (HTTP/SFTP) and auth strategy | READY_FOR_PRP | - | - |
 | F-032 | M2 | Implement HTTP crawler connector + retries/auth + CLI | PENDING | R-016 | - |
 | F-033 | M2 | Implement SFTP/FTP downloader connector | PENDING | R-016 | - |

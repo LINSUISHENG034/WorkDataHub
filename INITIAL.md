@@ -1,148 +1,181 @@
-# INITIAL.md — C‑011 Validate Trustee Performance E2E Execute Mode (Fix DB Context, JSONB, Decimal)
+# INITIAL.md — M3 Schedules, Sensors, and Alerting for Trustee Performance
 
-Selected task: ROADMAP.md → Milestone 1 → C‑011
+Selected task: ROADMAP.md → Milestone 3 → F‑030 (Add schedules for domain jobs), F‑031 (Add data quality sensors), C‑030 (Configure alerting)
 
-Purpose: Ensure the trustee_performance Dagster job runs end‑to‑end against PostgreSQL with `--execute`, not just plan‑only. Address defects surfaced in VALIDATION.md: psycopg2 connection context recursion, JSONB parameter adaptation, and Decimal precision validation causing row drops.
+Purpose: Operationalize the trustee_performance pipeline by adding a production schedule, file‑based trigger sensor, and basic data‑quality sensor with alert hooks. Expose these through a Dagster Definitions module so `dagster dev` can discover jobs, schedules, and sensors.
 
-Reference: See VALIDATION.md — errors include Pydantic `decimal_max_places` on `return_rate`, and `psycopg2.ProgrammingError: the connection cannot be re-entered recursively` during load.
+Dependencies: R‑030 (Research Dagster sensors/alerts) is implicitly satisfied by the design below; no external services required.
 
 ## FEATURE
-Make `uv run python -m src.work_data_hub.orchestration.jobs --execute --max-files 2` succeed end‑to‑end:
-- Fix DB connection context handling to avoid recursive re‑entry.
-- Properly adapt JSONB parameters for psycopg2.
-- Quantize numeric inputs to the declared decimal places to avoid Pydantic precision errors.
+Add:
+- A daily schedule to run `trustee_performance_multi_file_job` at 02:00 Asia/Shanghai in execute mode.
+- A file discovery sensor that triggers the job when new matching trustee files are discovered since the last run.
+- A post‑run data quality sensor that checks the last job result and raises an alert when inserted rows == 0.
+- A `Definitions` entry point that registers jobs, schedules, and sensors for `dagster dev`.
 
 ## SCOPE
 - In‑scope:
-  - `src/work_data_hub/orchestration/ops.py` — adjust DB connection lifecycle in `load_op` to avoid nesting with the loader’s own context management.
-  - `src/work_data_hub/io/loader/warehouse_loader.py` — adapt dict/list values to JSONB via `psycopg2.extras.Json` before `execute_values`.
-  - `src/work_data_hub/domain/trustee_performance/models.py` — extend decimal field validator to convert/quantize inputs to the model’s precision (`return_rate`: 6, `net_asset_value`: 4, `fund_scale`: 2) and avoid float tail precision errors.
-  - Tests covering the above, including a DB‑skipped suite and optional `@pytest.mark.postgres` for live DB.
+  - New files under `src/work_data_hub/orchestration/`:
+    - `schedules.py`: schedule(s) for trustee_performance job(s).
+    - `sensors.py`: file discovery sensor + data-quality sensor.
+    - `repository.py`: exports `Definitions` including jobs, schedules, sensors.
+  - Unit tests for schedule config and sensor logic (no external services needed).
 - Non‑goals:
-  - Do not change DB schema or table/column names (table SQL already applied).
-  - Do not change file discovery patterns or job CLI contract beyond these fixes.
-  - No new domains, connectors, or scheduling.
+  - No Slack/email integration (provide alert hooks/logging only).
+  - No changes to job/ops behavior beyond run_config injection.
+  - No Docker/K8s deployment work (separate task).
 
 ## CONTEXT SNAPSHOT
 ```bash
 src/work_data_hub/
   orchestration/
-    ops.py               # load_op opens psycopg2 connection (nested)
-    jobs.py              # CLI and run_config (works)
-  io/
-    loader/warehouse_loader.py  # uses `with conn:` and execute_values
-    readers/excel_reader.py      # ok
-  domain/trustee_performance/
-    models.py            # Pydantic v2; decimal_places set on Decimal fields
-    service.py           # transformation; model_dump() yields list/dict for warnings
-config/
-  data_sources.yml       # table/pk = trustee_performance
-scripts/create_table/trustee_performance.sql   # already applied
+    jobs.py                   # trustee_performance_*_job + build_run_config(args)
+    ops.py                    # ops
+  io/connectors/file_connector.py   # DataSourceConnector.discover(domain)
+  config/
+    settings.py               # get_settings(); DB + paths
+    data_sources.yml          # domains.trustee_performance.table/pk
 ```
 
-## EXAMPLES
-- Pattern: Connection lifecycle — pick one layer to own transaction
-  - Current: ops.py wraps `psycopg2.connect(dsn)` in `with ...:` and loader also does `with conn:` → recursion error.
-  - Follow loader’s transaction management: in ops.py use bare `conn = psycopg2.connect(dsn)` and pass to `load(...)`; rely on loader’s `with conn:` to commit/rollback and close cursor; ensure `conn.close()` in finally.
-
-- JSONB adaptation with psycopg2
+## EXAMPLES (most important)
+- `Definitions` module pattern
 ```python
-from psycopg2.extras import Json
+# src/work_data_hub/orchestration/repository.py
+from dagster import Definitions
+from .jobs import trustee_performance_job, trustee_performance_multi_file_job
+from .schedules import trustee_daily_schedule
+from .sensors import trustee_new_files_sensor, trustee_dq_sensor
 
-def _adapt_param(v):
-    # wrap non‑scalar JSON types so psycopg2 can send to json/jsonb
-    if isinstance(v, (dict, list)):
-        return Json(v)
-    return v
-
-# before execute_values, map each value in each row
-row_data = [[_adapt_param(val) for val in row] for row in row_data]
+defs = Definitions(
+    jobs=[trustee_performance_job, trustee_performance_multi_file_job],
+    schedules=[trustee_daily_schedule],
+    sensors=[trustee_new_files_sensor, trustee_dq_sensor],
+)
 ```
 
-- Decimal quantization in Pydantic v2
+- Daily schedule with run_config
 ```python
-from decimal import Decimal, ROUND_HALF_UP
-from pydantic import FieldValidationInfo
+# src/work_data_hub/orchestration/schedules.py
+from dagster import schedule
+from .jobs import trustee_performance_multi_file_job
+from ..config.settings import get_settings
+import yaml
 
-PLACES = {"return_rate": 6, "net_asset_value": 4, "fund_scale": 2}
+def _build_schedule_run_config():
+    settings = get_settings()
+    with open(settings.data_sources_config, "r", encoding="utf-8") as f:
+        ds = yaml.safe_load(f) or {}
+    domain_cfg = ds.get("domains", {}).get("trustee_performance", {})
+    return {
+        "ops": {
+            "discover_files_op": {"config": {"domain": "trustee_performance"}},
+            "read_and_process_trustee_files_op": {"config": {"sheet": 0, "max_files": 5}},
+            "load_op": {
+                "config": {
+                    "table": domain_cfg.get("table", "trustee_performance"),
+                    "mode": "delete_insert",
+                    "pk": domain_cfg.get("pk", ["report_date", "plan_code", "company_code"]),
+                    "plan_only": False,
+                }
+            },
+        }
+    }
 
-@field_validator("return_rate", "net_asset_value", "fund_scale", mode="before")
-@classmethod
-def clean_decimal_fields(cls, v, info: FieldValidationInfo):
-    # existing parsing (%, cleaning) → obtain a numeric/str value "val"
-    if v is None or v == "":
-        return None
-    # normalize str/float/int → Decimal using string to avoid float tail
-    s = str(v).strip() if not isinstance(v, (int, float, Decimal)) else (str(v) if isinstance(v, float) else v)
-    d = Decimal(str(s)) if not isinstance(v, Decimal) else v
-    places = PLACES.get(info.field_name)
-    if places is not None:
-        quant = Decimal("1." + ("0" * places))
-        d = d.quantize(quant, rounding=ROUND_HALF_UP)
-    return d
+@schedule(cron_schedule="0 2 * * *", job=trustee_performance_multi_file_job, execution_timezone="Asia/Shanghai")
+def trustee_daily_schedule(_context):
+    return _build_schedule_run_config()
+```
+
+- File discovery sensor
+```python
+# src/work_data_hub/orchestration/sensors.py
+from dagster import sensor, RunRequest, SkipReason
+from ..io.connectors.file_connector import DataSourceConnector
+from .jobs import trustee_performance_multi_file_job
+
+@sensor(job=trustee_performance_multi_file_job, minimum_interval_seconds=300)
+def trustee_new_files_sensor(context):
+    connector = DataSourceConnector()
+    files = connector.discover("trustee_performance")
+    if not files:
+        return SkipReason("No trustee_performance files found")
+
+    # Cursor: last processed mtime
+    last_mtime = float(context.cursor) if context.cursor else 0.0
+    new_files = [f for f in files if f.metadata.get("modified_time", 0) > last_mtime]
+    if not new_files:
+        return SkipReason("No new files since last poll")
+
+    max_mtime = max(f.metadata.get("modified_time", 0) for f in new_files)
+    context.update_cursor(str(max_mtime))
+
+    run_config = {
+        "ops": {
+            "discover_files_op": {"config": {"domain": "trustee_performance"}},
+            "read_and_process_trustee_files_op": {"config": {"sheet": 0, "max_files": 5}},
+            "load_op": {"config": {"table": "trustee_performance", "mode": "delete_insert", "pk": ["report_date","plan_code","company_code"], "plan_only": False}},
+        }
+    }
+    return RunRequest(run_key=str(max_mtime), run_config=run_config)
+```
+
+- Simple data‑quality sensor (checks prior run result via instance/run storage is non‑trivial; here we compute a quick health probe by counting planned insert parameters)
+```python
+from dagster import sensor, SkipReason
+from ..io.loader.warehouse_loader import build_insert_sql
+
+@sensor(minimum_interval_seconds=600)
+def trustee_dq_sensor(context):
+    # Lightweight check: ensure at least some records would be inserted if run now
+    # (Plan-only probe avoids DB access.)
+    # In practice, you could query the DB or Dagster event log for last run stats.
+    from ..io.connectors.file_connector import DataSourceConnector
+    from ..io.readers.excel_reader import read_excel_rows
+    from ..domain.trustee_performance.service import process
+
+    files = DataSourceConnector().discover("trustee_performance")
+    if not files:
+        return SkipReason("DQ: No files to process")
+    rows = read_excel_rows(files[0].path, sheet=0)
+    processed = [m.model_dump() for m in process(rows, data_source=files[0].path)]
+    if not processed:
+        return SkipReason("DQ: No records would be produced")
+    sql, params = build_insert_sql("trustee_performance", sorted(processed[0].keys()), processed[:100])
+    if not params:
+        return SkipReason("DQ: Insert plan has no parameters")
+    return SkipReason("DQ: OK (probe passed)")
 ```
 
 ## DOCUMENTATION
-- Pydantic v2 field validators & validation info:
-  - https://docs.pydantic.dev/2.11/usage/validators/#field-validators
-- Decimal pitfalls and quantize:
-  - Python `decimal` — https://docs.python.org/3/library/decimal.html#decimal.Decimal.quantize
-- psycopg2 JSON adaptation:
-  - https://www.psycopg.org/docs/extras.html#json-adaptation
-- psycopg2 connections and context managers:
-  - https://www.psycopg.org/docs/connection.html#connection
+- Dagster schedules: https://docs.dagster.io/concepts/partitions-schedules-sensors/schedules
+- Dagster sensors: https://docs.dagster.io/concepts/partitions-schedules-sensors/sensors
+- Dagster Definitions: https://docs.dagster.io/deployment/code-locations#definitions
+- Timezone: https://docs.dagster.io/concepts/partitions-schedules-sensors/schedules#time-zones
 
 ## INTEGRATION POINTS
-- Data models: `TrusteePerformanceOut` decimal fields — keep `decimal_places` as is; validator enforces quantization.
-- Database: no DDL changes; table `trustee_performance` exists per `scripts/create_table/trustee_performance.sql` (JSONB column `validation_warnings`).
-- Config/ENV: keep using `.env` → `Settings.get_database_connection_string()`; no new vars.
-- Jobs: no CLI changes; continue using `--execute` and `--plan-only` semantics.
+- Orchestration: imports existing jobs, no changes to ops.
+- Config: schedule/sensor run_config must pull table/pk from `data_sources.yml` for consistency.
+- IO: File connector used by file sensor and DQ probe; Excel reader + domain service used by DQ probe.
+- CLI/Web: Expose Definitions for `dagster dev -m src.work_data_hub.orchestration.repository`.
 
 ## DATA CONTRACTS
-Trustee performance output schema (aligned with table):
-- `report_date: date`
-- `plan_code: str`
-- `company_code: str`
-- `return_rate: Decimal(8,6) | null`
-- `net_asset_value: Decimal(18,4) | null`
-- `fund_scale: Decimal(18,2) | null`
-- `data_source: text`
-- `processed_at: timestamp`
-- `has_performance_data: boolean`
-- `validation_warnings: jsonb` (list of strings)
-
-Sample record:
-```json
-{
-  "report_date": "2024-01-01",
-  "plan_code": "PLAN001",
-  "company_code": "COMP001",
-  "return_rate": 0.048800,
-  "net_asset_value": 1.0512,
-  "fund_scale": 12000000.00,
-  "data_source": "tests/fixtures/sample_data/2024-01_受托业绩_sample.xlsx",
-  "processed_at": "2025-09-08T14:00:00",
-  "has_performance_data": true,
-  "validation_warnings": []
-}
-```
+- No changes to database schema.
+- Schedule/sensor run_config must specify:
+  - `ops.discover_files_op.config.domain`
+  - `ops.read_and_process_trustee_files_op.config.sheet` and `max_files`
+  - `ops.load_op.config.table`, `mode`, `pk`, `plan_only=False` for execute paths
 
 ## GOTCHAS & LIBRARY QUIRKS
-- Do not nest psycopg2 connection context managers; only one layer should manage `with conn:`.
-- psycopg2 will not adapt Python list/dict to JSONB automatically; wrap with `extras.Json`.
-- Avoid constructing `Decimal` from binary floats directly; always use `Decimal(str(x))` prior to `quantize`.
-- Keep Dagster job execution in‑process; `jobs.py` is fine. No need for DAGSTER_HOME unless `--debug`.
-- Windows paths may appear in logs; avoid hard‑coded separators.
+- Dagster schedules/sensors require a Definitions module; ensure imports are lightweight (avoid heavy I/O at import time).
+- Keep sensors fast; use `minimum_interval_seconds` and avoid DB calls by default.
+- Time zones: set `execution_timezone` to avoid UTC cron surprises.
+- Windows paths: use `Path`/OS‑agnostic joins in any file path handling.
 
 ## IMPLEMENTATION NOTES
-- ops.py
-  - Replace `with psycopg2.connect(dsn) as conn:` with `conn = psycopg2.connect(dsn)` and ensure `finally: conn.close()` when not plan‑only.
-  - Keep plan‑only path unchanged.
-- warehouse_loader.py
-  - Before `execute_values`, adapt per‑value using helper `_adapt_param` (wrap dict/list with `Json`).
-  - Leave plan‑only `sql_plans` intact; do not mutate returned params for readability.
-- models.py
-  - Extend existing `clean_decimal_fields` to perform quantization keyed by `info.field_name` without loosening constraints.
+- Create three new modules as outlined (schedules.py, sensors.py, repository.py).
+- Reuse `data_sources.yml` to populate table/pk for load config.
+- Prefer pure‑python logic; no network calls.
+- Keep code consistent with existing logging and error handling patterns.
 
 ## VALIDATION GATES (must pass)
 ```bash
@@ -151,60 +184,48 @@ uv run mypy src/
 uv run pytest -v
 ```
 
-E2E checks:
+Manual checks (optional):
 ```bash
-# Plan‑only sanity
-uv run python -m src.work_data_hub.orchestration.jobs --plan-only --max-files 2
+# Start Dagster UI with Definitions
+uv run dagster dev -m src.work_data_hub.orchestration.repository
 
-# Execute against DB (requires .env pointing to a reachable Postgres)
-uv run python -m src.work_data_hub.orchestration.jobs --execute --max-files 2
+# Verify in UI:
+# - Jobs show up
+# - trustee_daily_schedule appears on Schedules page
+# - Sensors page shows trustee_new_files_sensor and trustee_dq_sensor
 ```
 
-Expected outcomes:
-- Plan‑only: job succeeds; `load_op` returns `sql_plans` with DELETE + INSERT batches.
-- Execute: job succeeds; no `ProgrammingError: connection cannot be re-entered`; inserted rows match processed count; JSONB column accepted.
-
 ## ACCEPTANCE CRITERIA
-- [ ] psycopg2 recursion error eliminated in execute mode.
-- [ ] JSONB parameters are correctly adapted; no `can't adapt type list/dict` errors.
-- [ ] Decimal inputs quantized to their declared precision; no `decimal_max_places` errors on valid inputs.
-- [ ] All validation gates green (ruff, mypy, pytest), and E2E execute succeeds on sample data with a reachable DB.
+- [ ] `Definitions` exposes jobs, schedule, and sensors without import errors.
+- [ ] Daily schedule returns a valid run_config and targets `trustee_performance_multi_file_job`.
+- [ ] File discovery sensor triggers when new files appear (cursor advances) and skips otherwise.
+- [ ] DQ sensor runs fast (<5s), skips with informative reason, and returns OK when probe passes.
+- [ ] All validation gates pass (ruff, mypy, pytest).
 
 ## ROLLOUT & RISK
-- Requires a reachable Postgres for execute validation; otherwise, rely on plan‑only tests and mark DB tests with `@pytest.mark.postgres`.
-- Minimal risk to plan‑only path; primary changes are guarded under execute branch and model validators.
-- Rollback: revert ops.py connection lifecycle and loader JSON adaptation; Decimal validator change is additive and can be gated.
+- Default sensors perform plan‑only probes to avoid DB dependency.
+- Schedule runs in execute mode, relying on existing DB configuration via .env.
+- Low risk: changes are additive. Rollback by removing the new modules from Definitions.
 
 ## APPENDICES
 Useful ripgrep searches:
 ```bash
-rg -n "load_op\(|execute_values|jsonb|decimal_places|FieldValidationInfo" src/
+rg -n "Definitions\(|@schedule|@sensor|execution_timezone|RunRequest|SkipReason" src/
 ```
 
-Minimal test skeleton (DB‑less):
+Test skeletons:
 ```python
-def test_build_insert_plan_includes_jsonb_without_error():
-    rows = [{"a": 1, "validation_warnings": ["ok"]}]
-    plan = load("t", rows, mode="append", conn=None)
-    assert plan["sql_plans"]
-```
+def test_schedule_builds_run_config():
+    from src.work_data_hub.orchestration.schedules import _build_schedule_run_config
+    cfg = _build_schedule_run_config()
+    assert cfg["ops"]["load_op"]["config"]["plan_only"] is False
 
-Optional DB test (requires Postgres, mark with `postgres`):
-```python
-import pytest, psycopg2
-
-@pytest.mark.postgres
-def test_execute_values_accepts_jsonb(settings):
-    conn = psycopg2.connect(settings.get_database_connection_string())
-    try:
-        rows = [{"report_date": "2024-01-01", "plan_code": "P", "company_code": "C", "validation_warnings": []}]
-        out = load("trustee_performance", rows, mode="append", pk=None, conn=conn)
-        assert out["inserted"] == 1
-    finally:
-        conn.close()
+def test_file_sensor_cursor(monkeypatch, tmp_path):
+    # monkeypatch DataSourceConnector.discover to return synthetic files with mtimes
+    ...
 ```
 
 Next steps for Claude:
-1) Generate PRP from this INITIAL (C‑011) and implement fixes in ops.py, warehouse_loader.py, and models.py with tests.
-2) Run validation gates; verify plan‑only and execute modes as applicable.
-3) Update ROADMAP.md: mark C‑011 → COMPLETED with PRP link; if new subtask(s) were introduced (e.g., JSONB adaptation), add them and mark COMPLETED.
+1) Generate PRP from this INITIAL (F‑030, F‑031, C‑030) and implement schedules.py, sensors.py, repository.py with tests.
+2) Run validation gates; optionally verify in Dagster UI via `dagster dev`.
+3) Update ROADMAP.md: mark F‑030/F‑031/C‑030 → COMPLETED with PRP link(s).

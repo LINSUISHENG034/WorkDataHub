@@ -15,6 +15,34 @@ WorkDataHub is a reliable, declarative, and testable data processing platform re
 - Orchestration: Dagster‑style ops and jobs (discover → read → transform → load).
 - Utils: typed helpers and common types.
 
+## Workflow (High‑Level)
+A structural view of the end‑to‑end pipeline from trigger to data load. This focuses on orchestration and dataflow, independent of domain‑specific rules.
+
+```mermaid
+flowchart TD
+  A[Triggers\nCLI / Schedule / Sensor] --> B[Dagster Definitions\n(repository.py)]
+  B --> C{Job}
+  C --> D[discover_files_op\nConfig‑driven file discovery]
+  D --> E{Single file?}
+  E -- Yes --> F[read_excel_op\nRead rows from Excel]
+  E -- No  --> G[read_and_process_files_op\nBatch read + accumulate]
+  F --> H[process_op\nDomain service transformation]
+  G --> H[process_op\nDomain service transformation]
+  H --> I[load_op\nPlan‑only (SQL plan) or Execute]
+  I --> J[Results\nPlans or transactional DB load]
+  J --> K[Logging / Observability / Error handling]
+```
+
+Key characteristics
+- Triggers: initiated via CLI, scheduled runs, or file‑driven sensors.
+- Central registry: Dagster `Definitions` exposes jobs/schedules/sensors.
+- Jobs: compose ops into a directed flow; support single or multi‑file paths.
+- Discovery: configuration‑driven patterns and selection strategies determine inputs.
+- Reading: resilient Excel ingestion producing normalized row records.
+- Processing: domain services apply validation and transformations.
+- Loading: plan‑only returns SQL plans; execute mode performs transactional writes.
+
+
 ## Code Map (stable entry points)
 - Config: `src/work_data_hub/config/settings.py`, `src/work_data_hub/config/schema.py`, `src/work_data_hub/config/data_sources.yml`
 - IO — Readers/Connectors/Loader:
@@ -55,7 +83,7 @@ uv run pytest tests/e2e/test_trustee_performance_e2e.py -v
 ## Docs Index
 - System overview (current): `docs/overview/01_system_overview.md`
 - PRPs (Product Requirements Prompts): `PRPs/`
-- PRP workflow and commands: `AGENTS.md`, `COMMANDS.md`
+- PRP workflow: `AGENTS.md`
 - Legacy analyses (superseded, for history):
   - `docs/project/01_architecture_analysis_report.md`
   - `docs/implement/01_implementation_plan.md`
@@ -63,7 +91,7 @@ uv run pytest tests/e2e/test_trustee_performance_e2e.py -v
   - `docs/project/03_specified_data_source_problems_analysis.md`
   - `docs/project/04_dependency_and_priority_analysis.md`
 - PRPs (Product Requirements Prompts): `PRPs/`
-- PRP workflow and commands: `AGENTS.md`, `COMMANDS.md`
+- PRP workflow: `AGENTS.md`
 
 ## Source of Truth & Maintenance
 - Plan and status live in `ROADMAP.md`.

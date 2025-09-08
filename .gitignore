@@ -1,16 +1,12 @@
 # Claude Code settings
-
-# Ignore all CLAUDE.md files
-**/CLAUDE.md
-**/CLAUDE.local.md
+.claude/
+monthly/
 
 # Ignore folders
-reference/
 deprecated/
 legacy/
 archive/
 .kiro/
-.claude/
 .serena/
 .trae/
 .ruff_cache/
