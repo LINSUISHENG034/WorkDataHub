@@ -6,18 +6,19 @@ including Chinese character handling and comprehensive error scenarios.
 """
 
 import os
-import pytest
-import yaml
 from pathlib import Path
 
+import pytest
+import yaml
+
 from src.work_data_hub.config.mapping_loader import (
-    load_yaml_mapping,
-    load_company_branch,
-    load_default_portfolio_code,
-    load_company_id_overrides_plan,
-    load_business_type_code,
     MappingLoaderError,
     get_mappings_dir,
+    load_business_type_code,
+    load_company_branch,
+    load_company_id_overrides_plan,
+    load_default_portfolio_code,
+    load_yaml_mapping,
 )
 
 
@@ -65,7 +66,7 @@ def invalid_value_types_file(tmp_path):
         "invalid_key": {"nested": "dict"},
         "another_key": ["list", "value"],
     }
-    
+
     invalid_path = tmp_path / "invalid_values.yml"
     with open(invalid_path, "w", encoding="utf-8") as f:
         yaml.dump(invalid_values, f, allow_unicode=True)
@@ -78,13 +79,13 @@ class TestLoadYamlMapping:
     def test_load_yaml_mapping_happy_path(self, sample_mapping_file, sample_mapping):
         """Test successful loading of YAML mapping."""
         mapping = load_yaml_mapping(sample_mapping_file)
-        
+
         # Assert known entries from sample mapping
         assert mapping["内蒙"] == "G31"
         assert mapping["战略"] == "G37"
         assert mapping["济南"] == "G21"
         assert mapping["北京其他"] == "G37"
-        
+
         # Assert all values are converted to strings
         for key, value in mapping.items():
             assert isinstance(key, str)
@@ -97,18 +98,18 @@ class TestLoadYamlMapping:
             "FP0002": 614810477,
             "P0809": 608349737,
         }
-        
+
         mapping_path = tmp_path / "int_values.yml"
         with open(mapping_path, "w", encoding="utf-8") as f:
             yaml.dump(mapping_data, f)
-        
+
         mapping = load_yaml_mapping(str(mapping_path))
-        
+
         # All values should be converted to strings
         assert mapping["FP0001"] == "614810477"
-        assert mapping["FP0002"] == "614810477" 
+        assert mapping["FP0002"] == "614810477"
         assert mapping["P0809"] == "608349737"
-        
+
         for key, value in mapping.items():
             assert isinstance(key, str)
             assert isinstance(value, str)
@@ -132,11 +133,11 @@ class TestLoadYamlMapping:
         """Test error with non-string keys."""
         # Create YAML with non-string keys
         invalid_data = {123: "numeric_key", "valid_key": "valid_value"}
-        
+
         invalid_path = tmp_path / "invalid_keys.yml"
         with open(invalid_path, "w", encoding="utf-8") as f:
             yaml.dump(invalid_data, f)
-        
+
         with pytest.raises(MappingLoaderError, match="Mapping key must be string"):
             load_yaml_mapping(str(invalid_path))
 
@@ -149,20 +150,20 @@ class TestLoadYamlMapping:
         """Test loading empty YAML file returns empty dict."""
         empty_path = tmp_path / "empty.yml"
         empty_path.write_text("", encoding="utf-8")
-        
+
         mapping = load_yaml_mapping(str(empty_path))
         assert mapping == {}
 
     def test_load_yaml_mapping_chinese_characters_preserved(self, sample_mapping_file):
         """Test that Chinese characters are correctly preserved."""
         mapping = load_yaml_mapping(sample_mapping_file)
-        
+
         # Check Chinese keys are preserved
         assert "内蒙" in mapping
         assert "战略" in mapping
         assert "济南" in mapping
         assert "北京其他" in mapping
-        
+
         # Verify the actual Chinese characters are correct
         assert len("内蒙") == 2  # Two Chinese characters
         assert len("北京其他") == 4  # Four Chinese characters
@@ -174,7 +175,7 @@ class TestSpecificLoaderFunctions:
     def test_load_company_branch_happy_path(self):
         """Test successful loading of company branch mapping."""
         mapping = load_company_branch()
-        
+
         # Assert known sample entries from YAML
         assert "内蒙" in mapping
         assert mapping["内蒙"] == "G31"
@@ -182,7 +183,7 @@ class TestSpecificLoaderFunctions:
         assert mapping["济南"] == "G21"
         assert "战略" in mapping
         assert mapping["战略"] == "G37"
-        
+
         # Verify all values are strings
         for key, value in mapping.items():
             assert isinstance(key, str)
@@ -191,7 +192,7 @@ class TestSpecificLoaderFunctions:
     def test_load_default_portfolio_code_happy_path(self):
         """Test successful loading of default portfolio code mapping."""
         mapping = load_default_portfolio_code()
-        
+
         # Assert known sample entries from YAML
         assert "集合计划" in mapping
         assert mapping["集合计划"] == "QTAN001"
@@ -199,7 +200,7 @@ class TestSpecificLoaderFunctions:
         assert mapping["单一计划"] == "QTAN002"
         assert "职业年金" in mapping
         assert mapping["职业年金"] == "QTAN003"
-        
+
         # Verify all values are strings
         for key, value in mapping.items():
             assert isinstance(key, str)
@@ -208,7 +209,7 @@ class TestSpecificLoaderFunctions:
     def test_load_company_id_overrides_plan_happy_path(self):
         """Test successful loading of company ID overrides mapping."""
         mapping = load_company_id_overrides_plan()
-        
+
         # Assert known sample entries from YAML
         assert "FP0001" in mapping
         assert mapping["FP0001"] == "614810477"
@@ -216,7 +217,7 @@ class TestSpecificLoaderFunctions:
         assert mapping["FP0002"] == "614810477"
         assert "P0809" in mapping
         assert mapping["P0809"] == "608349737"
-        
+
         # Verify all values are strings (even though they're numbers)
         for key, value in mapping.items():
             assert isinstance(key, str)
@@ -225,13 +226,13 @@ class TestSpecificLoaderFunctions:
     def test_load_business_type_code_happy_path(self):
         """Test successful loading of business type code mapping."""
         mapping = load_business_type_code()
-        
+
         # Assert known sample entries from YAML
         assert "职年受托" in mapping
         assert mapping["职年受托"] == "ZNST"
         assert "职年投资" in mapping
         assert mapping["职年投资"] == "ZNTZ"
-        
+
         # Verify all values are strings
         for key, value in mapping.items():
             assert isinstance(key, str)
@@ -242,18 +243,18 @@ class TestSpecificLoaderFunctions:
         # Mock the mapping files to not exist
         def mock_load_yaml_mapping(path):
             raise MappingLoaderError(f"Mapping file not found: {path}")
-        
+
         monkeypatch.setattr("src.work_data_hub.config.mapping_loader.load_yaml_mapping", mock_load_yaml_mapping)
-        
+
         with pytest.raises(MappingLoaderError, match="Mapping file not found"):
             load_company_branch()
-            
+
         with pytest.raises(MappingLoaderError, match="Mapping file not found"):
             load_default_portfolio_code()
-            
+
         with pytest.raises(MappingLoaderError, match="Mapping file not found"):
             load_company_id_overrides_plan()
-            
+
         with pytest.raises(MappingLoaderError, match="Mapping file not found"):
             load_business_type_code()
 
@@ -269,12 +270,12 @@ class TestIntegration:
             "id_overrides": load_company_id_overrides_plan(),
             "business_type": load_business_type_code(),
         }
-        
+
         # Verify each mapping has expected structure
         for name, mapping in mappings.items():
             assert isinstance(mapping, dict)
             assert len(mapping) > 0
-            
+
             # All keys and values should be strings
             for key, value in mapping.items():
                 assert isinstance(key, str)
@@ -286,12 +287,12 @@ class TestIntegration:
         branch_mapping = load_company_branch()
         assert "内蒙" in branch_mapping
         assert "济南" in branch_mapping
-        
-        # Test portfolio code mapping  
+
+        # Test portfolio code mapping
         portfolio_mapping = load_default_portfolio_code()
         assert "集合计划" in portfolio_mapping
         assert "职业年金" in portfolio_mapping
-        
+
         # Test business type mapping
         business_mapping = load_business_type_code()
         assert "职年受托" in business_mapping
@@ -307,7 +308,7 @@ class TestPortabilityAndEnvironmentOverride:
         try:
             # Change to different directory
             os.chdir(tmp_path)
-            
+
             # Should still work - test known values from repo seeds
             mapping = load_company_branch()
             assert "内蒙" in mapping
@@ -324,12 +325,12 @@ class TestPortabilityAndEnvironmentOverride:
         temp_mappings = tmp_path / "mappings"
         temp_mappings.mkdir()
         (temp_mappings / "company_branch.yml").write_text(
-            "test_key: test_value\noverride_key: override_value", 
+            "test_key: test_value\noverride_key: override_value",
             encoding="utf-8"
         )
-        
+
         monkeypatch.setenv("WDH_MAPPINGS_DIR", str(temp_mappings))
-        
+
         mapping = load_company_branch()
         assert mapping["test_key"] == "test_value"
         assert mapping["override_key"] == "override_value"
@@ -339,7 +340,7 @@ class TestPortabilityAndEnvironmentOverride:
     def test_env_override_missing_dir(self, monkeypatch):
         """Test that WDH_MAPPINGS_DIR with missing directory raises error."""
         monkeypatch.setenv("WDH_MAPPINGS_DIR", "/nonexistent/path")
-        
+
         with pytest.raises(MappingLoaderError, match="WDH_MAPPINGS_DIR not found or not a directory"):
             load_company_branch()
 
@@ -348,9 +349,9 @@ class TestPortabilityAndEnvironmentOverride:
         # Create a file instead of directory
         temp_file = tmp_path / "not_a_directory.txt"
         temp_file.write_text("not a directory", encoding="utf-8")
-        
+
         monkeypatch.setenv("WDH_MAPPINGS_DIR", str(temp_file))
-        
+
         with pytest.raises(MappingLoaderError, match="WDH_MAPPINGS_DIR not found or not a directory"):
             get_mappings_dir()
 
@@ -359,12 +360,12 @@ class TestPortabilityAndEnvironmentOverride:
         # Clear any environment variable
         if "WDH_MAPPINGS_DIR" in os.environ:
             del os.environ["WDH_MAPPINGS_DIR"]
-            
+
         mappings_dir = get_mappings_dir()
-        
+
         # Should be module-relative path
         expected_path = Path(__file__).parent.parent.parent / "src" / "work_data_hub" / "config" / "mappings"
-        
+
         # Check that both paths exist and resolve to same location
         assert mappings_dir.exists()
         assert expected_path.exists()

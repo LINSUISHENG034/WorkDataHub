@@ -1,5 +1,7 @@
 # 数据处理优先级与依赖关系分析报告
 
+> Note: This document is superseded by `docs/overview/01_system_overview.md` (2025-09-08). It is preserved for historical context. For current plan/status see `ROADMAP.md`.
+
 ## 1. 问题阐述
 
 在实际生产环境中，数据处理任务之间存在明确的优先级和依赖关系。例如，某些核心数据集（如客户主数据）必须先于交易数据进行处理和加载，因为后者需要引用前者进行数据丰富或验证。遗留系统通过在 `main.py` 中硬编码执行顺序来隐式处理这些依赖，这种方式脆弱且难以维护。

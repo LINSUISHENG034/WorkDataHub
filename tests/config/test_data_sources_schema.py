@@ -5,17 +5,17 @@ This module tests the schema validation functionality for data_sources.yml
 configuration, including validation of domain configurations and error handling.
 """
 
+
 import pytest
 import yaml
-from pathlib import Path
 
 from src.work_data_hub.config.schema import (
-    DomainConfig,
-    DiscoveryConfig, 
     DataSourcesConfig,
-    validate_data_sources_config,
-    get_domain_config,
     DataSourcesValidationError,
+    DiscoveryConfig,
+    DomainConfig,
+    get_domain_config,
+    validate_data_sources_config,
 )
 
 
@@ -54,7 +54,7 @@ def valid_data_sources_config(valid_domain_config, valid_discovery_config):
             "test_domain": valid_domain_config,
             "another_domain": {
                 "pattern": r"another.*\.xlsx$",
-                "select": "latest_by_mtime", 
+                "select": "latest_by_mtime",
                 "sheet": "Sheet1",
                 "table": "another_table",
                 "pk": ["key"]
@@ -79,7 +79,7 @@ class TestDomainConfig:
     def test_valid_domain_config(self, valid_domain_config):
         """Test that valid domain config passes validation."""
         config = DomainConfig(**valid_domain_config)
-        
+
         assert config.description == "Test domain configuration"
         assert config.pattern == r"(?P<year>20\d{2}).*test.*\.xlsx$"
         assert config.select == "latest_by_year_month"
@@ -97,7 +97,7 @@ class TestDomainConfig:
             "table": "test_table",
             "pk": ["id"]
         }
-        
+
         config = DomainConfig(**minimal_config)
         assert config.pattern == r"test.*\.xlsx$"
         assert config.select == "latest_by_mtime"
@@ -111,15 +111,15 @@ class TestDomainConfig:
         # Missing pattern
         with pytest.raises(Exception):  # Pydantic ValidationError
             DomainConfig(select="latest_by_mtime", table="test", pk=["id"])
-            
+
         # Missing select
         with pytest.raises(Exception):
             DomainConfig(pattern="test", table="test", pk=["id"])
-            
+
         # Missing table
         with pytest.raises(Exception):
             DomainConfig(pattern="test", select="latest_by_mtime", pk=["id"])
-            
+
         # Missing pk
         with pytest.raises(Exception):
             DomainConfig(pattern="test", select="latest_by_mtime", table="test")
@@ -151,7 +151,7 @@ class TestDomainConfig:
             pattern="test", select="latest_by_mtime", table="test", pk=["id"], sheet=1
         )
         assert config1.sheet == 1
-        
+
         # String sheet name
         config2 = DomainConfig(
             pattern="test", select="latest_by_mtime", table="test", pk=["id"], sheet="Sheet1"
@@ -165,7 +165,7 @@ class TestDiscoveryConfig:
     def test_valid_discovery_config(self, valid_discovery_config):
         """Test that valid discovery config passes validation."""
         config = DiscoveryConfig(**valid_discovery_config)
-        
+
         assert config.file_extensions == [".xlsx", ".xlsm"]
         assert config.exclude_directories == ["temp", "backup"]
         assert config.ignore_patterns == ["~$*", "*.tmp"]
@@ -175,7 +175,7 @@ class TestDiscoveryConfig:
     def test_minimal_discovery_config(self):
         """Test that discovery config with all optional fields works."""
         config = DiscoveryConfig()
-        
+
         assert config.file_extensions is None
         assert config.exclude_directories is None
         assert config.ignore_patterns is None
@@ -189,7 +189,7 @@ class TestDataSourcesConfig:
     def test_valid_data_sources_config(self, valid_data_sources_config):
         """Test that valid complete config passes validation."""
         config = DataSourcesConfig(**valid_data_sources_config)
-        
+
         assert len(config.domains) == 2
         assert "test_domain" in config.domains
         assert "another_domain" in config.domains
@@ -207,7 +207,7 @@ class TestDataSourcesConfig:
                 }
             }
         }
-        
+
         config = DataSourcesConfig(**config_data)
         assert len(config.domains) == 1
         assert config.discovery is None
@@ -245,7 +245,7 @@ class TestValidateDataSourcesConfig:
         """Test validation with invalid YAML file."""
         bad_config = tmp_path / "bad_config.yml"
         bad_config.write_text("invalid: yaml: content: [")
-        
+
         with pytest.raises(DataSourcesValidationError, match="Invalid YAML"):
             validate_data_sources_config(str(bad_config))
 
@@ -259,11 +259,11 @@ class TestValidateDataSourcesConfig:
                 }
             }
         }
-        
+
         config_path = tmp_path / "invalid_config.yml"
         with open(config_path, "w") as f:
             yaml.dump(invalid_config, f)
-        
+
         with pytest.raises(DataSourcesValidationError, match="validation failed"):
             validate_data_sources_config(str(config_path))
 
@@ -279,11 +279,11 @@ class TestValidateDataSourcesConfig:
                 }
             }
         }
-        
+
         config_path = tmp_path / "invalid_domain.yml"
         with open(config_path, "w") as f:
             yaml.dump(invalid_config, f)
-        
+
         with pytest.raises(DataSourcesValidationError, match="validation failed"):
             validate_data_sources_config(str(config_path))
 
@@ -294,7 +294,7 @@ class TestGetDomainConfig:
     def test_get_existing_domain_config(self, config_file):
         """Test retrieving configuration for an existing domain."""
         domain_config = get_domain_config("test_domain", config_file)
-        
+
         assert isinstance(domain_config, DomainConfig)
         assert domain_config.description == "Test domain configuration"
         assert domain_config.table == "test_table"
@@ -318,15 +318,15 @@ class TestIntegration:
         """Test complete validation workflow."""
         # First validate the entire config
         assert validate_data_sources_config(config_file) is True
-        
+
         # Then get specific domain configs
         test_domain = get_domain_config("test_domain", config_file)
         another_domain = get_domain_config("another_domain", config_file)
-        
+
         # Verify domain configurations
         assert test_domain.table == "test_table"
         assert another_domain.table == "another_table"
-        
+
         assert test_domain.select == "latest_by_year_month"
         assert another_domain.select == "latest_by_mtime"
 
@@ -335,10 +335,10 @@ class TestIntegration:
         # This should pass if the real file is properly structured
         result = validate_data_sources_config("src/work_data_hub/config/data_sources.yml")
         assert result is True
-        
+
         # Test getting the trustee_performance domain
         trustee_config = get_domain_config("trustee_performance", "src/work_data_hub/config/data_sources.yml")
-        
+
         assert trustee_config.table == "trustee_performance"
         assert trustee_config.select == "latest_by_year_month"
         assert "report_date" in trustee_config.pk

@@ -1,5 +1,7 @@
 # **Project: WorkDataHub**
 
+[Start Here — Developer Quickstart](README.md)
+
 ## **Vision**
 
 Build a reliable, declarative, and testable data processing platform that replaces the legacy monolithic ETL with isolated domain services, configuration-driven discovery, and orchestrated end-to-end pipelines. The platform prioritizes correctness, observability, and safety with CI gates, environment-based configuration, and vertically sliced, independently verifiable deliveries.
@@ -32,7 +34,7 @@ PHILOSOPHY: Front-load uncertainty (R-001), then implement atomic chores/feature
 | F-015 | M1 | Implement Dagster jobs + CLI (`--execute`, multi-file accumulation) | COMPLETED | F-014 | P-003, P-005 |
 | C-010 | M1 | Provide domain config (`data_sources.yml`) with table + pk | COMPLETED | - | P-003 |
 | C-016 | M1 | Fix Pydantic v2 ValidationError misuse in trustee_performance.service | COMPLETED | F-012 | P-007 |
-| C-011 | M1 | Validate local Dagster "hello-world" pipeline + runbook | READY_FOR_PRP | F-014, F-015 | - |
+| C-011 | M1 | Validate trustee_performance E2E execute mode (DB context, JSONB, Decimal) | COMPLETED | F-014, F-015 | P-012, P-013 |
 | C-012 | M1 | Convert legacy handler mappings (DB) to YAML config seeds | COMPLETED | F-010 | P-008 |
 | C-013 | M1 | Mapping loader portability + config hardening | COMPLETED | C-012 | P-010 |
 | C-017 | M1 | Relax input model types for trustee_performance metrics (Excel numeric cells) | COMPLETED | F-012 | P-011 |

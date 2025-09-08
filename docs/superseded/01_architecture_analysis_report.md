@@ -1,3 +1,5 @@
+> Note: This document is superseded by `docs/overview/01_system_overview.md` (2025-09-08). It is preserved for historical context. For current plan/status see `ROADMAP.md`.
+
 <architectural_proposal>
     <as_is_analysis>
         **1. 核心领域与职责:**

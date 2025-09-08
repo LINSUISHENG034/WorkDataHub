@@ -3,7 +3,6 @@ This module contains a specific test case to reproduce and expose a bug
 in the exception handling of the trustee performance service.
 """
 
-import pytest
 
 from src.work_data_hub.domain.trustee_performance.service import _transform_single_row
 
@@ -30,6 +29,6 @@ def test_transform_row_with_invalid_month_reproduces_bug():
     # Instead, the invalid month should cause _extract_report_date to return None,
     # which means the entire row gets filtered out (returns None).
     result = _transform_single_row(bug_trigger_row, data_source="bug_test", row_index=0)
-    
+
     # Verify that the row is filtered out due to invalid date
     assert result is None, "Row with invalid month=13 should be filtered out (return None)"

@@ -1,3 +1,5 @@
+> Note: This document is superseded by `docs/overview/01_system_overview.md` (2025-09-08). It is preserved for historical context. For current plan/status see `ROADMAP.md`.
+
 ### Architecture Suitability Analysis
 
 **Yes, the proposed architecture is not only suitable but is specifically designed to address the exact challenges presented by your production data.**

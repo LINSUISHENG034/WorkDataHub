@@ -1,5 +1,7 @@
 # Annuity Hub 重构项目实施计划 (修订版)
 
+> Note: This document is superseded by `docs/overview/01_system_overview.md` (2025-09-08). It is preserved for historical context. For current plan/status see `ROADMAP.md`.
+
 ## 1. 最终技术栈选型
 
 *技术栈选型保持不变，确保了技术方向的稳定性。*

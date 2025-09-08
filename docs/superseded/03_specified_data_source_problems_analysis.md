@@ -1,3 +1,5 @@
+> Note: This document is superseded by `docs/overview/01_system_overview.md` (2025-09-08). It is preserved for historical context. For current plan/status see `ROADMAP.md`.
+
 The new architecture is not only capable of addressing the specified data source problems but is fundamentally designed to eliminate the root causes of such issues.
 
 Here is a detailed breakdown of how the new architecture effectively solves each of the identified problems:
