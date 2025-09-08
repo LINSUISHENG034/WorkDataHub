@@ -7,6 +7,7 @@ and provides comprehensive validation and error handling.
 """
 
 import logging
+import os
 from pathlib import Path
 from typing import Dict
 
@@ -19,6 +20,25 @@ class MappingLoaderError(Exception):
     """Raised when mapping loader encounters an error."""
 
     pass
+
+
+def get_mappings_dir() -> Path:
+    """
+    Get mappings directory with environment variable override support.
+
+    Returns:
+        Path to the mappings directory
+
+    Raises:
+        MappingLoaderError: If WDH_MAPPINGS_DIR environment variable points to invalid path
+    """
+    env_dir = os.environ.get("WDH_MAPPINGS_DIR")
+    if env_dir:
+        p = Path(env_dir)
+        if not p.exists() or not p.is_dir():
+            raise MappingLoaderError(f"WDH_MAPPINGS_DIR not found or not a directory: {env_dir}")
+        return p
+    return Path(__file__).parent / "mappings"
 
 
 def load_yaml_mapping(path: str) -> Dict[str, str]:
@@ -67,19 +87,19 @@ def load_yaml_mapping(path: str) -> Dict[str, str]:
 
 def load_company_branch() -> Dict[str, str]:
     """Load company branch name to code mapping."""
-    return load_yaml_mapping("src/work_data_hub/config/mappings/company_branch.yml")
+    return load_yaml_mapping(str(get_mappings_dir() / "company_branch.yml"))
 
 
 def load_default_portfolio_code() -> Dict[str, str]:
     """Load default portfolio code mapping."""
-    return load_yaml_mapping("src/work_data_hub/config/mappings/default_portfolio_code.yml")
+    return load_yaml_mapping(str(get_mappings_dir() / "default_portfolio_code.yml"))
 
 
 def load_company_id_overrides_plan() -> Dict[str, str]:
     """Load company ID override mapping for plans."""
-    return load_yaml_mapping("src/work_data_hub/config/mappings/company_id_overrides_plan.yml")
+    return load_yaml_mapping(str(get_mappings_dir() / "company_id_overrides_plan.yml"))
 
 
 def load_business_type_code() -> Dict[str, str]:
     """Load business type to code mapping."""
-    return load_yaml_mapping("src/work_data_hub/config/mappings/business_type_code.yml")
+    return load_yaml_mapping(str(get_mappings_dir() / "business_type_code.yml"))

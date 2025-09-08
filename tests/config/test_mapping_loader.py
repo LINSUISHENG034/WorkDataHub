@@ -5,6 +5,7 @@ This module tests the mapping_loader with various YAML structures,
 including Chinese character handling and comprehensive error scenarios.
 """
 
+import os
 import pytest
 import yaml
 from pathlib import Path
@@ -16,6 +17,7 @@ from src.work_data_hub.config.mapping_loader import (
     load_company_id_overrides_plan,
     load_business_type_code,
     MappingLoaderError,
+    get_mappings_dir,
 )
 
 
@@ -294,3 +296,76 @@ class TestIntegration:
         business_mapping = load_business_type_code()
         assert "职年受托" in business_mapping
         assert "职年投资" in business_mapping
+
+
+class TestPortabilityAndEnvironmentOverride:
+    """Test cases for path portability and environment override functionality."""
+
+    def test_module_relative_paths_portable(self, tmp_path):
+        """Test that loaders work when invoked from any working directory."""
+        original_cwd = os.getcwd()
+        try:
+            # Change to different directory
+            os.chdir(tmp_path)
+            
+            # Should still work - test known values from repo seeds
+            mapping = load_company_branch()
+            assert "内蒙" in mapping
+            assert mapping["内蒙"] == "G31"
+            assert "济南" in mapping
+            assert mapping["济南"] == "G21"
+        finally:
+            # CRITICAL: Always restore
+            os.chdir(original_cwd)
+
+    def test_env_override_directory(self, tmp_path, monkeypatch):
+        """Test that WDH_MAPPINGS_DIR override works with valid directory."""
+        # Create temp mappings directory with minimal YAML
+        temp_mappings = tmp_path / "mappings"
+        temp_mappings.mkdir()
+        (temp_mappings / "company_branch.yml").write_text(
+            "test_key: test_value\noverride_key: override_value", 
+            encoding="utf-8"
+        )
+        
+        monkeypatch.setenv("WDH_MAPPINGS_DIR", str(temp_mappings))
+        
+        mapping = load_company_branch()
+        assert mapping["test_key"] == "test_value"
+        assert mapping["override_key"] == "override_value"
+        # Should use override, not repo
+        assert "内蒙" not in mapping
+
+    def test_env_override_missing_dir(self, monkeypatch):
+        """Test that WDH_MAPPINGS_DIR with missing directory raises error."""
+        monkeypatch.setenv("WDH_MAPPINGS_DIR", "/nonexistent/path")
+        
+        with pytest.raises(MappingLoaderError, match="WDH_MAPPINGS_DIR not found or not a directory"):
+            load_company_branch()
+
+    def test_env_override_file_not_directory(self, tmp_path, monkeypatch):
+        """Test that WDH_MAPPINGS_DIR pointing to file (not directory) raises error."""
+        # Create a file instead of directory
+        temp_file = tmp_path / "not_a_directory.txt"
+        temp_file.write_text("not a directory", encoding="utf-8")
+        
+        monkeypatch.setenv("WDH_MAPPINGS_DIR", str(temp_file))
+        
+        with pytest.raises(MappingLoaderError, match="WDH_MAPPINGS_DIR not found or not a directory"):
+            get_mappings_dir()
+
+    def test_get_mappings_dir_default_path(self):
+        """Test that get_mappings_dir returns correct default path."""
+        # Clear any environment variable
+        if "WDH_MAPPINGS_DIR" in os.environ:
+            del os.environ["WDH_MAPPINGS_DIR"]
+            
+        mappings_dir = get_mappings_dir()
+        
+        # Should be module-relative path
+        expected_path = Path(__file__).parent.parent.parent / "src" / "work_data_hub" / "config" / "mappings"
+        
+        # Check that both paths exist and resolve to same location
+        assert mappings_dir.exists()
+        assert expected_path.exists()
+        assert mappings_dir.resolve() == expected_path.resolve()

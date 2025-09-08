@@ -34,6 +34,8 @@ PHILOSOPHY: Front-load uncertainty (R-001), then implement atomic chores/feature
 | C-016 | M1 | Fix Pydantic v2 ValidationError misuse in trustee_performance.service | COMPLETED | F-012 | P-007 |
 | C-011 | M1 | Validate local Dagster "hello-world" pipeline + runbook | READY_FOR_PRP | F-014, F-015 | - |
 | C-012 | M1 | Convert legacy handler mappings (DB) to YAML config seeds | COMPLETED | F-010 | P-008 |
+| C-013 | M1 | Mapping loader portability + config hardening | COMPLETED | C-012 | P-010 |
+| C-017 | M1 | Relax input model types for trustee_performance metrics (Excel numeric cells) | READY_FOR_PRP | F-012 | - |
 
 <!--
 TASK BREAKDOWN PHILOSOPHY:

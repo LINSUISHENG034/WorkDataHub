@@ -35,6 +35,16 @@ def _load_valid_domains() -> List[str]:
         - Logs warnings for missing config or empty domains
         - Handles exceptions gracefully to prevent complete failure
     """
+    # Optional: Validate data_sources.yml for fail-fast behavior
+    try:
+        from ..config.schema import DataSourcesValidationError, validate_data_sources_config
+        validate_data_sources_config()
+    except DataSourcesValidationError as e:
+        logger.error(f"data_sources.yml validation failed: {e}")
+        raise
+    except Exception as e:
+        logger.debug(f"Optional data_sources validation skipped: {e}")
+
     try:
         settings = get_settings()
         config_path = Path(settings.data_sources_config)
