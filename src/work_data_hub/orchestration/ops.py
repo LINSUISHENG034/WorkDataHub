@@ -328,8 +328,8 @@ def load_op(
     Returns:
         Dictionary with execution metadata or SQL plans
     """
+    conn = None
     try:
-        conn = None
         if not config.plan_only:
             try:
                 import psycopg2
@@ -338,15 +338,16 @@ def load_op(
 
                 context.log.info(f"Connecting to database for execution (table: {config.table})")
 
-                # Use context manager for automatic connection cleanup
-                with psycopg2.connect(dsn) as conn:
-                    result = load(
-                        table=config.table,
-                        rows=processed_rows,
-                        mode=config.mode,
-                        pk=config.pk,
-                        conn=conn,
-                    )
+                # CRITICAL: Use bare connection, let warehouse_loader manage transaction
+                conn = psycopg2.connect(dsn)
+
+                result = load(
+                    table=config.table,
+                    rows=processed_rows,
+                    mode=config.mode,
+                    pk=config.pk,
+                    conn=conn,
+                )
 
             except ImportError as e:
                 raise DataWarehouseLoaderError(
@@ -382,3 +383,7 @@ def load_op(
     except Exception as e:
         context.log.error(f"Load operation failed: {e}")
         raise
+    finally:
+        # CRITICAL: Always clean up connection
+        if conn is not None:
+            conn.close()

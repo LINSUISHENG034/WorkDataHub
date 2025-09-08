@@ -15,7 +15,8 @@ This file is a README for agents. It gives any AI coding assistant a predictable
 We use a PRP (Product Requirements Prompt) workflow to produce high‑quality, repeatable changes.
 
 1) Prepare INITIAL.md (Definition of Ready)
-   - **Select a Task**: A planning agent identifies a task in `ROADMAP.md` with the status READY_FOR_PRP
+   Using PRPs/templates/INITIAL.template.md as template:
+   - **Select a Task** or **Create a Task** in `ROADMAP.md`
    - Define the feature and boundaries (non‑goals).
    - Add concrete examples: existing files, code snippets, or patterns to follow.
    - Link precise external docs (URLs, sections) and internal standards (file paths).
@@ -23,7 +24,6 @@ We use a PRP (Product Requirements Prompt) workflow to produce high‑quality, r
    - Note integration points: data models, APIs, migrations, configs.
    - Call out gotchas: library quirks, rate limits, concurrency/timeouts, version traps.
    - Include validation commands and expected outcomes.
-   - Start from template: `PRPs/templates/INITIAL.template.md`
 
 *** CRITICAL AFTER YOU ARE DONE RESEARCHING AND EXPLORING THE CODEBASE BEFORE YOU START WRITING THE INITIAL ***
 

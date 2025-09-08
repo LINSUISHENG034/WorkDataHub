@@ -190,6 +190,21 @@ def build_delete_sql(
     return sql, params
 
 
+def _adapt_param(v):
+    """
+    Adapt dict/list parameters for JSONB columns.
+
+    Args:
+        v: Parameter value
+
+    Returns:
+        psycopg2.extras.Json wrapped value for dict/list, otherwise unchanged
+    """
+    if isinstance(v, (dict, list)):
+        from psycopg2.extras import Json
+        return Json(v)
+    return v
+
 def load(
     table: str,
     rows: List[Dict[str, Any]],
@@ -295,10 +310,10 @@ def load(
                                 "psycopg2 not available for bulk operations"
                             )
 
-                        # Convert flattened params back to rows
+                        # Convert flattened params back to rows and adapt JSONB parameters
                         cols_per_row = len(cols)
                         row_data = [
-                            params[i : i + cols_per_row]
+                            [_adapt_param(val) for val in params[i : i + cols_per_row]]
                             for i in range(0, len(params), cols_per_row)
                         ]
 

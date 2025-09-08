@@ -389,3 +389,187 @@ class TestPerformanceMetrics:
         assert result.net_asset_value is None
         assert result.fund_scale is None
         assert not result.has_performance_data
+
+    def test_numeric_cells_are_accepted_and_converted(self):
+        """Numeric Excel cells (float/int) should be accepted and converted to Decimals."""
+        row = {
+            "年": "2024",
+            "月": "11",
+            "计划代码": "PLAN001",
+            "公司代码": "COMP001",
+            "净值": 1.0512,      # float from Excel cell
+            "规模": 12000000,     # int from Excel cell
+            "收益率": 0.055,      # float decimal form
+        }
+
+        result = _transform_single_row(row, "test", 0)
+
+        assert result is not None
+        assert result.net_asset_value == Decimal("1.0512")
+        assert result.fund_scale == Decimal("12000000")
+        assert result.return_rate == Decimal("0.055")
+
+    def test_numeric_cells_are_accepted_and_converted(self):
+        """Test that numeric Excel cells work without ValidationError."""
+        row = {
+            "年": "2024",
+            "月": "11",
+            "计划代码": "PLAN001",
+            "公司代码": "COMP001",
+            "净值": 1.0512,       # Excel float (was causing error)
+            "规模": 12000000,      # Excel int (was causing error)
+            "收益率": 0.055,        # Excel decimal
+        }
+        
+        # Should not raise ValidationError
+        result = _transform_single_row(row, "test", 0)
+        
+        assert result is not None
+        assert isinstance(result, TrusteePerformanceOut)
+        assert result.net_asset_value == Decimal("1.0512")
+        assert result.fund_scale == Decimal("12000000")
+        assert result.return_rate == Decimal("0.055")
+
+    def test_mixed_numeric_string_inputs(self):
+        """Test mixing numeric and string inputs (backward compatibility)."""
+        row = {
+            "年": "2024",
+            "月": "11",
+            "计划代码": "PLAN001",
+            "公司代码": "COMP001",
+            "净值": "1.0512",      # String (existing behavior)
+            "规模": 12000000,       # Numeric (new capability)
+            "收益率": "5.5%",        # String percentage (existing behavior)
+        }
+        
+        result = _transform_single_row(row, "test", 0)
+        
+        assert result is not None
+        assert isinstance(result, TrusteePerformanceOut)
+        assert result.net_asset_value == Decimal("1.0512")
+        assert result.fund_scale == Decimal("12000000")
+        assert result.return_rate == Decimal("0.055")  # 5.5% -> 0.055
+
+class TestDecimalQuantization:
+    """Test field-specific decimal quantization in TrusteePerformanceOut."""
+    
+    def test_return_rate_quantization_6_places(self):
+        """Test return_rate quantization to 6 decimal places."""
+        from decimal import Decimal
+        from src.work_data_hub.domain.trustee_performance.models import TrusteePerformanceOut
+        
+        # Test float precision tail that would fail without quantization
+        model = TrusteePerformanceOut(
+            report_date="2024-01-01",
+            plan_code="P001", 
+            company_code="C001",
+            return_rate=0.048799999999999996,  # Float precision tail
+            data_source="test"
+        )
+        
+        # Should be quantized to 6 decimal places
+        assert model.return_rate == Decimal("0.048800")
+        assert str(model.return_rate) == "0.048800"
+    
+    def test_net_asset_value_quantization_4_places(self):
+        """Test net_asset_value quantization to 4 decimal places."""
+        from decimal import Decimal
+        from src.work_data_hub.domain.trustee_performance.models import TrusteePerformanceOut
+        
+        model = TrusteePerformanceOut(
+            report_date="2024-01-01",
+            plan_code="P001", 
+            company_code="C001",
+            net_asset_value=1.23456789,  # Should be rounded to 4 places
+            data_source="test"
+        )
+        
+        # Should be quantized to 4 decimal places using ROUND_HALF_UP
+        assert model.net_asset_value == Decimal("1.2346")
+        assert str(model.net_asset_value) == "1.2346"
+    
+    def test_fund_scale_quantization_2_places(self):
+        """Test fund_scale quantization to 2 decimal places."""
+        from decimal import Decimal
+        from src.work_data_hub.domain.trustee_performance.models import TrusteePerformanceOut
+        
+        model = TrusteePerformanceOut(
+            report_date="2024-01-01",
+            plan_code="P001", 
+            company_code="C001",
+            fund_scale=1000.999,  # Should be rounded to 2 places
+            data_source="test"
+        )
+        
+        # Should be quantized to 2 decimal places
+        assert model.fund_scale == Decimal("1001.00")
+        assert str(model.fund_scale) == "1001.00"
+    
+    def test_decimal_from_string_avoids_float_precision(self):
+        """Test that string inputs avoid float precision issues."""
+        from decimal import Decimal
+        from src.work_data_hub.domain.trustee_performance.models import TrusteePerformanceOut
+        
+        model = TrusteePerformanceOut(
+            report_date="2024-01-01",
+            plan_code="P001", 
+            company_code="C001",
+            return_rate="0.048799999999999996",  # String input
+            data_source="test"
+        )
+        
+        # Should handle string properly and quantize
+        assert model.return_rate == Decimal("0.048800")
+    
+    def test_percentage_format_with_quantization(self):
+        """Test percentage format conversion with quantization."""
+        from decimal import Decimal
+        from src.work_data_hub.domain.trustee_performance.models import TrusteePerformanceOut
+        
+        model = TrusteePerformanceOut(
+            report_date="2024-01-01",
+            plan_code="P001", 
+            company_code="C001",
+            return_rate="4.8799999%",  # Percentage with precision tail
+            data_source="test"
+        )
+        
+        # Should convert to decimal and quantize: 4.8799999% -> 0.048800
+        assert model.return_rate == Decimal("0.048800")
+    
+    def test_field_specific_quantization_preserved(self):
+        """Test that different fields get different precision levels."""
+        from decimal import Decimal
+        from src.work_data_hub.domain.trustee_performance.models import TrusteePerformanceOut
+        
+        model = TrusteePerformanceOut(
+            report_date="2024-01-01",
+            plan_code="P001", 
+            company_code="C001",
+            return_rate=0.123456789,      # Should be 6 places: 0.123457
+            net_asset_value=1.123456789,  # Should be 4 places: 1.1235
+            fund_scale=100.123456789,     # Should be 2 places: 100.12
+            data_source="test"
+        )
+        
+        assert model.return_rate == Decimal("0.123457")
+        assert model.net_asset_value == Decimal("1.1235") 
+        assert model.fund_scale == Decimal("100.12")
+    
+    def test_none_values_preserved(self):
+        """Test that None values are preserved through quantization."""
+        from src.work_data_hub.domain.trustee_performance.models import TrusteePerformanceOut
+        
+        model = TrusteePerformanceOut(
+            report_date="2024-01-01",
+            plan_code="P001", 
+            company_code="C001",
+            return_rate=None,
+            net_asset_value=None,
+            fund_scale=None,
+            data_source="test"
+        )
+        
+        assert model.return_rate is None
+        assert model.net_asset_value is None 
+        assert model.fund_scale is None

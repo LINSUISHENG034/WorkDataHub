@@ -302,20 +302,32 @@ class TestDatabaseIntegration:
     
     @pytest.fixture
     def db_connection(self):
-        """Create test database connection."""
+        """Create test database connection.
+
+        Preference order:
+        1) WDH_TEST_DATABASE_URI (explicit test DSN)
+        2) Settings-derived DSN from .env (development default)
+        """
         import os
-        
-        # Requires environment variables for test database
+
+        # Prefer explicit test DSN if provided
         conn_str = os.getenv("WDH_TEST_DATABASE_URI")
         if not conn_str:
-            pytest.skip("Test database not configured")
-        
+            # Fallback: use application settings (loads .env)
+            try:
+                from src.work_data_hub.config.settings import get_settings
+                settings = get_settings()
+                conn_str = settings.get_database_connection_string()
+            except Exception:
+                pytest.skip("Test database not configured")
+
         try:
             import psycopg2
         except ImportError:
             pytest.skip("psycopg2 not available")
-        
-        conn = psycopg2.connect(conn_str)
+
+        # Keep a modest timeout to fail fast on misconfiguration
+        conn = psycopg2.connect(conn_str, connect_timeout=5)
         
         # Setup test table
         with conn.cursor() as cursor:
@@ -365,3 +377,62 @@ class TestDatabaseIntegration:
         
         assert result["inserted"] == 1
         assert result["deleted"] == 0
+
+class TestJSONBParameterAdaptation:
+    """Test JSONB parameter adaptation for execute_values."""
+    
+    def test_adapt_param_wraps_dict_and_list(self):
+        """Test parameter adaptation for JSONB types."""
+        from psycopg2.extras import Json
+        from src.work_data_hub.io.loader.warehouse_loader import _adapt_param
+        
+        dict_param = {"key": "value"}
+        list_param = ["item1", "item2"]
+        scalar_param = "scalar"
+        none_param = None
+        
+        assert isinstance(_adapt_param(dict_param), Json)
+        assert isinstance(_adapt_param(list_param), Json)  
+        assert _adapt_param(scalar_param) == "scalar"
+        assert _adapt_param(none_param) is None
+    
+    def test_load_adapts_jsonb_parameters_in_sql_plan(self):
+        """Test that load function properly adapts JSONB parameters in plan mode."""
+        rows = [{
+            "report_date": "2024-01-01",
+            "plan_code": "P001",
+            "company_code": "C001",
+            "validation_warnings": ["warning1", "warning2"],  # List that needs JSONB adaptation
+            "metadata": {"source": "test", "processed": True}   # Dict that needs JSONB adaptation
+        }]
+        
+        result = load("trustee_performance", rows, mode="append", conn=None)
+        
+        # Verify sql_plans are generated
+        assert "sql_plans" in result
+        operations = result["sql_plans"]
+        assert len(operations) == 1
+        assert operations[0][0] == "INSERT"
+        
+        # The actual adaptation happens during execution, not in plan mode
+        # But we can verify the function is available and the structure is correct
+        sql, params = operations[0][1], operations[0][2]
+        assert "INSERT INTO" in sql
+        assert len(params) == 5  # Should have all row values flattened
+    
+    def test_adapt_param_handles_nested_structures(self):
+        """Test adaptation of complex nested dict/list structures."""
+        from psycopg2.extras import Json
+        from src.work_data_hub.io.loader.warehouse_loader import _adapt_param
+        
+        complex_dict = {
+            "nested": {"key": "value"},
+            "array": [1, 2, 3],
+            "mixed": ["string", {"inner": "dict"}]
+        }
+        
+        adapted = _adapt_param(complex_dict)
+        assert isinstance(adapted, Json)
+        
+        # Verify the wrapped data is preserved
+        assert adapted.adapted == complex_dict

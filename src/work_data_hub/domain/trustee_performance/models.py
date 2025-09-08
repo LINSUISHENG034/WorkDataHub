@@ -8,9 +8,19 @@ data processing, providing robust validation and type safety using Pydantic v2.
 import logging
 from datetime import date, datetime
 from decimal import Decimal
-from typing import List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+if TYPE_CHECKING:
+    pass
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +58,15 @@ class TrusteePerformanceIn(BaseModel):
     company_code: Optional[str] = Field(None, description="Company code in English")
 
     # Common performance metrics (flexible types to handle various formats)
-    收益率: Optional[str] = Field(None, description="Return rate (收益率)")
-    净值: Optional[str] = Field(None, description="Net asset value (净值)")
-    规模: Optional[str] = Field(None, description="Scale/size (规模)")
+    收益率: Optional[Union[Decimal, float, int, str]] = Field(
+        None, description="Return rate (收益率)"
+    )
+    净值: Optional[Union[Decimal, float, int, str]] = Field(
+        None, description="Net asset value (净值)"
+    )
+    规模: Optional[Union[Decimal, float, int, str]] = Field(
+        None, description="Scale/size (规模)"
+    )
 
     # Metadata fields
     report_period: Optional[str] = Field(None, description="Report period string")
@@ -152,18 +168,20 @@ class TrusteePerformanceOut(BaseModel):
 
     @field_validator("return_rate", "net_asset_value", "fund_scale", mode="before")
     @classmethod
-    def clean_decimal_fields(cls, v):
-        """Clean and convert percentage/decimal fields from various string formats."""
+    def clean_decimal_fields(cls, v, info: Any):
+        """Clean and convert percentage/decimal fields with precision quantization."""
         if v is None or v == "":
             return None
 
         # Handle various input types
-        if isinstance(v, (int, float, Decimal)):
-            return v
-
-        # Clean string values
-        if isinstance(v, str):
-            # Remove common formatting characters
+        if isinstance(v, (int, Decimal)):
+            # For integers and Decimals, process for quantization
+            pass
+        elif isinstance(v, float):
+            # Convert float to string first to avoid precision issues
+            v = str(v)
+        elif isinstance(v, str):
+            # Clean string values
             v_clean = v.strip().replace(",", "").replace(" ", "")
             v_clean = v_clean.replace("¥", "").replace("$", "").replace("￥", "")
 
@@ -171,21 +189,47 @@ class TrusteePerformanceOut(BaseModel):
             if "%" in v_clean:
                 v_clean = v_clean.replace("%", "")
                 try:
-                    return float(v_clean) / 100.0
+                    v = float(v_clean) / 100.0
+                    v = str(v)  # Convert to string for Decimal conversion
                 except ValueError:
                     raise ValueError(f"Invalid percentage format: {v}")
+            else:
+                v = v_clean
 
             # Handle empty or placeholder values
-            if v_clean in ("", "-", "N/A", "无", "暂无"):
+            if v in ("", "-", "N/A", "无", "暂无"):
                 return None
 
-            # Try to convert to float
+            # Try to convert to float for validation, then back to string
             try:
-                return float(v_clean)
+                float_val = float(v)
+                v = str(float_val)
             except ValueError:
                 raise ValueError(f"Cannot convert to decimal: {v}")
 
-        return v
+        # Convert to Decimal using string to avoid float precision issues
+        try:
+            if isinstance(v, Decimal):
+                d = v
+            else:
+                d = Decimal(str(v))
+        except (ValueError, TypeError):
+            raise ValueError(f"Cannot convert to decimal: {v}")
+
+        # Field-specific quantization based on schema precision requirements
+        field_precision_map = {
+            "return_rate": 6,        # NUMERIC(8,6)
+            "net_asset_value": 4,    # NUMERIC(18,4)
+            "fund_scale": 2          # NUMERIC(18,2)
+        }
+
+        if info.field_name and info.field_name in field_precision_map:
+            from decimal import ROUND_HALF_UP
+            places = field_precision_map[info.field_name]
+            quantizer = Decimal("1." + ("0" * places))
+            d = d.quantize(quantizer, rounding=ROUND_HALF_UP)
+
+        return d
 
     @model_validator(mode="after")
     def validate_report_date(self) -> "TrusteePerformanceOut":
