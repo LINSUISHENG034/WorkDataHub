@@ -1,4 +1,4 @@
-# CLAUDE.md
+# CLAUDE.md v1.01
 
 This file provides comprehensive guidance to Claude Code when working with Python code in this repository.
 
@@ -27,56 +27,61 @@ Avoid building functionality on speculation. Implement features only when they a
 - **Functions should be under 50 lines** with a single, clear responsibility.
 - **Classes should be under 100 lines** and represent a single concept or entity.
 - **Organize code into clearly separated modules**, grouped by feature or responsibility.
-- **Line lenght should be max 100 characters** ruff rule in pyproject.toml
-- **Use venv_linux** (the virtual environment) whenever executing Python commands, including for unit tests.
+- **Line length should be max 100 characters** ruff rule in pyproject.toml
+- Use the project virtual environment for all Python commands; prefer running tools via uv:
+  - Setup: uv venv && uv sync
+  - Run: uv run <command>
+  - Optional manual activation (if you need it):
+  - WSL or Linux shell: source .venv_linux/bin/activate (Use the `--active` flag with `uv run` to prevent it from automatically searching for and managing a virtual environment named `.venv`)
+  - PowerShell: .\.venv\Scripts\Activate.ps1
+  - CMD: .\.venv\Scripts\activate.bat
 
 ### Project Architecture
 
-Follow strict vertical slice architecture with tests living next to the code they test:
+This project follows a configuration‑driven, vertically sliced ETL architecture with clear boundaries between orchestration, IO, domain, and configuration. Tests live under the top‑level `tests/` directory (unit, integration, and end‑to‑end).
 
+```text
+src/work_data_hub/
+  config/
+    settings.py            # pydantic‑settings; env vars prefixed WDH_*
+    schema.py              # config schema validation
+    data_sources.yml       # discovery patterns, selection, table/pk
+  io/
+    connectors/
+      file_connector.py    # config‑driven file discovery
+    readers/
+      excel_reader.py      # resilient Excel ingestion
+    loader/
+      warehouse_loader.py  # PostgreSQL loader (plan‑only or execute)
+  domain/
+    trustee_performance/
+      models.py            # Pydantic v2 models (in/out)
+      service.py           # pure transformation functions
+  orchestration/
+    ops.py                 # discover/read/process/load ops
+    jobs.py                # single/multi‑file jobs + CLI entry
+    schedules.py           # production schedules
+    sensors.py             # file/new‑data sensors
+    repository.py          # Dagster Definitions registry
+  utils/
+    types.py               # shared types/helpers
+
+tests/
+  e2e/                     # end‑to‑end flows
+  domain/
+  io/
+  config/
+  fixtures/
+
+legacy/annuity_hub/        # reference during migration (read‑only)
 ```
-src/project/
-    __init__.py
-    main.py
-    tests/
-        test_main.py
-    conftest.py
 
-    # Core modules
-    database/
-        __init__.py
-        connection.py
-        models.py
-        tests/
-            test_connection.py
-            test_models.py
+Dependencies Rule
 
-    auth/
-        __init__.py
-        authentication.py
-        authorization.py
-        tests/
-            test_authentication.py
-            test_authorization.py
-
-    # Feature slices
-    features/
-        user_management/
-            __init__.py
-            handlers.py
-            validators.py
-            tests/
-                test_handlers.py
-                test_validators.py
-
-        payment_processing/
-            __init__.py
-            processor.py
-            gateway.py
-            tests/
-                test_processor.py
-                test_gateway.py
-```
+- Orchestration may depend on IO, Domain, Config, and Utils.
+- Domain must not import Orchestration.
+- IO should not import Orchestration.
+- Config and Utils provide shared, dependency‑free infrastructure.
 
 ## 🛠️ Development Environment
 
@@ -85,9 +90,6 @@ src/project/
 This project uses UV for blazing-fast Python package and environment management.
 
 ```bash
-# Install UV (if not already installed)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
 # Create virtual environment
 uv venv
 
@@ -107,10 +109,7 @@ uv remove requests
 # Run commands in the environment
 uv run python script.py
 uv run pytest
-uv run ruff check .
-
-# Install specific Python version
-uv python install 3.12
+uv run ruff check src/
 ```
 
 ### Development Commands
@@ -119,26 +118,29 @@ uv python install 3.12
 # Run all tests
 uv run pytest
 
+# Focus tests by pattern
+uv run pytest -k "<pattern>" -v
+
 # Run specific tests with verbose output
 uv run pytest tests/test_module.py -v
 
-# Run tests with coverage
-uv run pytest --cov=src --cov-report=html
+# Run tests with coverage (optional)
+uv run pytest --cov=src --cov-report=term-missing
 
 # Format code
 uv run ruff format .
 
-# Check linting
-uv run ruff check .
+# Check linting (scoped to src/)
+uv run ruff check src/
 
 # Fix linting issues automatically
-uv run ruff check --fix .
+uv run ruff check src/ --fix
 
 # Type checking
 uv run mypy src/
 
-# Run pre-commit hooks
-uv run pre-commit run --all-files
+# Optional: pre-commit hooks (only if configured)
+# uv run pre-commit run --all-files
 ```
 
 ## 📋 Style & Conventions
@@ -246,110 +248,180 @@ def test_user_update_email_fails_with_invalid_format(sample_user):
 
 ## 🚨 Error Handling
 
-### Exception Best Practices
+Use domain‑specific exceptions at clear boundaries (connector → reader → domain service → loader → orchestration). Fail fast on invalid configuration or mode; provide actionable messages.
+
+Custom exceptions (examples in this repo)
 
 ```python
-# Create custom exceptions for your domain
-class PaymentError(Exception):
-    """Base exception for payment-related errors."""
-    pass
+# IO / Readers
+class ExcelReadError(Exception):
+    """Raised when Excel file reading fails."""
 
-class InsufficientFundsError(PaymentError):
-    """Raised when account has insufficient funds."""
-    def __init__(self, required: Decimal, available: Decimal):
-        self.required = required
-        self.available = available
-        super().__init__(
-            f"Insufficient funds: required {required}, available {available}"
-        )
+# IO / Connectors
+class DataSourceConnectorError(Exception):
+    """Raised when data source discovery or config handling fails."""
 
-# Use specific exception handling
-try:
-    process_payment(amount)
-except InsufficientFundsError as e:
-    logger.warning(f"Payment failed: {e}")
-    return PaymentResult(success=False, reason="insufficient_funds")
-except PaymentError as e:
-    logger.error(f"Payment error: {e}")
-    return PaymentResult(success=False, reason="payment_error")
-
-# Use context managers for resource management
-from contextlib import contextmanager
-
-@contextmanager
-def database_transaction():
-    """Provide a transactional scope for database operations."""
-    conn = get_connection()
-    trans = conn.begin_transaction()
-    try:
-        yield conn
-        trans.commit()
-    except Exception:
-        trans.rollback()
-        raise
-    finally:
-        conn.close()
+# IO / Loader
+class DataWarehouseLoaderError(Exception):
+    """Raised for validation or execution errors in warehouse loading."""
 ```
 
-### Logging Strategy
+Error boundaries and patterns
+
+- Connectors (discovery): Validate YAML structure and domain keys. Raise DataSourceConnectorError on missing sections, invalid regex, or unknown domain.
+- Readers (Excel): Raise ExcelReadError for missing/invalid sheet, empty files, parse/engine errors; return [] only for legitimate "no data" cases.
+- Domain services: Keep pure and deterministic. Validate inputs; aggregate per‑row issues as warnings, and raise a single transformation error only when error rate crosses a threshold.
+- Loader (DB plan/execute): Validate mode, PK, and input shape; raise DataWarehouseLoaderError for invalid configuration or database execution failures.
+- Orchestration (ops/jobs): Catch at op boundary, log with context, then re‑raise. Do not silently swallow exceptions.
+
+Example: op‑level handling
 
 ```python
+@op
+def read_excel_op(context, config, file_paths):
+    if not file_paths:
+        context.log.warning("No file paths provided to read_excel_op")
+        return []
+    try:
+        rows = read_excel_rows(file_paths[0], sheet=config.sheet)
+        context.log.info(
+            "Excel reading completed",
+            extra={"file": file_paths[0], "sheet": config.sheet, "rows": len(rows)}
+        )
+        return rows
+    except Exception as e:
+        context.log.error(f"Excel reading failed: {e}")
+        raise
+```
+
+Sensors: prefer SkipReason over hard failures
+
+```python
+@sensor(job=trustee_performance_multi_file_job)
+def trustee_new_files_sensor(context):
+    try:
+        files = DataSourceConnector().discover("trustee_performance")
+        if not files:
+            return SkipReason("No trustee performance files found")
+        # ...
+    except Exception as e:
+        context.log.error(f"File discovery sensor error: {e}")
+        return SkipReason(f"Sensor error: {e}")
+```
+
+Guidelines
+
+- Raise specific exceptions; avoid generic bare exceptions in library code.
+- Validate early at the edges; keep core transformations pure.
+- Log once at the boundary and re‑raise; avoid duplicate noisy logs.
+- Do not expose secrets or full payloads in error messages.
+
+## 📓 Logging Strategy
+
+Use standard logging for libraries and Dagster’s `context.log` inside ops/sensors. Prefer structured, concise summaries with key context.
+
+Levels and usage
+
+- DEBUG: verbose details for diagnosis (e.g., compiled patterns, selected files).
+- INFO: pipeline summaries (counts, domains, table names).
+- WARNING: recoverable anomalies (missing optional files, empty results).
+- ERROR: failures with actionable context (which step, which file/config).
+
+Patterns (consistent with repository)
+
+```python
+# Library modules
 import logging
-from functools import wraps
-
-# Configure structured logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-
 logger = logging.getLogger(__name__)
 
-# Log function entry/exit for debugging
-def log_execution(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        logger.debug(f"Entering {func.__name__}")
-        try:
-            result = func(*args, **kwargs)
-            logger.debug(f"Exiting {func.__name__} successfully")
-            return result
-        except Exception as e:
-            logger.exception(f"Error in {func.__name__}: {e}")
-            raise
-    return wrapper
+logger.debug("Compiled pattern", extra={"domain": domain, "pattern": pattern})
+logger.info("Selected files", extra={"domain": domain, "count": len(selected)})
+
+# Orchestration
+context.log.info(
+    "Load completed",
+    extra={"table": cfg.table, "mode": cfg.mode, "deleted": res["deleted"], "inserted": res["inserted"]}
+)
+context.log.error(f"Load operation failed: {e}")
 ```
+
+Best practices
+
+- In ops/sensors, prefer `context.log` to include run metadata automatically.
+- Include domain, file path (or basename), counts, and config path; avoid logging large payloads.
+- Do not log full SQL statements with sensitive values; summarize and/or log parameter counts instead.
+- Keep messages consistent and searchable; prefer key=value or structured extras.
 
 ## 🔧 Configuration Management
 
 ### Environment Variables and Settings
 
+This project uses Pydantic v2 Settings with an `WDH_` environment prefix and nested keys via double underscore. See `.env.example` for available variables.
+
 ```python
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import Optional
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    """Application settings with validation."""
-    app_name: str = "MyApp"
+    # Core
+    app_name: str = Field(default="WorkDataHub")
     debug: bool = False
-    database_url: str
-    redis_url: str = "redis://localhost:6379"
-    api_key: str
-    max_connections: int = 100
+    log_level: str = "INFO"
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    # Data processing
+    data_base_dir: str = "./data"
+    data_sources_config: str = "./src/work_data_hub/config/data_sources.yml"
+
+    # Performance
+    max_file_size_mb: int = 100
+    max_workers: int = 4
+    dev_sample_size: Optional[int] = None
+
+    # Database (nested via WDH_DATABASE__*)
+    database_host: str = "localhost"
+    database_port: int = 5432
+    database_user: str = "wdh_user"
+    database_password: str = "changeme"
+    database_db: str = "wdh"
+    database_uri: Optional[str] = None
+
+    def get_database_connection_string(self) -> str:
+        if self.database_uri:
+            return self.database_uri
+        return (
+            f"postgresql://{self.database_user}:{self.database_password}"
+            f"@{self.database_host}:{self.database_port}/{self.database_db}"
+        )
+
+    model_config = SettingsConfigDict(
+        env_prefix="WDH_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        env_nested_delimiter="__",
+    )
 
 @lru_cache()
 def get_settings() -> Settings:
-    """Get cached settings instance."""
     return Settings()
-
-# Usage
-settings = get_settings()
 ```
+
+Usage
+
+```python
+from src.work_data_hub.config.settings import get_settings
+
+settings = get_settings()
+dsn = settings.get_database_connection_string()
+```
+
+Common env vars
+
+- `WDH_DATA_BASE_DIR`, `WDH_DATA_SOURCES_CONFIG`
+- `WDH_DATABASE__HOST`, `WDH_DATABASE__PORT`, `WDH_DATABASE__USER`, `WDH_DATABASE__PASSWORD`, `WDH_DATABASE__DB`
+- Optional override: `WDH_DATABASE__URI`
 
 ## 🏗️ Data Models and Validation
 
@@ -420,18 +492,19 @@ class Product(ProductBase):
 
 Never include claude code, or written by claude code in commit messages
 
-```
+```commit
 <type>(<scope>): <subject>
 
 <body>
 
 <footer>
-``
+```
+
 Types: feat, fix, docs, style, refactor, test, chore
 
 Example:
-```
 
+```commit
 feat(auth): add two-factor authentication
 
 - Implement TOTP generation and validation
@@ -439,12 +512,12 @@ feat(auth): add two-factor authentication
 - Update user model with 2FA fields
 
 Closes #123
-
-````
+```
 
 ## 🗄️ Database Naming Standards
 
 ### Entity-Specific Primary Keys
+
 All database tables use entity-specific primary keys for clarity and consistency:
 
 ```sql
@@ -454,7 +527,7 @@ leads.lead_id UUID PRIMARY KEY
 messages.message_id UUID PRIMARY KEY
 daily_metrics.daily_metric_id UUID PRIMARY KEY
 agencies.agency_id UUID PRIMARY KEY
-````
+```
 
 ### Field Naming Conventions
 
@@ -520,22 +593,55 @@ class Lead(BaseModel):
     )
 ```
 
-### API Route Standards
+### Orchestration Standards
+
+Use Dagster jobs/ops for all pipeline orchestration. Keep ops thin and side‑effect aware; delegate transformation to pure domain services and IO to dedicated modules.
+
+Guidelines
+
+- Jobs compose ops: discover → read → process → load.
+- Ops take validated Config objects; return JSON‑serializable results.
+- Use `Definitions` (repository.py) to register jobs/schedules/sensors.
+- Keep ops idempotent where practical; log concise summaries with context.
+
+Example (composition pattern)
 
 ```python
-# ✅ STANDARDIZED: RESTful with consistent parameter naming
-router = APIRouter(prefix="/api/v1/leads", tags=["leads"])
-
-@router.get("/{lead_id}")           # GET /api/v1/leads/{lead_id}
-@router.put("/{lead_id}")           # PUT /api/v1/leads/{lead_id}
-@router.delete("/{lead_id}")        # DELETE /api/v1/leads/{lead_id}
-
-# Sub-resources
-@router.get("/{lead_id}/messages")  # GET /api/v1/leads/{lead_id}/messages
-@router.get("/agency/{agency_id}")  # GET /api/v1/leads/agency/{agency_id}
+@job
+def trustee_performance_job():
+    discovered_paths = discover_files_op()
+    excel_rows = read_excel_op(discovered_paths)
+    processed = process_trustee_performance_op(excel_rows, discovered_paths)
+    load_op(processed)
 ```
 
-For complete naming standards, see [NAMING_CONVENTIONS.md](./NAMING_CONVENTIONS.md).
+Configuration (run_config pattern)
+
+```yaml
+ops:
+  discover_files_op:
+    config:
+      domain: trustee_performance
+  read_excel_op:
+    config:
+      sheet: 0
+  load_op:
+    config:
+      table: trustee_performance
+      mode: delete_insert
+      pk: [report_date, plan_code, company_code]
+      plan_only: true
+```
+
+Do
+
+- Keep orchestration free of domain specifics beyond wiring.
+- Use `context.log` at boundaries; re‑raise on failures.
+
+Don’t
+
+- Add HTTP routes or web handlers in this repository.
+- Embed business rules inside ops when they belong to domain services.
 
 ## 📝 Documentation Standards
 
@@ -547,99 +653,136 @@ For complete naming standards, see [NAMING_CONVENTIONS.md](./NAMING_CONVENTIONS.
 - Keep README.md updated with setup instructions and examples
 - Maintain CHANGELOG.md for version history
 
-### API Documentation
+### Pipeline Documentation
+
+Document pipelines, not HTTP APIs. Provide:
+
+- A short purpose statement for each job/op.
+- Inputs/outputs, including config schema and example run_config.
+- Error boundaries and failure modes (what raises where).
+- Observability notes (key logs/metrics) and validation gates.
+
+Example op docstring
 
 ```python
-from fastapi import APIRouter, HTTPException, status
-from typing import List
-
-router = APIRouter(prefix="/products", tags=["products"])
-
-@router.get(
-    "/",
-    response_model=List[Product],
-    summary="List all products",
-    description="Retrieve a paginated list of all active products"
-)
-async def list_products(
-    skip: int = 0,
-    limit: int = 100,
-    category: Optional[str] = None
-) -> List[Product]:
+def load_op(context, config, processed_rows):
     """
-    Retrieve products with optional filtering.
+    Load processed data to the warehouse or return a plan (plan_only).
 
-    - **skip**: Number of products to skip (for pagination)
-    - **limit**: Maximum number of products to return
-    - **category**: Filter by product category
+    Args:
+        context: Dagster execution context
+        config: LoadConfig (table, mode, pk, plan_only)
+        processed_rows: JSON-serializable records
+
+    Returns:
+        Dict with execution metadata (and 'sql_plans' when plan_only)
+
+    Raises:
+        DataWarehouseLoaderError: invalid config or DB execution failure
     """
-    # Implementation here
 ```
+
+Notes
+
+- Summarize SQL plans (counts) rather than logging full SQL with parameters.
+- Reference `data_sources.yml` for table/pk binding where applicable.
+- Keep examples minimal and copy‑pastable (YAML or CLI).
 
 ## 🚀 Performance Considerations
 
-### Optimization Guidelines
+Optimize for end-to-end pipeline throughput and safety. Profile only when needed; prefer simple, bounded changes (sampling, chunking).
 
-- Profile before optimizing - use `cProfile` or `py-spy`
-- Use `lru_cache` for expensive computations
-- Prefer generators for large datasets
-- Use `asyncio` for I/O-bound operations
-- Consider `multiprocessing` for CPU-bound tasks
-- Cache database queries appropriately
+I/O and discovery
 
-### Example Optimization
+- Pre‑compile regex patterns and use directory exclusions and max_depth to reduce traversal cost.
+- Prefer selection strategies (e.g., latest_by_year_month or latest_by_mtime) to avoid processing historical files unnecessarily.
+- Log counts and selected files; avoid listing the entire tree at INFO level.
+
+Excel reading
+
+- Use explicit sheet indices (or names) to avoid workbook scanning overhead.
+- For development and diagnostics, sample with ExcelReader(max_rows=N) to bound memory and CPU.
+- Keep column typing simple; defer heavy conversions to domain models when possible.
+
+Transformation
+
+- Keep services pure and deterministic; avoid global state and side effects.
+- Fail fast on structurally invalid rows but continue processing the batch when safe.
+- Quantize decimals in models (Pydantic validators) to avoid downstream precision churn.
+
+Loading (PostgreSQL)
+
+- Tune chunk_size for INSERT batching (typical range: 500–2000). Larger chunks reduce round‑trips but increase memory footprint.
+- Ensure PKs and indexes exist for delete_insert mode to keep DELETE selective.
+- Use plan‑only mode to validate SQL shape and row counts before executing against DB.
+- Avoid logging full SQL with payloads; prefer summarizing operation counts and parameter lengths.
+
+Example (plan‑only vs execute)
 
 ```python
-from functools import lru_cache
-import asyncio
-from typing import AsyncIterator
-
-@lru_cache(maxsize=1000)
-def expensive_calculation(n: int) -> int:
-    """Cache results of expensive calculations."""
-    # Complex computation here
-    return result
-
-async def process_large_dataset() -> AsyncIterator[dict]:
-    """Process large dataset without loading all into memory."""
-    async with aiofiles.open('large_file.json', mode='r') as f:
-        async for line in f:
-            data = json.loads(line)
-            # Process and yield each item
-            yield process_item(data)
+# Plan-only
+plan = load(
+    table="trustee_performance",
+    rows=processed_dicts,
+    mode="delete_insert",
+    pk=["report_date", "plan_code", "company_code"],
+    conn=None,                  # Plan-only
+)
+# Execute with tuned chunk size (inside ops, connection managed safely)
+result = load(
+    table="trustee_performance",
+    rows=processed_dicts,
+    mode="delete_insert",
+    pk=["report_date", "plan_code", "company_code"],
+    conn=conn,                  # psycopg2 connection
+)
 ```
+
+Memory hygiene
+
+- Limit read volume during development (max_rows or file subsets).
+- Avoid constructing massive intermediate structures; prefer chunked operations for load.
+- Summarize payloads in logs (counts, sizes), not raw rows.
 
 ## 🛡️ Security Best Practices
 
-### Security Guidelines
+Secrets and configuration
 
-- Never commit secrets - use environment variables
-- Validate all user input with Pydantic
-- Use parameterized queries for database operations
-- Implement rate limiting for APIs
-- Keep dependencies updated with `uv`
-- Use HTTPS for all external communications
-- Implement proper authentication and authorization
+- Use environment variables with the WDH_ prefix; do not commit .env files.
+- Reference `.env.example` for required/optional variables; use double underscore for nested keys (e.g., `WDH_DATABASE__HOST`).
+- Never log secrets or full DSNs; keep DSN handling inside configuration helpers.
 
-### Example Security Implementation
+Database safety
+
+- Use parameterized operations (psycopg2) and JSONB adapters for dict/list values.
+- Apply least‑privilege DB credentials suitable for the target schema.
+- Keep transactional integrity: wrap DELETE + INSERT in a single transaction and rollback on failure.
+
+Logging and error messages
+
+- No secrets, passwords, or full SQL with parameters in logs.
+- Prefer concise summaries: table, mode, counts (deleted/inserted/batches).
+- On failures, log which step and context (domain, file name, config path) without leaking data.
+
+Secret scanning and CI
+
+- Keep optional secret scanning (e.g., pre‑commit/gitleaks) enabled where available.
+- Validation gates must pass before merging (ruff, mypy, pytest).
+
+Usage example
 
 ```python
-from passlib.context import CryptContext
-import secrets
+from src.work_data_hub.config.settings import get_settings
+settings = get_settings()
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Safe DSN retrieval
+dsn = settings.get_database_connection_string()
 
-def hash_password(password: str) -> str:
-    """Hash password using bcrypt."""
-    return pwd_context.hash(password)
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash."""
-    return pwd_context.verify(plain_password, hashed_password)
-
-def generate_secure_token(length: int = 32) -> str:
-    """Generate a cryptographically secure random token."""
-    return secrets.token_urlsafe(length)
+# In ops, prefer plan-only first; switch to execute via config
+context.log.info(
+    "Connecting to database for execution",
+    extra={"table": cfg.table, "mode": cfg.mode}
+)
 ```
 
 ## 🔍 Debugging Tools
@@ -666,22 +809,79 @@ uv add --dev rich
 
 ## 📊 Monitoring and Observability
 
-### Structured Logging
+Monitor pipelines through Dagster schedules, sensors, and structured logs. Aim for early, actionable signals with minimal noise.
+
+### Dagster Components
+
+- Schedules
+  - Use a fixed daily schedule (e.g., 02:00 Asia/Shanghai) that builds run_config from `data_sources.yml`.
+  - Run in execute mode with multi‑file processing and consistent load settings.
+
+- Sensors
+  - New files sensor: discovers files for a domain, filters by modification time using a cursor, and triggers a job with a unique run_key. Return `SkipReason` when there is nothing to do.
+  - Data quality sensor: performs lightweight health checks (discovery counts, file accessibility, plan‑only SQL probe) and logs the outcome; prefer `SkipReason` over raising failures.
+
+Example patterns
 
 ```python
-import structlog
+# Cursor-based new-file detection (pseudo)
+files = DataSourceConnector().discover("trustee_performance")
+last_mtime = float(context.cursor) if context.cursor else 0.0
+new_files = [f for f in files if f.metadata.get("modified_time", 0) > last_mtime]
+if not new_files:
+    return SkipReason("No new files detected")
+max_mtime = max(f.metadata.get("modified_time", 0) for f in new_files)
+context.update_cursor(str(max_mtime))
+return RunRequest(run_key=f"new_files_{max_mtime}", run_config=...)
+```
 
-logger = structlog.get_logger()
+### Logging Fields (canonical)
 
-# Log with context
-logger.info(
-    "payment_processed",
-    user_id=user.id,
-    amount=amount,
-    currency="USD",
-    processing_time=processing_time
+Use consistent fields to make logs searchable and comparable across runs:
+
+- Domain discovery: `domain`, `config_path`, `discovered_count`, `selected_count`
+- Reading: `file`, `sheet`, `rows`
+- Processing: `source_file`, `input_rows`, `output_records`, `domain`
+- Loading: `table`, `mode`, `plan_only`, `deleted`, `inserted`, `batches`
+- Sensor state: `cursor_last_mtime`, `new_files_count`, `run_key`
+
+Recommended pattern
+
+```python
+context.log.info(
+    "Load completed",
+    extra={
+        "table": cfg.table,
+        "mode": cfg.mode,
+        "plan_only": cfg.plan_only,
+        "deleted": res.get("deleted", 0),
+        "inserted": res.get("inserted", 0),
+        "batches": res.get("batches", 0),
+    },
 )
 ```
+
+### Data-Quality Signals
+
+- No files discovered or accessible for an expected domain/path.
+- Zero records produced after read/process (unexpected emptiness).
+- Plan‑only SQL probe yields `None` SQL or mismatched column sets.
+- Excessive validation warnings or error rates in transformations.
+
+Treat these as warnings unless they indicate a hard failure; escalate to ERROR when the pipeline cannot proceed safely.
+
+### Alerting (placeholder)
+
+- Route alerts via environment‑based channels (e.g., Slack/email) when available.
+- Use thresholds to avoid noisy alerts (e.g., repeated “no new files” within a window).
+- Prefer summaries (counts, domains, time windows) over raw payloads.
+
+### Operational Recipes
+
+- Reproduce locally with plan‑only mode first (CLI), then switch to execute.
+- Verify configuration sources: `WDH_DATA_BASE_DIR`, `WDH_DATA_SOURCES_CONFIG`.
+- Inspect sensor cursor values and run_key continuity to confirm detection logic.
+- Use focused tests (`-k <pattern>`) and domain unit tests before E2E.
 
 ## 📚 Useful Resources
 
@@ -691,7 +891,7 @@ logger.info(
 - Ruff: https://github.com/astral-sh/ruff
 - Pytest: https://docs.pytest.org/
 - Pydantic: https://docs.pydantic.dev/
-- FastAPI: https://fastapi.tiangolo.com/
+- Dagster: https://docs.dagster.io/
 
 ### Python Best Practices
 
@@ -709,7 +909,7 @@ logger.info(
 
 ## 🔍 Search Command Requirements
 
-**CRITICAL**: Always use `rg` (ripgrep) instead of traditional `grep` and `find` commands:
+**CRITICAL**: Always use MCP Serena or `rg` (ripgrep) instead of traditional `grep` and `find` commands:
 
 ```bash
 # ❌ Don't use grep
@@ -729,7 +929,7 @@ rg --files -g "*.py"
 
 **Enforcement Rules:**
 
-```
+```bash
 (
     r"^grep\b(?!.*\|)",
     "Use 'rg' (ripgrep) instead of 'grep' for better performance and features",
@@ -746,7 +946,7 @@ main (protected) ←── PR ←── feature/your-feature
 ↓ ↑
 deploy development
 
-### Daily Workflow:
+### Daily Workflow
 
 1. git checkout main && git pull origin main
 2. git checkout -b feature/new-feature

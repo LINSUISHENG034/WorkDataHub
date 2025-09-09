@@ -1,50 +1,82 @@
-# AGENTS.md v1.01
+# AGENTS.md v1.02
 
 This file is a README for agents. It gives any AI coding assistant a predictable, minimal set of rules and commands to work effectively in this repository.
 
+Scope: This guide targets the supporting agent that maintains ROADMAP/README, prepares INITIAL.md, and reviews Claude’s PRP and code. Claude runs the fixed “Generate PRP” and “Execute PRP” flows.
+
 ## Development Tips
 
-- **Package Management:** `uv` for all dependency and virtual environment management.
-- **WSL**: `source .venv_linux/bin/activate`; **PowerShell**: `.\.venv\Scripts\Activate.ps1`; **CMD**: `.\.venv\Scripts\activate.bat`.
-- Use `uv` for everything: `uv venv && uv sync` to set up; run tools via `uv run ...`.
-- Search fast: prioritize using MCP Serena. As an alternative, prefer `rg` (ripgrep) over `grep/find` for code and files.
+- Package management: use `uv` for all dependencies and virtualenvs.
+- Virtualenv usage: prefer `uv run <command>` over manual activation.
+  - Optional activation:
+    - WSL or Linux shell: `source .venv_linux/bin/activate` (Use the `--active` flag with `uv run` to prevent it from automatically searching for and managing a virtual environment named `.venv`)
+    - PowerShell: `.\\.venv\\Scripts\\Activate.ps1`
+    - CMD: `.\\.venv\\Scripts\\activate.bat`
+- Setup: `uv venv && uv sync`. Run tools via `uv run ...`.
+- Search fast: prioritize MCP Serena; otherwise use `rg` (ripgrep) over `grep/find` for code and files.
+- Baseline checks (keep green before PRs):
+  - Format: `uv run ruff format .`
+  - Lint: `uv run ruff check src/ --fix`
+  - Types: `uv run mypy src/`
+  - Tests: `uv run pytest -v` (focus with `-k <pattern>`)
+  - Optional coverage: `uv run pytest --cov=src --cov-report=term-missing`
 - Keep changes small and focused; follow existing patterns and conventions.
+- Network/tooling constraints: if external search tools or network are unavailable, rely on in-repo docs/code, state assumptions, and proceed incrementally.
 
 ## PRP Workflow (Plan → Execute → Prove)
 
-We use a PRP (Product Requirements Prompt) workflow to produce high‑quality, repeatable changes.
+This repository uses a PRP (Product Requirements Prompt) workflow. Claude is responsible for generating and executing PRPs. The agent following this document is responsible for maintaining docs, preparing the INITIAL, and reviewing Claude’s work.
 
-1) Prepare INITIAL.md (Definition of Ready)
-   Using PRPs/templates/INITIAL.template.md as template:
-   - **Select a Task** or **Create a Task** in `ROADMAP.md`
-   - Define the feature and boundaries (non‑goals).
-   - Add concrete examples: existing files, code snippets, or patterns to follow.
-   - Link precise external docs (URLs, sections) and internal standards (file paths).
-   - Do more web searches and codebase exploration as needed; Use `gemini -p "your requirements"` for web searches. You should express your requirements clearly in natural language, for example: `gemini -p "Please search online for 'best practices for python dependency injection'."`
-   - Note integration points: data models, APIs, migrations, configs.
-   - Call out gotchas: library quirks, rate limits, concurrency/timeouts, version traps.
-   - Include validation commands and expected outcomes.
+0) Keep ROADMAP and README current (This agent)
 
-*** CRITICAL AFTER YOU ARE DONE RESEARCHING AND EXPLORING THE CODEBASE BEFORE YOU START WRITING THE INITIAL ***
+- Update ROADMAP.md when tasks are added, re‑scoped, completed, or blocked.
+- Reflect any user intent changes or scope clarifications.
+- Keep README commands and pointers aligned with current reality.
 
-*** ULTRATHINK ABOUT THE INITIAL AND ROADMAP THEN START WRITING THE INITIAL ***
+1) Prepare INITIAL.md (Definition of Ready) — This agent
 
-2) Generate PRP
-   - If your assistant supports slash commands: `/generate-prp INITIAL.md` (see `.claude/commands/generate-prp.md`).
-   - Otherwise: open `.claude/commands/generate-prp.md`, copy the instructions into a prompt, and provide `INITIAL.md` as context.
-   - Output file: `PRPs/<feature-name>.md`.
+Using PRPs/templates/INITIAL.template.md as a template:
 
-3) Execute PRP
-   - If supported: `/execute-prp PRPs/<feature-name>.md` (see `.claude/commands/execute-prp.md`).
-   - Otherwise: follow the PRP plan step‑by‑step; implement code, then run validation gates.
+- Select or create a Task in ROADMAP.md; define boundaries (non‑goals).
+- Provide concrete examples: files, code snippets, patterns to follow.
+- Link precise docs: external (URLs/sections) and internal standards (file paths).
+- Identify integration points: models, ops/jobs, loader, config/`data_sources.yml`.
+- Call out risks: library quirks, precision, schedules/sensors behavior, config traps.
+- Include validation commands and expected outcomes.
+- Optional research if available: use web search judiciously; otherwise rely on repo docs and state assumptions.
 
-4) Validation Gates (Definition of Done)
-   - All checks must pass before marking complete:
-     - `uv run ruff check src/ --fix`
-     - `uv run mypy src/`
-     - `uv run pytest -v`
-   - Add/adjust tests so critical paths are covered; fix failures, re‑run gates to green.
-   - Update documentation impacted by the change.
+Exit criteria for INITIAL.md:
+
+- Clear scope and acceptance criteria, copy‑pastable commands for validation, and explicit constraints/assumptions for Claude to follow.
+
+2) Handoff: Generate PRP — Claude
+
+- If supported: `/generate-prp INITIAL.md` (see `.claude/commands/generate-prp.md`).
+- Otherwise: open `.claude/commands/generate-prp.md`, copy the instructions into a prompt, and provide `INITIAL.md` as context.
+- Output: `PRPs/<feature-name>.md`.
+
+3) Handoff: Execute PRP — Claude
+
+- If supported: `/execute-prp PRPs/<feature-name>.md` (see `.claude/commands/execute-prp.md`).
+- Otherwise: Claude follows the PRP step‑by‑step; implements code, runs validation gates.
+
+4) Review & Validation Gates (Definition of Done) — This agent
+
+- All checks must pass before marking complete:
+  - `uv run ruff check src/ --fix`
+  - `uv run mypy src/`
+  - `uv run pytest -v` (optional coverage: `uv run pytest --cov=src --cov-report=term-missing`)
+- Review Claude’s PRP and code:
+  - Alignment with INITIAL.md and ROADMAP.md (scope, acceptance criteria).
+  - Tests cover critical paths; E2E behavior matches expectations.
+  - Docs updated (README/CLAUDE/AGENTS if affected).
+- If discrepancies exist: request changes and update ROADMAP.md status accordingly.
+- When green: update ROADMAP.md task status and document any flags/migrations.
+
+Notes
+
+- Do not guess requirements. Ask for clarifications when ambiguous.
+- Keep instructions and comments runnable and minimal.
 
 ## Testing & Linting (Python)
 
@@ -62,17 +94,32 @@ We use a PRP (Product Requirements Prompt) workflow to produce high‑quality, r
 
 ## Files to Know
 
-- `ROADMAP.md`: The project's master plan. It defines the vision, milestones, and the dependency graph of all features. **This is the single source of truth for project status.**
-- `INITIAL.md`: Seed file for PRP with feature, examples, docs, gotchas, validation.
+- `ROADMAP.md`: The project’s master plan and dependency graph. Single source of truth for status.
+- `README.md`: Quickstart and run commands. Update when stable entry points or commands change.
+- `INITIAL.md`: Seed file for PRP with feature, examples, docs, risks, validation.
 - `PRPs/`: Stores generated PRP files (implementation blueprints).
-- `.claude/commands/generate-prp.md`: How to generate a PRP from INITIAL.md.
-- `.claude/commands/execute-prp.md`: How to execute a PRP and validate.
-- `CLAUDE.md`: Project‑specific rules (style, structure, tooling, search, DB/API standards).
+- `.claude/commands/generate-prp.md`: How Claude generates a PRP from INITIAL.md.
+- `.claude/commands/execute-prp.md`: How Claude executes a PRP and validates.
+- `CLAUDE.md`: Project-specific rules (style, structure, tooling, search, orchestration/DB standards).
+- `src/work_data_hub/orchestration/repository.py`: Dagster Definitions entry (jobs, schedules, sensors).
+- `src/work_data_hub/config/data_sources.yml`: Domain discovery patterns, selection strategies, table/pk.
+- `.env.example`: `WDH_*` variables (paths, DB, flags) — do not commit `.env` files.
+- `tests/`: E2E and unit tests; fixtures under `tests/fixtures/` for sample data.
 
 ## Assistant Notes
 
-- If your assistant supports custom commands, prefer the commands above; otherwise copy the command file contents into your prompt with the appropriate arguments.
-- Keep instructions concrete and runnable; prefer the shortest viable commands.
+- Roles and boundaries:
+  - Claude runs the fixed “Generate PRP” and “Execute PRP” flows.
+  - This agent maintains ROADMAP/README, prepares INITIAL.md, and reviews Claude’s PRP and code.
+- Priorities and constraints:
+  - Keep instructions concrete and runnable; prefer the shortest viable commands (`uv run ...`).
+  - Search smart: use MCP Serena; otherwise prefer `rg` over `grep/find`.
+  - Respect environment limits (no network when restricted); rely on in-repo docs and state assumptions.
+- Mandatory pre‑review checklist (before approving work):
+  - ROADMAP.md alignment (task, scope, status, dependencies) is correct and updated.
+  - Validation gates are green: ruff, mypy, pytest (optional coverage).
+  - Docs updated where applicable (README/CLAUDE/AGENTS, configs).
+- Do not bypass the PRP workflow or change scope mid‑stream without updating ROADMAP.md and INITIAL.md.
 - Ask for clarification when requirements are ambiguous; do not guess.
 
-Remember: Before conducting any code review, you must first cross-reference the code changes with their corresponding task(s) in `ROADMAP.md`. Your review should validate alignment with the task's stated goals. If the review reveals discrepancies—such as new tasks, completed work, or scope changes—you are required to perform the necessary updates (add, modify, or change status) to the `ROADMAP.md` immediately. This ensures the roadmap is perpetually maintained as the single source of truth for project status.
+**CRITICAL**: Before any code review, cross‑reference the changes with their ROADMAP task(s). If discrepancies exist (new tasks, completed work, or scope changes), update ROADMAP.md immediately to keep it as the single source of truth.

@@ -1,6 +1,6 @@
 # Annuity Hub 重构项目实施计划 (修订版)
 
-> Note: This document is superseded by `docs/overview/01_system_overview.md` (2025-09-08). It is preserved for historical context. For current plan/status see `ROADMAP.md`.
+> Note: This document is superseded by `README.md` (Developer Quickstart) and `ROADMAP.md`. It is preserved for historical context. For current plan/status see `ROADMAP.md`.
 
 ## 1. 最终技术栈选型
 

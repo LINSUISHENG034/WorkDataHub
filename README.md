@@ -3,12 +3,15 @@
 A concise entry point for new contributors. This page orients you quickly and links to the single sources of truth for plan, design, and code.
 
 ## What & Why
+
 WorkDataHub is a reliable, declarative, and testable data processing platform replacing a legacy monolithic ETL with isolated domain services, configuration‑driven discovery, and orchestrated end‑to‑end pipelines.
 
 ## Status
+
 - Project plan and current status: see [ROADMAP.md](ROADMAP.md).
 
 ## Architecture at a Glance
+
 - Config: environment settings and schemas; config‑driven discovery of inputs.
 - IO: connectors (file), readers (Excel), and a transactional warehouse loader.
 - Domain: Pydantic models + pure services (e.g., trustee_performance).
@@ -16,6 +19,7 @@ WorkDataHub is a reliable, declarative, and testable data processing platform re
 - Utils: typed helpers and common types.
 
 ## Workflow (High‑Level)
+
 A structural view of the end‑to‑end pipeline from trigger to data load. This focuses on orchestration and dataflow, independent of domain‑specific rules.
 
 ```mermaid
@@ -34,6 +38,7 @@ flowchart TD
 ```
 
 Key characteristics
+
 - Triggers: initiated via CLI, scheduled runs, or file‑driven sensors.
 - Central registry: Dagster `Definitions` exposes jobs/schedules/sensors.
 - Jobs: compose ops into a directed flow; support single or multi‑file paths.
@@ -42,8 +47,8 @@ Key characteristics
 - Processing: domain services apply validation and transformations.
 - Loading: plan‑only returns SQL plans; execute mode performs transactional writes.
 
-
 ## Code Map (stable entry points)
+
 - Config: `src/work_data_hub/config/settings.py`, `src/work_data_hub/config/schema.py`, `src/work_data_hub/config/data_sources.yml`
 - IO — Readers/Connectors/Loader:
   - `src/work_data_hub/io/readers/excel_reader.py`
@@ -58,22 +63,31 @@ Key characteristics
 - Utils: `src/work_data_hub/utils/types.py`
 
 ## How to Run
+
 Prerequisite: Install `uv` (https://docs.astral.sh/uv/).
 
 ```bash
 # Setup environment
 uv venv && uv sync
 
-# Lint, types, tests
+# Format, lint, types, tests
+uv run ruff format .
 uv run ruff check src/ --fix
 uv run mypy src/
 uv run pytest -v
 
+# Optional coverage
+uv run pytest --cov=src --cov-report=term-missing
+
 # Focus a subset
 uv run pytest -k trustee_performance -v
+
+# Optional: pre-commit hooks (only if configured)
+# uv run pre-commit run --all-files
 ```
 
 ## Try It (End‑to‑End)
+
 Run the existing end‑to‑end test for the first vertical slice (trustee performance):
 
 ```bash
@@ -81,19 +95,21 @@ uv run pytest tests/e2e/test_trustee_performance_e2e.py -v
 ```
 
 ## Docs Index
-- System overview (current): `docs/overview/01_system_overview.md`
+
+- Migration reference: `docs/plan/MIGRATION_REFERENCE.md`
+- Legacy inventory: `docs/plan/R-015_LEGACY_INVENTORY.md`
 - PRPs (Product Requirements Prompts): `PRPs/`
 - PRP workflow: `AGENTS.md`
+- Dagster docs: https://docs.dagster.io/
 - Legacy analyses (superseded, for history):
   - `docs/project/01_architecture_analysis_report.md`
   - `docs/implement/01_implementation_plan.md`
   - `docs/project/02_production_data_sample_analysis.md`
   - `docs/project/03_specified_data_source_problems_analysis.md`
   - `docs/project/04_dependency_and_priority_analysis.md`
-- PRPs (Product Requirements Prompts): `PRPs/`
-- PRP workflow: `AGENTS.md`
 
 ## Source of Truth & Maintenance
+
 - Plan and status live in `ROADMAP.md`.
 - This quickstart stays minimal; update only when stable entry points or commands change.
 - Changes that affect stable facts should include a README update in the DoD.
