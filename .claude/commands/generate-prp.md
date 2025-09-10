@@ -98,7 +98,7 @@ Save as: `PRPs/{[id-prefix]}.md`
 - [ ] References existing patterns
 - [ ] Clear implementation path
 - [ ] Error handling documented
- - [ ] External research captured for reuse (actionable notes + links)
+- [ ] External research captured for reuse (actionable notes + links)
 
 Score the PRP on a scale of 1-10 (confidence level to succeed in one-pass implementation using claude codes)
 

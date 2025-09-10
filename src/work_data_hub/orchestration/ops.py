@@ -22,6 +22,12 @@ from ..io.readers.excel_reader import read_excel_rows
 
 logger = logging.getLogger(__name__)
 
+# psycopg2 lazy import holder to satisfy both patching styles in tests:
+# 1) patch("src.work_data_hub.orchestration.ops.psycopg2") expects a module attribute here
+# 2) patch builtins.__import__ expects a dynamic import path at runtime
+_PSYCOPG2_NOT_LOADED = object()
+psycopg2 = _PSYCOPG2_NOT_LOADED  # type: ignore
+
 
 def _load_valid_domains() -> List[str]:
     """
@@ -332,66 +338,64 @@ def load_op(
     conn = None
     try:
         if not config.plan_only:
-            try:
-                # Import psycopg2 here to be compatible with tests that patch builtins.__import__
-                import psycopg2  # type: ignore
-                settings = get_settings()
-
-                # Primary DSN retrieval with fallback for test compatibility
-                # Resolve DSN with robust fallback and type checks
-                dsn = None
-                # Primary: consolidated accessor
-                if hasattr(settings, "get_database_connection_string"):
-                    try:
-                        dsn = settings.get_database_connection_string()
-                    except Exception:
-                        dsn = None
-                # Fallback: compatibility wrapper
-                if not isinstance(dsn, str) and hasattr(settings, "database"):
-                    try:
-                        dsn = settings.database.get_connection_string()  # type: ignore[attr-defined]
-                    except Exception:
-                        pass
-                if not isinstance(dsn, str) or not dsn:
-                    raise DataWarehouseLoaderError(
-                        "Database connection failed: invalid DSN resolved from settings"
-                    )
-
-                context.log.info(f"Connecting to database for execution (table: {config.table})")
-
-                # Establish connection only; classify connection errors clearly
+            # Lazy import psycopg2 into module-global for test compatibility
+            global psycopg2  # type: ignore
+            if psycopg2 is None:  # type: ignore
+                # Explicitly treated as unavailable (tests may patch to None)
+                raise DataWarehouseLoaderError(
+                    "psycopg2 not available for database operations"
+                )
+            if psycopg2 is _PSYCOPG2_NOT_LOADED:  # type: ignore
                 try:
-                    raw_conn = psycopg2.connect(dsn)
-                except Exception as e:
+                    import psycopg2 as _psycopg2  # type: ignore
+                except ImportError:
                     raise DataWarehouseLoaderError(
-                        f"Database connection failed: {e}. "
-                        "Check WDH_DATABASE__* environment variables."
-                    ) from e
-
-                # Support both context-managed and bare connections (for test compatibility)
-                if hasattr(raw_conn, "__enter__") and hasattr(raw_conn, "__exit__"):
-                    # Use context manager if available (some tests mock this path)
-                    with raw_conn as managed_conn:
-                        result = load(
-                            table=config.table,
-                            rows=processed_rows,
-                            mode=config.mode,
-                            pk=config.pk,
-                            conn=managed_conn,
-                        )
-                    conn = None  # handled by context manager
-                else:
-                    # Bare connection path (production default)
-                    conn = raw_conn
-                    result = load(
-                        table=config.table,
-                        rows=processed_rows,
-                        mode=config.mode,
-                        pk=config.pk,
-                        conn=conn,
+                        "psycopg2 not available for database operations"
                     )
+                psycopg2 = _psycopg2  # type: ignore
+
+            settings = get_settings()
+
+            # Primary DSN retrieval with fallback for test compatibility
+            dsn = None
+            # Primary: consolidated accessor
+            if hasattr(settings, "get_database_connection_string"):
+                try:
+                    dsn = settings.get_database_connection_string()
+                except Exception:
+                    dsn = None
+            # Fallback: compatibility wrapper
+            if not isinstance(dsn, str) and hasattr(settings, "database"):
+                try:
+                    dsn = settings.database.get_connection_string()  # type: ignore[attr-defined]
+                except Exception:
+                    pass
+            if not isinstance(dsn, str) or not dsn:
+                raise DataWarehouseLoaderError(
+                    "Database connection failed: invalid DSN resolved from settings"
+                )
+
+            context.log.info(f"Connecting to database for execution (table: {config.table})")
+
+            # CRITICAL: Only catch psycopg2.connect failures
+            try:
+                conn = psycopg2.connect(dsn)  # type: ignore  # Bare connection, no context manager
+            except Exception as e:
+                raise DataWarehouseLoaderError(
+                    f"Database connection failed: {e}. "
+                    "Check WDH_DATABASE__* environment variables."
+                ) from e
+
+            # Call loader - it handles transactions with 'with conn:'
+            result = load(
+                table=config.table,
+                rows=processed_rows,
+                mode=config.mode,
+                pk=config.pk,
+                conn=conn,
+            )
         else:
-            # Plan-only path unchanged
+            # Plan-only: no connection created
             result = load(
                 table=config.table,
                 rows=processed_rows,
@@ -415,6 +419,7 @@ def load_op(
         context.log.error(f"Load operation failed: {e}")
         raise
     finally:
-        # CRITICAL: Always clean up connection
+        # CRITICAL: Clean up bare connection in finally
         if conn is not None:
             conn.close()
+

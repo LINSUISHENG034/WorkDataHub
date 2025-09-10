@@ -1,4 +1,4 @@
-# Execute BASE PRP v1.02
+# Execute BASE PRP v1.03
 
 Implement a feature using using the PRP file.
 
@@ -11,6 +11,7 @@ Implement a feature using using the PRP file.
    - Understand all context and requirements
    - Follow all instructions in the PRP and extend the research if needed
    - Ensure you have all needed context to implement the PRP fully
+   - Consult the "Implementation-Facing Research Notes" section in the PRP first to reuse research, links, commands, and decisions
    - **Leverage AI for Efficient Research**: Use the `gemini -p '...'` command to accelerate online research. Ensure your prompts are clear and goal-oriented.
       - **For Pattern Discovery**: When exploring general solutions or best practices, state your requirements clearly.
       - **e.g.**, `gemini -p 'Search online for best practices for Python dependency injection.'`

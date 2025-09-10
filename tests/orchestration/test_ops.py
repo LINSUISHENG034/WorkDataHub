@@ -28,6 +28,7 @@ from src.work_data_hub.orchestration.ops import (
     read_and_process_trustee_files_op,
     read_excel_op,
 )
+from src.work_data_hub.io.loader.warehouse_loader import DataWarehouseLoaderError
 
 
 class TestDiscoverFilesOp:
@@ -397,7 +398,7 @@ class TestLoadOp:
 
     def test_load_op_execute_mode_mocked(self):
         """Test load_op with execute=True using mocked psycopg2."""
-        processed_rows = [{"col": "value"}]
+        processed_rows = [{"col": "value", "id": 1}]  # Add missing id field
 
         mock_conn = Mock()
         mock_result = {
@@ -408,19 +409,9 @@ class TestLoadOp:
             "batches": 1
         }
 
-        # Mock the import statement itself
-        import builtins
-        original_import = builtins.__import__
-
-        def mock_import(name, *args, **kwargs):
-            if name == "psycopg2":
-                mock_psycopg2 = Mock()
-                mock_psycopg2.connect.return_value.__enter__.return_value = mock_conn
-                mock_psycopg2.connect.return_value.__exit__.return_value = None
-                return mock_psycopg2
-            return original_import(name, *args, **kwargs)
-
-        with patch("builtins.__import__", side_effect=mock_import):
+        with patch("src.work_data_hub.orchestration.ops.psycopg2", create=True) as mock_psycopg2:
+            mock_psycopg2.connect.return_value = mock_conn
+            
             with patch("src.work_data_hub.orchestration.ops.load") as mock_load:
                 mock_load.return_value = mock_result
 
@@ -433,7 +424,10 @@ class TestLoadOp:
                     config = LoadConfig(plan_only=False, table="test_table", pk=["id"])
                     result = load_op(context, config, processed_rows)
 
-                    # Verify load was called with connection from context manager
+                    # Verify bare connection was used
+                    mock_psycopg2.connect.assert_called_once_with("postgresql://test")
+                    
+                    # Verify load was called with bare connection
                     mock_load.assert_called_once_with(
                         table="test_table",
                         rows=processed_rows,
@@ -441,29 +435,24 @@ class TestLoadOp:
                         pk=["id"],
                         conn=mock_conn
                     )
+                    
+                    # Verify connection cleanup
+                    mock_conn.close.assert_called_once()
                     assert result == mock_result
 
     def test_load_op_execute_mode_psycopg2_not_available(self):
         """Test load_op with execute=True when psycopg2 is not available."""
-        processed_rows = [{"col": "value"}]
+        processed_rows = [{"col": "value", "id": 1}]  # Add missing id field
 
-        # Mock import to raise ImportError for psycopg2
-        import builtins
-        original_import = builtins.__import__
-
-        def mock_import(name, *args, **kwargs):
-            if name == "psycopg2":
-                raise ImportError("No module named 'psycopg2'")
-            return original_import(name, *args, **kwargs)
-
-        with patch("builtins.__import__", side_effect=mock_import):
+        # Mock psycopg2 module to be None (simulating ImportError at module level)
+        with patch("src.work_data_hub.orchestration.ops.psycopg2", None):
             context = build_op_context()
             config = LoadConfig(plan_only=False, table="test_table", pk=["id"])
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(DataWarehouseLoaderError) as exc_info:
                 load_op(context, config, processed_rows)
 
-            assert "psycopg2 not available for database execution" in str(exc_info.value)
+            assert "psycopg2 not available for database operations" in str(exc_info.value)
 
     def test_load_op_execute_mode_connection_failed(self):
         """Test load_op with execute=True when database connection fails."""
@@ -842,15 +831,14 @@ class TestLoadOpConnectionLifecycle:
 
     # Preserve existing tests with legacy names for backward compatibility
     def test_load_op_db_context_manager_mocked(self):
-        """Test load_op uses context manager for DB connections."""
-        processed_rows = [{"col": "value"}]
+        """Test load_op uses bare connection with fallback DSN resolution."""
+        processed_rows = [{"col": "value", "id": 1}]  # Add missing id field
 
         mock_conn = Mock()
         mock_result = {"mode": "delete_insert", "table": "test", "deleted": 1, "inserted": 1, "batches": 1}
 
         with patch("src.work_data_hub.orchestration.ops.psycopg2", create=True) as mock_psycopg2:
-            mock_psycopg2.connect.return_value.__enter__.return_value = mock_conn
-            mock_psycopg2.connect.return_value.__exit__.return_value = None
+            mock_psycopg2.connect.return_value = mock_conn
 
             with patch("src.work_data_hub.orchestration.ops.load") as mock_load:
                 mock_load.return_value = mock_result
@@ -859,29 +847,32 @@ class TestLoadOpConnectionLifecycle:
                     mock_db = Mock()
                     mock_db.get_connection_string.return_value = "postgresql://test"
                     mock_settings.return_value.database = mock_db
+                    # Primary method not available to test fallback
+                    del mock_settings.return_value.get_database_connection_string
 
                     context = build_op_context()
                     config = LoadConfig(plan_only=False, table="test", pk=["id"])
                     result = load_op(context, config, processed_rows)
 
-                    # Verify context manager was used
+                    # Verify bare connection was used (not context manager)
                     mock_psycopg2.connect.assert_called_once_with("postgresql://test")
-                    mock_psycopg2.connect.return_value.__enter__.assert_called_once()
-                    mock_psycopg2.connect.return_value.__exit__.assert_called_once()
 
-                    # Verify load was called with connection from context manager
+                    # Verify load was called with bare connection
                     mock_load.assert_called_once_with(
                         table="test", rows=processed_rows, mode="delete_insert", pk=["id"], conn=mock_conn
                     )
+                    
+                    # Verify connection cleanup
+                    mock_conn.close.assert_called_once()
                     assert result == mock_result
 
     def test_load_op_context_manager_exception_handling(self):
-        """Test load_op context manager handles exceptions properly."""
-        processed_rows = [{"col": "value"}]
+        """Test load_op connection handling with exceptions."""
+        processed_rows = [{"col": "value", "id": 1}]  # Add missing id field
 
         with patch("src.work_data_hub.orchestration.ops.psycopg2", create=True) as mock_psycopg2:
-            # Context manager should handle exceptions and call __exit__
-            mock_psycopg2.connect.return_value.__enter__.side_effect = Exception("Connection error")
+            # Simulate connection failure
+            mock_psycopg2.connect.side_effect = Exception("Connection error")
 
             with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
                 mock_db = Mock()

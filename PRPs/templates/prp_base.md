@@ -1,4 +1,4 @@
-name: "Base PRP Template v2 - Context-Rich with Validation Loops"
+name: "Base PRP Template v2.02 - Context-Rich with Validation Loops"
 description: |
 
 ## Purpose
@@ -45,6 +45,42 @@ Template optimized for AI agents to implement features with sufficient context a
 - docfile: [PRPs/ai_docs/file.md]
   why: [docs that the user has pasted in to the project]
 
+```
+
+### Implementation-Facing Research Notes
+Purpose: Consolidate external research into actionable, implementation-facing notes to avoid duplicate searching and reduce information drift.
+
+```yaml
+sources:
+  - url: <URL#anchor>
+    section: <specific-section-or-anchor>
+    why: <which decision or usage this informs>
+    type: [docs|blog|github|stackoverflow]
+
+tldr:
+  - <3–5 bullets capturing the actionable essence>
+
+setup_commands:
+  - "uv add <package>[extra]==<version>"
+  - "uv run <tool> <args>"
+  - "edit config: src/work_data_hub/config/data_sources.yml (keys: ...)"
+
+api_decisions:
+  - name: <api/function/parameter>
+    choice: <selected-option>
+    rationale: <why selected>
+
+versions:
+  - library: <name>
+    constraint: ">=X,<Y"
+    compatibility: <e.g., python 3.11, pydantic v2, dagster version>
+
+pitfalls_and_mitigations:
+  - issue: <known-pitfall>
+    mitigation: <how to avoid>
+
+open_questions:
+  - <clarification needed before execution>
 ```
 
 ### Current Codebase tree (run `tree` in the root of the project) to get an overview of the codebase

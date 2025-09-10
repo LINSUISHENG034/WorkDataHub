@@ -1,5 +1,10 @@
 # 学习笔记
 
+- 测试脚本
+```bash
+uv run python -m src.work_data_hub.orchestration.jobs --execute --max-files 2
+```
+
 ## 新架构起始点
 
 - Dagster Job: 通过 src/work_data_hub/orchestration/jobs.py 中的 trustee_performance_job 或
