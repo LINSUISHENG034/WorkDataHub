@@ -224,9 +224,18 @@ class DataSourceConnector:
                         # Extract year/month from named groups if present
                         groups = match.groupdict()
                         year = int(groups["year"]) if "year" in groups and groups["year"] else None
-                        month = (
-                            int(groups["month"]) if "month" in groups and groups["month"] else None
-                        )
+
+                        # Post-process month extraction for robustness
+                        month_str = groups.get("month")
+                        if month_str and len(month_str) == 1 and month_str in "12":
+                            # Check if this is actually part of "10", "11", or "12"
+                            match_end = match.end("month")
+                            if match_end < len(filename):
+                                next_char = filename[match_end]
+                                if month_str == "1" and next_char in "012":
+                                    month_str = month_str + next_char  # Form "10", "11", "12"
+
+                        month = int(month_str) if month_str else None
 
                         # Extract additional file metadata
                         try:
@@ -264,7 +273,7 @@ class DataSourceConnector:
             List of selected files after applying strategies
         """
         # Group files by domain
-        by_domain = {}
+        by_domain: dict[str, list[DiscoveredFile]] = {}
         for file in files:
             if file.domain not in by_domain:
                 by_domain[file.domain] = []

@@ -14,6 +14,54 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+class DatabaseSettings:
+    """
+    Database settings compatibility layer for unified DSN retrieval.
+
+    This class provides a lightweight compatibility wrapper around individual
+    database configuration parameters, supporting both component-based and
+    URI-based connection string generation.
+    """
+
+    def __init__(
+        self,
+        host: str,
+        port: int = 5432,
+        user: str = "",
+        password: str = "",
+        db: str = "",
+        uri: Optional[str] = None,
+    ):
+        """
+        Initialize database settings.
+
+        Args:
+            host: Database host
+            port: Database port
+            user: Database user
+            password: Database password
+            db: Database name
+            uri: Complete database URI (overrides other parameters if provided)
+        """
+        self.host = host
+        self.port = port
+        self.user = user
+        self.password = password
+        self.db = db
+        self.uri = uri
+
+    def get_connection_string(self) -> str:
+        """
+        Get PostgreSQL connection string.
+
+        Returns:
+            Database connection string (DSN)
+        """
+        if self.uri:
+            return self.uri
+        return f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.db}"
+
+
 class Settings(BaseSettings):
     """
     Application settings with environment variable support.
@@ -61,13 +109,28 @@ class Settings(BaseSettings):
     database_user: str = Field(default="user", description="Database user")
     database_password: str = Field(default="password", description="Database password")
     database_db: str = Field(default="database", description="Database name")
-    database_uri: Optional[str] = Field(None, description="Complete database URI")
+    database_uri: Optional[str] = Field(default=None, description="Complete database URI")
 
     def get_database_connection_string(self) -> str:
         """Get PostgreSQL connection string."""
-        if self.database_uri:
-            return self.database_uri
-        return f"postgresql://{self.database_user}:{self.database_password}@{self.database_host}:{self.database_port}/{self.database_db}"
+        return self.database.get_connection_string()
+
+    @property
+    def database(self) -> DatabaseSettings:
+        """
+        Get database settings compatibility wrapper.
+
+        Returns:
+            DatabaseSettings instance assembled from individual configuration fields
+        """
+        return DatabaseSettings(
+            host=self.database_host,
+            port=self.database_port,
+            user=self.database_user,
+            password=self.database_password,
+            db=self.database_db,
+            uri=self.database_uri,
+        )
 
     model_config = SettingsConfigDict(
         env_prefix="WDH_",

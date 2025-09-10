@@ -1,231 +1,96 @@
-# INITIAL.md — M3 Schedules, Sensors, and Alerting for Trustee Performance
+# INITIAL.md — C-019..C-022 小补丁（减少关键用例失败）
 
-Selected task: ROADMAP.md → Milestone 3 → F‑030 (Add schedules for domain jobs), F‑031 (Add data quality sensors), C‑030 (Configure alerting)
+目标：以最小改动修复当前最主要的失败簇，提升端到端稳定性；不改变架构、不扩大范围。后续C-023将单独处理连接语义对齐。
 
-Purpose: Operationalize the trustee_performance pipeline by adding a production schedule, file‑based trigger sensor, and basic data‑quality sensor with alert hooks. Expose these through a Dagster Definitions module so `dagster dev` can discover jobs, schedules, and sensors.
+## 任务
+- ROADMAP：
+  - C-019（DB设置兼容层与DSN获取统一）
+  - C-020（ExcelReader健壮化）
+  - C-021（文件发现月份提取稳健化）
+  - C-022（受托业绩小数/百分比处理与量化稳健性）
+- 范围：仅限小补丁，不改测试，不动无关模块。
 
-Dependencies: R‑030 (Research Dagster sensors/alerts) is implicitly satisfied by the design below; no external services required.
+## 现状与主要症状（摘自VALIDATION.md）
+- 配置/API不匹配：测试期望存在`DatabaseSettings`与`settings.database.get_connection_string()`；当前仅有`Settings.get_database_connection_string()`。
+- 月份提取错误：正则`(?P<month>0?[1-9]|1[0-2])`在“12”时匹配到“1”（左侧优先），致断言期望12变为1。
+- ExcelReader不一致：
+  - “年/月”断言为字符串（"2024"），但读成了整数；
+  - “Unnamed: n”列名未清洗为空字符串""；
+  - 损坏文件未统一抛出“Failed to parse Excel file”类错误。
+- 领域小数/百分比：`return_rate=5.5`应按百分比解释为0.055；量化器构造需更稳健。
 
-## FEATURE
-Add:
-- A daily schedule to run `trustee_performance_multi_file_job` at 02:00 Asia/Shanghai in execute mode.
-- A file discovery sensor that triggers the job when new matching trustee files are discovered since the last run.
-- A post‑run data quality sensor that checks the last job result and raises an alert when inserted rows == 0.
-- A `Definitions` entry point that registers jobs, schedules, and sensors for `dagster dev`.
+## 交付物（最小变更集）
+1) DB设置兼容层（C-019）
+   - 文件：`src/work_data_hub/config/settings.py`
+   - 新增轻量`DatabaseSettings`（host/port/user/password/db/uri + `get_connection_string()`）。
+   - `Settings`新增属性`database: DatabaseSettings`（从现有环境变量组装），并让`get_database_connection_string()`委托给`self.database.get_connection_string()`；保留现有`database_uri`直连优先逻辑。
+   - `ops.load_op`取DSN时：优先`settings.get_database_connection_string()`；若异常或缺失，回退`settings.database.get_connection_string()`（兼容老测试）。
 
-## SCOPE
-- In‑scope:
-  - New files under `src/work_data_hub/orchestration/`:
-    - `schedules.py`: schedule(s) for trustee_performance job(s).
-    - `sensors.py`: file discovery sensor + data-quality sensor.
-    - `repository.py`: exports `Definitions` including jobs, schedules, sensors.
-  - Unit tests for schedule config and sensor logic (no external services needed).
-- Non‑goals:
-  - No Slack/email integration (provide alert hooks/logging only).
-  - No changes to job/ops behavior beyond run_config injection.
-  - No Docker/K8s deployment work (separate task).
+2) ExcelReader健壮化（C-020）
+   - 文件：`src/work_data_hub/io/readers/excel_reader.py`
+   - 在`_dataframe_to_rows`：
+     - 保持“年”“月”列值为字符串（不向int收缩）；
+     - 将列名形如`^Unnamed:\s*\d+`归一为`""`（空字符串）；
+   - 在`read_rows`错误处理：捕获`zipfile.BadZipFile`、`openpyxl`相关异常，统一抛出`ExcelReadError("Failed to parse Excel file ...")`以匹配断言。
 
-## CONTEXT SNAPSHOT
-```bash
-src/work_data_hub/
-  orchestration/
-    jobs.py                   # trustee_performance_*_job + build_run_config(args)
-    ops.py                    # ops
-  io/connectors/file_connector.py   # DataSourceConnector.discover(domain)
-  config/
-    settings.py               # get_settings(); DB + paths
-    data_sources.yml          # domains.trustee_performance.table/pk
-```
+3) 月份提取稳健化（C-021）
+   - 文件：`src/work_data_hub/io/connectors/file_connector.py`
+   - 在`_scan_directory_for_domain`里，匹配后对`match`结果进行回退修正：
+     - 若捕获`month`为一位数字，且文件名中该位后紧跟的字符与其组成的两位数在[10, 12]，则将`month`改为两位数（例如"12").
+   - 注意：不改测试里给定的正则（测试自带sample config），仅在我们代码里做安全后处理。
 
-## EXAMPLES (most important)
-- `Definitions` module pattern
-```python
-# src/work_data_hub/orchestration/repository.py
-from dagster import Definitions
-from .jobs import trustee_performance_job, trustee_performance_multi_file_job
-from .schedules import trustee_daily_schedule
-from .sensors import trustee_new_files_sensor, trustee_dq_sensor
+4) 领域小数/百分比与量化稳健（C-022）
+   - 文件：`src/work_data_hub/domain/trustee_performance/models.py`
+   - 在`clean_decimal_fields`（`mode="before"`）：
+     - 对`return_rate`：若输入为数值且>1（且合理上限<=100），按百分比解释（除以100），与`"5.5%"`一致；
+     - 小数量化使用：`Decimal(1).scaleb(-places)`构造量化器 + `ROUND_HALF_UP`，增强稳健性；
+   - 仅限上述字段，不影响`net_asset_value`/`fund_scale`语义。
 
-defs = Definitions(
-    jobs=[trustee_performance_job, trustee_performance_multi_file_job],
-    schedules=[trustee_daily_schedule],
-    sensors=[trustee_new_files_sensor, trustee_dq_sensor],
-)
-```
+## 非目标
+- 不在本PR中统一“ops使用上下文管理器连接 vs 裸连接”的语义（留给C-023）。
+- 不为全部失败一次性兜底。仅修复上述高杠杆问题。
 
-- Daily schedule with run_config
-```python
-# src/work_data_hub/orchestration/schedules.py
-from dagster import schedule
-from .jobs import trustee_performance_multi_file_job
-from ..config.settings import get_settings
-import yaml
+## 集成与兼容性
+- 现有入口保持不变：
+  - `src/work_data_hub/orchestration/ops.py` 仅在DSN获取上做兼容处理；
+  - 不改`data_sources.yml`，避免影响其他用例；
+  - 不修改测试文件。
 
-def _build_schedule_run_config():
-    settings = get_settings()
-    with open(settings.data_sources_config, "r", encoding="utf-8") as f:
-        ds = yaml.safe_load(f) or {}
-    domain_cfg = ds.get("domains", {}).get("trustee_performance", {})
-    return {
-        "ops": {
-            "discover_files_op": {"config": {"domain": "trustee_performance"}},
-            "read_and_process_trustee_files_op": {"config": {"sheet": 0, "max_files": 5}},
-            "load_op": {
-                "config": {
-                    "table": domain_cfg.get("table", "trustee_performance"),
-                    "mode": "delete_insert",
-                    "pk": domain_cfg.get("pk", ["report_date", "plan_code", "company_code"]),
-                    "plan_only": False,
-                }
-            },
-        }
-    }
+## 验证步骤（本地）
+- 基线：
+  - `uv run ruff check src/ --fix`
+  - `uv run mypy src/`
+  - `uv run pytest -v`（观察失败减少）
+- 重点用例抽样（建议先聚焦以下）：
+  - `uv run pytest -v tests/io/test_excel_reader.py -k "read_rows_success or corrupted_file or column_name_cleaning"`
+  - `uv run pytest -v tests/io/test_file_connector.py -k latest_by_year_month_selection`
+  - `uv run pytest -v tests/io/test_warehouse_loader.py -k DatabaseSettings`
+  - `uv run pytest -v tests/e2e/test_trustee_performance_e2e.py -k complete_pipeline_plan_only_mode`
+  - `uv run pytest -v tests/domain/trustee_performance/test_models.py -k validator_handles_various_input_types`
 
-@schedule(cron_schedule="0 2 * * *", job=trustee_performance_multi_file_job, execution_timezone="Asia/Shanghai")
-def trustee_daily_schedule(_context):
-    return _build_schedule_run_config()
-```
+## 验收标准（小补丁）
+- 配置兼容：`tests/io/test_warehouse_loader.py::TestDatabaseSettings::*`通过（可导入`DatabaseSettings`且生成正确DSN）。
+- ExcelReader：
+  - `test_read_rows_success`断言“年/月”为字符串通过；
+  - `test_read_rows_corrupted_file`捕获“Failed to parse Excel file”通过；
+  - `test_dataframe_to_rows_column_name_cleaning`包含空列名`""`通过。
+- 文件发现：`test_latest_by_year_month_selection`能正确识别12月。
+- 领域小数/百分比：`test_validator_handles_various_input_types`中`return_rate=5.5`按百分比转换为`0.055000`通过。
+- 不引入新的mypy/ruff错误。
 
-- File discovery sensor
-```python
-# src/work_data_hub/orchestration/sensors.py
-from dagster import sensor, RunRequest, SkipReason
-from ..io.connectors.file_connector import DataSourceConnector
-from .jobs import trustee_performance_multi_file_job
+## 风险与回退
+- Excel列名归一化把多个“Unnamed”映射为同一空列名；当前测试只断言存在空列名，不校验重复，风险可接受。
+- 月份回退修正仅在明确两位数（10/11/12）时生效，不改变其他匹配路径。
+- `return_rate`数值解释为百分比仅在>1（且<=100）时生效，避免误伤小于1的小数（已作为小数）。
 
-@sensor(job=trustee_performance_multi_file_job, minimum_interval_seconds=300)
-def trustee_new_files_sensor(context):
-    connector = DataSourceConnector()
-    files = connector.discover("trustee_performance")
-    if not files:
-        return SkipReason("No trustee_performance files found")
+## 附：涉及文件
+- `src/work_data_hub/config/settings.py`
+- `src/work_data_hub/orchestration/ops.py`
+- `src/work_data_hub/io/readers/excel_reader.py`
+- `src/work_data_hub/io/connectors/file_connector.py`
+- `src/work_data_hub/domain/trustee_performance/models.py`
 
-    # Cursor: last processed mtime
-    last_mtime = float(context.cursor) if context.cursor else 0.0
-    new_files = [f for f in files if f.metadata.get("modified_time", 0) > last_mtime]
-    if not new_files:
-        return SkipReason("No new files since last poll")
-
-    max_mtime = max(f.metadata.get("modified_time", 0) for f in new_files)
-    context.update_cursor(str(max_mtime))
-
-    run_config = {
-        "ops": {
-            "discover_files_op": {"config": {"domain": "trustee_performance"}},
-            "read_and_process_trustee_files_op": {"config": {"sheet": 0, "max_files": 5}},
-            "load_op": {"config": {"table": "trustee_performance", "mode": "delete_insert", "pk": ["report_date","plan_code","company_code"], "plan_only": False}},
-        }
-    }
-    return RunRequest(run_key=str(max_mtime), run_config=run_config)
-```
-
-- Simple data‑quality sensor (checks prior run result via instance/run storage is non‑trivial; here we compute a quick health probe by counting planned insert parameters)
-```python
-from dagster import sensor, SkipReason
-from ..io.loader.warehouse_loader import build_insert_sql
-
-@sensor(minimum_interval_seconds=600)
-def trustee_dq_sensor(context):
-    # Lightweight check: ensure at least some records would be inserted if run now
-    # (Plan-only probe avoids DB access.)
-    # In practice, you could query the DB or Dagster event log for last run stats.
-    from ..io.connectors.file_connector import DataSourceConnector
-    from ..io.readers.excel_reader import read_excel_rows
-    from ..domain.trustee_performance.service import process
-
-    files = DataSourceConnector().discover("trustee_performance")
-    if not files:
-        return SkipReason("DQ: No files to process")
-    rows = read_excel_rows(files[0].path, sheet=0)
-    processed = [m.model_dump() for m in process(rows, data_source=files[0].path)]
-    if not processed:
-        return SkipReason("DQ: No records would be produced")
-    sql, params = build_insert_sql("trustee_performance", sorted(processed[0].keys()), processed[:100])
-    if not params:
-        return SkipReason("DQ: Insert plan has no parameters")
-    return SkipReason("DQ: OK (probe passed)")
-```
-
-## DOCUMENTATION
-- Dagster schedules: https://docs.dagster.io/concepts/partitions-schedules-sensors/schedules
-- Dagster sensors: https://docs.dagster.io/concepts/partitions-schedules-sensors/sensors
-- Dagster Definitions: https://docs.dagster.io/deployment/code-locations#definitions
-- Timezone: https://docs.dagster.io/concepts/partitions-schedules-sensors/schedules#time-zones
-
-## INTEGRATION POINTS
-- Orchestration: imports existing jobs, no changes to ops.
-- Config: schedule/sensor run_config must pull table/pk from `data_sources.yml` for consistency.
-- IO: File connector used by file sensor and DQ probe; Excel reader + domain service used by DQ probe.
-- CLI/Web: Expose Definitions for `dagster dev -m src.work_data_hub.orchestration.repository`.
-
-## DATA CONTRACTS
-- No changes to database schema.
-- Schedule/sensor run_config must specify:
-  - `ops.discover_files_op.config.domain`
-  - `ops.read_and_process_trustee_files_op.config.sheet` and `max_files`
-  - `ops.load_op.config.table`, `mode`, `pk`, `plan_only=False` for execute paths
-
-## GOTCHAS & LIBRARY QUIRKS
-- Dagster schedules/sensors require a Definitions module; ensure imports are lightweight (avoid heavy I/O at import time).
-- Keep sensors fast; use `minimum_interval_seconds` and avoid DB calls by default.
-- Time zones: set `execution_timezone` to avoid UTC cron surprises.
-- Windows paths: use `Path`/OS‑agnostic joins in any file path handling.
-
-## IMPLEMENTATION NOTES
-- Create three new modules as outlined (schedules.py, sensors.py, repository.py).
-- Reuse `data_sources.yml` to populate table/pk for load config.
-- Prefer pure‑python logic; no network calls.
-- Keep code consistent with existing logging and error handling patterns.
-
-## VALIDATION GATES (must pass)
-```bash
-uv run ruff check src/ --fix
-uv run mypy src/
-uv run pytest -v
-```
-
-Manual checks (optional):
-```bash
-# Start Dagster UI with Definitions
-uv run dagster dev -m src.work_data_hub.orchestration.repository
-
-# Verify in UI:
-# - Jobs show up
-# - trustee_daily_schedule appears on Schedules page
-# - Sensors page shows trustee_new_files_sensor and trustee_dq_sensor
-```
-
-## ACCEPTANCE CRITERIA
-- [ ] `Definitions` exposes jobs, schedule, and sensors without import errors.
-- [ ] Daily schedule returns a valid run_config and targets `trustee_performance_multi_file_job`.
-- [ ] File discovery sensor triggers when new files appear (cursor advances) and skips otherwise.
-- [ ] DQ sensor runs fast (<5s), skips with informative reason, and returns OK when probe passes.
-- [ ] All validation gates pass (ruff, mypy, pytest).
-
-## ROLLOUT & RISK
-- Default sensors perform plan‑only probes to avoid DB dependency.
-- Schedule runs in execute mode, relying on existing DB configuration via .env.
-- Low risk: changes are additive. Rollback by removing the new modules from Definitions.
-
-## APPENDICES
-Useful ripgrep searches:
-```bash
-rg -n "Definitions\(|@schedule|@sensor|execution_timezone|RunRequest|SkipReason" src/
-```
-
-Test skeletons:
-```python
-def test_schedule_builds_run_config():
-    from src.work_data_hub.orchestration.schedules import _build_schedule_run_config
-    cfg = _build_schedule_run_config()
-    assert cfg["ops"]["load_op"]["config"]["plan_only"] is False
-
-def test_file_sensor_cursor(monkeypatch, tmp_path):
-    # monkeypatch DataSourceConnector.discover to return synthetic files with mtimes
-    ...
-```
-
-Next steps for Claude:
-1) Generate PRP from this INITIAL (F‑030, F‑031, C‑030) and implement schedules.py, sensors.py, repository.py with tests.
-2) Run validation gates; optionally verify in Dagster UI via `dagster dev`.
-3) Update ROADMAP.md: mark F‑030/F‑031/C‑030 → COMPLETED with PRP link(s).
+## 提交要求
+- 变更保持最小、聚焦；不改测试文件；
+- 通过`ruff`/`mypy`；关键用例通过如上；
+- PR描述简要列出影响面与验证命令。

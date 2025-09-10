@@ -174,9 +174,16 @@ class TrusteePerformanceOut(BaseModel):
 
         # Handle various input types
         if isinstance(v, (int, Decimal)):
-            # For integers and Decimals, process for quantization
+            # For integers and Decimals, check for percentage interpretation
+            if info.field_name == "return_rate" and isinstance(v, (int, float)):
+                if 1 < v <= 100:  # Interpret as percentage
+                    v = v / 100.0
+            # Process for quantization
             pass
         elif isinstance(v, float):
+            # Check for percentage interpretation before string conversion
+            if info.field_name == "return_rate" and 1 < v <= 100:
+                v = v / 100.0
             # Convert float to string first to avoid precision issues
             v = str(v)
         elif isinstance(v, str):
@@ -225,7 +232,7 @@ class TrusteePerformanceOut(BaseModel):
         if info.field_name and info.field_name in field_precision_map:
             from decimal import ROUND_HALF_UP
             places = field_precision_map[info.field_name]
-            quantizer = Decimal("1." + ("0" * places))
+            quantizer = Decimal(1).scaleb(-places)  # More robust than string construction
             d = d.quantize(quantizer, rounding=ROUND_HALF_UP)
 
         return d

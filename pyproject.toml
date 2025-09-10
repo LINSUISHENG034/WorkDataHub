@@ -33,7 +33,8 @@ quote-style = "double"
 
 [tool.pytest.ini_options]
 markers = [
-    "postgres: marks tests as requiring a PostgreSQL database (deselect with '-m \"not postgres\"')"
+    "postgres: marks tests as requiring a PostgreSQL database (deselect with '-m \"not postgres\"')",
+    "monthly_data: marks tests requiring reference/monthly data (opt-in)"
 ]
 
 [dependency-groups]

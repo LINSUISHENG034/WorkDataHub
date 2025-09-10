@@ -7,6 +7,8 @@ like missing sheets, corrupted files, and encoding problems.
 """
 
 import logging
+import re
+import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -80,7 +82,7 @@ class ExcelReader:
             logger.info(f"Reading Excel file: {file_path} (sheet: {sheet})")
 
             # Configure pandas read parameters
-            read_kwargs = {
+            read_kwargs: dict[str, Any] = {
                 "sheet_name": sheet,
                 "engine": "openpyxl",  # Explicitly use openpyxl for .xlsx files
                 "header": header,
@@ -104,6 +106,10 @@ class ExcelReader:
 
         except FileNotFoundError:
             raise
+        except zipfile.BadZipFile:
+            raise ExcelReadError(
+                f"Failed to parse Excel file {file_path}: corrupted or invalid format"
+            )
         except pd.errors.EmptyDataError:
             logger.warning(f"Excel file contains no data: {file_path}")
             return []
@@ -124,10 +130,13 @@ class ExcelReader:
                 raise ExcelReadError(f"Sheet '{sheet}' not found in {file_path}")
             raise ExcelReadError(f"Invalid Excel file or parameters for {file_path}: {e}")
         except Exception as e:
-            # Catch-all for other Excel reading issues
+            # Catch-all for other Excel reading issues, including openpyxl-related
+            error_msg = str(e)
+            if "openpyxl" in error_msg:
+                raise ExcelReadError(f"Failed to parse Excel file {file_path}: {e}")
             raise ExcelReadError(f"Unexpected error reading Excel file {file_path}: {e}")
 
-    def get_sheet_names(self, file_path: str) -> List[str]:
+    def get_sheet_names(self, file_path: str) -> List[Union[str, int]]:
         """
         Get list of sheet names from Excel file.
 
@@ -181,8 +190,23 @@ class ExcelReader:
         Returns:
             List of dictionaries representing the DataFrame rows
         """
-        # Clean column names (remove leading/trailing whitespace)
-        df.columns = [str(col).strip() if col is not None else "" for col in df.columns]
+        # Clean column names (remove leading/trailing whitespace and handle unnamed columns)
+        cleaned_columns = []
+        for col in df.columns:
+            col_str = str(col).strip() if col is not None else ""
+            # Convert "Unnamed: n" columns to empty strings
+            if re.match(r'^Unnamed:\s*\d+', col_str):
+                cleaned_columns.append("")
+            else:
+                cleaned_columns.append(col_str)
+
+        df.columns = cleaned_columns
+
+        # Ensure year/month columns remain as strings
+        year_month_columns = ["年", "月", "year", "month"]
+        for col in year_month_columns:
+            if col in df.columns:
+                df[col] = df[col].astype(str)
 
         # Convert to list of dictionaries
         rows = df.to_dict(orient="records")
@@ -190,19 +214,21 @@ class ExcelReader:
         # Clean values in each row
         cleaned_rows = []
         for row in rows:
-            cleaned_row = {}
+            cleaned_row: dict[str, Any] = {}
             for key, value in row.items():
+                # Ensure key is a string
+                str_key = str(key)
                 # Handle pandas NaN values
                 if pd.isna(value):
-                    cleaned_row[key] = None
+                    cleaned_row[str_key] = None
                 # Convert numpy types to native Python types
                 elif hasattr(value, "item"):
-                    cleaned_row[key] = value.item()
+                    cleaned_row[str_key] = value.item()
                 # Strip whitespace from string values
                 elif isinstance(value, str):
-                    cleaned_row[key] = value.strip()
+                    cleaned_row[str_key] = value.strip()
                 else:
-                    cleaned_row[key] = value
+                    cleaned_row[str_key] = value
 
             cleaned_rows.append(cleaned_row)
 

@@ -6,6 +6,7 @@ with both unit tests (no database required) and integration tests.
 """
 
 import pytest
+from unittest.mock import Mock, patch
 
 from src.work_data_hub.io.loader.warehouse_loader import (
     DataWarehouseLoaderError,

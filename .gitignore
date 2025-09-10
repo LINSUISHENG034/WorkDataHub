@@ -1,7 +1,7 @@
 # Claude Code settings
-.claude/
 monthly/
 db_migration/
+reference/claude-code-full-guide/
 
 # Ignore folders
 deprecated/

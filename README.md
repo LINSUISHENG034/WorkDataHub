@@ -86,6 +86,55 @@ uv run pytest -k trustee_performance -v
 # uv run pre-commit run --all-files
 ```
 
+## Local Smoke Test
+
+Test the complete trustee_performance pipeline using real `reference/monthly/` data and optional local PostgreSQL integration.
+
+### Setup
+
+1. **Ensure reference data exists** (or tests will be skipped):
+   ```bash
+   # Reference data should be at:
+   ./reference/monthly/
+   ```
+
+2. **Configure environment variables** for local testing:
+   ```bash
+   # Required: Override data source directory
+   export WDH_DATA_BASE_DIR=./reference/monthly
+   
+   # Optional: Local database for execute mode
+   export WDH_DATABASE__URI=postgresql://wdh_user:changeme@localhost:5432/wdh_local
+   ```
+
+3. **Setup local database** (optional, for execute mode):
+   ```bash
+   # Apply test schema to your local PostgreSQL
+   psql "$WDH_DATABASE__URI" -f scripts/dev/setup_test_schema.sql
+   ```
+
+### Usage
+
+```bash
+# Run plan-only mode (no database required)
+uv run python -m src.work_data_hub.orchestration.jobs --domain trustee_performance --plan-only --max-files 2
+
+# Run execute mode (requires database setup)
+uv run python -m src.work_data_hub.orchestration.jobs --domain trustee_performance --execute --max-files 2
+
+# Run smoke tests (opt-in via marker)
+uv run pytest -m monthly_data -v
+
+# Skip smoke tests by default (normal test runs)
+uv run pytest tests/
+```
+
+### Expected Results
+
+- **Plan-only**: Shows SQL execution plan with DELETE + INSERT operations, no database connection
+- **Execute**: Shows loader summary with deleted/inserted counts from actual database operations
+- **Smoke tests**: Validates discovery, plan generation, and optional database integration
+
 ## Try It (End‑to‑End)
 
 Run the existing end‑to‑end test for the first vertical slice (trustee performance):

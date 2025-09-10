@@ -65,6 +65,12 @@ TASK BREAKDOWN PHILOSOPHY:
 | F-037 | M2 | Migrate Financial domains (风准金/历史浮费/减值计提) - MEDIUM | PENDING | C-014, F-018 | - |
 | F-038 | M2 | Migrate GRAward and RenewalPending domains (团养中标/续签) - LOW | PENDING | C-014, F-018 | - |
 | C-015 | M2 | Create regression test suite comparing legacy vs new outputs | PENDING | F-019 | - |
+| C-018 | M2 | Local Postgres test schema + smoke E2E (reference/monthly) | COMPLETED | F-013 | P-015 |
+| C-019 | M2 | DB settings兼容层与DSN获取统一（提供DatabaseSettings并兼容旧用法） | COMPLETED | C-018 | P-016 |
+| C-020 | M2 | ExcelReader健壮化（年/月输出为字符串、‘Unnamed’列名清洗、坏文件错误归一） | COMPLETED | - | P-016 |
+| C-021 | M2 | 文件发现月份提取稳健化（10/11/12回退修正逻辑） | COMPLETED | - | P-016 |
+| C-022 | M2 | 受托业绩小数/百分比处理与量化稳健性（return_rate数值按百分比解释） | COMPLETED | - | P-016 |
+| C-023 | M2 | DB连接语义对齐（ops与loader连接生命周期/模式对齐） | READY_FOR_PRP | C-019 | - |
 | R-016 | M2 | Research ingestion connectors (HTTP/SFTP) and auth strategy | READY_FOR_PRP | - | - |
 | F-032 | M2 | Implement HTTP crawler connector + retries/auth + CLI | PENDING | R-016 | - |
 | F-033 | M2 | Implement SFTP/FTP downloader connector | PENDING | R-016 | - |
