@@ -17,6 +17,7 @@ from ..config.settings import get_settings
 from .ops import (
     discover_files_op,
     load_op,
+    process_annuity_performance_op,
     process_trustee_performance_op,
     read_and_process_trustee_files_op,
     read_excel_op,
@@ -59,6 +60,26 @@ def trustee_performance_multi_file_job():
 
     # Use combined op for multi-file processing
     processed_data = read_and_process_trustee_files_op(discovered_paths)
+    load_op(processed_data)  # No return needed
+
+
+@job
+def annuity_performance_job():
+    """
+    End-to-end annuity performance processing job.
+
+    This job orchestrates the complete ETL pipeline for Chinese "规模明细" data:
+    1. Discover files matching domain patterns
+    2. Read Excel data from discovered files (sheet="规模明细")
+    3. Process data through annuity performance domain service with column projection
+    4. Load data to database or generate execution plan
+    """
+    # Wire ops together - Dagster handles dependency graph
+    discovered_paths = discover_files_op()
+
+    # Read Excel data and process through annuity performance service
+    excel_rows = read_excel_op(discovered_paths)
+    processed_data = process_annuity_performance_op(excel_rows, discovered_paths)
     load_op(processed_data)  # No return needed
 
 
@@ -198,7 +219,7 @@ def main():
     # Build run configuration from CLI arguments
     run_config = build_run_config(args)
 
-    print("🚀 Starting trustee performance job...")
+    print(f"🚀 Starting {args.domain} job...")
     print(f"   Domain: {args.domain}")
     print(f"   Mode: {args.mode}")
     print(f"   Execute: {args.execute}")
@@ -207,9 +228,23 @@ def main():
     print(f"   Max files: {args.max_files}")
     print("=" * 50)
 
-    # Select appropriate job based on max_files parameter
+    # Select appropriate job based on domain and max_files parameter
     max_files = getattr(args, "max_files", 1)
-    selected_job = trustee_performance_multi_file_job if max_files > 1 else trustee_performance_job
+
+    if args.domain == "annuity_performance":
+        # Currently only single file supported for annuity performance
+        selected_job = annuity_performance_job
+        if max_files > 1:
+            print(f"Warning: max_files > 1 not yet supported for {args.domain}, using 1")
+    elif args.domain == "trustee_performance":
+        selected_job = (trustee_performance_multi_file_job
+                       if max_files > 1
+                       else trustee_performance_job)
+    else:
+        raise ValueError(
+            f"Unsupported domain: {args.domain}. "
+            f"Supported: trustee_performance, annuity_performance"
+        )
 
     # Execute job with appropriate settings
     try:

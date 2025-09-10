@@ -57,6 +57,9 @@ Key characteristics
 - Domain — Trustee Performance:
   - `src/work_data_hub/domain/trustee_performance/models.py`
   - `src/work_data_hub/domain/trustee_performance/service.py`
+- Domain — Annuity Performance:
+  - `src/work_data_hub/domain/annuity_performance/models.py`
+  - `src/work_data_hub/domain/annuity_performance/service.py`
 - Orchestration:
   - `src/work_data_hub/orchestration/ops.py`
   - `src/work_data_hub/orchestration/jobs.py`
@@ -137,9 +140,11 @@ uv run pytest tests/
 
 ## Real Sample Smoke (Annuity Performance)
 
-Test the Annuity Performance (规模明细) domain using legacy sample data with opt-in smoke tests.
+Test the Annuity Performance (规模明细) domain using legacy sample data with both plan-only and execute modes.
 
-### Setup
+⚠️ **IMPORTANT**: Execute mode modifies database state. Only use with test databases.
+
+### Prerequisites
 
 1. **Ensure reference data exists** (or tests will be skipped):
    ```bash
@@ -151,13 +156,49 @@ Test the Annuity Performance (规模明细) domain using legacy sample data with
    ```bash
    # Required: Override data source directory
    export WDH_DATA_BASE_DIR=./reference/monthly
+   
+   # Optional: Local database for execute mode
+   export WDH_DATABASE__URI=postgresql://wdh_user:changeme@localhost:5432/wdh_local
    ```
 
-### Usage
+3. **Setup local database** (required for execute mode):
+   ```bash
+   # Apply DDL to your local PostgreSQL database
+   psql "$WDH_DATABASE__URI" -f scripts/dev/annuity_performance_real.sql
+   ```
+
+### CLI Usage
+
+```bash
+# Plan-only mode (safe - no database required)
+uv run python -m src.work_data_hub.orchestration.jobs \
+  --domain annuity_performance \
+  --plan-only \
+  --max-files 1
+
+# Execute mode (MODIFIES DATABASE - requires DDL applied)
+uv run python -m src.work_data_hub.orchestration.jobs \
+  --domain annuity_performance \
+  --execute \
+  --max-files 1 \
+  --mode delete_insert
+
+# With specific sheet name (optional - configured in data_sources.yml)
+uv run python -m src.work_data_hub.orchestration.jobs \
+  --domain annuity_performance \
+  --plan-only \
+  --sheet "规模明细" \
+  --max-files 1
+```
+
+### Test Usage
 
 ```bash
 # Run legacy data smoke tests (opt-in via marker)
-uv run pytest -m legacy_data -v
+uv run pytest -m legacy_data -v -k annuity_performance
+
+# Run E2E integration tests
+uv run pytest -m legacy_data -v -k annuity_performance_e2e
 
 # Skip legacy data tests by default (normal test runs)  
 uv run pytest tests/
@@ -168,9 +209,18 @@ WDH_DATA_BASE_DIR=./reference/monthly uv run pytest -m legacy_data -v
 
 ### Expected Results
 
-- **Discovery smoke**: Validates reference/monthly structure and Unicode filename handling
-- **Plan-only placeholder**: Prepares for future pipeline integration
-- **Database placeholder**: Prepares for future database integration (requires psycopg2)
+- **Plan-only**: Shows SQL execution plans with DELETE + INSERT operations targeting `"规模明细"` table
+- **Execute**: Shows loader summary with deleted/inserted/batches counts from actual database operations
+- **Column projection**: Prevents SQL column-not-found errors by filtering Excel data to valid database columns
+- **Unicode handling**: Properly processes Chinese column names, table names, and file names
+
+### Safety Guidelines
+
+- Always use `--plan-only` first to validate SQL plans before executing
+- Use `--max-files 1` for initial testing to limit scope
+- Apply DDL (`scripts/dev/annuity_performance_real.sql`) before execute mode
+- Verify database configuration with test data, not production
+- Monitor logs for column projection warnings and transformation errors
 
 ## Try It (End‑to‑End)
 

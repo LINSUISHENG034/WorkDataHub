@@ -54,8 +54,8 @@ domains:
     pattern: "(?P<year>\\d{2}|20\\d{2})年(?P<month>0?[1-9]|1[0-2])月.*年金.*终稿数据.*\\.(xlsx|xlsm)$"
     
     # Selection strategy when multiple files match
-    # - "latest_by_year_month_and_version": Groups by (year, month), selects highest version within each group
-    select: "latest_by_year_month_and_version"
+    # - "latest_by_year_month": Groups by (year, month), selects highest version within each group
+    select: "latest_by_year_month"
     
     # Excel sheet to process (use sheet name for consistency)
     sheet: "规模明细"

@@ -59,7 +59,8 @@
       "Bash(set DAGSTER_HOME=E:ProjectsWorkDataHubdagster_home)",
       "Bash(DAGSTER_HOME=\"E:\\Projects\\WorkDataHub\\dagster_home\")",
       "Bash(set WDH_DATA_BASE_DIR=./reference/monthly)",
-      "Bash(set WDH_DATA_BASE_DIR=tests/test_data)"
+      "Bash(set WDH_DATA_BASE_DIR=tests/test_data)",
+      "Bash(WDH_DATA_BASE_DIR=./reference/monthly uv run python -m src.work_data_hub.orchestration.jobs --domain annuity_performance --plan-only --max-files 1)"
     ],
     "deny": []
   }

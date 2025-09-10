@@ -15,6 +15,7 @@ from dagster import Config, OpExecutionContext, op
 from pydantic import field_validator, model_validator
 
 from ..config.settings import get_settings
+from ..domain.annuity_performance.service import process as process_annuity
 from ..domain.trustee_performance.service import process
 from ..io.connectors.file_connector import DataSourceConnector
 from ..io.loader.warehouse_loader import DataWarehouseLoaderError, load
@@ -209,6 +210,48 @@ def process_trustee_performance_op(
             f"Domain processing completed - source: {file_path}, "
             f"input_rows: {len(excel_rows)}, output_records: {len(result_dicts)}, "
             f"domain: trustee_performance"
+        )
+
+        return result_dicts
+
+    except Exception as e:
+        context.log.error(f"Domain processing failed: {e}")
+        raise
+
+
+@op
+def process_annuity_performance_op(
+    context: OpExecutionContext, excel_rows: List[Dict[str, Any]], file_paths: List[str]
+) -> List[Dict[str, Any]]:
+    """
+    Process annuity performance data and return validated records as dicts.
+
+    Handles Chinese "规模明细" Excel data with column projection to prevent
+    SQL column mismatch errors.
+
+    Args:
+        context: Dagster execution context
+        excel_rows: Raw Excel row data
+        file_paths: List of file paths (uses first one for data_source metadata)
+
+    Returns:
+        List of processed record dictionaries (JSON-serializable)
+    """
+    # Use first file path for data_source metadata
+    file_path = file_paths[0] if file_paths else "unknown"
+
+    try:
+        # Process using annuity performance domain service with column projection
+        processed_models = process_annuity(excel_rows, data_source=file_path)
+
+        # Convert Pydantic models to JSON-serializable dicts
+        # mode="json" ensures date/datetime/Decimal become JSON friendly types
+        result_dicts = [model.model_dump(mode="json") for model in processed_models]
+
+        context.log.info(
+            f"Domain processing completed - source: {file_path}, "
+            f"input_rows: {len(excel_rows)}, output_records: {len(result_dicts)}, "
+            f"domain: annuity_performance"
         )
 
         return result_dicts
