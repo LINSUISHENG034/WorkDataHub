@@ -5,9 +5,9 @@ This module tests the schedule configuration and ensures that the generated
 run_config matches the expected op schemas defined in ops.py.
 """
 
-import pytest
-import yaml
 from unittest.mock import patch
+
+import yaml
 
 from src.work_data_hub.orchestration.schedules import (
     _build_schedule_run_config,
@@ -126,7 +126,7 @@ class TestScheduleRunConfig:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             result = _build_schedule_run_config()
-            
+
             # Verify schedule always uses execute mode
             load_config = result["ops"]["load_op"]["config"]
             assert load_config["plan_only"] is False
@@ -140,11 +140,11 @@ class TestTrusteeSchedule:
         """Test that the trustee daily schedule has correct configuration."""
         # Access the schedule's configuration
         schedule = trustee_daily_schedule
-        
+
         # Verify schedule properties
         assert schedule.cron_schedule == "0 2 * * *"  # 02:00 daily
         assert schedule.execution_timezone == "Asia/Shanghai"
-        
+
         # Verify the job is correctly configured
         from src.work_data_hub.orchestration.jobs import trustee_performance_multi_file_job
         assert schedule.job == trustee_performance_multi_file_job

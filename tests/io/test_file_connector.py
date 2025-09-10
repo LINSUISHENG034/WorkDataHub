@@ -311,3 +311,62 @@ class TestDataSourceConnector:
                 assert "modified_time" in file.metadata
                 assert "filename" in file.metadata
                 assert file.metadata["filename"] == "2024_11_受托业绩.xlsx"
+
+    @patch("src.work_data_hub.config.settings.get_settings")
+    def test_latest_by_year_month_and_version_selection(self, mock_settings, tmp_path):
+        """Test selection of latest version by year/month with version-aware strategy."""
+        # Create versioned directory structure with Chinese filenames
+        scenarios = [
+            ("数据采集/V1", "24年11月年金终稿数据.xlsx"),
+            ("数据采集/V2", "24年11月年金终稿数据.xlsx"),  # Same month, higher version
+            ("数据采集/V1", "24年10月年金终稿数据.xlsx"),  # Different month
+            ("数据采集/VX", "24年12月年金终稿数据.xlsx"),  # Malformed version
+        ]
+
+        for dir_path, filename in scenarios:
+            full_dir = tmp_path / dir_path
+            full_dir.mkdir(parents=True, exist_ok=True)
+            (full_dir / filename).write_text("test content")
+
+        # Create config with annuity_performance domain
+        config_content = {
+            "domains": {
+                "annuity_performance": {
+                    "pattern": r"(?P<year>\d{2}|20\d{2})年(?P<month>0?[1-9]|1[0-2])月.*年金.*终稿数据.*\.(xlsx|xlsm)$",
+                    "select": "latest_by_year_month_and_version",
+                    "sheet": "规模明细"
+                }
+            }
+        }
+
+        config_file = tmp_path / "test_config.yml"
+        import yaml
+        with open(config_file, "w", encoding="utf-8") as f:
+            yaml.dump(config_content, f, allow_unicode=True)
+
+        mock_settings.return_value.data_base_dir = str(tmp_path)
+        mock_settings.return_value.data_sources_config = str(config_file)
+
+        connector = DataSourceConnector(config_path=str(config_file))
+        files = connector.discover("annuity_performance")
+
+        # Should return 3 files: V2 for 2024/11, V1 for 2024/10, VX(None) for 2024/12
+        assert len(files) == 3
+
+        # Verify version selection logic
+        files_by_month = {(f.year, f.month): f for f in files}
+
+        # Check 2024/11 -> V2 (highest version)
+        nov_file = files_by_month[(2024, 11)]
+        assert nov_file.metadata['version'] == 2
+        assert "V2" in nov_file.path
+
+        # Check 2024/10 -> V1 (only version)
+        oct_file = files_by_month[(2024, 10)]
+        assert oct_file.metadata['version'] == 1
+        assert "V1" in oct_file.path
+
+        # Check 2024/12 -> VX (malformed version = None)
+        dec_file = files_by_month[(2024, 12)]
+        assert dec_file.metadata['version'] is None
+        assert "VX" in dec_file.path

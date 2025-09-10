@@ -237,13 +237,36 @@ class DataSourceConnector:
 
                         month = int(month_str) if month_str else None
 
+                        # Apply two-digit year normalization (24 → 2024, but 2024 → 2024)
+                        if year and year < 100:
+                            year = 2000 + year
+
+                        # Extract version from parent directory (only under "数据采集")
+                        version = None
+                        parent_path = Path(file_path).parent
+                        if (parent_path.parent.name == "数据采集" and
+                            parent_path.name.upper().startswith("V")):
+                            try:
+                                version_str = parent_path.name[1:]  # Remove 'V' prefix
+                                version = int(version_str)
+                                logger.debug(
+                                    f"Extracted version {version} from directory {parent_path.name}"
+                                )
+                            except ValueError:
+                                version = None  # Fallback for malformed versions like 'VX'
+                                logger.debug(
+                                    f"Malformed version in {parent_path.name}, using mtime fallback"
+                                )
+
                         # Extract additional file metadata
                         try:
                             file_metadata = extract_file_metadata(file_path)
                             file_metadata.update(groups)  # Add regex groups to metadata
+                            file_metadata['version'] = version  # Add version to metadata
                         except OSError as e:
                             logger.warning(f"Cannot extract metadata for {file_path}: {e}")
                             file_metadata = groups
+                            file_metadata['version'] = version  # Add version to metadata
 
                         discovered_file = DiscoveredFile(
                             domain=domain_name,
@@ -289,6 +312,8 @@ class DataSourceConnector:
                 selected = self._select_latest_by_year_month(domain_files)
             elif strategy == "latest_by_mtime":
                 selected = self._select_latest_by_mtime(domain_files)
+            elif strategy == "latest_by_year_month_and_version":
+                selected = self._select_latest_by_year_month_and_version(domain_files)
             else:
                 logger.warning(f"Unknown selection strategy '{strategy}' for domain '{domain}'")
                 selected = domain_files  # Return all files if strategy unknown
@@ -349,3 +374,51 @@ class DataSourceConnector:
             logger.error(f"Error accessing file modification times: {e}")
             # Fallback to first file if mtime comparison fails
             return [files[0]] if files else []
+
+    def _select_latest_by_year_month_and_version(
+        self, files: List[DiscoveredFile]
+    ) -> List[DiscoveredFile]:
+        """
+        Select latest file by year/month/version, with mtime fallback.
+
+        Groups files by (year, month) and selects file with highest
+        (version, mtime) tuple within each group. Files without versions
+        are assigned version=0 for comparison.
+
+        Args:
+            files: List of files to select from
+
+        Returns:
+            List of selected files (one per unique year/month combination)
+        """
+        if not files:
+            return []
+
+        # Group by (year, month) - same as existing method
+        from itertools import groupby
+
+        # Sort first by year/month for grouping
+        sorted_files = sorted(files, key=lambda f: (f.year or 0, f.month or 0))
+
+        selected = []
+        for (year, month), group_files in groupby(sorted_files, key=lambda f: (f.year, f.month)):
+            group_list = list(group_files)
+
+            # Within group, select by (version, mtime) descending
+            try:
+                best_file = max(group_list, key=lambda f: (
+                    f.metadata.get('version') or 0,  # None versions get 0
+                    Path(f.path).stat().st_mtime
+                ))
+                selected.append(best_file)
+                logger.debug(
+                    f"Selected file with version {best_file.metadata.get('version')} "
+                    f"for year={year}, month={month}: {best_file.path}"
+                )
+            except (OSError, FileNotFoundError) as e:
+                logger.error(f"Error accessing file modification times in version selection: {e}")
+                # Fallback to first file if stat() fails
+                if group_list:
+                    selected.append(group_list[0])
+
+        return selected

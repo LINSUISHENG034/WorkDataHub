@@ -10,11 +10,11 @@ Build a reliable, declarative, and testable data processing platform that replac
 
 | ID | Epic | Feature/Task | Status | Dependencies | PRP_Link |
 | :---- | :---- | :---- | :---- | :---- | :---- |
-| R-001 | M0 | Research and document secrets policy (env vars, .env.example, scanning) | COMPLETED | - | P-006 |
-| C-001 | M0 | Add `.env.example` with `WDH_*` vars and docs on secrets handling | COMPLETED | R-001 | P-006 |
-| C-002 | M0 | Set up GitHub Actions CI (ruff, mypy, pytest) | COMPLETED | - | P-006 |
-| C-003 | M0 | Add optional secret scanning (e.g., pre-commit/gitleaks) | COMPLETED | R-001 | P-006 |
-| F-001 | M0 | Establish end-to-end test baseline (plan-only path) | COMPLETED | - | P-001 |
+| R-001 | M0 | Research and document secrets policy (env vars, .env.example, scanning) | COMPLETED ✅ | - | P-006 |
+| C-001 | M0 | Add `.env.example` with `WDH_*` vars and docs on secrets handling | COMPLETED ✅ | R-001 | P-006 |
+| C-002 | M0 | Set up GitHub Actions CI (ruff, mypy, pytest) | COMPLETED ✅ | - | P-006 |
+| C-003 | M0 | Add optional secret scanning (e.g., pre-commit/gitleaks) | COMPLETED ✅ | R-001 | P-006 |
+| F-001 | M0 | Establish end-to-end test baseline (plan-only path) | COMPLETED ✅ | - | P-001 |
 | C-004 | M0 | Optional local dev via docker-compose (PostgreSQL + Dagster) | READY_FOR_PRP | C-002 | - |
 
 <!--
@@ -25,19 +25,19 @@ PHILOSOPHY: Front-load uncertainty (R-001), then implement atomic chores/feature
 
 | ID | Epic | Feature/Task | Status | Dependencies | PRP_Link |
 | :---- | :---- | :---- | :---- | :---- | :---- |
-| R-010 | M1 | Define JSON-serializable contracts and job shape for Dagster | COMPLETED | - | P-003 |
-| F-010 | M1 | Implement `DataSourceConnector` (config-driven discovery) | COMPLETED | - | P-001 |
-| F-011 | M1 | Implement robust `ExcelReader` with error handling | COMPLETED | - | P-001 |
-| F-012 | M1 | Implement `trustee_performance` Pydantic models + service | COMPLETED | - | P-001 |
-| F-013 | M1 | Implement transactional `DataWarehouseLoader` (plan-only + execute) | COMPLETED | - | P-002 |
-| F-014 | M1 | Implement Dagster ops (discover/read/process/load) with dynamic domain validation | COMPLETED | F-010, F-011, F-012, F-013 | P-004 |
-| F-015 | M1 | Implement Dagster jobs + CLI (`--execute`, multi-file accumulation) | COMPLETED | F-014 | P-003, P-005 |
-| C-010 | M1 | Provide domain config (`data_sources.yml`) with table + pk | COMPLETED | - | P-003 |
-| C-016 | M1 | Fix Pydantic v2 ValidationError misuse in trustee_performance.service | COMPLETED | F-012 | P-007 |
-| C-011 | M1 | Validate trustee_performance E2E execute mode (DB context, JSONB, Decimal) | COMPLETED | F-014, F-015 | P-012, P-013 |
-| C-012 | M1 | Convert legacy handler mappings (DB) to YAML config seeds | COMPLETED | F-010 | P-008 |
-| C-013 | M1 | Mapping loader portability + config hardening | COMPLETED | C-012 | P-010 |
-| C-017 | M1 | Relax input model types for trustee_performance metrics (Excel numeric cells) | COMPLETED | F-012 | P-011 |
+| R-010 | M1 | Define JSON-serializable contracts and job shape for Dagster | COMPLETED ✅ | - | P-003 |
+| F-010 | M1 | Implement `DataSourceConnector` (config-driven discovery) | COMPLETED ✅ | - | P-001 |
+| F-011 | M1 | Implement robust `ExcelReader` with error handling | COMPLETED ✅ | - | P-001 |
+| F-012 | M1 | Implement `trustee_performance` Pydantic models + service | COMPLETED ✅ | - | P-001 |
+| F-013 | M1 | Implement transactional `DataWarehouseLoader` (plan-only + execute) | COMPLETED ✅ | - | P-002 |
+| F-014 | M1 | Implement Dagster ops (discover/read/process/load) with dynamic domain validation | COMPLETED ✅ | F-010, F-011, F-012, F-013 | P-004 |
+| F-015 | M1 | Implement Dagster jobs + CLI (`--execute`, multi-file accumulation) | COMPLETED ✅ | F-014 | P-003, P-005 |
+| C-010 | M1 | Provide domain config (`data_sources.yml`) with table + pk | COMPLETED ✅ | - | P-003 |
+| C-016 | M1 | Fix Pydantic v2 ValidationError misuse in trustee_performance.service | COMPLETED ✅ | F-012 | P-007 |
+| C-011 | M1 | Validate trustee_performance E2E execute mode (DB context, JSONB, Decimal) | COMPLETED ✅ | F-014, F-015 | P-012, P-013 |
+| C-012 | M1 | Convert legacy handler mappings (DB) to YAML config seeds | COMPLETED ✅ | F-010 | P-008 |
+| C-013 | M1 | Mapping loader portability + config hardening | COMPLETED ✅ | C-012 | P-010 |
+| C-017 | M1 | Relax input model types for trustee_performance metrics (Excel numeric cells) | COMPLETED ✅ | F-012 | P-011 |
 
 <!--
 TASK BREAKDOWN PHILOSOPHY:
@@ -50,7 +50,7 @@ TASK BREAKDOWN PHILOSOPHY:
 
 | ID | Epic | Feature/Task | Status | Dependencies | PRP_Link |
 | :---- | :---- | :---- | :---- | :---- | :---- |
-| R-015 | M2 | Inventory legacy cleaners/domains and produce migration plan | COMPLETED | - | P-015 |
+| R-015 | M2 | Inventory legacy cleaners/domains and produce migration plan | COMPLETED ✅ | - | P-015 |
 | C-014 | M2 | Build intelligent MappingService with DB-driven rules engine | READY_FOR_PRP | R-015 | - |
 | F-018 | M2 | Create BaseDomainService framework and utilities | READY_FOR_PRP | R-015 | - |
 | F-019 | M2 | Migrate AnnuityPerformance domain (规模明细) - HIGH complexity | PENDING | C-014, F-018 | - |
@@ -65,15 +65,15 @@ TASK BREAKDOWN PHILOSOPHY:
 | F-037 | M2 | Migrate Financial domains (风准金/历史浮费/减值计提) - MEDIUM | PENDING | C-014, F-018 | - |
 | F-038 | M2 | Migrate GRAward and RenewalPending domains (团养中标/续签) - LOW | PENDING | C-014, F-018 | - |
 | C-015 | M2 | Create regression test suite comparing legacy vs new outputs | PENDING | F-019 | - |
-| C-018 | M2 | Local Postgres test schema + smoke E2E (reference/monthly) | COMPLETED | F-013 | P-015 |
-| C-019 | M2 | DB settings兼容层与DSN获取统一（提供DatabaseSettings并兼容旧用法） | COMPLETED | C-018 | P-016 |
-| C-020 | M2 | ExcelReader健壮化（年/月输出为字符串、‘Unnamed’列名清洗、坏文件错误归一） | COMPLETED | - | P-016 |
-| C-021 | M2 | 文件发现月份提取稳健化（10/11/12回退修正逻辑） | COMPLETED | - | P-016 |
-| C-022 | M2 | 受托业绩小数/百分比处理与量化稳健性（return_rate数值按百分比解释） | COMPLETED | - | P-016 |
-| C-023 | M2 | DB连接语义对齐（ops与loader连接生命周期/模式对齐） | COMPLETED | C-019 | P-017 |
-| C-024 | M2 | 规模明细（真实样本）E2E骨架与标记（legacy_data） | COMPLETED | C-023 | P-018 |
-| C-025 | M2 | 规模明细数据发现配置（data_sources.yml 正则与V*版本选择） | READY_FOR_PRP | C-024 | - |
-| C-026 | M2 | 规模明细Postgres最小DDL（scripts/dev/annuity_performance.sql） | READY_FOR_PRP | C-024 | - |
+| C-018 | M2 | Local Postgres test schema + smoke E2E (reference/monthly) | COMPLETED ✅ | F-013 | P-015 |
+| C-019 | M2 | DB settings兼容层与DSN获取统一（提供DatabaseSettings并兼容旧用法） | COMPLETED ✅ | C-018 | P-016 |
+| C-020 | M2 | ExcelReader健壮化（年/月输出为字符串、‘Unnamed’列名清洗、坏文件错误归一） | COMPLETED ✅ | - | P-016 |
+| C-021 | M2 | 文件发现月份提取稳健化（10/11/12回退修正逻辑） | COMPLETED ✅ | - | P-016 |
+| C-022 | M2 | 受托业绩小数/百分比处理与量化稳健性（return_rate数值按百分比解释） | COMPLETED ✅ | - | P-016 |
+| C-023 | M2 | DB连接语义对齐（ops与loader连接生命周期/模式对齐） | COMPLETED ✅ | C-019 | P-017 |
+| C-024 | M2 | 规模明细（真实样本）E2E骨架与标记（legacy_data） | COMPLETED ✅ | C-023 | P-018 |
+| C-025 | M2 | 规模明细数据发现配置（data_sources.yml 正则与V*版本选择） | COMPLETED ✅ | C-024 | P-019 |
+| C-026 | M2 | 规模明细Postgres最小DDL（scripts/dev/annuity_performance.sql） | COMPLETED ✅ | C-024 | P-020 |
 | C-027 | M2 | 规模明细E2E（plan-only/execute，本地样本） | READY_FOR_PRP | C-025, C-026 | - |
 | R-016 | M2 | Research ingestion connectors (HTTP/SFTP) and auth strategy | READY_FOR_PRP | - | - |
 | F-032 | M2 | Implement HTTP crawler connector + retries/auth + CLI | PENDING | R-016 | - |
@@ -139,5 +139,5 @@ Vertical value: Demonstrable parity with auditable reports is a tangible outcome
 3. PRP_GENERATED: PRP is created and linked. Ready for an execution agent.  
 4. IN_PROGRESS: An agent is actively working on the task.  
 5. VALIDATING: Code is complete, agent is running validation loops.  
-6. COMPLETED: All validation gates passed.  
+6. COMPLETED ✅: All validation gates passed.  
 7. BLOCKED: Progress is impeded. Requires human review.

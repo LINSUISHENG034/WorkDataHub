@@ -42,15 +42,38 @@ domains:
       min_rows: 1
       max_file_age_days: 365
 
-  # Example of a second domain (commented out for now)
-  # annuity_performance:
-  #   description: "Annuity performance data files"
-  #   pattern: "(?P<year>\\d{4}).*年金.*\\.xlsx$"
-  #   select: "latest_by_mtime"
-  #   sheet: 0
-  #   required_columns:
-  #     - "年金代码"
-  #     - "收益率"
+  # Annuity Performance Reports
+  # Handles files with patterns like: "24年11月年金终稿数据.xlsx", "2024年12月年金终稿数据.xlsx"
+  annuity_performance:
+    description: "Annuity performance (规模明细) with version-aware selection"
+    
+    # Unicode-aware regex pattern with named groups for year/month extraction
+    # Matches patterns: YY年MM月*年金*终稿数据*.xlsx or YYYY年MM月*年金*终稿数据*.xlsx
+    # Supports both 2-digit years (24 → 2024) and 4-digit years
+    # Month: 1-12 with optional leading zero
+    pattern: "(?P<year>\\d{2}|20\\d{2})年(?P<month>0?[1-9]|1[0-2])月.*年金.*终稿数据.*\\.(xlsx|xlsm)$"
+    
+    # Selection strategy when multiple files match
+    # - "latest_by_year_month_and_version": Groups by (year, month), selects highest version within each group
+    select: "latest_by_year_month_and_version"
+    
+    # Excel sheet to process (use sheet name for consistency)
+    sheet: "规模明细"
+    
+    # Database table configuration for loader
+    table: "规模明细"
+    pk: ["report_date", "plan_code", "company_code"]
+    
+    # Data quality requirements
+    required_columns:
+      - "年"           # Year column
+      - "月"           # Month column
+      - "计划代码"     # Plan code
+    
+    # Optional validation rules
+    validation:
+      min_rows: 1
+      max_file_age_days: 365
 
 # Global file discovery settings
 discovery:

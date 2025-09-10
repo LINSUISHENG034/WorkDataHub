@@ -58,7 +58,8 @@
       "Bash(set WDH_MAPPINGS_DIR=/nonexistent/path)",
       "Bash(set DAGSTER_HOME=E:ProjectsWorkDataHubdagster_home)",
       "Bash(DAGSTER_HOME=\"E:\\Projects\\WorkDataHub\\dagster_home\")",
-      "Bash(set WDH_DATA_BASE_DIR=./reference/monthly)"
+      "Bash(set WDH_DATA_BASE_DIR=./reference/monthly)",
+      "Bash(set WDH_DATA_BASE_DIR=tests/test_data)"
     ],
     "deny": []
   }

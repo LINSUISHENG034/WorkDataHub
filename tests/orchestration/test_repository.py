@@ -5,7 +5,6 @@ This module tests the repository definitions to ensure all components
 (jobs, schedules, sensors) are properly registered for Dagster discovery.
 """
 
-import pytest
 from dagster import Definitions, JobDefinition, ScheduleDefinition, SensorDefinition
 
 from src.work_data_hub.orchestration.repository import defs
@@ -109,7 +108,7 @@ class TestDefinitionsModule:
     def test_schedule_configuration(self):
         """Test schedule configuration properties."""
         schedules = defs.schedules
-        
+
         for schedule in schedules:
             if schedule.name == "trustee_daily_schedule":
                 # Verify schedule configuration
@@ -120,14 +119,14 @@ class TestDefinitionsModule:
     def test_sensor_configuration(self):
         """Test sensor configuration properties."""
         sensors = defs.sensors
-        
+
         for sensor in sensors:
             if sensor.name == "trustee_new_files_sensor":
                 # Verify file discovery sensor configuration
                 assert sensor.minimum_interval_seconds == 300  # 5 minutes
                 assert sensor.job_name == "trustee_performance_multi_file_job"
             elif sensor.name == "trustee_data_quality_sensor":
-                # Verify data quality sensor configuration  
+                # Verify data quality sensor configuration
                 assert sensor.minimum_interval_seconds == 600  # 10 minutes
                 assert sensor.job_name == "trustee_performance_multi_file_job"
 
@@ -135,16 +134,16 @@ class TestDefinitionsModule:
         """Test that definitions import is lightweight and doesn't fail."""
         # This test ensures that importing the definitions module
         # doesn't perform heavy I/O operations or fail due to missing files
-        
+
         # The fact that we can import and instantiate the defs object
         # without errors indicates that the imports are working correctly
         assert defs is not None
-        
+
         # Verify that we can access all components without errors
         jobs_count = len(defs.jobs)
         schedules_count = len(defs.schedules)
         sensors_count = len(defs.sensors)
-        
+
         assert jobs_count > 0
         assert schedules_count > 0
         assert sensors_count > 0
@@ -158,19 +157,19 @@ class TestDefinitionsIntegration:
         jobs = defs.jobs
         schedules = defs.schedules
         sensors = defs.sensors
-        
+
         # Collect all job names referenced by schedules and sensors
         referenced_job_names = set()
-        
+
         for schedule in schedules:
             referenced_job_names.add(schedule.job_name)
-        
+
         for sensor in sensors:
             referenced_job_names.add(sensor.job_name)
-        
+
         # Collect all actual job names
         actual_job_names = {job.name for job in jobs}
-        
+
         # Verify all referenced jobs actually exist
         for ref_job_name in referenced_job_names:
             assert ref_job_name in actual_job_names, f"Referenced job '{ref_job_name}' not found in definitions"
@@ -180,11 +179,11 @@ class TestDefinitionsIntegration:
         # Job names should be unique
         job_names = [job.name for job in defs.jobs]
         assert len(job_names) == len(set(job_names)), "Duplicate job names found"
-        
+
         # Schedule names should be unique
         schedule_names = [schedule.name for schedule in defs.schedules]
         assert len(schedule_names) == len(set(schedule_names)), "Duplicate schedule names found"
-        
+
         # Sensor names should be unique
         sensor_names = [sensor.name for sensor in defs.sensors]
         assert len(sensor_names) == len(set(sensor_names)), "Duplicate sensor names found"

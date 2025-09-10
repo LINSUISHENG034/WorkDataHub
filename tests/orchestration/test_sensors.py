@@ -5,15 +5,15 @@ This module tests sensor logic, cursor management, and health check functionalit
 for the trustee performance file discovery and data quality sensors.
 """
 
-import pytest
+from unittest.mock import patch
+
 import yaml
-from unittest.mock import patch, Mock, MagicMock
 from dagster import RunRequest, SkipReason, build_sensor_context
 
 from src.work_data_hub.orchestration.sensors import (
-    trustee_new_files_sensor,
-    trustee_data_quality_sensor,
     _build_sensor_run_config,
+    trustee_data_quality_sensor,
+    trustee_new_files_sensor,
 )
 from src.work_data_hub.utils.types import DiscoveredFile
 
@@ -146,7 +146,7 @@ class TestFileDiscoverySensor:
 
         with patch("src.work_data_hub.orchestration.sensors.DataSourceConnector") as mock_connector_class, \
              patch("src.work_data_hub.orchestration.sensors.get_settings") as mock_settings:
-            
+
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.return_value = new_files
             mock_settings.return_value.data_sources_config = str(config_file)
@@ -187,7 +187,7 @@ class TestFileDiscoverySensor:
 
         with patch("src.work_data_hub.orchestration.sensors.DataSourceConnector") as mock_connector_class, \
              patch("src.work_data_hub.orchestration.sensors.get_settings") as mock_settings:
-            
+
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.return_value = files
             mock_settings.return_value.data_sources_config = str(config_file)
@@ -243,7 +243,7 @@ class TestDataQualitySensor:
 
         with patch("src.work_data_hub.orchestration.sensors.DataSourceConnector") as mock_connector_class, \
              patch("pathlib.Path.exists", return_value=False):
-            
+
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.return_value = [mock_file]
 
@@ -268,10 +268,10 @@ class TestDataQualitySensor:
         with patch("src.work_data_hub.orchestration.sensors.DataSourceConnector") as mock_connector_class, \
              patch("pathlib.Path.exists", return_value=True), \
              patch("src.work_data_hub.orchestration.sensors.build_insert_sql") as mock_build_sql:
-            
+
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.return_value = [mock_file]
-            
+
             # Mock successful SQL building
             mock_build_sql.return_value = ("INSERT INTO table...", ["param1", "param2"])
 
@@ -300,10 +300,10 @@ class TestDataQualitySensor:
         with patch("src.work_data_hub.orchestration.sensors.DataSourceConnector") as mock_connector_class, \
              patch("pathlib.Path.exists", return_value=True), \
              patch("src.work_data_hub.orchestration.sensors.build_insert_sql") as mock_build_sql:
-            
+
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.return_value = [mock_file]
-            
+
             # Mock SQL building returning None (failure case)
             mock_build_sql.return_value = (None, [])
 

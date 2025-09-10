@@ -16,6 +16,7 @@ import pytest
 import yaml
 from dagster import build_op_context
 
+from src.work_data_hub.io.loader.warehouse_loader import DataWarehouseLoaderError
 from src.work_data_hub.orchestration.ops import (
     DiscoverFilesConfig,
     LoadConfig,
@@ -28,7 +29,6 @@ from src.work_data_hub.orchestration.ops import (
     read_and_process_trustee_files_op,
     read_excel_op,
 )
-from src.work_data_hub.io.loader.warehouse_loader import DataWarehouseLoaderError
 
 
 class TestDiscoverFilesOp:
@@ -411,7 +411,7 @@ class TestLoadOp:
 
         with patch("src.work_data_hub.orchestration.ops.psycopg2", create=True) as mock_psycopg2:
             mock_psycopg2.connect.return_value = mock_conn
-            
+
             with patch("src.work_data_hub.orchestration.ops.load") as mock_load:
                 mock_load.return_value = mock_result
 
@@ -426,7 +426,7 @@ class TestLoadOp:
 
                     # Verify bare connection was used
                     mock_psycopg2.connect.assert_called_once_with("postgresql://test")
-                    
+
                     # Verify load was called with bare connection
                     mock_load.assert_called_once_with(
                         table="test_table",
@@ -435,7 +435,7 @@ class TestLoadOp:
                         pk=["id"],
                         conn=mock_conn
                     )
-                    
+
                     # Verify connection cleanup
                     mock_conn.close.assert_called_once()
                     assert result == mock_result
@@ -861,7 +861,7 @@ class TestLoadOpConnectionLifecycle:
                     mock_load.assert_called_once_with(
                         table="test", rows=processed_rows, mode="delete_insert", pk=["id"], conn=mock_conn
                     )
-                    
+
                     # Verify connection cleanup
                     mock_conn.close.assert_called_once()
                     assert result == mock_result
