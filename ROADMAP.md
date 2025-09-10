@@ -71,6 +71,10 @@ TASK BREAKDOWN PHILOSOPHY:
 | C-021 | M2 | 文件发现月份提取稳健化（10/11/12回退修正逻辑） | COMPLETED | - | P-016 |
 | C-022 | M2 | 受托业绩小数/百分比处理与量化稳健性（return_rate数值按百分比解释） | COMPLETED | - | P-016 |
 | C-023 | M2 | DB连接语义对齐（ops与loader连接生命周期/模式对齐） | COMPLETED | C-019 | P-017 |
+| C-024 | M2 | 规模明细（真实样本）E2E骨架与标记（legacy_data） | COMPLETED | C-023 | P-018 |
+| C-025 | M2 | 规模明细数据发现配置（data_sources.yml 正则与V*版本选择） | READY_FOR_PRP | C-024 | - |
+| C-026 | M2 | 规模明细Postgres最小DDL（scripts/dev/annuity_performance.sql） | READY_FOR_PRP | C-024 | - |
+| C-027 | M2 | 规模明细E2E（plan-only/execute，本地样本） | READY_FOR_PRP | C-025, C-026 | - |
 | R-016 | M2 | Research ingestion connectors (HTTP/SFTP) and auth strategy | READY_FOR_PRP | - | - |
 | F-032 | M2 | Implement HTTP crawler connector + retries/auth + CLI | PENDING | R-016 | - |
 | F-033 | M2 | Implement SFTP/FTP downloader connector | PENDING | R-016 | - |

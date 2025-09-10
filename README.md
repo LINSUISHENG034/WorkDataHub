@@ -135,6 +135,43 @@ uv run pytest tests/
 - **Execute**: Shows loader summary with deleted/inserted counts from actual database operations
 - **Smoke tests**: Validates discovery, plan generation, and optional database integration
 
+## Real Sample Smoke (Annuity Performance)
+
+Test the Annuity Performance (规模明细) domain using legacy sample data with opt-in smoke tests.
+
+### Setup
+
+1. **Ensure reference data exists** (or tests will be skipped):
+   ```bash
+   # Reference data should be at:
+   ./reference/monthly/数据采集/V1/
+   ```
+
+2. **Configure environment variables**:
+   ```bash
+   # Required: Override data source directory
+   export WDH_DATA_BASE_DIR=./reference/monthly
+   ```
+
+### Usage
+
+```bash
+# Run legacy data smoke tests (opt-in via marker)
+uv run pytest -m legacy_data -v
+
+# Skip legacy data tests by default (normal test runs)  
+uv run pytest tests/
+
+# Run with environment override
+WDH_DATA_BASE_DIR=./reference/monthly uv run pytest -m legacy_data -v
+```
+
+### Expected Results
+
+- **Discovery smoke**: Validates reference/monthly structure and Unicode filename handling
+- **Plan-only placeholder**: Prepares for future pipeline integration
+- **Database placeholder**: Prepares for future database integration (requires psycopg2)
+
 ## Try It (End‑to‑End)
 
 Run the existing end‑to‑end test for the first vertical slice (trustee performance):
