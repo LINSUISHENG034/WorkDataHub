@@ -13,7 +13,7 @@ import pytest
 import yaml
 
 from src.work_data_hub.config.settings import Settings
-from src.work_data_hub.domain.trustee_performance.service import process
+from src.work_data_hub.domain.sample_trustee_performance.service import process
 from src.work_data_hub.io.connectors.file_connector import DataSourceConnector
 from src.work_data_hub.io.readers.excel_reader import read_excel_rows
 
@@ -23,7 +23,7 @@ def integration_test_config(tmp_path):
     """Create integration test configuration."""
     config = {
         "domains": {
-            "trustee_performance": {
+            "sample_trustee_performance": {
                 "description": "Test trustee performance integration",
                 "pattern": r"(?P<year>20\d{2})[-_](?P<month>0?[1-9]|1[0-2]).*受托业绩.*\.xlsx$",
                 "select": "latest_by_year_month",
@@ -101,7 +101,7 @@ class TestEndToEndIntegration:
 
         # Step 2: File Discovery
         connector = DataSourceConnector(config_path=integration_test_config)
-        discovered_files = connector.discover("trustee_performance")
+        discovered_files = connector.discover("sample_trustee_performance")
 
         # Verify file discovery results
         assert len(discovered_files) == 1, (
@@ -109,7 +109,7 @@ class TestEndToEndIntegration:
         )
 
         selected_file = discovered_files[0]
-        assert selected_file.domain == "trustee_performance"
+        assert selected_file.domain == "sample_trustee_performance"
         assert selected_file.year == 2024
         assert selected_file.month == 11  # Latest version should be selected
         assert "2024_11_受托业绩报告.xlsx" in selected_file.path
@@ -173,7 +173,7 @@ class TestEndToEndIntegration:
 
         # Run discovery
         connector = DataSourceConnector(config_path=integration_test_config)
-        discovered_files = connector.discover("trustee_performance")
+        discovered_files = connector.discover("sample_trustee_performance")
 
         # Should find no files
         assert len(discovered_files) == 0
@@ -197,7 +197,7 @@ class TestEndToEndIntegration:
 
         # Run pipeline
         connector = DataSourceConnector(config_path=integration_test_config)
-        discovered_files = connector.discover("trustee_performance")
+        discovered_files = connector.discover("sample_trustee_performance")
 
         assert len(discovered_files) == 1
 
@@ -238,7 +238,7 @@ class TestEndToEndIntegration:
 
         # Run discovery
         connector = DataSourceConnector(config_path=integration_test_config)
-        discovered_files = connector.discover("trustee_performance")
+        discovered_files = connector.discover("sample_trustee_performance")
 
         # Should select the latest version (November)
         assert len(discovered_files) == 1

@@ -87,6 +87,11 @@ jobs:
       
       - name: Install dependencies
         run: uv sync --dev
+
+      - name: Verify DDL generator drift (annuity_performance)
+        run: |
+          uv run python -m scripts.create_table.generate_from_json --domain annuity_performance --out scripts/create_table/ddl/annuity_performance.sql
+          git diff --exit-code -- scripts/create_table/ddl/annuity_performance.sql || (echo "❌ DDL drift detected. Regenerate via generate_from_json.py and commit." && exit 1)
       
       - name: Run tests (excluding postgres)
         run: uv run pytest -v -m "not postgres" --cov=src --cov-report=xml

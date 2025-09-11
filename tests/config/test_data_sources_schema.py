@@ -332,13 +332,13 @@ class TestIntegration:
         result = validate_data_sources_config("src/work_data_hub/config/data_sources.yml")
         assert result is True
 
-        # Test getting the trustee_performance domain
-        trustee_config = get_domain_config(
-            "trustee_performance", "src/work_data_hub/config/data_sources.yml"
+        # Test getting the sample_trustee_performance domain
+        sample_config = get_domain_config(
+            "sample_trustee_performance", "src/work_data_hub/config/data_sources.yml"
         )
 
-        assert trustee_config.table == "trustee_performance"
-        assert trustee_config.select == "latest_by_year_month"
-        assert "report_date" in trustee_config.pk
-        assert "plan_code" in trustee_config.pk
-        assert "company_code" in trustee_config.pk
+        assert sample_config.table == "sample_trustee_performance"
+        assert sample_config.select == "latest_by_year_month"
+        assert "report_date" in sample_config.pk
+        assert "plan_code" in sample_config.pk
+        assert "company_code" in sample_config.pk

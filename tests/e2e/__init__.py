@@ -5,5 +5,5 @@ This directory contains end-to-end validation tests for the WorkDataHub trustee 
 
 ## Test Structure
 
-- `test_trustee_performance_e2e.py` - Comprehensive E2E pipeline validation tests
+- `test_trustee_performance_e2e.py` - Comprehensive E2E pipeline validation tests (sample domain)
 """

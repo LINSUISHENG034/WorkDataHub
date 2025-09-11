@@ -110,10 +110,8 @@ class TestColumnProjection:
         for col in expected_ddl_cols:
             assert col in allowed, f"Column {col} should be in allowed columns"
 
-        # Should also include processing fields
-        assert "年" in allowed
-        assert "月" in allowed
-        assert "公司代码" in allowed
+        # Do not assume non-DDL helper fields exist in allowed set
+        # (实际规模明细原始数据不包含 年/月/公司代码/报告日期 这些模拟字段)
 
     def test_project_columns_filters_extra(self, row_with_extra_columns):
         """Test that project_columns removes extra columns."""
@@ -177,8 +175,7 @@ class TestProcess:
         assert isinstance(record, AnnuityPerformanceOut)
         assert record.计划代码 == "PLAN001"
         assert record.月度 == date(2024, 11, 1)
-        assert record.data_source == "test_source.xlsx"
-        assert record.has_financial_data is True
+        assert record.company_id is not None  # Should have company_id derived
 
     def test_process_with_date_field(self, valid_row_with_date):
         """Test processing row with existing 月度 date field."""
@@ -295,47 +292,79 @@ class TestExtractFunctions:
 
         assert result is None
 
-    def test_extract_plan_code_strips_f_prefix(self):
-        """Test ^F prefix stripping from 组合代码."""
-        # Test with F prefix when 组合代码 is present
+    def test_extract_plan_code_no_f_prefix_stripping(self):
+        """Test that F-prefix is NOT stripped from 计划代码 (plan code)."""
+        # F-prefix should NOT be stripped from plan code anymore
         model = AnnuityPerformanceIn(计划代码="FPLAN001", 组合代码="FPORTFOLIO001")
         result = _extract_plan_code(model, 0)
-        assert result == "PLAN001", "F prefix should be stripped when 组合代码 is present"
+        assert result == "FPLAN001", "F-prefix should NOT be stripped from plan code"
 
         # Test without F prefix (should not change)
         model = AnnuityPerformanceIn(计划代码="PLAN002", 组合代码="PORTFOLIO002")
         result = _extract_plan_code(model, 0)
         assert result == "PLAN002", "Non-F codes should not change"
 
-        # Test legitimate F in data (not a prefix case)
-        model = AnnuityPerformanceIn(计划代码="FIDELITY001", 组合代码="FUND001")
-        result = _extract_plan_code(model, 0)
-        assert result == "IDELITY001", "Only leading F should be stripped"
-
         # Test F prefix without 组合代码 field (should not strip)
         model = AnnuityPerformanceIn(计划代码="FPLAN003")  # No 组合代码
         result = _extract_plan_code(model, 0)
-        assert result == "FPLAN003", "F prefix should not be stripped without 组合代码 context"
+        assert result == "FPLAN003", "F prefix should never be stripped from plan code"
 
-        # Test F prefix with empty 组合代码 (should not strip)
-        model = AnnuityPerformanceIn(计划代码="FPLAN004", 组合代码="")
-        result = _extract_plan_code(model, 0)
-        assert result == "FPLAN004", "F prefix should not be stripped with empty 组合代码"
+    def test_strip_f_prefix_from_portfolio_code(self):
+        """Test F-prefix stripping from portfolio code with strict pattern matching."""
+        from src.work_data_hub.domain.annuity_performance.service import (
+            _strip_f_prefix_if_pattern_matches,
+        )
 
-        # Test F prefix with None 组合代码 (should not strip)
-        model = AnnuityPerformanceIn(计划代码="FPLAN005", 组合代码=None)
-        result = _extract_plan_code(model, 0)
-        assert result == "FPLAN005", "F prefix should not be stripped with None 组合代码"
+        # Test cases that SHOULD have F-prefix stripped (match ^F[0-9A-Z]+$)
+        assert _strip_f_prefix_if_pattern_matches("F123ABC") == "123ABC"
+        assert _strip_f_prefix_if_pattern_matches("F123") == "123"
+        assert _strip_f_prefix_if_pattern_matches("FABC") == "ABC"
+        assert _strip_f_prefix_if_pattern_matches("F001X") == "001X"
 
-        # Test single character F (edge case)
-        model = AnnuityPerformanceIn(计划代码="F", 组合代码="PORTFOLIO")
-        result = _extract_plan_code(model, 0)
-        assert result == "", "Single F should result in empty string when stripped"
+        # Test cases that should now have F-prefix stripped (pattern broadened)
+        assert _strip_f_prefix_if_pattern_matches("FIDELITY001") == "IDELITY001"
+        assert _strip_f_prefix_if_pattern_matches("Fund123") == "Fund123"  # Contains lowercase
+        assert _strip_f_prefix_if_pattern_matches("F") == "F"  # No chars after F
+        assert _strip_f_prefix_if_pattern_matches("fPLAN001") == "fPLAN001"  # Lowercase f
+        assert _strip_f_prefix_if_pattern_matches("F-123") == "F-123"  # Contains hyphen
+        assert _strip_f_prefix_if_pattern_matches("F123abc") == "F123abc"  # Contains lowercase
+        assert _strip_f_prefix_if_pattern_matches("F1234567") == "1234567"
 
-        # Test lowercase f (should not be stripped)
-        model = AnnuityPerformanceIn(计划代码="fPLAN001", 组合代码="PORTFOLIO")
-        result = _extract_plan_code(model, 0)
-        assert result == "fPLAN001", "Lowercase f should not be stripped"
+        # Test None and empty cases
+        assert _strip_f_prefix_if_pattern_matches(None) is None
+        assert _strip_f_prefix_if_pattern_matches("") == ""
+        assert _strip_f_prefix_if_pattern_matches(" ") == ""  # Whitespace gets stripped
+
+    def test_alias_serialization(self):
+        """Test that model serialization uses aliases for column mapping."""
+        from src.work_data_hub.domain.annuity_performance.models import AnnuityPerformanceOut
+
+        # Create a model with aliased field - use the validation alias
+        model = AnnuityPerformanceOut(
+            计划代码="PLAN001",
+            company_id="COMP001",
+            **{"流失(含待遇支付)": 1000.50},  # Use validation alias in dict
+        )
+
+        # Test serialization without aliases (should use field names)
+        normal_dump = model.model_dump(mode="json")
+        assert "流失_含待遇支付" in normal_dump
+
+        # Test serialization with aliases (should use alias names)
+        alias_dump = model.model_dump(mode="json", by_alias=True)
+        assert "流失(含待遇支付)" in alias_dump  # Should use alias
+        assert "流失_含待遇支付" not in alias_dump  # Should not use field name
+
+        # Test exclude_none functionality
+        model_with_none = AnnuityPerformanceOut(
+            计划代码="PLAN001", company_id="COMP001", **{"流失(含待遇支付)": None}
+        )
+
+        normal_dump_with_none = model_with_none.model_dump(mode="json")
+        assert "流失_含待遇支付" in normal_dump_with_none  # Should include None field
+
+        exclude_none_dump = model_with_none.model_dump(mode="json", exclude_none=True)
+        assert "流失_含待遇支付" not in exclude_none_dump  # Should exclude None field
 
     def test_extract_company_code_from_company_id(self):
         """Test company code extraction from company_id field."""

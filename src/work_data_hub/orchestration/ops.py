@@ -16,7 +16,7 @@ from pydantic import field_validator, model_validator
 
 from ..config.settings import get_settings
 from ..domain.annuity_performance.service import process as process_annuity
-from ..domain.trustee_performance.service import process
+from ..domain.sample_trustee_performance.service import process
 from ..io.connectors.file_connector import DataSourceConnector
 from ..io.loader.warehouse_loader import DataWarehouseLoaderError, load
 from ..io.readers.excel_reader import read_excel_rows
@@ -182,7 +182,7 @@ def read_excel_op(
 
 
 @op
-def process_trustee_performance_op(
+def process_sample_trustee_performance_op(
     context: OpExecutionContext, excel_rows: List[Dict[str, Any]], file_paths: List[str]
 ) -> List[Dict[str, Any]]:
     """
@@ -205,12 +205,15 @@ def process_trustee_performance_op(
 
         # Convert Pydantic models to JSON-serializable dicts
         # mode="json" ensures date/datetime/Decimal become JSON friendly types
-        result_dicts = [model.model_dump(mode="json") for model in processed_models]
+        result_dicts = [
+            model.model_dump(mode="json", by_alias=True, exclude_none=True)
+            for model in processed_models
+        ]
 
         context.log.info(
             f"Domain processing completed - source: {file_path}, "
             f"input_rows: {len(excel_rows)}, output_records: {len(result_dicts)}, "
-            f"domain: trustee_performance"
+            f"domain: sample_trustee_performance"
         )
 
         return result_dicts
@@ -247,7 +250,10 @@ def process_annuity_performance_op(
 
         # Convert Pydantic models to JSON-serializable dicts
         # mode="json" ensures date/datetime/Decimal become JSON friendly types
-        result_dicts = [model.model_dump(mode="json") for model in processed_models]
+        result_dicts = [
+            model.model_dump(mode="json", by_alias=True, exclude_none=True)
+            for model in processed_models
+        ]
 
         context.log.info(
             f"Domain processing completed - source: {file_path}, "
@@ -288,7 +294,7 @@ class ReadProcessConfig(Config):
 
 
 @op
-def read_and_process_trustee_files_op(
+def read_and_process_sample_trustee_files_op(
     context: OpExecutionContext, config: ReadProcessConfig, file_paths: List[str]
 ) -> List[Dict]:
     """
@@ -315,7 +321,9 @@ def read_and_process_trustee_files_op(
             models = process(rows, data_source=file_path)
 
             # JSON-serializable accumulation (use mode="json" for friendly types)
-            processed_dicts = [model.model_dump(mode="json") for model in models]
+            processed_dicts = [
+                model.model_dump(mode="json", by_alias=True, exclude_none=True) for model in models
+            ]
             all_processed.extend(processed_dicts)
 
             # Structured logging like existing ops
@@ -337,7 +345,7 @@ def read_and_process_trustee_files_op(
 class LoadConfig(Config):
     """Configuration for data loading operation."""
 
-    table: str = "trustee_performance"
+    table: str = "sample_trustee_performance"
     mode: str = "delete_insert"
     pk: List[str] = ["report_date", "plan_code", "company_code"]
     plan_only: bool = True

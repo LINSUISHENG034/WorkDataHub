@@ -10,8 +10,8 @@
 domains:
   # Trustee Performance Reports
   # Handles files with patterns like: "2024_11_受托业绩报告.xlsx", "2023-12-受托业绩数据.xlsx"
-  trustee_performance:
-    description: "Annual trustee performance reports with Chinese naming conventions"
+  sample_trustee_performance:
+    description: "Sample (non-production) trustee performance domain for tests and demos"
     
     # Unicode-aware regex pattern with named groups for year/month extraction
     # Matches patterns: YYYY[separator]MM*受托业绩*.xlsx
@@ -28,7 +28,7 @@ domains:
     sheet: 0
     
     # Database table configuration for loader
-    table: "trustee_performance"
+    table: "sample_trustee_performance"
     pk: ["report_date", "plan_code", "company_code"]
     
     # Data quality requirements
@@ -62,7 +62,7 @@ domains:
     
     # Database table configuration for loader
     table: "规模明细"
-    pk: ["report_date", "plan_code", "company_code"]
+    pk: ["月度", "计划代码", "company_id"]  # Business composite key for delete_insert operations
     
     # Data quality requirements
     required_columns:

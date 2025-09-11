@@ -1,161 +1,106 @@
-# INITIAL.md — Cleansing Framework Hardening (KISS/YAGNI) with Minimal Domain Changes
+# INITIAL_en.md — P‑023 Finalization (C‑028): Alias Serialization, DB Auto IDs, Narrowed F‑Prefix, Tests Alignment
 
-This INITIAL defines a minimal, KISS‑compliant enhancement to the shared cleansing framework and a few domain‑level tweaks so we achieve parity with critical legacy cleansing behavior without over‑engineering.
+This INITIAL guides Claude to complete the P‑023 validation loop with minimal, KISS‑aligned changes. It codifies the required clarifications and acceptance criteria to align the annuity domain (and all business data) with the new architecture.
 
-## FEATURE
-Strengthen numeric cleansing and input header normalization to remove cross‑domain duplication and align with legacy behavior, while keeping business‑specific logic in domain or the future Mapping Service.
+## Feature / Roadmap
+- Epic/Chore: C‑028 Cleansing framework hardening (negative/full‑width percentage, Excel header normalization, F‑prefix handling)
+- PRP: P‑023 (validation and hardening loop)
+- Domains: annuity_performance (规模明细) + shared cleansing components
 
-## SCOPE
-- In‑scope:
-  - Numeric rules: support negative percentages and full‑width percent sign (％) in `handle_percentage_conversion`; preserve sign and only treat numbers as percent when `abs(value) > 1` for rate fields.
-  - Input layer: normalize Excel header strings by removing newlines and tabs so `project_columns` never drops columns due to formatting.
-  - Annuity domain: strip `^F` prefix from `组合代码` to match legacy behavior.
-  - Keep public cleansing APIs stable (`comprehensive_decimal_cleaning`, `decimal_fields_cleaner`).
-  - Add focused tests for the above.
-- Non‑goals:
-  - Company name normalization, multi‑source `company_id` backfill, special plan‑code replacements, default institution code; these remain in domain or the planned Mapping Service (M2).
-  - No DDL or orchestration changes; no DSL/pipeline engine for rules.
+## Scope
+- In scope:
+  - Enable alias‑based, null‑excluding serialization in Dagster ops for JSON handoff to the loader: `model_dump(mode="json", by_alias=True, exclude_none=True)`.
+  - Adopt DB auto‑increment primary keys for the annuity domain and all business data; adjust DDL accordingly while keeping column names compliant with database naming rules in `CLAUDE.md`.
+  - Narrow F‑prefix stripping to affect only the portfolio code field (Chinese: `组合代码`) and only when it matches the strict pattern `^F[0-9A-Z]+$`. Do not strip from the plan code (`计划代码`).
+  - Keep Excel header normalization and column standardization as implemented (e.g., full/half‑width parentheses normalization; newlines/tabs removed).
+  - Update tests: unify annuity tests to `company_id`; remove assertions on fields that no longer exist (e.g., `data_source`, `processed_at`, `validation_warnings`).
+- Out of scope:
+  - Introducing a new Mapping Service, or moving company name normalization/backfill logic; keep domain‑specific mapping out of this PRP.
+  - Changing trustee domain contracts (beyond `by_alias=True` serialization which is a no‑op there).
 
-## CONTEXT SNAPSHOT (optional)
-```bash
-src/work_data_hub/
-  cleansing/
-    rules/numeric_rules.py              # numeric rules to extend
-    integrations/pydantic_adapter.py    # Pydantic decorator (no API change)
-  io/readers/excel_reader.py            # header normalization to add
-  domain/
-    annuity_performance/service.py      # strip ^F from 组合代码
-    trustee_performance/                # already using shared numeric rules
-tests/
-  test_cleansing_framework.py           # strengthen numeric tests
-  domain/annuity_performance/test_service.py
-  io/readers/ ... (add header normalization tests)
-```
+## Key Decisions
+- JSON output alignment
+  - Issue: The annuity output model maps `流失_含待遇支付` to the DB column `流失(含待遇支付)` via aliases, but ops previously did not serialize by alias or exclude `None` fields.
+  - Decision: In `src/work_data_hub/orchestration/ops.py`, use `model_dump(mode="json", by_alias=True, exclude_none=True)` in all three places where Pydantic models are serialized.
 
-## EXAMPLES (most important)
-- Path: `src/work_data_hub/cleansing/rules/numeric_rules.py` — reuse the staged flow: null standardization → currency symbol removal → percent handling → decimal quantization.
-- Path: `tests/test_cleansing_framework.py` — mirror test style for currency, percent, null, and quantization assertions.
-- Path: `src/work_data_hub/io/readers/excel_reader.py` — extend `_dataframe_to_rows` column cleaning to include `.replace("\n", "").replace("\t", "")`.
-- Path: `src/work_data_hub/domain/annuity_performance/service.py` — minimally strip `^F` prefix from `组合代码` while leaving other domain logic unchanged.
+- DB primary key strategy and naming
+  - Clarification: The annuity domain and ALL business data adopt DB‑generated auto‑increment primary keys.
+  - Decision: Update the annuity DDL (`scripts/dev/annuity_performance_real.sql`) to use an auto identity for `id` (e.g., `GENERATED ALWAYS AS IDENTITY`), while ensuring column names follow the database naming rules described in `CLAUDE.md` (including proper quoting and identifier conventions for Chinese column names).
 
-Snippet — negative and full‑width percentage handling (pattern to follow):
-```python
-# Example expectation
-from decimal import Decimal
-from src.work_data_hub.cleansing.rules.numeric_rules import comprehensive_decimal_cleaning
+- F‑prefix handling (annuity)
+  - Clarification: Narrow F‑prefix stripping to apply ONLY to the portfolio code (`组合代码`), NOT the plan code (`计划代码`), and ONLY when the portfolio code matches `^F[0-9A-Z]+$`.
+  - Decision: Adjust the annuity service logic accordingly; do not alter `计划代码`.
 
-assert comprehensive_decimal_cleaning("-5%", "当期收益率") == Decimal("-0.050000")
-assert comprehensive_decimal_cleaning("12.3％", "当期收益率") == Decimal("0.123000")
-assert comprehensive_decimal_cleaning(-12.3, "当期收益率") == Decimal("-0.123000")
-```
+- Column standardization and aliasing chain
+  - Input: `ExcelReader` + `column_normalizer` standardize headers (e.g., `流失（含待遇支付）` → `流失_含待遇支付`).
+  - Output: Annity model uses alias to serialize back to the actual DB column name `流失(含待遇支付)`; ops ensure alias serialization.
 
-## DOCUMENTATION
-- File: `README.md` — Developer quickstart and commands
-- File: `ROADMAP.md` — Single source of truth for scope/status (mark this task under current milestone)
-- File: `docs/overview/MIGRATION_REFERENCE.md` — Migration plan and role boundaries (Mapping Service in M2)
-- File: `docs/overview/LEGACY_WORKFLOW_ANALYSIS.md` — Objective legacy behavior reference
-- URL: https://docs.pydantic.dev/2.7/ — Pydantic v2 validators and model config
+- Primary key in data_sources
+  - Continue using `pk: ["月度", "计划代码", "company_id"]` in `data_sources.yml` for annuity, consistent with output and loader expectations.
 
-## INTEGRATION POINTS
-- Data models: No schema changes; both trustee and annuity models already call the shared numeric pipeline.
-- IO layer: `ExcelReader._dataframe_to_rows` — normalize header strings to avoid column projection issues.
-- Domain logic: Annuity service strips `^F` from `组合代码` (no other domain coupling introduced).
-- Database/DDL: None.
-- Config/ENV: None.
-- API/Routes: None.
-- Jobs/Events: None.
+## Files to Touch (Claude)
+- `src/work_data_hub/orchestration/ops.py`
+  - Replace all `model_dump(...)` calls that serialize domain output with:
+    - `model_dump(mode="json", by_alias=True, exclude_none=True)`
+  - Locations:
+    - `process_trustee_performance_op`
+    - `process_annuity_performance_op`
+    - `read_and_process_trustee_files_op`
 
-## DATA CONTRACTS (schemas & payloads)
-```python
-# Public cleansing API remains unchanged
-from decimal import Decimal
-from typing import Any, Optional, Dict
+- `scripts/dev/annuity_performance_real.sql`
+  - Change `"id" INTEGER NOT NULL` to an auto identity (e.g., `"id" INTEGER GENERATED ALWAYS AS IDENTITY`) while preserving the primary key.
+  - Keep column names and quoting consistent with `CLAUDE.md` database rules.
 
-def comprehensive_decimal_cleaning(
-    value: Any,
-    field_name: str = "",
-    precision: int | None = None,
-    handle_percentage: bool = True,
-    precision_config: Optional[Dict[str, int]] = None,
-) -> Optional[Decimal]:
-    ...  # unchanged public contract
-```
+- `src/work_data_hub/domain/annuity_performance/service.py`
+  - Modify F‑prefix stripping logic:
+    - Apply ONLY to the field `组合代码` (portfolio code), and ONLY when it matches `^F[0-9A-Z]+$`.
+    - Do NOT modify `计划代码` based on F‑prefix.
 
-```python
-# Pydantic integration stays the same
-from src.work_data_hub.cleansing import decimal_fields_cleaner
+- Tests under `tests/domain/annuity_performance/` and adjacent unit/e2e tests
+  - Update annuity tests to use `company_id`.
+  - Remove assertions for deleted fields (`data_source`, `processed_at`, `validation_warnings`).
+  - Add/adjust assertions verifying alias serialization (e.g., serialized output contains `"流失(含待遇支付)"`).
 
-@decimal_fields_cleaner("期初资产规模", "当期收益率", precision_config={"当期收益率": 6, "期初资产规模": 4})
-class AnnuityModel(BaseModel):
-    ...
-```
-
-## GOTCHAS & LIBRARY QUIRKS
-- Pydantic v2 only; use `field_validator(..., mode="before")` appropriately.
-- Chinese field names in validators (e.g., "当期收益率").
-- Full‑width percent sign `％` frequently appears in Excel; treat like `%`.
-- Numeric percent heuristics: only convert numbers to decimals for rate fields when `abs(value) > 1`.
-- Quantization uses `ROUND_HALF_UP`; keep precision from `precision_config`.
-- Prefer `rg` for search; avoid `grep/find`.
-
-## IMPLEMENTATION NOTES
-- KISS: keep enhancements tiny; do not introduce a rule pipeline/DSL.
-- YAGNI: do not move company name cleaning or mapping rules into the shared component.
-- Put header normalization where the data enters (ExcelReader) to prevent column mismatches early.
-- Keep the annuity `^F` handling in the domain service to avoid over‑generalizing the shared layer.
-
-## VALIDATION GATES (must pass)
+## Validation Commands (copy‑paste)
 ```bash
 uv venv && uv sync
 uv run ruff format .
 uv run ruff check src/ --fix
 uv run mypy src/
 uv run pytest -v
+
+# Plan‑only (safe): verify SQL plans contain the correct aliased column names
+WDH_DATA_BASE_DIR=./reference/monthly \
+  uv run python -m src.work_data_hub.orchestration.jobs \
+  --domain annuity_performance --plan-only --max-files 1
+
+# Execute (requires DB + DDL applied)
+psql "$WDH_DATABASE__URI" -f scripts/dev/annuity_performance_real.sql
+WDH_DATA_BASE_DIR=./reference/monthly \
+  uv run python -m src.work_data_hub.orchestration.jobs \
+  --domain annuity_performance --execute --max-files 1 --mode delete_insert
 ```
 
-Targeted tests:
-```bash
-# Numeric cleansing (negative percent, full‑width percent, currency‑only -> None)
-uv run pytest -v tests/test_cleansing_framework.py -k "percent or percentage or currency"
+## Acceptance Criteria (DoD)
+- Alias & null‑exclusion: Ops use `by_alias=True, exclude_none=True`; E2E plan shows `"流失(含待遇支付)"` in INSERT columns; no SQL errors due to column mismatches or null‑only columns.
+- DB auto IDs: The annuity table `id` is auto‑generated by the DB; execute mode inserts succeed without providing `id`.
+- F‑prefix rule: Only strips when `组合代码` matches `^F[0-9A-Z]+$`; never strips from `计划代码`; words like `FIDELITY001` remain intact.
+- Header/column chain: Excel headers normalized; `流失（含待遇支付）` → `流失_含待遇支付` → serialized as `流失(含待遇支付)` for DB.
+- PK consistency: `pk=["月度","计划代码","company_id"]` matches output; DELETE SQL uses properly quoted identifiers.
+- Tests: All existing tests pass; annuity tests updated to `company_id` and no longer reference removed fields; alias serialization assertions pass.
+- Docs/Status: Update README/ROADMAP if necessary to reflect the final behaviors; keep ROADMAP as the single source of truth.
 
-# ExcelReader header normalization (newline/tab in headers)
-uv run pytest -v tests/io/readers/test_excel_reader.py -k "header or column or newline or tab"
+## Risks & Mitigations
+- Risk: DB not updated with auto identity → execute mode fails on `id`.
+  - Mitigation: Enforce DDL application before execute tests; do not re‑introduce synthetic `id` generation in code.
+- Risk: `by_alias=True` unexpectedly changes trustee output.
+  - Mitigation: Trustee models do not rely on alias for DB column names; add a quick E2E sanity run.
+- Risk: Tight F‑prefix rule may leave some historical anomalies.
+  - Mitigation: Escalate to Mapping Service (M2) for exceptional cases; keep domain logic simple.
 
-# Annuity: strip ^F prefix from 组合代码
-uv run pytest -v tests/domain/annuity_performance/test_service.py -k "组合代码 or portfolio or prefix"
-```
-
-## ACCEPTANCE CRITERIA
-- [ ] "-5%" → Decimal("-0.050000") for rate fields; `"12.3％"` equals `"12.3%"` result.
-- [ ] Numeric values in rate fields: only `abs(value) > 1` are treated as percentage inputs (e.g., `-12.3` → `-0.123000`).
-- [ ] Non‑rate numeric fields do not get percentage conversion.
-- [ ] Currency/formatting‑only strings become `None` after null/currency normalization as applicable.
-- [ ] ExcelReader returns headers without `\n` or `\t`; `project_columns` no longer drops columns due to header formatting.
-- [ ] Annuity `组合代码` no longer contains leading `F` when present.
-- [ ] All existing tests remain green; new targeted tests pass.
-
-## ROLLOUT & RISK
-- No feature flags required; changes are local and reversible.
-- Rollback:
-  - Numeric: revert `handle_percentage_conversion` additions.
-  - Header: remove `.replace("\n", "").replace("\t", "")` in ExcelReader.
-  - Annuity: remove the `^F` prefix stripping in the service.
-- Performance impact is negligible (simple string ops and conditionals).
-
-## APPENDICES (optional snippets)
-```python
-# Test skeleton — Excel header normalization
-def test_header_normalization_removes_newlines_and_tabs(tmp_path):
-    # Arrange: write a tiny XLSX with headers containing \n/\t
-    # Act: read via ExcelReader
-    # Assert: headers no longer contain \n/\t and column projection succeeds
-    assert True
-```
-
-```bash
-# Useful ripgrep searches while implementing
-rg -n "handle_percentage_conversion|comprehensive_decimal_cleaning" src/
-rg -n "_dataframe_to_rows|ExcelReader" src/work_data_hub/io/readers
-rg -n "组合代码" src/work_data_hub/domain/annuity_performance
-```
+## References
+- `CLAUDE.md` — Database naming/quoting conventions must be followed.
+- `README.md` — Commands and local run instructions.
+- `ROADMAP.md` — Status and dependencies (single source of truth).
+- `docs/overview/MIGRATION_REFERENCE.md`, `docs/overview/LEGACY_WORKFLOW_ANALYSIS.md` — Migration and legacy behaviors.
 

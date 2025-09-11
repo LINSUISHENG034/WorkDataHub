@@ -14,6 +14,8 @@ from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 
+from work_data_hub.utils.column_normalizer import normalize_columns
+
 logger = logging.getLogger(__name__)
 
 
@@ -202,7 +204,20 @@ class ExcelReader:
             else:
                 cleaned_columns.append(col_str)
 
-        df.columns = cleaned_columns
+        # Apply column name standardization
+        column_mapping = normalize_columns(cleaned_columns)
+        standardized_columns = [column_mapping.get(col, col) for col in cleaned_columns]
+
+        df.columns = standardized_columns
+
+        # Log column standardization if any changes were made
+        changed_mappings = {k: v for k, v in column_mapping.items() if k != v}
+        if changed_mappings:
+            logger.info(
+                f"Applied column name standardization: {len(changed_mappings)} columns normalized"
+            )
+            for original, normalized in changed_mappings.items():
+                logger.debug(f"  '{original}' -> '{normalized}'")
 
         # Ensure year/month columns remain as strings
         year_month_columns = ["年", "月", "year", "month"]

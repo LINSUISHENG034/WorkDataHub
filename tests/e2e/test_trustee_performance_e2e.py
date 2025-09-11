@@ -13,10 +13,12 @@ from unittest.mock import Mock, patch
 
 import pandas as pd
 import pytest
+
+pytestmark = pytest.mark.sample_domain
 import yaml
 from dagster import build_op_context
 
-from src.work_data_hub.domain.trustee_performance.service import process
+from src.work_data_hub.domain.sample_trustee_performance.service import process
 from src.work_data_hub.io.loader.warehouse_loader import DataWarehouseLoaderError, load
 from src.work_data_hub.orchestration.ops import (
     DiscoverFilesConfig,
@@ -24,7 +26,7 @@ from src.work_data_hub.orchestration.ops import (
     ReadExcelConfig,
     discover_files_op,
     load_op,
-    process_trustee_performance_op,
+    process_sample_trustee_performance_op,
     read_excel_op,
 )
 
@@ -59,11 +61,11 @@ class TestTrusteePerformanceE2E:
         """Create temporary data sources configuration."""
         config_data = {
             "domains": {
-                "trustee_performance": {
+                "sample_trustee_performance": {
                     "pattern": r"(?P<year>20\d{2})[-_](?P<month>0?[1-9]|1[0-2]).*受托业绩.*\.xlsx$",
                     "select": "latest_by_year_month",
                     "sheet": 0,
-                    "table": "trustee_performance",
+                    "table": "sample_trustee_performance",
                     "primary_key": ["report_date", "plan_code", "company_code"],
                 }
             }
@@ -95,7 +97,7 @@ class TestTrusteePerformanceE2E:
 
                 # Step 1: Discover files
                 context = build_op_context()
-                discover_config = DiscoverFilesConfig(domain="trustee_performance")
+                discover_config = DiscoverFilesConfig(domain="sample_trustee_performance")
                 file_paths = discover_files_op(context, discover_config)
 
                 assert len(file_paths) == 1
@@ -110,7 +112,7 @@ class TestTrusteePerformanceE2E:
                 assert excel_rows[0]["计划代码"] == "PLAN001"
 
                 # Step 3: Process domain data
-                processed_rows = process_trustee_performance_op(context, excel_rows, file_paths)
+                processed_rows = process_sample_trustee_performance_op(context, excel_rows, file_paths)
 
                 assert len(processed_rows) == 3
                 assert processed_rows[0]["plan_code"] == "PLAN001"
@@ -118,7 +120,7 @@ class TestTrusteePerformanceE2E:
 
                 # Step 4: Load (plan-only mode)
                 load_config = LoadConfig(
-                    table="trustee_performance",
+                    table="sample_trustee_performance",
                     mode="delete_insert",
                     pk=["report_date", "plan_code", "company_code"],
                     plan_only=True,
@@ -172,7 +174,7 @@ class TestTrusteePerformanceE2E:
 
         # Load in plan-only mode
         load_result = load(
-            table="trustee_performance",
+            table="sample_trustee_performance",
             rows=processed_dicts,
             mode="delete_insert",
             pk=["report_date", "plan_code", "company_code"],
@@ -209,7 +211,7 @@ class TestTrusteePerformanceE2E:
                 ],
                 "metadata": {
                     "processing_context": {
-                        "data_source": "/path/to/trustee_performance_2024_11.xlsx",
+                        "data_source": "/path/to/sample_trustee_performance_2024_11.xlsx",
                         "batch_id": "batch_20241101_001",
                     },
                     "data_lineage": [
@@ -233,7 +235,7 @@ class TestTrusteePerformanceE2E:
 
         # Test load operation plan generation
         load_result = load(
-            table="trustee_performance",
+            table="sample_trustee_performance",
             rows=row_dicts,
             mode="delete_insert",
             pk=["report_date", "plan_code", "company_code"],
@@ -272,7 +274,7 @@ class TestTrusteePerformanceE2E:
 
         # Process should handle errors gracefully
         # Some rows should be filtered out, others should be processed successfully
-        with patch("src.work_data_hub.domain.trustee_performance.service.logger") as mock_logger:
+        with patch("src.work_data_hub.domain.sample_trustee_performance.service.logger") as mock_logger:
             processed_models = process(excel_rows, data_source=str(excel_file))
 
             # Should process at least some valid data (not all rows are completely invalid)
@@ -329,7 +331,7 @@ class TestTrusteePerformanceE2E:
         assert excel_rows == []
 
         # Test empty Excel data
-        processed_rows = process_trustee_performance_op(context, [], [])
+        processed_rows = process_sample_trustee_performance_op(context, [], [])
 
         assert processed_rows == []
 
@@ -366,7 +368,7 @@ class TestTrusteePerformanceE2E:
         pk = ["report_date", "plan_code", "company_code"] if mode == "delete_insert" else []
 
         load_result = load(
-            table="trustee_performance",
+            table="sample_trustee_performance",
             rows=processed_dicts,
             mode=mode,
             pk=pk,
@@ -406,7 +408,7 @@ class TestTrusteePerformanceE2E:
 
         # Test chunked load operation
         load_result = load(
-            table="trustee_performance",
+            table="sample_trustee_performance",
             rows=processed_dicts,
             mode="append",
             chunk_size=1000,

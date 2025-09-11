@@ -167,7 +167,7 @@ class TrusteePerformanceOut(BaseModel):
     @classmethod
     def clean_decimal_fields(cls, v, info: Any):
         """Clean decimal fields using the unified cleansing framework."""
-        from src.work_data_hub.cleansing.rules.numeric_rules import comprehensive_decimal_cleaning
+        from work_data_hub.cleansing.rules.numeric_rules import comprehensive_decimal_cleaning
 
         # Field-specific precision configuration
         precision_config = {

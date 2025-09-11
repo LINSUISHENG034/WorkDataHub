@@ -59,7 +59,7 @@ def _ensure_list_of_dicts(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 def _get_column_order(
     rows: List[Dict[str, Any]], provided_cols: Optional[List[str]] = None
 ) -> List[str]:
-    """Determine deterministic column ordering."""
+    """Determine deterministic column ordering, excluding auto-generated columns."""
     if provided_cols:
         return provided_cols
 
@@ -67,6 +67,12 @@ def _get_column_order(
     all_keys: set[str] = set()
     for row in rows:
         all_keys.update(row.keys())
+
+    # Exclude auto-generated ID columns (GENERATED ALWAYS AS IDENTITY)
+    # Common patterns: id, {entity}_id
+    auto_generated_columns = {"id", "annuity_performance_id", "trustee_performance_id"}
+    for col in auto_generated_columns:
+        all_keys.discard(col)
 
     return sorted(all_keys)
 
@@ -190,6 +196,39 @@ def build_delete_sql(
     return sql, params
 
 
+def _prepare_unique_pk_tuples(
+    pk_cols: List[str], rows: List[Dict[str, Any]]
+) -> List[Tuple[Any, ...]]:
+    """
+    Extract, validate and deduplicate PK tuples from rows.
+
+    Raises ValueError if any required PK is missing.
+    Returns a sorted list of unique PK tuples for deterministic behavior.
+    """
+    rows = _ensure_list_of_dicts(rows)
+    if not rows:
+        return []
+
+    missing_keys = []
+    pk_tuples: List[Tuple[Any, ...]] = []
+
+    for i, row in enumerate(rows):
+        pk_values = []
+        for col in pk_cols:
+            if col not in row or row[col] is None:
+                missing_keys.append(f"Row {i} missing key {col}")
+            else:
+                pk_values.append(row[col])
+        if len(pk_values) == len(pk_cols):
+            pk_tuples.append(tuple(pk_values))
+
+    if missing_keys:
+        raise ValueError("Missing primary key values: " + "; ".join(missing_keys))
+
+    unique_tuples = sorted(list(set(pk_tuples)))
+    return unique_tuples
+
+
 def _adapt_param(v):
     """
     Adapt dict/list parameters for JSONB columns.
@@ -263,11 +302,49 @@ def load(
     if mode == "delete_insert":
         # pk is guaranteed to be not None due to validation above
         assert pk is not None
-        delete_sql, delete_params = build_delete_sql(table, pk, rows)
-        if delete_sql:
-            operations.append(("DELETE", delete_sql, delete_params))
-            # Estimate deletions (may be less due to deduplication)
-            total_deleted = len(set(tuple(row.get(col) for col in pk) for row in rows))
+
+        # Build chunked DELETE operations to avoid oversized SQL and stack depth issues
+        # Validate rows and gather PK tuples
+        missing_keys: list[str] = []
+        pk_tuples_raw: list[tuple[Any, ...]] = []
+        for i, row in enumerate(rows):
+            pk_values: list[Any] = []
+            for col in pk:
+                if col not in row or row[col] is None:
+                    missing_keys.append(f"Row {i} missing key {col}")
+                    break
+                pk_values.append(row[col])
+            if len(pk_values) == len(pk):
+                pk_tuples_raw.append(tuple(pk_values))
+
+        if missing_keys:
+            raise DataWarehouseLoaderError(
+                "Missing primary key values: " + "; ".join(missing_keys)
+            )
+
+        # Deduplicate and sort for determinism
+        unique_tuples: list[tuple[Any, ...]] = sorted(list(set(pk_tuples_raw)))
+
+        # Estimate deletions
+        total_deleted = len(unique_tuples)
+
+        if unique_tuples:
+            quoted_table = quote_ident(table)
+            quoted_cols = ",".join(quote_ident(c) for c in pk)
+            cols_tuple = f"({quoted_cols})"
+
+            # Number of PK tuples per DELETE; reuse chunk_size to keep configuration simple
+            delete_chunk = max(1, min(chunk_size, 1000))
+            for j in range(0, len(unique_tuples), delete_chunk):
+                chunk_pk = unique_tuples[j : j + delete_chunk]
+                # Build placeholders for this chunk
+                tuple_placeholder = "(" + ",".join(["%s"] * len(pk)) + ")"
+                placeholders = ",".join([tuple_placeholder] * len(chunk_pk))
+                sql = f"DELETE FROM {quoted_table} WHERE {cols_tuple} IN ({placeholders})"
+                params: list[Any] = []
+                for t in chunk_pk:
+                    params.extend(t)
+                operations.append(("DELETE", sql, params))
 
     # Chunk insertions
     total_inserted = 0

@@ -1,0 +1,7 @@
+domains:
+  annuity_performance:
+    table: "规模明细"
+    entity: "annuity_performance"
+    delete_scope_key: ["月度", "计划代码", "company_id"]
+    ddl: "scripts/create_table/ddl/annuity_performance.sql"
+

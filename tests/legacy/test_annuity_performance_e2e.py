@@ -186,7 +186,7 @@ class TestAnnuityPerformanceE2E:
 
         Prerequisites:
         - PostgreSQL running and accessible
-        - DDL applied: psql -f scripts/dev/annuity_performance_real.sql
+        - DDL applied: psql -f scripts/create_table/ddl/annuity_performance.sql
         - WDH_DATABASE_* environment variables configured
         """
         if not _has_sample_root():

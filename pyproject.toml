@@ -15,6 +15,9 @@ dependencies = [
     "pydantic-settings>=2.10.1",
 ]
 
+[project.packages]
+find = {}
+
 [project.optional-dependencies]
 dev = [
     "pytest",
@@ -35,7 +38,8 @@ quote-style = "double"
 markers = [
     "postgres: marks tests as requiring a PostgreSQL database (deselect with '-m \"not postgres\"')",
     "monthly_data: marks tests requiring reference/monthly data (opt-in)",
-    "legacy_data: marks tests as requiring legacy sample data (opt-in)"
+    "legacy_data: marks tests as requiring legacy sample data (opt-in)",
+    "sample_domain: marks tests for the non-production sample domain (sample_trustee_performance)"
 ]
 
 [dependency-groups]
@@ -47,3 +51,9 @@ dev = [
     "types-psycopg2>=2.9.21.20250809",
     "types-pyyaml>=6.0.12.20250822",
 ]
+
+[tool.mypy]
+# 让 mypy 将 `src` 视为包根并避免重复模块名
+mypy_path = ["src"]
+explicit_package_bases = true
+namespace_packages = true

@@ -83,13 +83,17 @@ class CleansingRegistry:
 
     def get_statistics(self) -> Dict[str, Any]:
         """获取注册表统计信息"""
-        stats = {"total_rules": len(self._rules), "rules_by_category": {}}
-
+        rules_by_category: Dict[str, int] = {}
+        
         # 计算每个分类的规则数量
         for category in RuleCategory:
             count = len([r for r in self._rules.values() if r.category == category])
-            stats["rules_by_category"][category.value] = count
+            rules_by_category[category.value] = count
 
+        stats = {
+            "total_rules": len(self._rules), 
+            "rules_by_category": rules_by_category
+        }
         return stats
 
 
@@ -127,7 +131,7 @@ def rule(name: str, category: RuleCategory, description: str):
         registry.register(rule_obj)
 
         # 为函数添加元数据
-        func._cleansing_rule = rule_obj
+        func._cleansing_rule = rule_obj  # type: ignore[attr-defined]
 
         return func
 

@@ -1,4 +1,4 @@
-# AGENTS.md v1.02
+# AGENTS.md v1.03
 
 This file is a README for agents. It gives any AI coding assistant a predictable, minimal set of rules and commands to work effectively in this repository.
 
@@ -8,10 +8,6 @@ Scope: This guide targets the supporting agent that maintains ROADMAP/README, pr
 
 - Package management: use `uv` for all dependencies and virtualenvs.
 - Virtualenv usage: prefer `uv run <command>` over manual activation.
-  - Optional activation:
-    - WSL or Linux shell: `source .venv_linux/bin/activate` (Use the `--active` flag with `uv run` to prevent it from automatically searching for and managing a virtual environment named `.venv`)
-    - PowerShell: `.\\.venv\\Scripts\\Activate.ps1`
-    - CMD: `.\\.venv\\Scripts\\activate.bat`
 - Setup: `uv venv && uv sync`. Run tools via `uv run ...`.
 - Search fast: prioritize MCP Serena; otherwise use `rg` (ripgrep) over `grep/find` for code and files.
 - Baseline checks (keep green before PRs):

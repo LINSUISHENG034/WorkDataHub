@@ -73,9 +73,16 @@ TASK BREAKDOWN PHILOSOPHY:
 | C-023 | M2 | DB连接语义对齐（ops与loader连接生命周期/模式对齐） | COMPLETED ✅ | C-019 | P-017 |
 | C-024 | M2 | 规模明细（真实样本）E2E骨架与标记（legacy_data） | COMPLETED ✅ | C-023 | P-018 |
 | C-025 | M2 | 规模明细数据发现配置（data_sources.yml 正则与V*版本选择） | COMPLETED ✅ | C-024 | P-019 |
-| C-026 | M2 | 规模明细Postgres最小DDL（scripts/dev/annuity_performance.sql） | COMPLETED ✅ | C-024 | P-020 |
+| C-026 | M2 | 规模明细Postgres最小DDL（scripts/create_table/ddl/annuity_performance.sql） | COMPLETED ✅ | C-024 | P-020 |
 | C-027 | M2 | 规模明细E2E（plan-only/execute，本地样本） | COMPLETED ✅ | C-025, C-026 | P-021 |
-| C-028 | M2 | Cleansing framework hardening (negative/full-width percent, Excel header normalization, annuity portfolio-code ^F stripping) | VALIDATING | C-020, C-022, C-024 | P-023 |
+| C-029 | M2 | 规模明细DDL规范化（移除业务唯一约束，新增组合索引） | COMPLETED ✅ | C-026 | P-021 |
+| C-031 | M2 | Loader分批DELETE（避免PG堆栈深度/超大IN子句） | COMPLETED ✅ | F-013 | P-013 |
+| C-032 | M2 | 数据库URI统一（WDH_DATABASE__URI），Settings忽略额外env | COMPLETED ✅ | C-002 | P-012 |
+| C-033 | M2 | 样本域重命名：trustee_performance → sample_trustee_performance（含表名） | COMPLETED ✅ | F-014 | - |
+| C-034 | M2 | 清理scripts/dev，统一DDL目录结构（scripts/create_table/ddl） | COMPLETED ✅ | C-026 | P-020 |
+| C-035 | M2 | 新增DDL生成器与清单（generate_from_json + manifest.yml） | COMPLETED ✅ | C-026 | P-020 |
+| C-036 | M2 | 文档对齐（README/VALIDATION/ROADMAP）与命令统一 | COMPLETED ✅ | C-034, C-035 | - |
+| C-028 | M2 | Cleansing framework hardening (negative/full-width percent, Excel header normalization, annuity portfolio-code ^F stripping) | VALIDATING | C-020, C-022, C-024 | P-023, P-024 |
 | R-016 | M2 | Research ingestion connectors (HTTP/SFTP) and auth strategy | READY_FOR_PRP | - | - |
 | F-032 | M2 | Implement HTTP crawler connector + retries/auth + CLI | PENDING | R-016 | - |
 | F-033 | M2 | Implement SFTP/FTP downloader connector | PENDING | R-016 | - |

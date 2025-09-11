@@ -1,4 +1,4 @@
-# CLAUDE.md v1.01
+# CLAUDE.md v1.02
 
 This file provides comprehensive guidance to Claude Code when working with Python code in this repository.
 
@@ -31,10 +31,6 @@ Avoid building functionality on speculation. Implement features only when they a
 - Use the project virtual environment for all Python commands; prefer running tools via uv:
   - Setup: uv venv && uv sync
   - Run: uv run <command>
-  - Optional manual activation (if you need it):
-  - WSL or Linux shell: source .venv_linux/bin/activate (Use the `--active` flag with `uv run` to prevent it from automatically searching for and managing a virtual environment named `.venv`)
-  - PowerShell: .\.venv\Scripts\Activate.ps1
-  - CMD: .\.venv\Scripts\activate.bat
 
 ### Project Architecture
 

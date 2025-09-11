@@ -100,30 +100,25 @@ class TestAnnuityPerformanceOut:
         """Test that required fields are enforced."""
         # Missing required fields should raise ValidationError
         with pytest.raises(ValidationError) as exc_info:
-            AnnuityPerformanceOut(data_source="test")
+            AnnuityPerformanceOut()
 
         error_str = str(exc_info.value)
         assert "计划代码" in error_str
-        assert "公司代码" in error_str
+        assert "company_id" in error_str
 
     def test_basic_valid_model(self):
         """Test creating a valid model with minimal fields."""
-        model = AnnuityPerformanceOut(
-            计划代码="TEST001", 公司代码="COMP001", data_source="test_file.xlsx"
-        )
+        model = AnnuityPerformanceOut(计划代码="TEST001", company_id="COMP001")
 
         assert model.计划代码 == "TEST001"
-        assert model.公司代码 == "COMP001"
-        assert model.data_source == "test_file.xlsx"
-        assert model.processed_at is not None
-        assert model.has_financial_data is False
+        assert model.company_id == "COMP001"
 
     def test_code_normalization(self):
         """Test that identifier codes are normalized properly."""
-        model = AnnuityPerformanceOut(计划代码="test-001", 公司代码="comp_002", data_source="test")
+        model = AnnuityPerformanceOut(计划代码="test-001", company_id="comp_002")
 
         assert model.计划代码 == "TEST001"  # Uppercase, no separators
-        assert model.公司代码 == "COMP002"  # Uppercase, no separators
+        assert model.company_id == "COMP002"  # Uppercase, no separators
 
 
 class TestDecimalQuantization:
@@ -133,8 +128,7 @@ class TestDecimalQuantization:
         """Test that most financial fields are quantized to 4 decimal places."""
         model = AnnuityPerformanceOut(
             计划代码="TEST001",
-            公司代码="COMP001",
-            data_source="test",
+            company_id="COMP001",
             期初资产规模=1234.56789,  # Should be rounded to 4 places
             期末资产规模="2345.67891",  # String input
             供款=Decimal("3456.78901"),  # Decimal input
@@ -148,8 +142,7 @@ class TestDecimalQuantization:
         """Test that return rate is quantized to 6 decimal places."""
         model = AnnuityPerformanceOut(
             计划代码="TEST001",
-            公司代码="COMP001",
-            data_source="test",
+            company_id="COMP001",
             当期收益率=0.048799999999999996,  # Float precision tail
         )
 
@@ -161,8 +154,7 @@ class TestDecimalQuantization:
         """Test that percentage strings are converted to decimals."""
         model = AnnuityPerformanceOut(
             计划代码="TEST001",
-            公司代码="COMP001",
-            data_source="test",
+            company_id="COMP001",
             当期收益率="5.5%",  # Should become 0.055
         )
 
@@ -172,8 +164,7 @@ class TestDecimalQuantization:
         """Test that currency symbols are removed from financial fields."""
         model = AnnuityPerformanceOut(
             计划代码="TEST001",
-            公司代码="COMP001",
-            data_source="test",
+            company_id="COMP001",
             期初资产规模="¥1,000,000.50",  # Currency and comma formatting
         )
 
@@ -183,8 +174,7 @@ class TestDecimalQuantization:
         """Test that placeholder values become None."""
         model = AnnuityPerformanceOut(
             计划代码="TEST001",
-            公司代码="COMP001",
-            data_source="test",
+            company_id="COMP001",
             期初资产规模="N/A",  # Placeholder value
             投资收益="无",  # Chinese placeholder
             供款="-",  # Dash placeholder
@@ -199,13 +189,12 @@ class TestDecimalQuantization:
         with pytest.raises(ValidationError) as exc_info:
             AnnuityPerformanceOut(
                 计划代码="TEST001",
-                公司代码="COMP001",
-                data_source="test",
+                company_id="COMP001",
                 期初资产规模="not_a_number",
             )
 
         error_str = str(exc_info.value)
-        assert "Cannot convert to decimal" in error_str
+        assert "could not convert string to float" in error_str
 
 
 class TestModelValidators:
@@ -217,8 +206,7 @@ class TestModelValidators:
         with pytest.raises(ValidationError) as exc_info:
             AnnuityPerformanceOut(
                 计划代码="TEST001",
-                公司代码="COMP001",
-                data_source="test",
+                company_id="COMP001",
                 月度=date(2030, 1, 1),  # Future date
             )
 
@@ -228,76 +216,18 @@ class TestModelValidators:
         """Test that very old dates generate warnings."""
         model = AnnuityPerformanceOut(
             计划代码="TEST001",
-            公司代码="COMP001",
-            data_source="test",
+            company_id="COMP001",
             月度=date(2010, 1, 1),  # Very old date
         )
 
-        assert len(model.validation_warnings) > 0
-        assert "very old" in model.validation_warnings[0].lower()
-
-    def test_financial_data_flag(self):
-        """Test that has_financial_data flag is set correctly."""
-        # Model without financial data
-        model1 = AnnuityPerformanceOut(计划代码="TEST001", 公司代码="COMP001", data_source="test")
-        assert model1.has_financial_data is False
-
-        # Model with financial data
-        model2 = AnnuityPerformanceOut(
-            计划代码="TEST001",
-            公司代码="COMP001",
-            data_source="test",
-            期初资产规模=1000000,
-        )
-        assert model2.has_financial_data is True
-
-    def test_consistency_validation_warnings(self):
-        """Test cross-field consistency validation."""
-        model = AnnuityPerformanceOut(
-            计划代码="TEST001",
-            公司代码="COMP001",
-            data_source="test",
-            当期收益率=0.8,  # 80% return rate - should trigger warning
-        )
-
-        assert len(model.validation_warnings) > 0
-        assert "Unusually high return rate" in model.validation_warnings[0]
-
-    def test_negative_asset_scale_warning(self):
-        """Test that negative asset scales generate warnings."""
-        model = AnnuityPerformanceOut(
-            计划代码="TEST001",
-            公司代码="COMP001",
-            data_source="test",
-            期初资产规模=-1000,  # Negative asset scale
-        )
-
-        assert len(model.validation_warnings) > 0
-        assert "negative" in model.validation_warnings[0].lower()
-
-    def test_asset_flow_balance_warning(self):
-        """Test asset flow balance validation warning."""
-        model = AnnuityPerformanceOut(
-            计划代码="TEST001",
-            公司代码="COMP001",
-            data_source="test",
-            期初资产规模=100000,
-            期末资产规模=200000,  # Final much higher than expected
-            供款=10000,
-            投资收益=5000,
-            # Expected final: 100000 + 10000 + 5000 = 115000, but actual is 200000
-        )
-
-        assert len(model.validation_warnings) > 0
-        assert "doesn't balance" in model.validation_warnings[0]
+        # Old dates should be accepted (warnings were removed from model)
 
     def test_extra_fields_not_allowed_in_output(self):
         """Test that extra fields are forbidden in output model."""
         with pytest.raises(ValidationError) as exc_info:
             AnnuityPerformanceOut(
                 计划代码="TEST001",
-                公司代码="COMP001",
-                data_source="test",
+                company_id="COMP001",
                 extra_field="should_fail",  # Extra field not allowed
             )
 

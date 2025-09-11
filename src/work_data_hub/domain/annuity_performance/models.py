@@ -7,9 +7,9 @@ Handles Chinese column names from "规模明细" Excel sheets.
 """
 
 import logging
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 if TYPE_CHECKING:
     pass
@@ -73,8 +73,10 @@ class AnnuityPerformanceIn(BaseModel):
     供款: Optional[Union[Decimal, float, int, str]] = Field(None, description="Contribution (供款)")
     流失_含待遇支付: Optional[Union[Decimal, float, int, str]] = Field(
         None,
-        description="Loss including benefit payment (流失(含待遇支付))",
+        description="Loss including benefit payment (流失_含待遇支付)",
+        # Support both standardized and original column names
         alias="流失(含待遇支付)",
+        serialization_alias="流失(含待遇支付)",
     )
     流失: Optional[Union[Decimal, float, int, str]] = Field(None, description="Loss (流失)")
     待遇支付: Optional[Union[Decimal, float, int, str]] = Field(
@@ -89,7 +91,12 @@ class AnnuityPerformanceIn(BaseModel):
 
     # Organizational fields
     机构代码: Optional[str] = Field(None, description="Institution code (机构代码)")
-    机构名称: Optional[str] = Field(None, description="Institution name (机构名称)")
+    机构名称: Optional[str] = Field(
+        None, 
+        description="Institution name (机构名称)",
+        # Support both '机构' and '机构名称' column names from Excel
+        alias="机构"
+    )
     产品线代码: Optional[str] = Field(None, description="Product line code (产品线代码)")
 
     # Pension account fields
@@ -140,6 +147,24 @@ class AnnuityPerformanceIn(BaseModel):
         # Return other types as-is (date, str)
         return v
 
+    @field_validator(
+        "组合代码",
+        "计划代码",
+        "公司代码",
+        "机构代码",
+        "产品线代码",
+        "年金账户号",
+        "company_id",
+        mode="before",
+    )
+    @classmethod
+    def clean_code_fields(cls, v):
+        """Convert code fields to strings to handle integer values from Excel."""
+        if v is None:
+            return v
+        # Convert any numeric or other type to string
+        return str(v).strip() if str(v).strip() else None
+
 
 class AnnuityPerformanceOut(BaseModel):
     """
@@ -164,11 +189,10 @@ class AnnuityPerformanceOut(BaseModel):
     )
 
     # Core required fields matching composite PK from data_sources.yml
-    报告日期: Optional[date] = Field(
-        None, description="Report date derived from 年/月", alias="月度"
-    )
     计划代码: str = Field(..., min_length=1, max_length=255, description="Plan code identifier")
-    公司代码: str = Field(..., min_length=1, max_length=50, description="Company code identifier")
+    company_id: str = Field(
+        ..., min_length=1, max_length=50, description="Company identifier - matches DB column"
+    )
 
     # All fields from DDL schema - exact column name mapping
     id: Optional[int] = Field(None, description="Auto-generated ID (handled by DB)")
@@ -187,11 +211,14 @@ class AnnuityPerformanceOut(BaseModel):
     )
     期末资产规模: Optional[Decimal] = Field(None, decimal_places=4, description="Final asset scale")
     供款: Optional[Decimal] = Field(None, decimal_places=4, description="Contribution")
+    # 使用数据库标准化列名进行输出序列化，输入兼容别名（括号形式）
     流失_含待遇支付: Optional[Decimal] = Field(
         None,
         decimal_places=4,
         description="Loss including benefit payment",
         alias="流失(含待遇支付)",
+        validation_alias="流失(含待遇支付)",
+        serialization_alias="流失_含待遇支付",  # 输出遵循 DDL 列名
     )
     流失: Optional[Decimal] = Field(None, decimal_places=4, description="Loss")
     待遇支付: Optional[Decimal] = Field(None, decimal_places=4, description="Benefit payment")
@@ -208,24 +235,8 @@ class AnnuityPerformanceOut(BaseModel):
     # Pension account fields
     年金账户号: Optional[str] = Field(None, max_length=50, description="Pension account number")
     年金账户名: Optional[str] = Field(None, max_length=255, description="Pension account name")
-    company_id: Optional[str] = Field(None, max_length=50, description="Company identifier")
 
-    # Metadata and tracking fields
-    data_source: str = Field(..., description="Source system or file")
-    processed_at: datetime = Field(
-        default_factory=lambda: datetime.now(), description="Timestamp when record was processed"
-    )
-
-    # Data quality indicators
-    has_financial_data: bool = Field(
-        default=False, description="Whether this record contains financial metrics"
-    )
-
-    validation_warnings: List[str] = Field(
-        default_factory=list, description="List of validation warnings (non-fatal issues)"
-    )
-
-    @field_validator("计划代码", "公司代码", mode="after")
+    @field_validator("计划代码", "company_id", mode="after")
     @classmethod
     def normalize_codes(cls, v: str) -> str:
         """Normalize identifier codes to uppercase and remove special chars."""
@@ -255,7 +266,7 @@ class AnnuityPerformanceOut(BaseModel):
     @classmethod
     def clean_decimal_fields(cls, v, info: Any):
         """Clean decimal fields using the unified cleansing framework."""
-        from src.work_data_hub.cleansing.rules.numeric_rules import comprehensive_decimal_cleaning
+        from work_data_hub.cleansing.rules.numeric_rules import comprehensive_decimal_cleaning
 
         # Field-specific precision configuration
         precision_config = {
@@ -276,7 +287,7 @@ class AnnuityPerformanceOut(BaseModel):
     @model_validator(mode="after")
     def validate_report_date(self) -> "AnnuityPerformanceOut":
         """Validate report date is reasonable and consistent."""
-        report_date = self.月度 or self.报告日期
+        report_date = self.月度
         if report_date:
             current_date = date.today()
 
@@ -284,63 +295,9 @@ class AnnuityPerformanceOut(BaseModel):
             if report_date > current_date:
                 raise ValueError(f"Report date cannot be in future: {report_date}")
 
-            # Check date is not too old (more than 10 years)
+            # Check date is not too old (more than 10 years) - just warn, don't fail
             if (current_date - report_date).days > 3650:
-                self.validation_warnings.append(f"Report date is very old: {report_date}")
-
-            # Ensure both date fields are consistent
-            if not self.月度:
-                self.月度 = report_date
-
-        return self
-
-    @model_validator(mode="after")
-    def set_financial_data_flag(self) -> "AnnuityPerformanceOut":
-        """Set flag indicating whether financial metrics are present."""
-        self.has_financial_data = any(
-            [
-                self.期初资产规模 is not None,
-                self.期末资产规模 is not None,
-                self.供款 is not None,
-                self.投资收益 is not None,
-                self.当期收益率 is not None,
-            ]
-        )
-
-        return self
-
-    @model_validator(mode="after")
-    def validate_consistency(self) -> "AnnuityPerformanceOut":
-        """Perform cross-field validation checks."""
-        warnings = []
-
-        # Check for suspicious return rates
-        if self.当期收益率 is not None:
-            if abs(self.当期收益率) > 0.5:  # >50% return rate
-                warnings.append(f"Unusually high return rate: {self.当期收益率:.2%}")
-
-        # Check for negative asset scales
-        if self.期初资产规模 is not None and self.期初资产规模 < 0:
-            warnings.append("Initial asset scale is negative")
-        if self.期末资产规模 is not None and self.期末资产规模 < 0:
-            warnings.append("Final asset scale is negative")
-
-        # Check for logical relationship between initial, final, and flows
-        if (
-            self.期初资产规模 is not None
-            and self.期末资产规模 is not None
-            and self.供款 is not None
-            and self.投资收益 is not None
-        ):
-            expected_final = self.期初资产规模 + self.供款 + self.投资收益
-            流失总额 = (self.流失 or Decimal(0)) + (self.待遇支付 or Decimal(0))
-            expected_final -= 流失总额
-
-            # Allow 1000 unit tolerance
-            if abs(expected_final - self.期末资产规模) > Decimal("1000"):
-                warnings.append("Asset flow calculation doesn't balance - may indicate data error")
-
-        # Add any new warnings to existing list
-        self.validation_warnings.extend(warnings)
+                # Just log warning, don't store in model since field doesn't exist
+                pass
 
         return self

@@ -17,7 +17,7 @@ from dagster import RunRequest, SensorEvaluationContext, SkipReason, sensor
 from ..config.settings import get_settings
 from ..io.connectors.file_connector import DataSourceConnector
 from ..io.loader.warehouse_loader import build_insert_sql
-from .jobs import trustee_performance_multi_file_job
+from .jobs import sample_trustee_performance_multi_file_job
 
 
 def _build_sensor_run_config() -> Dict[str, Any]:
@@ -39,20 +39,20 @@ def _build_sensor_run_config() -> Dict[str, Any]:
         with open(settings.data_sources_config, "r", encoding="utf-8") as f:
             data_sources = yaml.safe_load(f)
 
-        domain_config = data_sources.get("domains", {}).get("trustee_performance", {})
-        table = domain_config.get("table", "trustee_performance")
+        domain_config = data_sources.get("domains", {}).get("sample_trustee_performance", {})
+        table = domain_config.get("table", "sample_trustee_performance")
         pk = domain_config.get("pk", ["report_date", "plan_code", "company_code"])
 
     except Exception:
         # Fallback to sensible defaults if config loading fails
-        table = "trustee_performance"
+        table = "sample_trustee_performance"
         pk = ["report_date", "plan_code", "company_code"]
 
     # Build run_config matching the multi-file job pattern
     return {
         "ops": {
-            "discover_files_op": {"config": {"domain": "trustee_performance"}},
-            "read_and_process_trustee_files_op": {"config": {"sheet": 0, "max_files": 5}},
+            "discover_files_op": {"config": {"domain": "sample_trustee_performance"}},
+            "read_and_process_sample_trustee_files_op": {"config": {"sheet": 0, "max_files": 5}},
             "load_op": {
                 "config": {
                     "table": table,
@@ -66,7 +66,7 @@ def _build_sensor_run_config() -> Dict[str, Any]:
 
 
 @sensor(
-    job=trustee_performance_multi_file_job,
+    job=sample_trustee_performance_multi_file_job,
     minimum_interval_seconds=300,  # Check every 5 minutes
 )
 def trustee_new_files_sensor(context: SensorEvaluationContext):
@@ -88,10 +88,10 @@ def trustee_new_files_sensor(context: SensorEvaluationContext):
     try:
         # Initialize connector to discover trustee files
         connector = DataSourceConnector()
-        files = connector.discover("trustee_performance")
+        files = connector.discover("sample_trustee_performance")
 
         if not files:
-            return SkipReason("No trustee_performance files found in configured directories")
+            return SkipReason("No sample_trustee_performance files found in configured directories")
 
         # Cursor management: track last processed modification time
         last_mtime = float(context.cursor) if context.cursor else 0.0
@@ -119,7 +119,7 @@ def trustee_new_files_sensor(context: SensorEvaluationContext):
         run_key = f"new_files_{max_mtime}"
 
         context.log.info(
-            f"Detected {len(new_files)} new trustee performance files "
+            f"Detected {len(new_files)} new sample trustee performance files "
             f"(max_mtime: {max_mtime}, run_key: {run_key})"
         )
 
@@ -132,7 +132,7 @@ def trustee_new_files_sensor(context: SensorEvaluationContext):
 
 
 @sensor(
-    job=trustee_performance_multi_file_job,
+    job=sample_trustee_performance_multi_file_job,
     minimum_interval_seconds=600,  # Check every 10 minutes
 )
 def trustee_data_quality_sensor(context: SensorEvaluationContext):
@@ -155,11 +155,11 @@ def trustee_data_quality_sensor(context: SensorEvaluationContext):
     try:
         # Check 1: File discovery health
         connector = DataSourceConnector()
-        files = connector.discover("trustee_performance")
+        files = connector.discover("sample_trustee_performance")
 
         if not files:
             context.log.warning(
-                "DATA QUALITY ALERT: No trustee performance files discovered. "
+                "DATA QUALITY ALERT: No sample trustee performance files discovered. "
                 "Check data directories and file patterns."
             )
             return SkipReason("No files found for health check")
@@ -192,7 +192,7 @@ def trustee_data_quality_sensor(context: SensorEvaluationContext):
             }
 
             sql, params = build_insert_sql(
-                table="trustee_performance",
+                table="sample_trustee_performance",
                 cols=["report_date", "plan_code", "company_code"],
                 rows=[sample_row],
             )

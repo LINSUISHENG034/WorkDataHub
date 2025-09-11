@@ -14,21 +14,21 @@ import yaml
 from src.work_data_hub.orchestration.jobs import (
     build_run_config,
     main,
-    trustee_performance_job,
-    trustee_performance_multi_file_job,
+    sample_trustee_performance_job,
+    sample_trustee_performance_multi_file_job,
 )
 
 
-class TestTrusteePerformanceJob:
-    """Test trustee_performance_job functionality."""
+class TestSampleTrusteePerformanceJob:
+    """Test sample_trustee_performance_job functionality."""
 
     def test_job_execution_plan_only(self, tmp_path):
         """Test job execution in plan-only mode."""
         # Create test configuration
         config_data = {
             "domains": {
-                "trustee_performance": {
-                    "table": "trustee_performance",
+                "sample_trustee_performance": {
+                    "table": "sample_trustee_performance",
                     "pk": ["report_date", "plan_code", "company_code"],
                 }
             }
@@ -45,11 +45,11 @@ class TestTrusteePerformanceJob:
             # Create run config
             run_config = {
                 "ops": {
-                    "discover_files_op": {"config": {"domain": "trustee_performance"}},
+                    "discover_files_op": {"config": {"domain": "sample_trustee_performance"}},
                     "read_excel_op": {"config": {"sheet": 0}},
                     "load_op": {
                         "config": {
-                            "table": "trustee_performance",
+                            "table": "sample_trustee_performance",
                             "mode": "delete_insert",
                             "pk": ["report_date", "plan_code", "company_code"],
                             "plan_only": True,
@@ -78,7 +78,7 @@ class TestTrusteePerformanceJob:
                 patch("src.work_data_hub.orchestration.ops.discover_files_op") as mock_discover,
                 patch("src.work_data_hub.orchestration.ops.read_excel_op") as mock_read,
                 patch(
-                    "src.work_data_hub.orchestration.ops.process_trustee_performance_op"
+                    "src.work_data_hub.orchestration.ops.process_sample_trustee_performance_op"
                 ) as mock_process,
                 patch("src.work_data_hub.orchestration.ops.load_op") as mock_load,
             ):
@@ -90,7 +90,7 @@ class TestTrusteePerformanceJob:
 
                 # Execute job
                 try:
-                    result = trustee_performance_job.execute_in_process(
+                    result = sample_trustee_performance_job.execute_in_process(
                         run_config=run_config, raise_on_error=True
                     )
                     assert result.success
@@ -102,8 +102,8 @@ class TestTrusteePerformanceJob:
     def test_job_definition_valid(self):
         """Test that job definition is valid and can be instantiated."""
         # This verifies the job wiring is correct
-        job_def = trustee_performance_job
-        assert job_def.name == "trustee_performance_job"
+        job_def = sample_trustee_performance_job
+        assert job_def.name == "sample_trustee_performance_job"
         assert len(job_def.nodes) == 4  # Four ops
 
 
@@ -115,8 +115,8 @@ class TestBuildRunConfig:
         # Create test configuration
         config_data = {
             "domains": {
-                "trustee_performance": {
-                    "table": "trustee_performance",
+                "sample_trustee_performance": {
+                    "table": "sample_trustee_performance",
                     "pk": ["report_date", "plan_code", "company_code"],
                 }
             }
@@ -128,7 +128,7 @@ class TestBuildRunConfig:
 
         # Mock args
         args = Mock()
-        args.domain = "trustee_performance"
+        args.domain = "sample_trustee_performance"
         args.mode = "delete_insert"
         args.execute = False  # Changed from plan_only=True to execute=False
         args.sheet = 0
@@ -141,11 +141,11 @@ class TestBuildRunConfig:
 
             expected = {
                 "ops": {
-                    "discover_files_op": {"config": {"domain": "trustee_performance"}},
+                    "discover_files_op": {"config": {"domain": "sample_trustee_performance"}},
                     "read_excel_op": {"config": {"sheet": 0}},
                     "load_op": {
                         "config": {
-                            "table": "trustee_performance",
+                            "table": "sample_trustee_performance",
                             "mode": "delete_insert",
                             "pk": ["report_date", "plan_code", "company_code"],
                             "plan_only": True,
@@ -159,14 +159,14 @@ class TestBuildRunConfig:
     def test_build_run_config_fallback(self, tmp_path):
         """Test run config building with fallback values."""
         # Create config without table/pk info
-        config_data = {"domains": {"trustee_performance": {}}}
+        config_data = {"domains": {"sample_trustee_performance": {}}}
 
         config_file = tmp_path / "test_config.yml"
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
         args = Mock()
-        args.domain = "trustee_performance"
+        args.domain = "sample_trustee_performance"
         args.mode = "append"
         args.plan_only = False
         args.sheet = 1

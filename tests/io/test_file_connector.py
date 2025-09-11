@@ -22,7 +22,7 @@ def sample_config():
     """Sample configuration for testing."""
     return {
         "domains": {
-            "trustee_performance": {
+            "sample_trustee_performance": {
                 "description": "Test trustee performance files",
                 "pattern": r"(?P<year>20\d{2})[-_/]?(?P<month>0?[1-9]|1[0-2]).*受托业绩.*\.xlsx$",
                 "select": "latest_by_year_month",
@@ -88,7 +88,7 @@ class TestDataSourceConnector:
 
         assert connector.config is not None
         assert "domains" in connector.config
-        assert "trustee_performance" in connector.config["domains"]
+        assert "sample_trustee_performance" in connector.config["domains"]
         assert len(connector.compiled_patterns) == 2
 
     def test_init_with_missing_config_file(self):
@@ -133,14 +133,14 @@ class TestDataSourceConnector:
             DataSourceConnector(config_path=str(config_path))
 
     @patch("src.work_data_hub.config.settings.get_settings")
-    def test_discover_trustee_performance_files(self, mock_settings, config_file, test_data_dir):
+    def test_discover_sample_trustee_performance_files(self, mock_settings, config_file, test_data_dir):
         """Test discovery of trustee performance files with Chinese characters."""
         # Mock settings to use test directory
         mock_settings.return_value.data_base_dir = test_data_dir
         mock_settings.return_value.data_sources_config = config_file
 
         connector = DataSourceConnector(config_path=config_file)
-        files = connector.discover("trustee_performance")
+        files = connector.discover("sample_trustee_performance")
 
         # Should find trustee performance files and ignore others
         assert len(files) > 0

@@ -16,7 +16,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 try:
-    from src.work_data_hub.cleansing import (
+    from work_data_hub.cleansing import (
         registry,
         decimal_fields_cleaner,
         comprehensive_decimal_cleaning,

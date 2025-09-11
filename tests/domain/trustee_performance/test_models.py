@@ -11,8 +11,11 @@ from unittest.mock import Mock
 
 import pytest
 from pydantic import ValidationError, ValidationInfo
+import pytest
 
-from src.work_data_hub.domain.trustee_performance.models import TrusteePerformanceOut
+pytestmark = pytest.mark.sample_domain
+
+from src.work_data_hub.domain.sample_trustee_performance.models import TrusteePerformanceOut
 
 
 class TestDecimalQuantizationEnhanced:
@@ -223,7 +226,7 @@ class TestFieldValidatorInfoIntegration:
 
     def test_field_validator_receives_correct_field_name(self):
         """Test that field validators receive correct field_name in ValidationInfo."""
-        from src.work_data_hub.domain.trustee_performance.models import TrusteePerformanceOut
+        from src.work_data_hub.domain.sample_trustee_performance.models import TrusteePerformanceOut
 
         # Mock ValidationInfo to test the field_name parameter
         original_validator = TrusteePerformanceOut.clean_decimal_fields
@@ -259,7 +262,7 @@ class TestFieldValidatorInfoIntegration:
 
     def test_field_precision_map_coverage(self):
         """Test that all decimal fields are covered in FIELD_PRECISION_MAP."""
-        from src.work_data_hub.domain.trustee_performance.models import TrusteePerformanceOut
+        from src.work_data_hub.domain.sample_trustee_performance.models import TrusteePerformanceOut
 
         # Extract field_precision_map from validator (this tests the actual implementation)
         field_precision_map = {
@@ -288,7 +291,7 @@ class TestFieldValidatorInfoIntegration:
 
     def test_clean_decimal_fields_direct_invocation(self):
         """Test direct invocation of clean_decimal_fields validator."""
-        from src.work_data_hub.domain.trustee_performance.models import TrusteePerformanceOut
+        from src.work_data_hub.domain.sample_trustee_performance.models import TrusteePerformanceOut
 
         # Mock ValidationInfo for testing
         mock_info = Mock(spec=ValidationInfo)

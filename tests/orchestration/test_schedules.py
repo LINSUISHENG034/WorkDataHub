@@ -23,8 +23,8 @@ class TestScheduleRunConfig:
         # Create test configuration matching data_sources.yml structure
         config_data = {
             "domains": {
-                "trustee_performance": {
-                    "table": "trustee_performance",
+                "sample_trustee_performance": {
+                    "table": "sample_trustee_performance",
                     "pk": ["report_date", "plan_code", "company_code"],
                 }
             }
@@ -43,11 +43,11 @@ class TestScheduleRunConfig:
             # Verify structure matches expected op config schemas
             expected = {
                 "ops": {
-                    "discover_files_op": {"config": {"domain": "trustee_performance"}},
+            "discover_files_op": {"config": {"domain": "sample_trustee_performance"}},
                     "read_and_process_trustee_files_op": {"config": {"sheet": 0, "max_files": 5}},
                     "load_op": {
                         "config": {
-                            "table": "trustee_performance",
+                            "table": "sample_trustee_performance",
                             "mode": "delete_insert",
                             "pk": ["report_date", "plan_code", "company_code"],
                             "plan_only": False,  # Execute mode for scheduled runs
@@ -74,14 +74,14 @@ class TestScheduleRunConfig:
 
             # Verify fallback values are used
             load_config = result["ops"]["load_op"]["config"]
-            assert load_config["table"] == "trustee_performance"
+        assert load_config["table"] == "sample_trustee_performance"
             assert load_config["pk"] == ["report_date", "plan_code", "company_code"]
             assert load_config["mode"] == "delete_insert"
             assert load_config["plan_only"] is False
 
             # Verify other ops have correct config
             discover_config = result["ops"]["discover_files_op"]["config"]
-            assert discover_config["domain"] == "trustee_performance"
+        assert discover_config["domain"] == "sample_trustee_performance"
 
             read_config = result["ops"]["read_and_process_trustee_files_op"]["config"]
             assert read_config["sheet"] == 0
@@ -97,12 +97,12 @@ class TestScheduleRunConfig:
             result = _build_schedule_run_config()
 
             load_config = result["ops"]["load_op"]["config"]
-            assert load_config["table"] == "trustee_performance"
+            assert load_config["table"] == "sample_trustee_performance"
             assert load_config["pk"] == ["report_date", "plan_code", "company_code"]
 
     def test_build_schedule_run_config_execution_mode(self, tmp_path):
         """Test that schedule always configures execution mode (plan_only=False)."""
-        config_data = {"domains": {"trustee_performance": {"table": "test_table", "pk": ["id"]}}}
+        config_data = {"domains": {"sample_trustee_performance": {"table": "test_table", "pk": ["id"]}}}
 
         config_file = tmp_path / "test_config.yml"
         with open(config_file, "w", encoding="utf-8") as f:
@@ -132,9 +132,9 @@ class TestTrusteeSchedule:
         assert schedule.execution_timezone == "Asia/Shanghai"
 
         # Verify the job is correctly configured
-        from src.work_data_hub.orchestration.jobs import trustee_performance_multi_file_job
+        from src.work_data_hub.orchestration.jobs import sample_trustee_performance_multi_file_job
 
-        assert schedule.job == trustee_performance_multi_file_job
+        assert schedule.job == sample_trustee_performance_multi_file_job
 
     def test_trustee_daily_schedule_run_config_generation(self, tmp_path):
         """Test that the schedule generates valid run_config when executed."""

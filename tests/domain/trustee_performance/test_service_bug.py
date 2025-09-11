@@ -3,7 +3,10 @@ This module contains a specific test case to reproduce and expose a bug
 in the exception handling of the trustee performance service.
 """
 
-from src.work_data_hub.domain.trustee_performance.service import _transform_single_row
+import pytest
+from src.work_data_hub.domain.sample_trustee_performance.service import _transform_single_row
+
+pytestmark = pytest.mark.sample_domain
 
 
 def test_transform_row_with_invalid_month_reproduces_bug():

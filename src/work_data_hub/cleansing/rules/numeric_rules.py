@@ -98,6 +98,17 @@ def handle_percentage_conversion(value: Any, field_name: str = "") -> Union[floa
         if abs(value) > 1:  # 判断是否为百分比格式，支持负百分比
             return value / 100.0
 
+    # 字符串数值的百分比处理（针对收益率字段）
+    if isinstance(value, str) and ("收益率" in field_name or "rate" in field_name.lower()):
+        try:
+            # 尝试将字符串转换为数值进行百分比判断
+            numeric_value = float(value)
+            if abs(numeric_value) > 1:  # 判断是否为百分比格式，支持负百分比
+                return numeric_value / 100.0
+        except (ValueError, TypeError):
+            # 如果转换失败，继续返回原值
+            pass
+
     return value
 
 

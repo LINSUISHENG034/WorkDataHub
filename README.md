@@ -14,7 +14,7 @@ WorkDataHub is a reliable, declarative, and testable data processing platform re
 
 - Config: environment settings and schemas; config‑driven discovery of inputs.
 - IO: connectors (file), readers (Excel), and a transactional warehouse loader.
-- Domain: Pydantic models + pure services (e.g., trustee_performance).
+- Domain: Pydantic models + pure services (e.g., sample_trustee_performance).
 - Orchestration: Dagster‑style ops and jobs (discover → read → transform → load).
 - Utils: typed helpers and common types.
 
@@ -54,9 +54,9 @@ Key characteristics
   - `src/work_data_hub/io/readers/excel_reader.py`
   - `src/work_data_hub/io/connectors/file_connector.py`
   - `src/work_data_hub/io/loader/warehouse_loader.py`
-- Domain — Trustee Performance:
-  - `src/work_data_hub/domain/trustee_performance/models.py`
-  - `src/work_data_hub/domain/trustee_performance/service.py`
+- Domain — Sample Trustee Performance:
+  - `src/work_data_hub/domain/sample_trustee_performance/models.py`
+  - `src/work_data_hub/domain/sample_trustee_performance/service.py`
 - Domain — Annuity Performance:
   - `src/work_data_hub/domain/annuity_performance/models.py`
   - `src/work_data_hub/domain/annuity_performance/service.py`
@@ -83,60 +83,28 @@ uv run pytest -v
 uv run pytest --cov=src --cov-report=term-missing
 
 # Focus a subset
-uv run pytest -k trustee_performance -v
+uv run pytest -k sample_trustee_performance -v
 
 # Optional: pre-commit hooks (only if configured)
 # uv run pre-commit run --all-files
 ```
 
-## Local Smoke Test
+## Sample Domain (Trustee Performance)
 
-Test the complete trustee_performance pipeline using real `reference/monthly/` data and optional local PostgreSQL integration.
+The `sample_trustee_performance` domain is a normative sample used for unit/integration tests and plan-only runs. It is not a production model and does not ship a DDL. For end‑to‑end database writes, use the `annuity_performance` domain instead.
 
-### Setup
-
-1. **Ensure reference data exists** (or tests will be skipped):
-   ```bash
-   # Reference data should be at:
-   ./reference/monthly/
-   ```
-
-2. **Configure environment variables** for local testing:
-   ```bash
-   # Required: Override data source directory
-   export WDH_DATA_BASE_DIR=./reference/monthly
-   
-   # Optional: Local database for execute mode
-   export WDH_DATABASE__URI=postgresql://wdh_user:changeme@localhost:5432/wdh_local
-   ```
-
-3. **Setup local database** (optional, for execute mode):
-   ```bash
-   # Apply test schema to your local PostgreSQL
-   psql "$WDH_DATABASE__URI" -f scripts/dev/setup_test_schema.sql
-   ```
-
-### Usage
+### Quick usage (plan‑only)
 
 ```bash
-# Run plan-only mode (no database required)
-uv run python -m src.work_data_hub.orchestration.jobs --domain trustee_performance --plan-only --max-files 2
+# Use legacy reference data if available
+export WDH_DATA_BASE_DIR=./reference/monthly
 
-# Run execute mode (requires database setup)
-uv run python -m src.work_data_hub.orchestration.jobs --domain trustee_performance --execute --max-files 2
+# Plan-only mode (no database required)
+uv run python -m src.work_data_hub.orchestration.jobs --domain sample_trustee_performance --plan-only --max-files 2
 
-# Run smoke tests (opt-in via marker)
-uv run pytest -m monthly_data -v
-
-# Skip smoke tests by default (normal test runs)
+# Run tests (default excludes postgres‑backed tests)
 uv run pytest tests/
 ```
-
-### Expected Results
-
-- **Plan-only**: Shows SQL execution plan with DELETE + INSERT operations, no database connection
-- **Execute**: Shows loader summary with deleted/inserted counts from actual database operations
-- **Smoke tests**: Validates discovery, plan generation, and optional database integration
 
 ## Real Sample Smoke (Annuity Performance)
 
@@ -147,25 +115,28 @@ Test the Annuity Performance (规模明细) domain using legacy sample data with
 ### Prerequisites
 
 1. **Ensure reference data exists** (or tests will be skipped):
-   ```bash
-   # Reference data should be at:
-   ./reference/monthly/数据采集/V1/
-   ```
+
+  ```bash
+  # Reference data should be at:
+  ./reference/monthly/数据采集/V1/
+  ```
 
 2. **Configure environment variables**:
-   ```bash
-   # Required: Override data source directory
-   export WDH_DATA_BASE_DIR=./reference/monthly
-   
-   # Optional: Local database for execute mode
-   export WDH_DATABASE__URI=postgresql://wdh_user:changeme@localhost:5432/wdh_local
-   ```
+
+  ```bash
+  # Required: Override data source directory
+  export WDH_DATA_BASE_DIR=./reference/monthly
+  
+  # Optional: Local database for execute mode
+  export WDH_DATABASE__URI=postgresql://wdh_user:changeme@localhost:5432/wdh_local
+  ```
 
 3. **Setup local database** (required for execute mode):
-   ```bash
-   # Apply DDL to your local PostgreSQL database
-   psql "$WDH_DATABASE__URI" -f scripts/dev/annuity_performance_real.sql
-   ```
+
+  ```bash
+  # Apply updated DDL to your local PostgreSQL database
+  psql "$WDH_DATABASE__URI" -f scripts/create_table/ddl/annuity_performance.sql
+  ```
 
 ### CLI Usage
 
@@ -207,10 +178,34 @@ uv run pytest tests/
 WDH_DATA_BASE_DIR=./reference/monthly uv run pytest -m legacy_data -v
 ```
 
+## DDL Management (Single Source of Truth)
+
+- Source: `reference/db_migration/db_structure.json` — describes physical columns from legacy; generator applies our conventions.
+- Manifest: `scripts/create_table/manifest.yml` — maps domain → table/entity/delete_scope_key/ddl path.
+- Generator: `scripts/create_table/generate_from_json.py` — produces normalized, idempotent PostgreSQL DDL.
+- Apply: `scripts/create_table/apply_sql.py` — applies DDL using `.env` (or `--dsn`).
+
+Commands
+
+```bash
+# Generate DDL for annuity_performance from JSON + manifest
+uv run python -m scripts.create_table.generate_from_json --domain annuity_performance
+
+# Apply by domain (recommended)
+uv run python -m scripts.create_table.apply_sql --domain annuity_performance
+
+# Or apply a specific file
+uv run python -m scripts.create_table.apply_sql --sql scripts/create_table/ddl/annuity_performance.sql
+
+# List supported domains
+uv run python -m scripts.create_table.apply_sql --list
+```
+
 ### Expected Results
 
 - **Plan-only**: Shows SQL execution plans with DELETE + INSERT operations targeting `"规模明细"` table
-- **Execute**: Shows loader summary with deleted/inserted/batches counts from actual database operations
+- **Execute**: Shows loader summary with deleted/inserted/batches counts from actual database operations  
+- **Primary Key**: Uses `annuity_performance_id` as auto-increment primary key; delete scope key uses (`月度`, `计划代码`, `company_id`) and is non-unique
 - **Column projection**: Prevents SQL column-not-found errors by filtering Excel data to valid database columns
 - **Unicode handling**: Properly processes Chinese column names, table names, and file names
 
@@ -218,13 +213,13 @@ WDH_DATA_BASE_DIR=./reference/monthly uv run pytest -m legacy_data -v
 
 - Always use `--plan-only` first to validate SQL plans before executing
 - Use `--max-files 1` for initial testing to limit scope
-- Apply DDL (`scripts/dev/annuity_performance_real.sql`) before execute mode
+- Apply updated DDL (`scripts/create_table/ddl/annuity_performance.sql`) before execute mode
 - Verify database configuration with test data, not production
 - Monitor logs for column projection warnings and transformation errors
 
 ## Try It (End‑to‑End)
 
-Run the existing end‑to‑end test for the first vertical slice (trustee performance):
+Run the existing tests for the first vertical slice (sample trustee performance):
 
 ```bash
 uv run pytest tests/e2e/test_trustee_performance_e2e.py -v
@@ -243,6 +238,109 @@ uv run pytest tests/e2e/test_trustee_performance_e2e.py -v
   - `docs/project/02_production_data_sample_analysis.md`
   - `docs/project/03_specified_data_source_problems_analysis.md`
   - `docs/project/04_dependency_and_priority_analysis.md`
+
+## Python Imports & Packaging
+
+Follow these conventions to keep imports clean and tools happy:
+
+- Use absolute imports that start from the `work_data_hub` package.
+- Do not add `src` to import paths (keep `src/` as the project root for code, not a package prefix).
+- When a tool requires the package to be installed (e.g., IDE/type-checking scenarios), use an editable install:
+  - `pip install -e .` (or `uv pip install -e .`) so Python can resolve `work_data_hub`.
+
+## Database Design Standards
+
+### Entity-Specific Primary Keys
+
+Following CLAUDE.md guidelines, all database tables use entity-specific primary keys for consistency and clarity:
+
+```sql
+-- ✅ STANDARDIZED: Entity-specific primary keys
+"annuity_performance_id"    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY
+"trustee_performance_id"    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY
+```
+
+### ETL-Specific Design Pattern
+
+For ETL pipelines using `delete_insert` mode, we employ a hybrid approach:
+
+1. **Technical Primary Key**: Auto-increment surrogate key (`{entity}_id`) for database performance
+2. **Delete Scope Key (non-unique)**: Composite key on business fields used to determine deletion scope prior to insert; DB does not enforce uniqueness because production data may contain multiple rows per scope.
+
+```sql
+CREATE TABLE "规模明细" (
+  "annuity_performance_id"    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  
+  -- Business fields
+  "月度"                      DATE NOT NULL,
+  "计划代码"                    VARCHAR(255) NOT NULL,
+  "company_id"              VARCHAR(50) NOT NULL,
+  
+  -- Other fields...
+);
+
+-- Indexes to support delete scope filtering and common queries
+CREATE INDEX IF NOT EXISTS "idx_规模明细_月度_计划代码_company_id"
+  ON "规模明细" ("月度", "计划代码", "company_id");
+```
+
+### Column Naming Conventions
+
+- **Primary keys**: `{entity}_id` (e.g., `annuity_performance_id`)
+- **Foreign keys**: `{referenced_entity}_id`
+- **Timestamps**: `{action}_at` (e.g., `created_at`, `updated_at`)
+- **Chinese business columns**: Standardized via `column_normalizer.py`
+- **Special characters**: Parentheses are normalized to underscores (e.g., `流失(含待遇支付)` → `流失_含待遇支付`)
+
+## Test Markers
+
+Markers configured in `pyproject.toml` to selectively run tests:
+
+- `postgres`: Requires a PostgreSQL database; excluded by default in CI. Run with `-m postgres`.
+- `monthly_data`: Requires `reference/monthly` sample data; opt-in. Run with `-m monthly_data`.
+- `legacy_data`: Legacy E2E validations on sample data; opt-in. Run with `-m legacy_data`.
+- `sample_domain`: Tests for the non‑production sample domain (`sample_trustee_performance`). Run with `-m sample_domain`.
+
+Examples
+
+```bash
+# Default (CI-equivalent): exclude postgres-backed tests
+uv run pytest -v -m "not postgres"
+
+# Only sample domain tests
+uv run pytest -v -m sample_domain
+
+# Legacy annuity E2E validations (opt-in)
+uv run pytest -v -m legacy_data -k annuity_performance_e2e
+
+# Monthly smoke validations (opt-in)
+uv run pytest -v -m monthly_data
+```
+
+### ETL Configuration
+
+In `data_sources.yml`, specify the business composite key for delete_insert operations:
+
+```yaml
+annuity_performance:
+  table: "规模明细"
+  pk: ["月度", "计划代码", "company_id"]  # Business composite key for delete_insert
+```
+
+### Warehouse Loader Integration
+
+The `warehouse_loader.py` automatically excludes auto-generated columns during INSERT operations:
+
+```python
+# Auto-generated columns are automatically excluded from INSERT statements
+auto_generated_columns = {"id", "annuity_performance_id", "trustee_performance_id"}
+```
+
+This design provides:
+- ✅ Database performance with surrogate keys
+- ✅ ETL compatibility with business keys
+- ✅ Data integrity through unique constraints
+- ✅ Consistent naming following CLAUDE.md standards
 
 ## Source of Truth & Maintenance
 

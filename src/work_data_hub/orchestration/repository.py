@@ -12,7 +12,7 @@ code location registration.
 from dagster import Definitions
 
 # Import jobs from the jobs module
-from .jobs import trustee_performance_job, trustee_performance_multi_file_job
+from .jobs import sample_trustee_performance_job, sample_trustee_performance_multi_file_job
 
 # Import schedules
 from .schedules import trustee_daily_schedule
@@ -24,8 +24,8 @@ from .sensors import trustee_data_quality_sensor, trustee_new_files_sensor
 # This is the single source of truth for all orchestration components
 defs = Definitions(
     jobs=[
-        trustee_performance_job,
-        trustee_performance_multi_file_job,
+        sample_trustee_performance_job,
+        sample_trustee_performance_multi_file_job,
     ],
     schedules=[
         trustee_daily_schedule,

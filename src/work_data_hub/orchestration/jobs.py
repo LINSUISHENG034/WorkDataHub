@@ -18,14 +18,14 @@ from .ops import (
     discover_files_op,
     load_op,
     process_annuity_performance_op,
-    process_trustee_performance_op,
-    read_and_process_trustee_files_op,
+    process_sample_trustee_performance_op,
+    read_and_process_sample_trustee_files_op,
     read_excel_op,
 )
 
 
 @job
-def trustee_performance_job():
+def sample_trustee_performance_job():
     """
     End-to-end trustee performance processing job.
 
@@ -41,12 +41,12 @@ def trustee_performance_job():
     # Note: For MVP, we'll modify the ops to handle the first file selection
     # The read_excel_op will internally select the first file from the list
     excel_rows = read_excel_op(discovered_paths)
-    processed_data = process_trustee_performance_op(excel_rows, discovered_paths)
+    processed_data = process_sample_trustee_performance_op(excel_rows, discovered_paths)
     load_op(processed_data)  # No return needed
 
 
 @job
-def trustee_performance_multi_file_job():
+def sample_trustee_performance_multi_file_job():
     """
     End-to-end trustee performance processing job for multi-file scenarios.
 
@@ -59,7 +59,7 @@ def trustee_performance_multi_file_job():
     discovered_paths = discover_files_op()
 
     # Use combined op for multi-file processing
-    processed_data = read_and_process_trustee_files_op(discovered_paths)
+    processed_data = read_and_process_sample_trustee_files_op(discovered_paths)
     load_op(processed_data)  # No return needed
 
 
@@ -133,7 +133,7 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
 
     if max_files > 1:
         # Use new combined op for multi-file processing
-        run_config["ops"]["read_and_process_trustee_files_op"] = {
+        run_config["ops"]["read_and_process_sample_trustee_files_op"] = {
             "config": {"sheet": args.sheet, "max_files": max_files}
         }
     else:
@@ -152,12 +152,12 @@ def main():
     error handling, and support for both testing and production modes.
     """
     parser = argparse.ArgumentParser(
-        description="Run WorkDataHub trustee performance job",
+        description="Run WorkDataHub ETL job",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
     # Core arguments
-    parser.add_argument("--domain", default="trustee_performance", help="Domain to process")
+    parser.add_argument("--domain", default="sample_trustee_performance", help="Domain to process")
     parser.add_argument(
         "--mode",
         choices=["delete_insert", "append"],
@@ -225,14 +225,14 @@ def main():
         selected_job = annuity_performance_job
         if max_files > 1:
             print(f"Warning: max_files > 1 not yet supported for {args.domain}, using 1")
-    elif args.domain == "trustee_performance":
+    elif args.domain == "sample_trustee_performance":
         selected_job = (
-            trustee_performance_multi_file_job if max_files > 1 else trustee_performance_job
+            sample_trustee_performance_multi_file_job if max_files > 1 else sample_trustee_performance_job
         )
     else:
         raise ValueError(
             f"Unsupported domain: {args.domain}. "
-            f"Supported: trustee_performance, annuity_performance"
+            f"Supported: sample_trustee_performance, annuity_performance"
         )
 
     # Execute job with appropriate settings

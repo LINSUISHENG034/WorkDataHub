@@ -7,6 +7,7 @@ environments while maintaining secure credential management.
 """
 
 from functools import lru_cache
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -112,7 +113,20 @@ class Settings(BaseSettings):
     database_uri: Optional[str] = Field(default=None, description="Complete database URI")
 
     def get_database_connection_string(self) -> str:
-        """Get PostgreSQL connection string."""
+        """Get PostgreSQL connection string.
+
+        Unifies environment variable usage by preferring a single canonical URI
+        while maintaining backward compatibility with prior naming.
+        Priority order:
+        1) WDH_DATABASE__URI (canonical)
+        2) WDH_DATABASE_URI (alternate)
+        3) self.database_uri (settings field)
+        4) Construct from individual components
+        """
+        # Canonical and alternate environment variable overrides
+        env_uri = os.getenv("WDH_DATABASE__URI") or os.getenv("WDH_DATABASE_URI")
+        if env_uri:
+            return env_uri
         return self.database.get_connection_string()
 
     @property
@@ -139,6 +153,8 @@ class Settings(BaseSettings):
         case_sensitive=False,
         # Nested settings using double underscore
         env_nested_delimiter="__",
+        # Accept additional env inputs (e.g., WDH_DATABASE__URI)
+        extra="ignore",
     )
 
 

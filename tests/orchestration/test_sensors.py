@@ -26,8 +26,8 @@ class TestSensorRunConfig:
         # Create test configuration matching data_sources.yml structure
         config_data = {
             "domains": {
-                "trustee_performance": {
-                    "table": "trustee_performance",
+                "sample_trustee_performance": {
+                    "table": "sample_trustee_performance",
                     "pk": ["report_date", "plan_code", "company_code"],
                 }
             }
@@ -46,11 +46,11 @@ class TestSensorRunConfig:
             # Verify structure matches expected op config schemas
             expected = {
                 "ops": {
-                    "discover_files_op": {"config": {"domain": "trustee_performance"}},
+            "discover_files_op": {"config": {"domain": "sample_trustee_performance"}},
                     "read_and_process_trustee_files_op": {"config": {"sheet": 0, "max_files": 5}},
                     "load_op": {
                         "config": {
-                            "table": "trustee_performance",
+                            "table": "sample_trustee_performance",
                             "mode": "delete_insert",
                             "pk": ["report_date", "plan_code", "company_code"],
                             "plan_only": False,  # Execute mode for sensor runs
@@ -68,7 +68,7 @@ class TestFileDiscoverySensor:
     def create_mock_discovered_file(self, path, modified_time):
         """Helper to create mock DiscoveredFile objects."""
         return DiscoveredFile(
-            domain="trustee_performance",
+            domain="sample_trustee_performance",
             path=path,
             year=2024,
             month=1,
@@ -90,7 +90,7 @@ class TestFileDiscoverySensor:
             result = trustee_new_files_sensor(context)
 
             assert isinstance(result, SkipReason)
-            assert "No trustee_performance files found" in str(result)
+            assert "No sample_trustee_performance files found" in str(result)
 
     def test_new_files_sensor_no_new_files(self):
         """Test sensor behavior when no new files since last cursor."""
@@ -130,8 +130,8 @@ class TestFileDiscoverySensor:
         # Create test configuration for run_config building
         config_data = {
             "domains": {
-                "trustee_performance": {
-                    "table": "trustee_performance",
+                "sample_trustee_performance": {
+                    "table": "sample_trustee_performance",
                     "pk": ["report_date", "plan_code", "company_code"],
                 }
             }
@@ -161,7 +161,7 @@ class TestFileDiscoverySensor:
             assert "ops" in result.run_config
             assert (
                 result.run_config["ops"]["discover_files_op"]["config"]["domain"]
-                == "trustee_performance"
+                == "sample_trustee_performance"
             )
 
     def test_new_files_sensor_first_run_no_cursor(self, tmp_path):
@@ -177,8 +177,8 @@ class TestFileDiscoverySensor:
         # Create test configuration
         config_data = {
             "domains": {
-                "trustee_performance": {
-                    "table": "trustee_performance",
+                "sample_trustee_performance": {
+                    "table": "sample_trustee_performance",
                     "pk": ["id"],
                 }
             }
@@ -244,7 +244,7 @@ class TestDataQualitySensor:
 
         # Create mock file with non-existent path
         mock_file = DiscoveredFile(
-            domain="trustee_performance",
+            domain="sample_trustee_performance",
             path="/nonexistent/file.xlsx",
             year=2024,
             month=1,
@@ -271,7 +271,7 @@ class TestDataQualitySensor:
 
         # Create mock accessible file
         mock_file = DiscoveredFile(
-            domain="trustee_performance",
+            domain="sample_trustee_performance",
             path="/test/file.xlsx",
             year=2024,
             month=1,
@@ -306,7 +306,7 @@ class TestDataQualitySensor:
 
         # Create mock accessible file
         mock_file = DiscoveredFile(
-            domain="trustee_performance",
+            domain="sample_trustee_performance",
             path="/test/file.xlsx",
             year=2024,
             month=1,

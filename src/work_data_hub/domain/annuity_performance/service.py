@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import ValidationError
 
-from src.work_data_hub.utils.date_parser import parse_chinese_date
+from work_data_hub.utils.date_parser import parse_chinese_date
 
 from .models import AnnuityPerformanceIn, AnnuityPerformanceOut
 
@@ -27,14 +27,14 @@ class AnnuityPerformanceTransformationError(Exception):
 
 def get_allowed_columns() -> List[str]:
     """
-    Get allowed columns from DDL - hardcoded for MVP.
+    Get allowed columns from actual database table schema.
 
-    Returns all 24 columns from scripts/dev/annuity_performance_real.sql
-    This prevents SQL column-not-found errors by filtering Excel data
-    to only valid database columns.
+    Returns all columns that exist in the "规模明细" table based on the
+    actual database schema, not the DDL. This prevents SQL column-not-found
+    errors by filtering data to only valid database columns.
 
     Returns:
-        List of allowed column names matching DDL schema
+        List of allowed column names matching actual database schema
     """
     return [
         "id",
@@ -50,7 +50,7 @@ def get_allowed_columns() -> List[str]:
         "期初资产规模",
         "期末资产规模",
         "供款",
-        "流失(含待遇支付)",
+        "流失_含待遇支付",  # 与实际 DDL 保持一致（标准化列名）
         "流失",
         "待遇支付",
         "投资收益",
@@ -61,11 +61,6 @@ def get_allowed_columns() -> List[str]:
         "年金账户号",
         "年金账户名",
         "company_id",
-        # Additional fields that may appear in Excel for processing
-        "年",
-        "月",
-        "公司代码",
-        "报告日期",
     ]
 
 
@@ -131,18 +126,13 @@ def process(
 
     logger.info(f"Processing {len(rows)} rows from data source: {data_source}")
 
-    # CRITICAL: Column projection to prevent SQL errors
-    allowed_columns = get_allowed_columns()
-    projected_rows = project_columns(rows, allowed_columns)
-
-    if not projected_rows:
-        logger.warning("No rows remained after column projection")
-        return []
-
     processed_records = []
     processing_errors = []
 
-    for row_index, raw_row in enumerate(projected_rows):
+    # NOTE: Do NOT project columns before transformation.
+    # Transformation may rely on helper fields like 年/月 present in raw rows.
+    # Output models already map to DB columns, and ops will serialize by alias.
+    for row_index, raw_row in enumerate(rows):
         try:
             # Transform single row
             processed_record = _transform_single_row(raw_row, data_source, row_index)
@@ -228,8 +218,7 @@ def _transform_single_row(
     output_data = {
         "月度": report_date,
         "计划代码": plan_code,
-        "公司代码": company_code,  # For composite PK
-        "data_source": data_source,
+        "company_id": company_code,  # For composite PK - matches database column
         **financial_data,
         **metadata_fields,
     }
@@ -384,14 +373,48 @@ def _parse_report_period(report_period: str) -> Optional[Tuple[int, int]]:
     return None
 
 
+def _strip_f_prefix_if_pattern_matches(value: Optional[str]) -> Optional[str]:
+    """
+    Strip F-prefix from portfolio code only if it matches strict pattern for portfolio codes.
+
+    This function implements surgical F-prefix removal as specified in PRP P-024.
+    Only removes the leading 'F' from codes that look like prefixed portfolio codes,
+    not from company names that happen to start with F.
+
+    Args:
+        value: The portfolio code string to potentially strip
+
+    Returns:
+        String with F-prefix removed if pattern matches, otherwise original string
+
+    Examples:
+        "F123ABC" -> "123ABC" (matches: code pattern)
+        "F123" -> "123" (matches: code pattern)
+        "FIDELITY001" -> "IDELITY001" (matches broadened code pattern)
+        "Fund123" -> "Fund123" (doesn't match: contains lowercase)
+        "F" -> "F" (doesn't match: no characters after F)
+    """
+    if not value:
+        return value
+
+    import re
+
+    portfolio_code = str(value).strip()
+
+    # Only strip if it matches pattern for portfolio codes:
+    # F followed by one or more uppercase alphanumeric characters
+    # Pattern broadened per requirement to ^F[0-9A-Z]+$
+    if re.match(r"^F[0-9A-Z]+$", portfolio_code):
+        return portfolio_code[1:]  # Remove leading 'F'
+
+    return portfolio_code
+
+
 def _extract_plan_code(input_model: AnnuityPerformanceIn, row_index: int) -> Optional[str]:
-    """Extract plan code from input model."""
+    """Extract plan code from input model without F-prefix modification."""
     # Try Chinese field name first
     if input_model.计划代码:
         plan_code = str(input_model.计划代码).strip()
-        # Strip ^F prefix if present in 组合代码 context
-        if hasattr(input_model, "组合代码") and input_model.组合代码 and plan_code.startswith("F"):
-            plan_code = plan_code[1:]  # Remove leading 'F'
         return plan_code
 
     logger.debug(f"Row {row_index}: No plan code found")
@@ -452,9 +475,11 @@ def _extract_financial_metrics(input_model: AnnuityPerformanceIn, row_index: int
         if hasattr(input_model, field) and getattr(input_model, field) is not None:
             metrics[field] = getattr(input_model, field)
 
-    # Handle the special case of "流失(含待遇支付)" -> "流失_含待遇支付"
+    # Handle the standardized field name "流失_含待遇支付"
+    # The column normalizer will convert "流失(含待遇支付)" to "流失_含待遇支付"
+    # but we need to use the original database column name for output
     if input_model.流失_含待遇支付 is not None:
-        metrics["流失_含待遇支付"] = input_model.流失_含待遇支付
+        metrics["流失(含待遇支付)"] = input_model.流失_含待遇支付
 
     return metrics
 
@@ -462,6 +487,9 @@ def _extract_financial_metrics(input_model: AnnuityPerformanceIn, row_index: int
 def _extract_metadata_fields(input_model: AnnuityPerformanceIn, row_index: int) -> Dict[str, Any]:
     """
     Extract all metadata and organizational fields from input model.
+
+    Applies F-prefix stripping logic specifically to portfolio code (组合代码)
+    when it matches the strict pattern ^F[0-9A-Z]+$.
 
     Args:
         input_model: Input model containing raw data
@@ -478,7 +506,6 @@ def _extract_metadata_fields(input_model: AnnuityPerformanceIn, row_index: int) 
         "计划类型",
         "计划名称",
         "组合类型",
-        "组合代码",
         "组合名称",
         "客户名称",
         "机构代码",
@@ -491,6 +518,11 @@ def _extract_metadata_fields(input_model: AnnuityPerformanceIn, row_index: int) 
     for field in text_fields:
         if hasattr(input_model, field) and getattr(input_model, field) is not None:
             fields[field] = getattr(input_model, field)
+
+    # Handle 组合代码 separately with F-prefix stripping logic
+    if hasattr(input_model, "组合代码") and input_model.组合代码 is not None:
+        portfolio_code = _strip_f_prefix_if_pattern_matches(input_model.组合代码)
+        fields["组合代码"] = portfolio_code
 
     # Handle company_id separately
     if input_model.company_id:
@@ -512,14 +544,12 @@ def validate_input_batch(rows: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any
     Returns:
         Tuple of (valid_rows, error_messages)
     """
-    # Apply column projection first
-    allowed_columns = get_allowed_columns()
-    projected_rows = project_columns(rows, allowed_columns)
-
     valid_rows = []
     errors = []
 
-    for i, row in enumerate(projected_rows):
+    allowed_columns = get_allowed_columns()
+
+    for i, row in enumerate(rows):
         try:
             # Basic structural validation
             model = AnnuityPerformanceIn(**row)
@@ -529,7 +559,9 @@ def validate_input_batch(rows: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any
             has_company = _extract_company_code(model, i) is not None
 
             if has_date and has_plan and has_company:
-                valid_rows.append(row)
+                # Project to allowed columns for downstream safety
+                projected = project_columns([row], allowed_columns)
+                valid_rows.append(projected[0] if projected else {})
             else:
                 errors.append(f"Row {i}: missing required fields (date/plan/company)")
         except ValidationError as e:

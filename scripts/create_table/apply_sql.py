@@ -1,12 +1,19 @@
 """
-Simple CLI to apply an SQL file to PostgreSQL using project .env.
+Simple CLI to apply SQL to PostgreSQL using project .env, with domain support.
 
 Usage (PowerShell / Bash):
-  uv run python -m scripts/create_table/apply_sql.py --sql scripts/create_table/trustee_performance.sql
+  # Apply specific SQL file
+  uv run python -m scripts.create_table.apply_sql --sql scripts/create_table/ddl/annuity_performance.sql
+
+  # Or apply by domain (per manifest)
+  uv run python -m scripts.create_table.apply_sql --domain annuity_performance
+
+  # List supported domains
+  uv run python -m scripts.create_table.apply_sql --list
 
 Notes:
-- By default, the script loads database configuration from the project .env
-  via Settings (get_settings). You can override with --dsn if needed.
+- Loads database configuration from the project .env via Settings (get_settings).
+  You can override with --dsn if needed.
 - Output avoids printing secrets; only sanitized connection info is shown.
 """
 
@@ -16,6 +23,9 @@ import argparse
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
+from typing import Optional
+
+import yaml
 
 
 def parse_args() -> argparse.Namespace:
@@ -24,8 +34,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--sql",
-        required=True,
+        required=False,
         help="Path to the SQL file to execute (UTF-8)",
+    )
+    parser.add_argument(
+        "--domain",
+        required=False,
+        help="Domain name defined in manifest.yml (e.g., annuity_performance)",
     )
     parser.add_argument(
         "--dsn",
@@ -50,6 +65,22 @@ def load_dsn(override_dsn: str | None) -> str:
     return settings.get_database_connection_string()
 
 
+def resolve_sql_path(sql: Optional[str], domain: Optional[str]) -> Path:
+    if sql:
+        return Path(sql)
+    if domain:
+        manifest_path = Path("scripts/create_table/manifest.yml")
+        data = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+        dom = data.get("domains", {}).get(domain)
+        if not dom:
+            raise ValueError(f"Domain not found in manifest: {domain}")
+        ddl = dom.get("ddl")
+        if not ddl:
+            raise ValueError(f"Domain '{domain}' missing 'ddl' in manifest")
+        return Path(ddl)
+    raise ValueError("Either --sql or --domain must be provided")
+
+
 def sanitize_dsn(dsn: str) -> str:
     p = urlparse(dsn)
     # Rebuild without password
@@ -62,7 +93,24 @@ def sanitize_dsn(dsn: str) -> str:
 
 def main() -> int:
     args = parse_args()
-    sql_path = Path(args.sql)
+    if getattr(args, "list", False):
+        try:
+            m = yaml.safe_load(Path("scripts/create_table/manifest.yml").read_text(encoding="utf-8")) or {}
+            domains = sorted((m.get("domains") or {}).keys())
+            print("Available domains:")
+            for d in domains:
+                print(f" - {d}")
+            return 0
+        except Exception as e:
+            print(f"Failed to read manifest: {e}")
+            return 2
+
+    try:
+        sql_path = resolve_sql_path(args.sql, args.domain)
+    except Exception as e:
+        print(str(e))
+        return 2
+
     if not sql_path.exists() or not sql_path.is_file():
         print(f"SQL file not found: {sql_path}")
         return 2

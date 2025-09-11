@@ -25,8 +25,8 @@ from src.work_data_hub.orchestration.ops import (
     _load_valid_domains,
     discover_files_op,
     load_op,
-    process_trustee_performance_op,
-    read_and_process_trustee_files_op,
+    process_sample_trustee_performance_op,
+    read_and_process_sample_trustee_files_op,
     read_excel_op,
 )
 
@@ -39,7 +39,7 @@ class TestDiscoverFilesOp:
         # Create test configuration
         config_data = {
             "domains": {
-                "trustee_performance": {
+                "sample_trustee_performance": {
                     "pattern": r"(?P<year>20\d{2})[-_](?P<month>0?[1-9]|1[0-2]).*受托业绩.*\.xlsx$",
                     "select": "latest_by_year_month",
                     "sheet": 0,
@@ -75,7 +75,7 @@ class TestDiscoverFilesOp:
 
                 # Execute op
                 context = build_op_context()
-                config = DiscoverFilesConfig(domain="trustee_performance")
+                config = DiscoverFilesConfig(domain="sample_trustee_performance")
                 result = discover_files_op(context, config)
 
                 # Verify result is JSON-serializable
@@ -95,7 +95,7 @@ class TestDiscoverFilesOp:
         """Test discovery with no matching files."""
         config_data = {
             "domains": {
-                "trustee_performance": {
+                "sample_trustee_performance": {
                     "pattern": r"(?P<year>20\d{2}).*受托业绩.*\.xlsx$",
                     "select": "latest_by_year_month",
                 }
@@ -117,7 +117,7 @@ class TestDiscoverFilesOp:
                 mock_connector_class.return_value = mock_connector
 
                 context = build_op_context()
-                config = DiscoverFilesConfig(domain="trustee_performance")
+                config = DiscoverFilesConfig(domain="sample_trustee_performance")
                 result = discover_files_op(context, config)
 
                 assert result == []
@@ -190,9 +190,9 @@ class TestReadExcelOp:
 
 
 class TestProcessTrusteePerformanceOp:
-    """Test process_trustee_performance_op functionality."""
+    """Test process_sample_trustee_performance_op functionality."""
 
-    def test_process_trustee_performance_op_success(self):
+    def test_process_sample_trustee_performance_op_success(self):
         """Test successful domain processing."""
         # Mock input data
         excel_rows = [{"年": "2024", "月": "11", "计划代码": "PLAN001", "收益率": "5.5%"}]
@@ -209,7 +209,7 @@ class TestProcessTrusteePerformanceOp:
             mock_process.return_value = [mock_model]
 
             context = build_op_context()
-            result = process_trustee_performance_op(context, excel_rows, ["/path/to/file.xlsx"])
+            result = process_sample_trustee_performance_op(context, excel_rows, ["/path/to/file.xlsx"])
 
             assert len(result) == 1
             assert result[0]["plan_code"] == "PLAN001"
@@ -220,17 +220,17 @@ class TestProcessTrusteePerformanceOp:
             # Verify process was called correctly
             mock_process.assert_called_once_with(excel_rows, data_source="/path/to/file.xlsx")
 
-    def test_process_trustee_performance_op_empty_data(self):
+    def test_process_sample_trustee_performance_op_empty_data(self):
         """Test processing empty data."""
         with patch("src.work_data_hub.orchestration.ops.process") as mock_process:
             mock_process.return_value = []
 
             context = build_op_context()
-            result = process_trustee_performance_op(context, [], ["/path/to/file.xlsx"])
+            result = process_sample_trustee_performance_op(context, [], ["/path/to/file.xlsx"])
 
             assert result == []
 
-    def test_process_trustee_performance_op_empty_file_paths(self):
+    def test_process_sample_trustee_performance_op_empty_file_paths(self):
         """Test processing with empty file paths."""
         excel_rows = [{"年": "2024", "月": "11", "计划代码": "PLAN001"}]
 
@@ -238,7 +238,7 @@ class TestProcessTrusteePerformanceOp:
             mock_process.return_value = []
 
             context = build_op_context()
-            result = process_trustee_performance_op(context, excel_rows, [])
+            result = process_sample_trustee_performance_op(context, excel_rows, [])
 
             assert result == []
             # Should use "unknown" as data_source when no file paths provided
@@ -262,7 +262,7 @@ class TestLoadOp:
         # Mock the load function result
         mock_result = {
             "mode": "delete_insert",
-            "table": "trustee_performance",
+            "table": "sample_trustee_performance",
             "deleted": 1,
             "inserted": 1,
             "batches": 1,
@@ -325,7 +325,7 @@ class TestLoadOp:
         """Test _load_valid_domains loads from YAML correctly."""
         config_data = {
             "domains": {
-                "trustee_performance": {"table": "trustee_performance"},
+                "sample_trustee_performance": {"table": "sample_trustee_performance"},
                 "annuity_performance": {"table": "annuity_performance"},
             }
         }
@@ -338,7 +338,7 @@ class TestLoadOp:
 
             domains = _load_valid_domains()
 
-            assert domains == ["annuity_performance", "trustee_performance"]
+            assert domains == ["annuity_performance", "sample_trustee_performance"]
 
     def test_load_valid_domains_missing_file(self, tmp_path):
         """Test _load_valid_domains handles missing config file gracefully."""
@@ -350,7 +350,7 @@ class TestLoadOp:
             domains = _load_valid_domains()
 
             # Should fallback to default
-            assert domains == ["trustee_performance"]
+            assert domains == ["sample_trustee_performance"]
 
     def test_load_valid_domains_empty_config(self, tmp_path):
         """Test _load_valid_domains handles empty domains gracefully."""
