@@ -135,12 +135,12 @@ class AnnuityPerformanceIn(BaseModel):
         """
         if v is None:
             return None
-        
+
         # If it's an integer that looks like YYYYMM, convert to string
         if isinstance(v, int):
             if 200000 <= v <= 999999:  # Valid YYYYMM range
                 return str(v)
-            
+
         # Return other types as-is (date, str)
         return v
 
@@ -261,64 +261,12 @@ class AnnuityPerformanceOut(BaseModel):
     )
     @classmethod
     def clean_decimal_fields(cls, v, info: Any):
-        """Clean and convert financial fields with precision quantization."""
-        if v is None or v == "":
-            return None
+        """Clean decimal fields using the unified cleansing framework."""
+        from src.work_data_hub.cleansing.rules.numeric_rules import comprehensive_decimal_cleaning
 
-        # Handle various input types
-        if isinstance(v, (int, Decimal)):
-            # For integers and Decimals, check for percentage interpretation
-            if info.field_name == "当期收益率" and isinstance(v, (int, float)):
-                if 1 < v <= 100:  # Interpret as percentage
-                    v = v / 100.0
-            # Process for quantization
-            pass
-        elif isinstance(v, float):
-            # Check for percentage interpretation before string conversion
-            if info.field_name == "当期收益率" and 1 < v <= 100:
-                v = v / 100.0
-            # Convert float to string first to avoid precision issues
-            v = str(v)
-        elif isinstance(v, str):
-            # Clean string values
-            v_clean = v.strip().replace(",", "").replace(" ", "")
-            v_clean = v_clean.replace("¥", "").replace("$", "").replace("￥", "")
-
-            # Handle percentage format (convert to decimal)
-            if "%" in v_clean:
-                v_clean = v_clean.replace("%", "")
-                try:
-                    v = float(v_clean) / 100.0
-                    v = str(v)  # Convert to string for Decimal conversion
-                except ValueError:
-                    raise ValueError(f"Invalid percentage format: {v}")
-            else:
-                v = v_clean
-
-            # Handle empty or placeholder values
-            if v in ("", "-", "N/A", "无", "暂无"):
-                return None
-
-            # Try to convert to float for validation, then back to string
-            try:
-                float_val = float(v)
-                v = str(float_val)
-            except ValueError:
-                raise ValueError(f"Cannot convert to decimal: {v}")
-
-        # Convert to Decimal using string to avoid float precision issues
-        try:
-            if isinstance(v, Decimal):
-                d = v
-            else:
-                d = Decimal(str(v))
-        except (ValueError, TypeError):
-            raise ValueError(f"Cannot convert to decimal: {v}")
-
-        # Field-specific quantization based on schema precision requirements
-        field_precision_map = {
+        # Field-specific precision configuration
+        precision_config = {
             "当期收益率": 6,  # Return rate needs higher precision
-            # Most financial fields use 4 decimal places for currency precision
             "期初资产规模": 4,
             "期末资产规模": 4,
             "供款": 4,
@@ -328,13 +276,11 @@ class AnnuityPerformanceOut(BaseModel):
             "投资收益": 4,
         }
 
-        if info.field_name and info.field_name in field_precision_map:
-            from decimal import ROUND_HALF_UP
-            places = field_precision_map[info.field_name]
-            quantizer = Decimal(1).scaleb(-places)
-            d = d.quantize(quantizer, rounding=ROUND_HALF_UP)
-
-        return d
+        return comprehensive_decimal_cleaning(
+            value=v,
+            field_name=info.field_name,
+            precision_config=precision_config
+        )
 
     @model_validator(mode="after")
     def validate_report_date(self) -> "AnnuityPerformanceOut":

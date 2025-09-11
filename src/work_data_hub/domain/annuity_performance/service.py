@@ -12,7 +12,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import ValidationError
 
-from src.work_data_hub.utils.date_parser import parse_chinese_date, extract_year_month_from_date
+from src.work_data_hub.utils.date_parser import parse_chinese_date
+
 from .models import AnnuityPerformanceIn, AnnuityPerformanceOut
 
 logger = logging.getLogger(__name__)

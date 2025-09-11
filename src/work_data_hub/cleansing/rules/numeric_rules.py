@@ -5,10 +5,10 @@
 提供统一、可配置的数值字段清洗解决方案。
 """
 
-import re
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Any, Dict, Optional, Union, List
-from ..registry import rule, RuleCategory
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Any, Dict, Optional, Union
+
+from ..registry import RuleCategory, rule
 
 # 字段精度配置 - 可以通过配置文件外部化
 DEFAULT_PRECISION_CONFIG = {
@@ -16,7 +16,7 @@ DEFAULT_PRECISION_CONFIG = {
     "return_rate": 6,
     "当期收益率": 6,
     "年化收益率": 6,
-    
+
     # 金额类字段 - 标准精度
     "net_asset_value": 4,
     "fund_scale": 2,
@@ -39,9 +39,7 @@ CURRENCY_SYMBOLS = {"¥", "$", "￥", "€", "£", "₽"}
 @rule(
     name="remove_currency_symbols",
     category=RuleCategory.STRING,
-    description="移除货币符号和格式化字符",
-    applicable_types={str},
-    field_patterns=["*金额", "*规模", "*收益", "*资产", "*供款", "*流失"]
+    description="移除货币符号和格式化字符"
 )
 def remove_currency_symbols(value: str) -> str:
     """
@@ -55,24 +53,22 @@ def remove_currency_symbols(value: str) -> str:
     """
     if not isinstance(value, str):
         return value
-    
+
     # 移除货币符号
     cleaned = value.strip()
     for symbol in CURRENCY_SYMBOLS:
         cleaned = cleaned.replace(symbol, "")
-    
+
     # 移除千分位分隔符和空格
     cleaned = cleaned.replace(",", "").replace(" ", "")
-    
+
     return cleaned
 
 
 @rule(
-    name="handle_percentage_conversion", 
+    name="handle_percentage_conversion",
     category=RuleCategory.NUMERIC,
-    description="处理百分比格式转换为小数",
-    applicable_types={str, float, int},
-    field_patterns=["*收益率", "*比率", "*rate"]
+    description="处理百分比格式转换为小数"
 )
 def handle_percentage_conversion(value: Any, field_name: str = "") -> Union[float, str]:
     """
@@ -92,21 +88,19 @@ def handle_percentage_conversion(value: Any, field_name: str = "") -> Union[floa
             return float(numeric_part) / 100.0
         except ValueError:
             raise ValueError(f"Invalid percentage format: {value}")
-    
+
     # 数值百分比处理（针对收益率字段）
     if isinstance(value, (int, float)) and ("收益率" in field_name or "rate" in field_name.lower()):
         if 1 < value <= 100:  # 判断是否为百分比格式
             return value / 100.0
-    
+
     return value
 
 
 @rule(
     name="standardize_null_values",
     category=RuleCategory.VALIDATION,
-    description="标准化空值表示",
-    applicable_types={str, type(None)},
-    field_patterns=["*"]  # 适用于所有字段
+    description="标准化空值表示"
 )
 def standardize_null_values(value: Any) -> Optional[Any]:
     """
@@ -120,22 +114,20 @@ def standardize_null_values(value: Any) -> Optional[Any]:
     """
     if value is None:
         return None
-    
+
     if isinstance(value, str) and value.strip() in NULL_PLACEHOLDERS:
         return None
-    
+
     return value
 
 
 @rule(
     name="decimal_quantization",
-    category=RuleCategory.NUMERIC, 
-    description="Decimal字段精度量化处理",
-    applicable_types={Decimal, float, int, str},
-    field_patterns=["*金额", "*规模", "*收益", "*资产", "*供款", "*流失", "*rate"]
+    category=RuleCategory.NUMERIC,
+    description="Decimal字段精度量化处理"
 )
 def decimal_quantization(
-    value: Any, 
+    value: Any,
     field_name: str = "",
     precision: Optional[int] = None,
     precision_config: Optional[Dict[str, int]] = None
@@ -156,13 +148,13 @@ def decimal_quantization(
     """
     if value is None:
         return None
-    
+
     # 使用提供的配置或默认配置
     config = precision_config or DEFAULT_PRECISION_CONFIG
-    
+
     # 确定精度
     target_precision = precision or config.get(field_name, 4)  # 默认4位小数
-    
+
     try:
         # 转换为Decimal
         if isinstance(value, Decimal):
@@ -170,13 +162,13 @@ def decimal_quantization(
         else:
             # 通过字符串转换避免浮点精度问题
             decimal_value = Decimal(str(value))
-        
+
         # 执行量化
         quantizer = Decimal(1).scaleb(-target_precision)
         quantized = decimal_value.quantize(quantizer, rounding=ROUND_HALF_UP)
-        
+
         return quantized
-        
+
     except (ValueError, TypeError, ArithmeticError) as e:
         raise ValueError(f"Cannot convert to decimal: {value} - {e}")
 
@@ -184,9 +176,7 @@ def decimal_quantization(
 @rule(
     name="comprehensive_decimal_cleaning",
     category=RuleCategory.NUMERIC,
-    description="综合数值字段清洗管道 - 整合所有清洗步骤",
-    applicable_types={str, int, float, Decimal},
-    field_patterns=["*金额", "*规模", "*收益", "*资产", "*供款", "*流失", "*rate", "*value", "*scale"]
+    description="综合数值字段清洗管道 - 整合所有清洗步骤"
 )
 def comprehensive_decimal_cleaning(
     value: Any,
@@ -215,34 +205,34 @@ def comprehensive_decimal_cleaning(
     cleaned_value = standardize_null_values(value)
     if cleaned_value is None:
         return None
-    
+
     # 步骤2: 字符串预处理
     if isinstance(cleaned_value, str):
         # 移除货币符号
         cleaned_value = remove_currency_symbols(cleaned_value)
-        
+
         # 再次检查空值
         cleaned_value = standardize_null_values(cleaned_value)
         if cleaned_value is None:
             return None
-    
+
     # 步骤3: 百分比处理
     if handle_percentage:
         cleaned_value = handle_percentage_conversion(cleaned_value, field_name)
-    
+
     # 步骤4: 转换和量化
     try:
         if isinstance(cleaned_value, str):
             # 验证字符串是否为有效数字
             float(cleaned_value)  # 验证但不使用结果
-        
+
         return decimal_quantization(
-            cleaned_value, 
+            cleaned_value,
             field_name=field_name,
             precision=precision,
             precision_config=precision_config
         )
-        
+
     except (ValueError, TypeError) as e:
         raise ValueError(f"Invalid numeric value for field '{field_name}': {value} - {e}")
 
@@ -264,7 +254,7 @@ def create_domain_decimal_cleaner(precision_config: Dict[str, int]):
             field_name=field_name,
             precision_config=precision_config
         )
-    
+
     return domain_decimal_cleaner
 
 

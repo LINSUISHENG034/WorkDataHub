@@ -18,9 +18,7 @@ try:
     from src.work_data_hub.cleansing import (
         registry,
         decimal_fields_cleaner,
-        comprehensive_decimal_cleaning,
-        get_framework_info,
-        find_rules_for_field
+        comprehensive_decimal_cleaning
     )
     FRAMEWORK_AVAILABLE = True
 except ImportError as e:
@@ -32,18 +30,19 @@ class TestCleansingFramework:
     """清洗框架核心功能测试"""
     
     def test_registry_functionality(self):
-        """测试注册表基本功能"""
+        """测试简化注册表的基本功能"""
         # 检查是否有注册的规则
         all_rules = registry.list_all_rules()
         assert len(all_rules) > 0, "应该有已注册的清洗规则"
         
         # 检查是否能按名称查找规则
-        decimal_rule = registry.find_by_name("comprehensive_decimal_cleaning")
+        decimal_rule = registry.get_rule("comprehensive_decimal_cleaning")
         assert decimal_rule is not None, "应该能找到 comprehensive_decimal_cleaning 规则"
         
-        # 检查是否能按字段模式查找规则
-        asset_rules = registry.find_by_field_pattern("期初资产规模")
-        assert len(asset_rules) > 0, "应该能为 '期初资产规模' 字段找到适用规则"
+        # 检查是否能按分类查找规则
+        from src.work_data_hub.cleansing.registry import RuleCategory
+        numeric_rules = registry.find_by_category(RuleCategory.NUMERIC)
+        assert len(numeric_rules) > 0, "应该能找到数值类型的清洗规则"
     
     def test_decimal_cleaning_rules(self):
         """测试数值清洗规则"""
@@ -85,33 +84,32 @@ class TestCleansingFramework:
         assert model.rate is None
     
     def test_framework_info(self):
-        """测试框架信息功能"""
-        info = get_framework_info()
+        """测试简化框架的统计功能"""
+        stats = registry.get_statistics()
         
-        assert "version" in info
-        assert "total_rules" in info
-        assert info["total_rules"] > 0
+        assert "total_rules" in stats
+        assert "rules_by_category" in stats
+        assert stats["total_rules"] > 0
         
-        # 测试字段规则查找
-        rules = find_rules_for_field("期初资产规模")
-        assert len(rules) > 0, "应该能为金额字段找到适用规则"
+        # 检查分类统计
+        assert "numeric" in stats["rules_by_category"]
+        assert stats["rules_by_category"]["numeric"] > 0
     
     def test_extensibility(self):
-        """测试框架扩展性"""
+        """测试简化框架的扩展性"""
         from src.work_data_hub.cleansing import rule, RuleCategory
         
-        # 动态添加新规则
+        # 动态添加新规则（使用简化的装饰器）
         @rule(
             name="test_custom_rule",
             category=RuleCategory.STRING,
-            description="测试自定义规则",
-            field_patterns=["test_*"]
+            description="测试自定义规则"
         )
         def custom_cleaner(value):
             return str(value).upper() if value else None
         
         # 验证规则已注册
-        custom_rule = registry.find_by_name("test_custom_rule")
+        custom_rule = registry.get_rule("test_custom_rule")
         assert custom_rule is not None
         
         # 验证规则功能

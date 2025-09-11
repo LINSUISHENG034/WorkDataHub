@@ -5,10 +5,10 @@ This module provides centralized date parsing functionality to handle various
 Chinese date formats commonly found in Excel files and business data.
 """
 
+import logging
 import re
 from datetime import date
-from typing import Union, Optional
-import logging
+from typing import Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -43,15 +43,15 @@ def parse_chinese_date(value: Union[str, int, date, None]) -> Optional[date]:
     """
     if value is None:
         return None
-        
+
     if isinstance(value, date):
         return value
-        
+
     # Convert to string for pattern matching
     str_value = str(value).strip()
     if not str_value:
         return None
-    
+
     try:
         # Pattern 1: Integer format like 202411 (YYYYMM)
         if isinstance(value, int) or str_value.isdigit():
@@ -63,7 +63,7 @@ def parse_chinese_date(value: Union[str, int, date, None]) -> Optional[date]:
                     return date(year, month, 1)
                 else:
                     raise ValueError(f"Invalid month in integer date: {month}")
-        
+
         # Pattern 2: Chinese format like "2024年11月" or "24年11月"
         chinese_pattern = r"^(\d{2,4})年(\d{1,2})月?$"
         match = re.match(chinese_pattern, str_value)
@@ -71,16 +71,16 @@ def parse_chinese_date(value: Union[str, int, date, None]) -> Optional[date]:
             year_str, month_str = match.groups()
             year = int(year_str)
             month = int(month_str)
-            
+
             # Handle 2-digit years (assume 20xx)
             if year < 100:
                 year += 2000
-                
+
             if 1 <= month <= 12:
                 return date(year, month, 1)
             else:
                 raise ValueError(f"Invalid month in Chinese date: {month}")
-        
+
         # Pattern 3: Standard date formats
         # Try common separators: -, /, .
         for separator in ["-", "/", "."]:
@@ -94,7 +94,7 @@ def parse_chinese_date(value: Union[str, int, date, None]) -> Optional[date]:
                     return date(year, month, day)
                 except (ValueError, TypeError):
                     continue
-                    
+
         # Pattern 4: YYYY-MM format (assume day 1)
         for separator in ["-", "/", "."]:
             parts = str_value.split(separator)
@@ -107,11 +107,11 @@ def parse_chinese_date(value: Union[str, int, date, None]) -> Optional[date]:
                         return date(year, month, 1)
                 except (ValueError, TypeError):
                     continue
-        
+
         # If no patterns match, log and return None
         logger.debug(f"Unable to parse date format: {repr(str_value)}")
         return None
-        
+
     except (ValueError, TypeError) as e:
         logger.warning(f"Date parsing failed for value {repr(value)}: {e}")
         raise ValueError(f"Invalid date value: {value}") from e
