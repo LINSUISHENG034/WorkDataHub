@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import ValidationError
 
+from src.work_data_hub.utils.date_parser import parse_chinese_date, extract_year_month_from_date
 from .models import AnnuityPerformanceIn, AnnuityPerformanceOut
 
 logger = logging.getLogger(__name__)
@@ -223,9 +224,11 @@ def _transform_single_row(
 
 def _extract_report_date(input_model: AnnuityPerformanceIn, row_index: int) -> Optional[date]:
     """
-    Extract report date from input model, trying various field combinations.
+    Extract report date from input model using unified date parsing.
 
     For annuity performance, we can use 月度 directly or construct from 年/月.
+    This function now uses the unified date parser to handle various Chinese
+    date formats including integer YYYYMM format from Excel.
 
     Args:
         input_model: Input model containing raw data
@@ -234,21 +237,13 @@ def _extract_report_date(input_model: AnnuityPerformanceIn, row_index: int) -> O
     Returns:
         Extracted date or None if cannot be determined
     """
-    # Try 月度 field first (may already be a date)
+    # Try 月度 field first using unified date parser
     if input_model.月度:
-        if isinstance(input_model.月度, date):
-            return input_model.月度
-        # Try to parse string date
         try:
-            from datetime import datetime
-            if isinstance(input_model.月度, str):
-                # Try common date formats
-                for fmt in ["%Y-%m-%d", "%Y/%m/%d", "%Y年%m月"]:
-                    try:
-                        parsed_date = datetime.strptime(input_model.月度.strip(), fmt).date()
-                        return parsed_date
-                    except ValueError:
-                        continue
+            parsed_date = parse_chinese_date(input_model.月度)
+            if parsed_date:
+                logger.debug(f"Row {row_index}: Parsed date from 月度 field: {parsed_date}")
+                return parsed_date
         except Exception as e:
             logger.debug(f"Row {row_index}: Cannot parse 月度 field {input_model.月度}: {e}")
 
@@ -256,7 +251,7 @@ def _extract_report_date(input_model: AnnuityPerformanceIn, row_index: int) -> O
     year = None
     month = None
 
-    # Try Chinese field names first
+    # Try Chinese field names first using unified date parser
     if input_model.年:
         try:
             year = int(str(input_model.年).strip())
@@ -276,12 +271,15 @@ def _extract_report_date(input_model: AnnuityPerformanceIn, row_index: int) -> O
 
     # Try to parse from report_period string if direct fields are not available
     if (year is None or month is None) and input_model.report_period:
-        parsed_date_tuple = _parse_report_period(input_model.report_period)
-        if parsed_date_tuple:
-            if year is None:
-                year = parsed_date_tuple[0]
-            if month is None:
-                month = parsed_date_tuple[1]
+        try:
+            parsed_date = parse_chinese_date(input_model.report_period)
+            if parsed_date:
+                if year is None:
+                    year = parsed_date.year
+                if month is None:
+                    month = parsed_date.month
+        except Exception as e:
+            logger.debug(f"Row {row_index}: Cannot parse report_period field: {e}")
 
     # Validate extracted values
     if year is not None and month is not None:
@@ -296,13 +294,10 @@ def _extract_report_date(input_model: AnnuityPerformanceIn, row_index: int) -> O
         try:
             return date(year, month, 1)
         except ValueError as e:
-            logger.debug(
-                f"Row {row_index}: Cannot construct date from year={year}, "
-                f"month={month}: {e}; returning None"
-            )
+            logger.debug(f"Row {row_index}: Cannot create date from year={year}, month={month}: {e}")
             return None
 
-    logger.debug(f"Row {row_index}: Could not extract valid year/month")
+    logger.debug(f"Row {row_index}: No valid date could be extracted")
     return None
 
 

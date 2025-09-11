@@ -48,7 +48,7 @@ class AnnuityPerformanceIn(BaseModel):
     # Core identification fields (Chinese column names from DDL)
     年: Optional[str] = Field(None, description="Year field from Excel (年)")
     月: Optional[str] = Field(None, description="Month field from Excel (月)")
-    月度: Optional[Union[date, str]] = Field(None, description="Report date (月度)")
+    月度: Optional[Union[date, str, int]] = Field(None, description="Report date (月度)")
     计划代码: Optional[str] = Field(None, description="Plan code (计划代码)")
     公司代码: Optional[str] = Field(None, description="Company code - for mapping")
 
@@ -122,6 +122,27 @@ class AnnuityPerformanceIn(BaseModel):
 
         # Return cleaned string (will be validated later in transformation)
         return v_str if v_str else None
+
+    @field_validator("月度", mode="before")
+    @classmethod
+    def preprocess_report_date(cls, v):
+        """
+        Preprocess 月度 field to handle integer dates from Excel.
+        
+        Excel often returns date fields as integers like 202411.
+        This validator converts them to strings so they can be processed
+        by the unified date parser in the service layer.
+        """
+        if v is None:
+            return None
+        
+        # If it's an integer that looks like YYYYMM, convert to string
+        if isinstance(v, int):
+            if 200000 <= v <= 999999:  # Valid YYYYMM range
+                return str(v)
+            
+        # Return other types as-is (date, str)
+        return v
 
 
 class AnnuityPerformanceOut(BaseModel):

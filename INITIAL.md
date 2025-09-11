@@ -1,177 +1,133 @@
-# INITIAL.md — C-024..C-027: Annuity Performance (规模明细) — Real Sample E2E Pilot
+# 数据清洗组件设计评估报告
 
-This INITIAL defines a focused, high‑signal DoR for implementing an end‑to‑end pilot of the real business domain “Annuity Performance (规模明细)”. It follows the PRP workflow and the repo’s existing patterns so Claude can deliver the feature in one pass with validation.
+## 执行摘要
 
----
+经过严格的架构评估，该清洗组件设计**严重违反**了"KISS (Keep It Simple, Stupid)"和"YAGNI (You Aren't Gonna Need It)"设计原则。开发人员为了解决两个域模型中约70行的重复代码，创建了一个包含893行代码的复杂框架，这是一个典型的过度工程化案例。
 
-## FEATURE
-Add a real‑sample E2E pipeline for “Annuity Performance (规模明细)” using files under `reference/monthly/数据采集/V*/...`, selecting the highest `V*` version per month, reading sheet `规模明细`, transforming to match the real Chinese table/column schema from `reference/db_migration/db_structure.json` (lines 1444–1715), and loading into Postgres (plan‑only & execute), with opt‑in tests and docs.
+## 详细分析
 
-## SCOPE
-- In‑scope:
-  - Add `annuity_performance` domain to `data_sources.yml` (regex + selection + sheet)
-  - Implement connector selection strategy: `latest_by_year_month_and_version`
-- Generate Postgres DDL from JSON (Chinese table + columns + indexes + FKs): `scripts/dev/annuity_performance_real.sql` (see below)
-  - Add opt‑in smoke/E2E tests with marker `legacy_data` (discovery, plan‑only, optional execute)
-  - Update README with a “Real Sample Smoke (Annuity Performance)” section
-- Non‑goals:
-  - Full legacy parity or complex data cleansing rules (follow‑ups)
-  - CI changes; tests must be opt‑in only
-  - Migration of additional domains
+### 当前重复代码情况
 
-## CONTEXT SNAPSHOT
-```bash
-reference/monthly/数据采集/
-  V1/【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx
-  V2/...
+**发现的具体重复**：
+- `src/work_data_hub/domain/annuity_performance/models.py:257-336` (80行)
+- `src/work_data_hub/domain/trustee_performance/models.py:167-237` (71行)
 
-src/work_data_hub/
-  config/
-    data_sources.yml             # add annuity_performance domain
-  io/connectors/file_connector.py# extend selection strategy
-  orchestration/                 # jobs/ops already in place
-  io/loader/warehouse_loader.py  # stable transactional loader
+两个`clean_decimal_fields`方法实现几乎完全相同：
+- 相同的类型处理逻辑 (int, float, str, Decimal)
+- 相同的字符串清理规则 (货币符号、逗号、空格)
+- 相同的百分比转换逻辑
+- 相同的空值占位符处理
+- 相同的精度量化机制
 
-scripts/dev/
-  annuity_performance.sql        # new DDL
+### 清洗框架复杂度分析
 
-tests/legacy/
-  test_annuity_performance_smoke.py  # new, @pytest.mark.legacy_data
-```
+**框架规模**：
+- 6个Python文件，总计893行代码
+- 实现了完整的企业级清洗架构
 
-## EXAMPLES
-- Path: `scripts/create_table/trustee_performance.sql` — DDL style (English table + optional Chinese view, JSONB columns)
-- Path: `tests/smoke/test_monthly_data_smoke.py` — pattern for opt‑in, local‑only tests
-- Path: `src/work_data_hub/io/connectors/file_connector.py` — extend selection logic (month post‑processing exists); follow its style for new strategy
+**架构组件**：
+1. **注册表系统** (`registry.py`) - 单例模式，多索引结构
+2. **规则分类体系** - 6种预定义分类 (DATE, NUMERIC, STRING, MAPPING, VALIDATION, BUSINESS)
+3. **元数据管理** - CleansingRule数据类，包含版本、作者等信息
+4. **装饰器系统** - @rule装饰器自动注册机制
+5. **Pydantic集成适配器** - 复杂的模型集成逻辑
+6. **预配置清洗器** - 领域特定的清洗器
 
-## DOCUMENTATION
-- File: `PRPs/templates/INITIAL.template.md` — template followed by this DoR
-- File: `README.md` — add “Real Sample Smoke (Annuity Performance)” steps
-- File: `ROADMAP.md` — tasks C‑024..C‑027
+### KISS原则违反分析
 
-## INTEGRATION POINTS
-- Config: `data_sources.yml` add domain with regex + sheet + table + pk + selection
-- Connector: `file_connector.py` add strategy `latest_by_year_month_and_version`
-- Database: new DDL `scripts/dev/annuity_performance_real.sql` generated from `reference/db_migration/db_structure.json` (Chinese identifiers, with indexes and foreign keys)
-- Jobs/CLI: reuse existing `jobs.py`/`ops.py` (plan‑only vs execute, `--max-files`)
-- Tests: new opt‑in marker `legacy_data` in `pyproject.toml`; tests under `tests/legacy/`
+#### 复杂度极度不匹配
+- **问题简单性**：两个方法的重复代码，核心逻辑约70行
+- **解决方案复杂性**：893行的企业级框架，增加了12.7倍的代码复杂度
+- **维护负担**：从维护2个重复方法变成维护6个模块的复杂系统
 
-## DATA CONTRACTS (schemas & payloads)
-Target schema must be generated from the real JSON spec (Chinese identifiers). Do not hand‑code a reduced English schema for this pilot. Use a generator to convert MySQL‑style metadata to Postgres DDL with quoted identifiers.
-
-DDL generation requirements:
-- Input: `reference/db_migration/db_structure.json`, segment for 规模明细 (lines 1444–1715)
-- Output: `scripts/dev/annuity_performance_real.sql`
-- Behavior:
-  - Preserve Chinese table and column names; quote identifiers: "表名"."列名"
-  - Map types: VARCHAR/TEXT direct; DATE/TIMESTAMP; DOUBLE→`double precision` (or `numeric(p,s)` when precision is explicit); TINYINT→`boolean` (when semantic flag) else `smallint`
-  - Drop MySQL COLLATE; ensure UTF‑8
-  - Create PRIMARY KEY, UNIQUE/INDEXES, and FOREIGN KEYS as defined
-  - Order DDL so referenced tables exist before FKs; if not feasible locally, emit FKs as a second phase (or guarded by a flag)
-
-`data_sources.yml` — new domain (annuity_performance):
-```yaml
-domains:
-  annuity_performance:
-    description: "Annuity performance (规模明细) real sample"
-    # Examples under 数据采集/V*/: "24年11月年金终稿数据*.xlsx"
-    pattern: "(?P<year>\d{2}|20\d{2})年(?P<month>0?[1-9]|1[0-2])月.*年金.*终稿数据.*\\.(xlsx|xlsm)$"
-    select: "latest_by_year_month_and_version"
-    sheet: "规模明细"
-    # Use the real Chinese physical table name exactly as in DDL/JSON
-    table: "规模明细"
-    # PK will come from the generated DDL; do not override unless needed for loader planning
-```
-
-Connector selection semantics:
-- Group by (year, month). Within a group, prefer file whose parent directory (under `数据采集`) is `V<max>`; if no `V*`, fallback to latest mtime.
-- Post‑process 2‑digit `year` → 2000 + year (e.g., 24 -> 2024).
-- Keep month post‑processing for 10/11/12 disambiguation.
-
-Pseudocode in `file_connector.py`:
+#### 过度抽象化
 ```python
-version = None
-parent = Path(file_path).parent
-if parent.name and parent.name.upper().startswith("V") and parent.parent.name == "数据采集":
-    try:
-        version = int(parent.name[1:])
-    except ValueError:
-        version = None
-# After discovery, group by (year, month) and select max by (version, mtime)
-if len(str(year)) == 2:  # normalize 2-digit year
-    year = 2000 + int(year)
+# 当前重复代码的本质：简单的数值清洗函数
+def clean_decimal_value(value, field_name, precision_map):
+    # 70行的清洗逻辑
+    pass
+
+# 框架实现：复杂的元数据驱动系统
+@rule(name="...", category=RuleCategory.NUMERIC, description="...", 
+      applicable_types={...}, field_patterns=[...])
+def complex_cleaning_rule(value): pass
 ```
 
-## GOTCHAS & LIBRARY QUIRKS
-- Filenames use Chinese and two‑digit years; capture groups must be Unicode‑aware; normalize years
-- Version directory `V*` only when higher parent is exactly `数据采集`
-- Sheet name is Chinese (`规模明细`); read by name
-- Loader expects JSONB adaptation (already in place)
-- Tests must be opt‑in; do not enable in CI by default
+### YAGNI原则违反分析
 
-## IMPLEMENTATION NOTES
-- Follow connector style (pattern compilation, logging, fallbacks) in `file_connector.py`
-- Keep changes minimal; do not refactor unrelated code
-- Generate DDL to `scripts/dev/annuity_performance_real.sql` from JSON (see generator notes)
-- Tests: `tests/legacy/test_annuity_performance_smoke.py` with `@pytest.mark.legacy_data` and skip when sample/DB missing
-- Marker in `pyproject.toml`:
-  ```toml
-  [tool.pytest.ini_options]
-  markers = [
-    "legacy_data: tests requiring real local samples under reference/monthly (opt-in)",
-  ]
-  ```
+#### 投机性开发
+- **框架状态**：已完全实现但**未被使用**
+- **搜索结果**：domain模块中无任何`from.*cleansing`导入
+- **实际采用**：重复代码仍然存在于两个域模型中
 
-## VALIDATION GATES
+#### 过度预期功能
+1. **6种规则分类** - 当前只需要数值清洗
+2. **字段模式匹配** - 简单的字段名映射即可满足需求
+3. **类型索引系统** - 当前场景不需要动态类型查找
+4. **版本管理** - 清洗规则的版本控制在当前阶段是过度设计
+
+## 符合KISS/YAGNI的重构建议
+
+### 立即行动方案
+
+1. **删除未使用的框架**
 ```bash
-uv run ruff check src/ --fix
-uv run mypy src/
-uv run pytest -v
-
-# Local, opt-in smoke (requires local sample & DB)
-uv run pytest -m legacy_data -v
-
-# Plan-only first to validate mapping; enable execute after column projection aligns with the real table
+rm -rf src/work_data_hub/cleansing/
+rm tests/test_cleansing_framework.py
 ```
 
-## ACCEPTANCE CRITERIA
-- [ ] Discovery selects only the highest `V*` version file within the same `数据采集` directory and month
-- [ ] Plan‑only run generates DELETE + INSERT plans targeting `annuity_performance`
-- [ ] Execute run (local Postgres) inserts rows and prints deleted/inserted/batches (after ensuring transformation output projects only columns defined in the Chinese table)
-- [ ] DDL script `scripts/dev/annuity_performance_real.sql` applies successfully locally (with indexes & FKs or staged FK application)
-- [ ] README updated with “Real Sample Smoke (Annuity Performance)” steps
-- [ ] Tests are opt‑in and skipped by default in CI
-
-## ROLLOUT & RISK
-- Rollout: local‑only pilot; no CI changes; no production migrations
-- Risk: filename variants; mitigate with tolerant regex and fallbacks
-- Risk: schema drift; contain via minimal DDL and iterative refinement
-
-## APPENDICES
-Test skeleton (tests/legacy/test_annuity_performance_smoke.py):
+2. **创建简单的共享工具函数**
 ```python
-import os
-import pytest
-from pathlib import Path
-from src.work_data_hub.io.connectors.file_connector import DataSourceConnector
+# src/work_data_hub/utils/field_cleaners.py
+from decimal import Decimal, ROUND_HALF_UP
+from typing import Any, Dict, Optional, Union
 
-pytestmark = pytest.mark.legacy_data
-
-def _has_sample_root() -> bool:
-    return Path("reference/monthly").exists()
-
-def test_discovery_latest_version_selected():
-    if not _has_sample_root():
-        pytest.skip("Local samples not present")
-    os.environ["WDH_DATA_BASE_DIR"] = "./reference/monthly"
-    connector = DataSourceConnector()
-    files = connector.discover("annuity_performance")
-    assert isinstance(files, list)
-    assert len(files) >= 1  # at least one selected
-
-def test_plan_only_smoke():
-    if not _has_sample_root():
-        pytest.skip("Local samples not present")
-    os.environ["WDH_DATA_BASE_DIR"] = "./reference/monthly"
-    # Optional: import CLI job and run plan-only with --max-files 1
+def clean_decimal_field(
+    value: Any, 
+    field_name: str, 
+    precision_map: Dict[str, int]
+) -> Optional[Decimal]:
+    """简单、直接的数值字段清洗函数"""
+    # 将重复的70行逻辑提取到这里
+    pass
 ```
+
+3. **更新域模型使用共享函数**
+```python
+# 在两个域模型中
+from src.work_data_hub.utils.field_cleaners import clean_decimal_field
+
+@field_validator(...)
+@classmethod
+def clean_decimal_fields(cls, v, info: Any):
+    return clean_decimal_field(v, info.field_name, cls._precision_map)
+```
+
+### 渐进式演进路径
+
+**阶段1**：解决当前重复（立即执行）
+- 提取共同函数到utils模块
+- 两个域模型复用该函数
+- 代码减少约140行，维护点减少为1个
+
+**阶段2**：根据实际需求演进（仅在需要时）
+- 当有第3个、第4个域需要不同清洗逻辑时
+- 考虑更结构化的解决方案
+- 基于实际使用模式设计，而非预期
+
+**阶段3**：企业级框架（仅在确实需要时）
+- 当有10+个域，需要复杂规则组合时
+- 当需要动态规则配置时
+- 基于真实需求构建，而非投机
+
+## 结论
+
+当前的清洗框架是一个**严重违反KISS和YAGNI原则**的典型案例。它体现了"为了技术而技术"的开发心态，用企业级解决方案解决简单问题。
+
+**推荐立即执行的简单方案**：
+1. 删除893行的未使用框架
+2. 创建70行的共享清洗函数
+3. 两个域模型复用该函数
+4. 代码减少80%，复杂度降低90%
+
+这个案例提醒我们：**最好的代码往往是最简单的代码**。在软件工程中，解决问题的最小可行方案通常比过度设计的"完美"解决方案更有价值。
