@@ -5,7 +5,6 @@ This module tests the schema validation functionality for data_sources.yml
 configuration, including validation of domain configurations and error handling.
 """
 
-
 import pytest
 import yaml
 
@@ -30,7 +29,7 @@ def valid_domain_config():
         "table": "test_table",
         "pk": ["id", "date"],
         "required_columns": ["col1", "col2"],
-        "validation": {"min_rows": 1}
+        "validation": {"min_rows": 1},
     }
 
 
@@ -42,7 +41,7 @@ def valid_discovery_config():
         "exclude_directories": ["temp", "backup"],
         "ignore_patterns": ["~$*", "*.tmp"],
         "max_depth": 10,
-        "follow_symlinks": False
+        "follow_symlinks": False,
     }
 
 
@@ -57,10 +56,10 @@ def valid_data_sources_config(valid_domain_config, valid_discovery_config):
                 "select": "latest_by_mtime",
                 "sheet": "Sheet1",
                 "table": "another_table",
-                "pk": ["key"]
-            }
+                "pk": ["key"],
+            },
         },
-        "discovery": valid_discovery_config
+        "discovery": valid_discovery_config,
     }
 
 
@@ -95,7 +94,7 @@ class TestDomainConfig:
             "pattern": r"test.*\.xlsx$",
             "select": "latest_by_mtime",
             "table": "test_table",
-            "pk": ["id"]
+            "pk": ["id"],
         }
 
         config = DomainConfig(**minimal_config)
@@ -128,10 +127,7 @@ class TestDomainConfig:
         """Test that invalid select values are rejected."""
         with pytest.raises(Exception):  # Pydantic ValidationError
             DomainConfig(
-                pattern="test",
-                select="invalid_selection_strategy",
-                table="test",
-                pk=["id"]
+                pattern="test", select="invalid_selection_strategy", table="test", pk=["id"]
             )
 
     def test_domain_config_empty_pk_list(self):
@@ -141,7 +137,7 @@ class TestDomainConfig:
                 pattern="test",
                 select="latest_by_mtime",
                 table="test",
-                pk=[]  # Empty pk list should be rejected
+                pk=[],  # Empty pk list should be rejected
             )
 
     def test_domain_config_sheet_types(self):
@@ -203,7 +199,7 @@ class TestDataSourcesConfig:
                     "pattern": "test",
                     "select": "latest_by_mtime",
                     "table": "test",
-                    "pk": ["id"]
+                    "pk": ["id"],
                 }
             }
         }
@@ -275,7 +271,7 @@ class TestValidateDataSourcesConfig:
                     "pattern": "test",
                     "select": "invalid_strategy",  # Invalid select value
                     "table": "test",
-                    "pk": ["id"]
+                    "pk": ["id"],
                 }
             }
         }
@@ -337,7 +333,9 @@ class TestIntegration:
         assert result is True
 
         # Test getting the trustee_performance domain
-        trustee_config = get_domain_config("trustee_performance", "src/work_data_hub/config/data_sources.yml")
+        trustee_config = get_domain_config(
+            "trustee_performance", "src/work_data_hub/config/data_sources.yml"
+        )
 
         assert trustee_config.table == "trustee_performance"
         assert trustee_config.select == "latest_by_year_month"

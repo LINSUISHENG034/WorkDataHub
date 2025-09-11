@@ -202,8 +202,10 @@ def _adapt_param(v):
     """
     if isinstance(v, (dict, list)):
         from psycopg2.extras import Json
+
         return Json(v)
     return v
+
 
 def load(
     table: str,
@@ -305,9 +307,7 @@ def load(
                     try:
                         from psycopg2.extras import execute_values  # type: ignore
                     except ImportError:
-                        raise DataWarehouseLoaderError(
-                            "psycopg2 not available for bulk operations"
-                        )
+                        raise DataWarehouseLoaderError("psycopg2 not available for bulk operations")
 
                     # Convert flattened params back to rows and adapt JSONB parameters
                     cols_per_row = len(cols)

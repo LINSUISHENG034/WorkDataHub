@@ -51,15 +51,8 @@ def _build_sensor_run_config() -> Dict[str, Any]:
     # Build run_config matching the multi-file job pattern
     return {
         "ops": {
-            "discover_files_op": {
-                "config": {"domain": "trustee_performance"}
-            },
-            "read_and_process_trustee_files_op": {
-                "config": {
-                    "sheet": 0,
-                    "max_files": 5
-                }
-            },
+            "discover_files_op": {"config": {"domain": "trustee_performance"}},
+            "read_and_process_trustee_files_op": {"config": {"sheet": 0, "max_files": 5}},
             "load_op": {
                 "config": {
                     "table": table,
@@ -74,7 +67,7 @@ def _build_sensor_run_config() -> Dict[str, Any]:
 
 @sensor(
     job=trustee_performance_multi_file_job,
-    minimum_interval_seconds=300  # Check every 5 minutes
+    minimum_interval_seconds=300,  # Check every 5 minutes
 )
 def trustee_new_files_sensor(context: SensorEvaluationContext):
     """
@@ -112,8 +105,7 @@ def trustee_new_files_sensor(context: SensorEvaluationContext):
 
         if not new_files:
             return SkipReason(
-                f"No new files detected (last_mtime: {last_mtime}, "
-                f"total_files: {len(files)})"
+                f"No new files detected (last_mtime: {last_mtime}, total_files: {len(files)})"
             )
 
         # Calculate new cursor value from maximum modification time
@@ -141,7 +133,7 @@ def trustee_new_files_sensor(context: SensorEvaluationContext):
 
 @sensor(
     job=trustee_performance_multi_file_job,
-    minimum_interval_seconds=600  # Check every 10 minutes
+    minimum_interval_seconds=600,  # Check every 10 minutes
 )
 def trustee_data_quality_sensor(context: SensorEvaluationContext):
     """
@@ -177,6 +169,7 @@ def trustee_data_quality_sensor(context: SensorEvaluationContext):
         for file in files[:1]:  # Check only the first file for lightweight probe
             try:
                 from pathlib import Path
+
                 if Path(file.path).exists():
                     accessible_files.append(file)
                 else:
@@ -195,13 +188,13 @@ def trustee_data_quality_sensor(context: SensorEvaluationContext):
             sample_row = {
                 "report_date": "2024-01-01",
                 "plan_code": "TEST001",
-                "company_code": "TEST_COMPANY"
+                "company_code": "TEST_COMPANY",
             }
 
             sql, params = build_insert_sql(
                 table="trustee_performance",
                 cols=["report_date", "plan_code", "company_code"],
-                rows=[sample_row]
+                rows=[sample_row],
             )
 
             if sql is None:

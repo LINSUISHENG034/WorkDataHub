@@ -41,7 +41,7 @@ print(problems_solved)
 # 3. 使用方式对比
 print("3. 使用方式对比:")
 print("\n--- 原来的重复实现方式 ---")
-old_way = '''
+old_way = """
 # 在 annuity_performance/models.py 中:
 @field_validator("期初资产规模", "期末资产规模", mode="before")
 @classmethod  
@@ -59,11 +59,11 @@ def clean_decimal_fields(cls, v, info):
 @classmethod
 def clean_decimal_fields(cls, v, info): 
     # 几乎相同的 100+ 行清洗逻辑（重复！）
-'''
+"""
 print(old_way)
 
 print("\n--- 新框架的统一方式 ---")
-new_way = '''
+new_way = """
 # 只需要一行装饰器，复用统一的清洗逻辑
 @decimal_fields_cleaner(
     "期初资产规模", "期末资产规模", "当期收益率",
@@ -80,7 +80,7 @@ class AnnuityPerformanceOut(BaseModel):
 class TrusteePerformanceOut(BaseModel):
     return_rate: Optional[Decimal] = None
     # ... 其他字段
-'''
+"""
 print(new_way)
 
 # 4. 框架特性
@@ -98,7 +98,7 @@ print(features)
 
 # 5. 扩展性示例
 print("5. 扩展性示例 - 新增清洗规则:")
-extension_example = '''
+extension_example = """
 from work_data_hub.cleansing import rule, RuleCategory
 
 @rule(
@@ -112,7 +112,7 @@ def clean_company_name(value):
     return standardized_name
 
 # 规则自动注册，立即可用于所有模型
-'''
+"""
 print(extension_example)
 
 # 6. 效果总结

@@ -22,9 +22,24 @@ from src.work_data_hub.io.loader.warehouse_loader import (
 def sample_rows():
     """Sample data for testing."""
     return [
-        {"report_date": "2024-01-01", "plan_code": "P001", "company_code": "C001", "return_rate": 0.05},
-        {"report_date": "2024-01-01", "plan_code": "P002", "company_code": "C001", "return_rate": 0.03},
-        {"report_date": "2024-02-01", "plan_code": "P001", "company_code": "C002", "return_rate": 0.07},
+        {
+            "report_date": "2024-01-01",
+            "plan_code": "P001",
+            "company_code": "C001",
+            "return_rate": 0.05,
+        },
+        {
+            "report_date": "2024-01-01",
+            "plan_code": "P002",
+            "company_code": "C001",
+            "return_rate": 0.03,
+        },
+        {
+            "report_date": "2024-02-01",
+            "plan_code": "P001",
+            "company_code": "C002",
+            "return_rate": 0.07,
+        },
     ]
 
 
@@ -166,12 +181,7 @@ class TestLoaderOrchestration:
 
     def test_load_append_mode_no_connection(self, sample_rows):
         """Test append mode returns SQL plan when no connection."""
-        result = load(
-            table="test_table",
-            rows=sample_rows,
-            mode="append",
-            conn=None
-        )
+        result = load(table="test_table", rows=sample_rows, mode="append", conn=None)
 
         assert result["mode"] == "append"
         assert result["table"] == "test_table"
@@ -189,11 +199,7 @@ class TestLoaderOrchestration:
         """Test delete_insert mode returns complete plan."""
         pk = ["report_date", "plan_code", "company_code"]
         result = load(
-            table="trustee_performance",
-            rows=sample_rows,
-            mode="delete_insert",
-            pk=pk,
-            conn=None
+            table="trustee_performance", rows=sample_rows, mode="delete_insert", pk=pk, conn=None
         )
 
         assert result["mode"] == "delete_insert"
@@ -212,13 +218,7 @@ class TestLoaderOrchestration:
         # Create 2500 rows to test chunking
         rows = [{"id": i, "value": f"val_{i}"} for i in range(2500)]
 
-        result = load(
-            table="test_table",
-            rows=rows,
-            mode="append",
-            chunk_size=1000,
-            conn=None
-        )
+        result = load(table="test_table", rows=rows, mode="append", chunk_size=1000, conn=None)
 
         assert result["inserted"] == 2500
         assert result["batches"] == 3  # ceil(2500/1000)
@@ -230,12 +230,7 @@ class TestLoaderOrchestration:
 
     def test_load_empty_rows(self):
         """Test graceful handling of empty input."""
-        result = load(
-            table="test_table",
-            rows=[],
-            mode="append",
-            conn=None
-        )
+        result = load(table="test_table", rows=[], mode="append", conn=None)
 
         assert result["deleted"] == 0
         assert result["inserted"] == 0
@@ -272,11 +267,7 @@ class TestDatabaseSettings:
         from src.work_data_hub.config.settings import DatabaseSettings
 
         db_settings = DatabaseSettings(
-            host="localhost",
-            port=5432,
-            user="testuser",
-            password="testpass",
-            db="testdb"
+            host="localhost", port=5432, user="testuser", password="testpass", db="testdb"
         )
 
         expected = "postgresql://testuser:testpass@localhost:5432/testdb"
@@ -291,7 +282,7 @@ class TestDatabaseSettings:
             user="ignored",
             password="ignored",
             db="ignored",
-            uri="postgresql://user:pass@host:5432/db"
+            uri="postgresql://user:pass@host:5432/db",
         )
 
         assert db_settings.get_connection_string() == "postgresql://user:pass@host:5432/db"
@@ -318,6 +309,7 @@ class TestDatabaseIntegration:
             # Fallback: use application settings (loads .env)
             try:
                 from src.work_data_hub.config.settings import get_settings
+
                 settings = get_settings()
                 conn_str = settings.get_database_connection_string()
             except Exception:
@@ -355,7 +347,7 @@ class TestDatabaseIntegration:
             rows=sample_rows,
             mode="delete_insert",
             pk=pk,
-            conn=db_connection
+            conn=db_connection,
         )
 
         assert result["inserted"] == 3
@@ -368,17 +360,22 @@ class TestDatabaseIntegration:
 
     def test_load_append_integration(self, db_connection):
         """Test actual database append operation."""
-        rows = [{"report_date": "2024-12-01", "plan_code": "TEST", "company_code": "TEST", "return_rate": 0.01}]
+        rows = [
+            {
+                "report_date": "2024-12-01",
+                "plan_code": "TEST",
+                "company_code": "TEST",
+                "return_rate": 0.01,
+            }
+        ]
 
         result = load(
-            table="test_trustee_performance",
-            rows=rows,
-            mode="append",
-            conn=db_connection
+            table="test_trustee_performance", rows=rows, mode="append", conn=db_connection
         )
 
         assert result["inserted"] == 1
         assert result["deleted"] == 0
+
 
 class TestJSONBParameterAdaptation:
     """Enhanced JSONB parameter adaptation testing according to PRP P-013."""
@@ -408,7 +405,7 @@ class TestJSONBParameterAdaptation:
         complex_dict = {
             "nested": {"key": "value"},
             "array": [1, 2, 3],
-            "mixed": ["string", {"inner": "dict"}]
+            "mixed": ["string", {"inner": "dict"}],
         }
 
         adapted = _adapt_param(complex_dict)
@@ -437,23 +434,23 @@ class TestJSONBParameterAdaptation:
                         "metadata": {
                             "source_row": 42,
                             "processing_timestamp": "2024-01-01T12:00:00Z",
-                            "validation_rules": ["range_check", "outlier_detection"]
-                        }
-                    }
-                }
+                            "validation_rules": ["range_check", "outlier_detection"],
+                        },
+                    },
+                },
             ],
             "metadata": {
                 "processing_context": {
                     "data_source": "/path/to/trustee_performance_2024_11.xlsx",
                     "batch_id": "batch_20241101_001",
-                    "processor_version": "2.1.0"
+                    "processor_version": "2.1.0",
                 },
                 "data_lineage": [
                     {"step": "extraction", "timestamp": "2024-01-01T11:00:00Z"},
                     {"step": "validation", "timestamp": "2024-01-01T11:30:00Z"},
-                    {"step": "transformation", "timestamp": "2024-01-01T12:00:00Z"}
-                ]
-            }
+                    {"step": "transformation", "timestamp": "2024-01-01T12:00:00Z"},
+                ],
+            },
         }
 
         adapted = _adapt_param(complex_nested)
@@ -480,13 +477,18 @@ class TestJSONBParameterAdaptation:
 
     def test_load_adapts_jsonb_parameters_in_sql_plan(self):
         """Test that load function properly adapts JSONB parameters in plan mode."""
-        rows = [{
-            "report_date": "2024-01-01",
-            "plan_code": "P001",
-            "company_code": "C001",
-            "validation_warnings": ["warning1", "warning2"],  # List that needs JSONB adaptation
-            "metadata": {"source": "test", "processed": True}   # Dict that needs JSONB adaptation
-        }]
+        rows = [
+            {
+                "report_date": "2024-01-01",
+                "plan_code": "P001",
+                "company_code": "C001",
+                "validation_warnings": ["warning1", "warning2"],  # List that needs JSONB adaptation
+                "metadata": {
+                    "source": "test",
+                    "processed": True,
+                },  # Dict that needs JSONB adaptation
+            }
+        ]
 
         result = load("trustee_performance", rows, mode="append", conn=None)
 
@@ -508,13 +510,13 @@ class TestJSONBParameterAdaptation:
             {
                 "id": 1,
                 "validation_warnings": ["warning1", {"type": "error", "msg": "Invalid data"}],
-                "metadata": {"source": "file1.xlsx", "processed": True}
+                "metadata": {"source": "file1.xlsx", "processed": True},
             },
             {
                 "id": 2,
                 "validation_warnings": ["warning2"],
-                "metadata": {"source": "file2.xlsx", "processed": False, "errors": [{"code": 500}]}
-            }
+                "metadata": {"source": "file2.xlsx", "processed": False, "errors": [{"code": 500}]},
+            },
         ]
 
         # Mock database connection
@@ -526,13 +528,10 @@ class TestJSONBParameterAdaptation:
         mock_conn.__exit__.return_value = None
 
         # Mock execute_values to capture the adapted parameters
-        with patch('src.work_data_hub.io.loader.warehouse_loader.execute_values') as mock_execute_values:
-            result = load(
-                table="test_table",
-                rows=rows,
-                mode="append",
-                conn=mock_conn
-            )
+        with patch(
+            "src.work_data_hub.io.loader.warehouse_loader.execute_values"
+        ) as mock_execute_values:
+            result = load(table="test_table", rows=rows, mode="append", conn=mock_conn)
 
             # Verify execute_values was called
             mock_execute_values.assert_called_once()
@@ -561,20 +560,19 @@ class TestJSONBParameterAdaptation:
     def test_execute_values_parameter_structure_with_jsonb(self):
         """Test that execute_values receives properly structured JSONB parameters."""
         # Test specific to execute_values parameter format requirements
-        rows = [{
-            "report_date": "2024-01-01",
-            "plan_code": "PLAN001",
-            "company_code": "COMP001",
-            "return_rate": 0.055,
-            "validation_warnings": ["Rate exceeds threshold"],
-            "metadata": {
-                "file_source": "2024_11_trustee_performance.xlsx",
-                "processing_info": {
-                    "batch_size": 1000,
-                    "warnings_count": 1
-                }
+        rows = [
+            {
+                "report_date": "2024-01-01",
+                "plan_code": "PLAN001",
+                "company_code": "COMP001",
+                "return_rate": 0.055,
+                "validation_warnings": ["Rate exceeds threshold"],
+                "metadata": {
+                    "file_source": "2024_11_trustee_performance.xlsx",
+                    "processing_info": {"batch_size": 1000, "warnings_count": 1},
+                },
             }
-        }]
+        ]
 
         # Mock the database components
         mock_conn = Mock()
@@ -584,19 +582,21 @@ class TestJSONBParameterAdaptation:
         mock_conn.__enter__.return_value = mock_conn
         mock_conn.__exit__.return_value = None
 
-        with patch('src.work_data_hub.io.loader.warehouse_loader.execute_values') as mock_execute_values:
-            load(
-                table="trustee_performance",
-                rows=rows,
-                mode="append",
-                conn=mock_conn
-            )
+        with patch(
+            "src.work_data_hub.io.loader.warehouse_loader.execute_values"
+        ) as mock_execute_values:
+            load(table="trustee_performance", rows=rows, mode="append", conn=mock_conn)
 
             # Verify execute_values call structure
             mock_execute_values.assert_called_once()
             call_args = mock_execute_values.call_args
 
-            cursor, sql, row_data, page_size = call_args[0][0], call_args[0][1], call_args[0][2], call_args[1]['page_size']
+            cursor, sql, row_data, page_size = (
+                call_args[0][0],
+                call_args[0][1],
+                call_args[0][2],
+                call_args[1]["page_size"],
+            )
 
             # Verify SQL structure
             assert 'INSERT INTO "trustee_performance"' in sql
@@ -611,8 +611,13 @@ class TestJSONBParameterAdaptation:
 
             # Verify JSONB parameters are Json-wrapped
             from psycopg2.extras import Json
-            validation_warnings_param = next(p for p in row_params if isinstance(p, Json) and isinstance(p.adapted, list))
-            metadata_param = next(p for p in row_params if isinstance(p, Json) and isinstance(p.adapted, dict))
+
+            validation_warnings_param = next(
+                p for p in row_params if isinstance(p, Json) and isinstance(p.adapted, list)
+            )
+            metadata_param = next(
+                p for p in row_params if isinstance(p, Json) and isinstance(p.adapted, dict)
+            )
 
             assert validation_warnings_param.adapted == ["Rate exceeds threshold"]
             assert metadata_param.adapted["file_source"] == "2024_11_trustee_performance.xlsx"
@@ -625,25 +630,23 @@ class TestJSONBParameterAdaptation:
         # Create dataset larger than chunk_size to test chunking with JSONB
         large_dataset = []
         for i in range(2500):  # Larger than default chunk_size=1000
-            large_dataset.append({
-                "id": i,
-                "data": f"row_{i}",
-                "jsonb_field": {
-                    "index": i,
-                    "metadata": {
-                        "created": f"2024-01-{(i % 28) + 1:02d}",
-                        "tags": [f"tag_{j}" for j in range(i % 3 + 1)]
-                    }
+            large_dataset.append(
+                {
+                    "id": i,
+                    "data": f"row_{i}",
+                    "jsonb_field": {
+                        "index": i,
+                        "metadata": {
+                            "created": f"2024-01-{(i % 28) + 1:02d}",
+                            "tags": [f"tag_{j}" for j in range(i % 3 + 1)],
+                        },
+                    },
                 }
-            })
+            )
 
         # Plan-only mode to test chunking logic
         result = load(
-            table="test_table",
-            rows=large_dataset,
-            mode="append",
-            chunk_size=1000,
-            conn=None
+            table="test_table", rows=large_dataset, mode="append", chunk_size=1000, conn=None
         )
 
         # Verify chunking worked correctly
@@ -664,9 +667,9 @@ class TestJSONBParameterAdaptation:
         unicode_data = {
             "chinese_text": "测试数据",
             "emoji": "🚀📊💰",
-            "special_chars": "Quote: \"Test\", Backslash: \\, Newline: \n, Tab: \t",
+            "special_chars": 'Quote: "Test", Backslash: \\, Newline: \n, Tab: \t',
             "unicode_escape": "\u4e2d\u6587",
-            "mixed_array": ["English", "中文", "🎯", {"nested": "测试"}]
+            "mixed_array": ["English", "中文", "🎯", {"nested": "测试"}],
         }
 
         adapted = _adapt_param(unicode_data)

@@ -26,7 +26,7 @@ class TestDecimalQuantizationEnhanced:
             plan_code="P001",
             company_code="C001",
             return_rate=0.048799999999999996,  # Float precision tail
-            data_source="test"
+            data_source="test",
         )
 
         # Should be quantized to 6 decimal places
@@ -40,7 +40,7 @@ class TestDecimalQuantizationEnhanced:
             plan_code="P001",
             company_code="C001",
             net_asset_value=1.23456789,  # Should be rounded to 4 places
-            data_source="test"
+            data_source="test",
         )
 
         # Should be quantized to 4 decimal places using ROUND_HALF_UP
@@ -54,7 +54,7 @@ class TestDecimalQuantizationEnhanced:
             plan_code="P001",
             company_code="C001",
             fund_scale=1000.999,  # Should be rounded to 2 places
-            data_source="test"
+            data_source="test",
         )
 
         # Should be quantized to 2 decimal places
@@ -68,7 +68,7 @@ class TestDecimalQuantizationEnhanced:
             plan_code="P001",
             company_code="C001",
             return_rate="0.048799999999999996",  # String input
-            data_source="test"
+            data_source="test",
         )
 
         # Should handle string properly and quantize
@@ -81,7 +81,7 @@ class TestDecimalQuantizationEnhanced:
             plan_code="P001",
             company_code="C001",
             return_rate="4.8799999%",  # Percentage with precision tail
-            data_source="test"
+            data_source="test",
         )
 
         # Should convert to decimal and quantize: 4.8799999% -> 0.048800
@@ -93,10 +93,10 @@ class TestDecimalQuantizationEnhanced:
             report_date="2024-01-01",
             plan_code="P001",
             company_code="C001",
-            return_rate=0.1234567890,      # Should be 6 places: 0.123457
-            net_asset_value=1.23456789,    # Should be 4 places: 1.2346
-            fund_scale=1000.12345,         # Should be 2 places: 1000.12
-            data_source="test"
+            return_rate=0.1234567890,  # Should be 6 places: 0.123457
+            net_asset_value=1.23456789,  # Should be 4 places: 1.2346
+            fund_scale=1000.12345,  # Should be 2 places: 1000.12
+            data_source="test",
         )
 
         assert model.return_rate == Decimal("0.123457")
@@ -112,7 +112,7 @@ class TestDecimalQuantizationEnhanced:
             return_rate=None,
             net_asset_value=None,
             fund_scale=None,
-            data_source="test"
+            data_source="test",
         )
 
         assert model.return_rate is None
@@ -141,21 +141,23 @@ class TestFloatPrecisionEdgeCases:
                 "plan_code": "P001",
                 "company_code": "C001",
                 field_name: float_val,
-                "data_source": "test"
+                "data_source": "test",
             }
 
             model = TrusteePerformanceOut(**kwargs)
             actual_value = getattr(model, field_name)
 
-            assert actual_value == expected_decimal, f"Field {field_name}: {float_val} -> {actual_value}, expected {expected_decimal}"
+            assert actual_value == expected_decimal, (
+                f"Field {field_name}: {float_val} -> {actual_value}, expected {expected_decimal}"
+            )
 
     def test_scientific_notation_float_inputs(self):
         """Test float inputs in scientific notation are handled correctly."""
         scientific_cases = [
-            (5.5e-2, "return_rate", Decimal("0.055000")),     # 0.055
-            (1.2e0, "net_asset_value", Decimal("1.2000")),     # 1.2
-            (1.5e6, "fund_scale", Decimal("1500000.00")),      # 1500000.0
-            (1e-6, "return_rate", Decimal("0.000001")),        # Very small
+            (5.5e-2, "return_rate", Decimal("0.055000")),  # 0.055
+            (1.2e0, "net_asset_value", Decimal("1.2000")),  # 1.2
+            (1.5e6, "fund_scale", Decimal("1500000.00")),  # 1500000.0
+            (1e-6, "return_rate", Decimal("0.000001")),  # Very small
         ]
 
         for sci_val, field_name, expected_decimal in scientific_cases:
@@ -164,7 +166,7 @@ class TestFloatPrecisionEdgeCases:
                 "plan_code": "P001",
                 "company_code": "C001",
                 field_name: sci_val,
-                "data_source": "test"
+                "data_source": "test",
             }
 
             model = TrusteePerformanceOut(**kwargs)
@@ -187,7 +189,7 @@ class TestFloatPrecisionEdgeCases:
                 "plan_code": "P001",
                 "company_code": "C001",
                 field_name: long_float,
-                "data_source": "test"
+                "data_source": "test",
             }
 
             model = TrusteePerformanceOut(**kwargs)
@@ -202,7 +204,7 @@ class TestFloatPrecisionEdgeCases:
             0.048799999999999996,
             1.0512000000000001,
             12000000.003,
-            0.1 + 0.2  # 0.30000000000000004
+            0.1 + 0.2,  # 0.30000000000000004
         ]
 
         for float_val in float_values:
@@ -213,7 +215,7 @@ class TestFloatPrecisionEdgeCases:
             # Verify string conversion fixes float precision
             assert isinstance(decimal_val, Decimal)
             # The string representation should be reasonable
-            assert len(str_val.split('.')[-1]) <= 17  # Reasonable precision length
+            assert len(str_val.split(".")[-1]) <= 17  # Reasonable precision length
 
 
 class TestFieldValidatorInfoIntegration:
@@ -243,7 +245,7 @@ class TestFieldValidatorInfoIntegration:
                 return_rate=0.055,
                 net_asset_value=1.23,
                 fund_scale=1000.00,
-                data_source="test"
+                data_source="test",
             )
 
             # Verify all three decimal fields were processed with correct field names
@@ -261,9 +263,9 @@ class TestFieldValidatorInfoIntegration:
 
         # Extract field_precision_map from validator (this tests the actual implementation)
         field_precision_map = {
-            "return_rate": 6,        # NUMERIC(8,6)
-            "net_asset_value": 4,    # NUMERIC(18,4)
-            "fund_scale": 2          # NUMERIC(18,2)
+            "return_rate": 6,  # NUMERIC(8,6)
+            "net_asset_value": 4,  # NUMERIC(18,4)
+            "fund_scale": 2,  # NUMERIC(18,2)
         }
 
         # Verify all decimal fields in model are covered
@@ -272,15 +274,17 @@ class TestFieldValidatorInfoIntegration:
 
         for field_name, field_info in model_fields.items():
             # Check for Optional[Decimal] fields
-            if hasattr(field_info.annotation, '__origin__'):
+            if hasattr(field_info.annotation, "__origin__"):
                 # Handle Optional[Decimal] -> Union[Decimal, None]
-                args = getattr(field_info.annotation, '__args__', ())
+                args = getattr(field_info.annotation, "__args__", ())
                 if Decimal in args:
                     decimal_fields.append(field_name)
 
         # Ensure all decimal fields have precision mapping
         for field_name in decimal_fields:
-            assert field_name in field_precision_map, f"Field {field_name} missing from field_precision_map"
+            assert field_name in field_precision_map, (
+                f"Field {field_name} missing from field_precision_map"
+            )
 
     def test_clean_decimal_fields_direct_invocation(self):
         """Test direct invocation of clean_decimal_fields validator."""
@@ -318,7 +322,7 @@ class TestPydanticV2ValidatorPatterns:
             plan_code="P001",
             company_code="C001",
             return_rate="5.5%",  # String input that should be processed by validator
-            data_source="test"
+            data_source="test",
         )
 
         # Validator should have processed the string percentage
@@ -327,11 +331,11 @@ class TestPydanticV2ValidatorPatterns:
     def test_validator_handles_various_input_types(self):
         """Test validator handles int, float, str, Decimal inputs correctly."""
         input_variations = [
-            (5, "fund_scale", Decimal("5.00")),           # int
-            (5.5, "return_rate", Decimal("0.055000")),    # float (as percentage)
-            ("5.5", "net_asset_value", Decimal("5.5000")), # string
-            (Decimal("5.5"), "fund_scale", Decimal("5.50")), # Decimal
-            ("5.5%", "return_rate", Decimal("0.055000")), # percentage string
+            (5, "fund_scale", Decimal("5.00")),  # int
+            (5.5, "return_rate", Decimal("0.055000")),  # float (as percentage)
+            ("5.5", "net_asset_value", Decimal("5.5000")),  # string
+            (Decimal("5.5"), "fund_scale", Decimal("5.50")),  # Decimal
+            ("5.5%", "return_rate", Decimal("0.055000")),  # percentage string
         ]
 
         for input_val, field_name, expected_output in input_variations:
@@ -340,7 +344,7 @@ class TestPydanticV2ValidatorPatterns:
                 "plan_code": "P001",
                 "company_code": "C001",
                 field_name: input_val,
-                "data_source": "test"
+                "data_source": "test",
             }
 
             model = TrusteePerformanceOut(**kwargs)
@@ -362,7 +366,7 @@ class TestPydanticV2ValidatorPatterns:
                 "plan_code": "P001",
                 "company_code": "C001",
                 field_name: invalid_value,
-                "data_source": "test"
+                "data_source": "test",
             }
 
             with pytest.raises(ValidationError) as exc_info:
@@ -370,7 +374,7 @@ class TestPydanticV2ValidatorPatterns:
 
             # Verify the error relates to the problematic field
             error_details = exc_info.value.errors()[0]
-            assert field_name in str(error_details['loc'])
+            assert field_name in str(error_details["loc"])
 
     def test_placeholder_value_handling(self):
         """Test that placeholder values are converted to None."""
@@ -384,7 +388,7 @@ class TestPydanticV2ValidatorPatterns:
                 return_rate=placeholder,
                 net_asset_value=placeholder,
                 fund_scale=placeholder,
-                data_source="test"
+                data_source="test",
             )
 
             assert model.return_rate is None
@@ -405,7 +409,7 @@ class TestPydanticV2ValidatorPatterns:
                 "plan_code": "P001",
                 "company_code": "C001",
                 field_name: input_val,
-                "data_source": "test"
+                "data_source": "test",
             }
 
             model = TrusteePerformanceOut(**kwargs)
@@ -421,9 +425,9 @@ class TestRoundingBehaviorConsistency:
         """Test ROUND_HALF_UP behavior is consistent."""
         # Test exact .5 cases that should round up
         half_up_cases = [
-            ("return_rate", 0.0555555, Decimal("0.055556")),   # 6th place = 5, round up
-            ("net_asset_value", 1.23455, Decimal("1.2346")),   # 4th place = 5, round up
-            ("fund_scale", 1000.125, Decimal("1000.13")),      # 2nd place = 5, round up
+            ("return_rate", 0.0555555, Decimal("0.055556")),  # 6th place = 5, round up
+            ("net_asset_value", 1.23455, Decimal("1.2346")),  # 4th place = 5, round up
+            ("fund_scale", 1000.125, Decimal("1000.13")),  # 2nd place = 5, round up
         ]
 
         for field_name, input_val, expected_output in half_up_cases:
@@ -432,7 +436,7 @@ class TestRoundingBehaviorConsistency:
                 "plan_code": "P001",
                 "company_code": "C001",
                 field_name: input_val,
-                "data_source": "test"
+                "data_source": "test",
             }
 
             model = TrusteePerformanceOut(**kwargs)
@@ -446,16 +450,16 @@ class TestRoundingBehaviorConsistency:
             report_date="2024-01-01",
             plan_code="P001",
             company_code="C001",
-            return_rate=0.1,           # Should have 6 decimal places
-            net_asset_value=1.2,       # Should have 4 decimal places
-            fund_scale=1000,           # Should have 2 decimal places
-            data_source="test"
+            return_rate=0.1,  # Should have 6 decimal places
+            net_asset_value=1.2,  # Should have 4 decimal places
+            fund_scale=1000,  # Should have 2 decimal places
+            data_source="test",
         )
 
         # Test the string representation has correct decimal places
         assert str(model.return_rate) == "0.100000"  # 6 places
         assert str(model.net_asset_value) == "1.2000"  # 4 places
-        assert str(model.fund_scale) == "1000.00"    # 2 places
+        assert str(model.fund_scale) == "1000.00"  # 2 places
 
         # Test the scale property
         assert model.return_rate.as_tuple().exponent == -6
@@ -470,9 +474,9 @@ class TestExcelNumericCellCompatibility:
         """Test that Excel float cells don't cause ValidationError crashes."""
         # These simulate actual Excel cell values that caused crashes
         excel_float_values = [
-            1.0512,       # Excel float (was causing error)
-            12000000,     # Excel int (was causing error)
-            0.055,        # Excel decimal
+            1.0512,  # Excel float (was causing error)
+            12000000,  # Excel int (was causing error)
+            0.055,  # Excel decimal
             1.0512000000000001,  # Excel precision artifact
         ]
 
@@ -483,7 +487,7 @@ class TestExcelNumericCellCompatibility:
                 plan_code="P001",
                 company_code="C001",
                 net_asset_value=excel_val,
-                data_source="test"
+                data_source="test",
             )
 
             assert isinstance(model, TrusteePerformanceOut)
@@ -495,10 +499,10 @@ class TestExcelNumericCellCompatibility:
             report_date="2024-01-01",
             plan_code="P001",
             company_code="C001",
-            net_asset_value="1.0512",    # String (existing behavior)
-            fund_scale=12000000,         # Numeric (new capability)
-            return_rate="5.5%",          # String percentage (existing behavior)
-            data_source="test"
+            net_asset_value="1.0512",  # String (existing behavior)
+            fund_scale=12000000,  # Numeric (new capability)
+            return_rate="5.5%",  # String percentage (existing behavior)
+            data_source="test",
         )
 
         assert model.net_asset_value == Decimal("1.0512")

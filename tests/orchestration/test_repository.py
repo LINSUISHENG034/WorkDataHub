@@ -25,10 +25,7 @@ class TestDefinitionsModule:
         job_names = [job.name for job in jobs]
 
         # Verify expected jobs are present
-        expected_jobs = [
-            "trustee_performance_job",
-            "trustee_performance_multi_file_job"
-        ]
+        expected_jobs = ["trustee_performance_job", "trustee_performance_multi_file_job"]
 
         for expected_job in expected_jobs:
             assert expected_job in job_names, f"Job '{expected_job}' not found in definitions"
@@ -44,12 +41,12 @@ class TestDefinitionsModule:
         schedule_names = [schedule.name for schedule in schedules]
 
         # Verify expected schedules are present
-        expected_schedules = [
-            "trustee_daily_schedule"
-        ]
+        expected_schedules = ["trustee_daily_schedule"]
 
         for expected_schedule in expected_schedules:
-            assert expected_schedule in schedule_names, f"Schedule '{expected_schedule}' not found in definitions"
+            assert expected_schedule in schedule_names, (
+                f"Schedule '{expected_schedule}' not found in definitions"
+            )
 
         # Verify schedules are actual ScheduleDefinition objects
         for schedule in schedules:
@@ -62,13 +59,12 @@ class TestDefinitionsModule:
         sensor_names = [sensor.name for sensor in sensors]
 
         # Verify expected sensors are present
-        expected_sensors = [
-            "trustee_new_files_sensor",
-            "trustee_data_quality_sensor"
-        ]
+        expected_sensors = ["trustee_new_files_sensor", "trustee_data_quality_sensor"]
 
         for expected_sensor in expected_sensors:
-            assert expected_sensor in sensor_names, f"Sensor '{expected_sensor}' not found in definitions"
+            assert expected_sensor in sensor_names, (
+                f"Sensor '{expected_sensor}' not found in definitions"
+            )
 
         # Verify sensors are actual SensorDefinition objects
         for sensor in sensors:
@@ -172,7 +168,9 @@ class TestDefinitionsIntegration:
 
         # Verify all referenced jobs actually exist
         for ref_job_name in referenced_job_names:
-            assert ref_job_name in actual_job_names, f"Referenced job '{ref_job_name}' not found in definitions"
+            assert ref_job_name in actual_job_names, (
+                f"Referenced job '{ref_job_name}' not found in definitions"
+            )
 
     def test_unique_component_names(self):
         """Test that all component names are unique within their categories."""

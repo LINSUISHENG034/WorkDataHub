@@ -75,6 +75,7 @@ TASK BREAKDOWN PHILOSOPHY:
 | C-025 | M2 | 规模明细数据发现配置（data_sources.yml 正则与V*版本选择） | COMPLETED ✅ | C-024 | P-019 |
 | C-026 | M2 | 规模明细Postgres最小DDL（scripts/dev/annuity_performance.sql） | COMPLETED ✅ | C-024 | P-020 |
 | C-027 | M2 | 规模明细E2E（plan-only/execute，本地样本） | COMPLETED ✅ | C-025, C-026 | P-021 |
+| C-028 | M2 | Cleansing framework hardening (negative/full-width percent, Excel header normalization, annuity portfolio-code ^F stripping) | VALIDATING | C-020, C-022, C-024 | P-023 |
 | R-016 | M2 | Research ingestion connectors (HTTP/SFTP) and auth strategy | READY_FOR_PRP | - | - |
 | F-032 | M2 | Implement HTTP crawler connector + retries/auth + CLI | PENDING | R-016 | - |
 | F-033 | M2 | Implement SFTP/FTP downloader connector | PENDING | R-016 | - |

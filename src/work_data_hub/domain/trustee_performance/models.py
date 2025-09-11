@@ -63,9 +63,7 @@ class TrusteePerformanceIn(BaseModel):
     净值: Optional[Union[Decimal, float, int, str]] = Field(
         None, description="Net asset value (净值)"
     )
-    规模: Optional[Union[Decimal, float, int, str]] = Field(
-        None, description="Scale/size (规模)"
-    )
+    规模: Optional[Union[Decimal, float, int, str]] = Field(None, description="Scale/size (规模)")
 
     # Metadata fields
     report_period: Optional[str] = Field(None, description="Report period string")
@@ -173,15 +171,13 @@ class TrusteePerformanceOut(BaseModel):
 
         # Field-specific precision configuration
         precision_config = {
-            "return_rate": 6,        # NUMERIC(8,6)
-            "net_asset_value": 4,    # NUMERIC(18,4)
-            "fund_scale": 2          # NUMERIC(18,2)
+            "return_rate": 6,  # NUMERIC(8,6)
+            "net_asset_value": 4,  # NUMERIC(18,4)
+            "fund_scale": 2,  # NUMERIC(18,2)
         }
 
         return comprehensive_decimal_cleaning(
-            value=v,
-            field_name=info.field_name,
-            precision_config=precision_config
+            value=v, field_name=info.field_name, precision_config=precision_config
         )
 
     @model_validator(mode="after")

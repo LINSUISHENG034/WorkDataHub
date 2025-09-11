@@ -1,8 +1,8 @@
 """
 Smoke tests for Annuity Performance (规模明细) using legacy sample data - opt-in via marker.
 
-These tests validate discovery and processing pipeline capabilities for the 
-Annuity Performance domain using real reference data. Tests are skipped by 
+These tests validate discovery and processing pipeline capabilities for the
+Annuity Performance domain using real reference data. Tests are skipped by
 default and require explicit marker activation.
 
 Usage:
@@ -33,6 +33,7 @@ def _has_psycopg2() -> bool:
     """Check if psycopg2 is available for database tests."""
     try:
         import psycopg2  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -79,7 +80,9 @@ class TestAnnuityPerformanceSmoke:
                 # Look for V1 directory
                 v1_path = data_collection_path / "V1"
                 if v1_path.exists():
-                    print(f"Found V1 directory with {len(list(v1_path.glob('*.xlsx')))} Excel files")
+                    print(
+                        f"Found V1 directory with {len(list(v1_path.glob('*.xlsx')))} Excel files"
+                    )
 
     def test_plan_only_placeholder(self):
         """Test plan-only placeholder for future pipeline integration."""

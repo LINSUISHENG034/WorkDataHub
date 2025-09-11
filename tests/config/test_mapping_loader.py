@@ -240,11 +240,14 @@ class TestSpecificLoaderFunctions:
 
     def test_specific_loaders_file_not_found_error(self, monkeypatch):
         """Test that specific loaders raise error when files are missing."""
+
         # Mock the mapping files to not exist
         def mock_load_yaml_mapping(path):
             raise MappingLoaderError(f"Mapping file not found: {path}")
 
-        monkeypatch.setattr("src.work_data_hub.config.mapping_loader.load_yaml_mapping", mock_load_yaml_mapping)
+        monkeypatch.setattr(
+            "src.work_data_hub.config.mapping_loader.load_yaml_mapping", mock_load_yaml_mapping
+        )
 
         with pytest.raises(MappingLoaderError, match="Mapping file not found"):
             load_company_branch()
@@ -325,8 +328,7 @@ class TestPortabilityAndEnvironmentOverride:
         temp_mappings = tmp_path / "mappings"
         temp_mappings.mkdir()
         (temp_mappings / "company_branch.yml").write_text(
-            "test_key: test_value\noverride_key: override_value",
-            encoding="utf-8"
+            "test_key: test_value\noverride_key: override_value", encoding="utf-8"
         )
 
         monkeypatch.setenv("WDH_MAPPINGS_DIR", str(temp_mappings))
@@ -341,7 +343,9 @@ class TestPortabilityAndEnvironmentOverride:
         """Test that WDH_MAPPINGS_DIR with missing directory raises error."""
         monkeypatch.setenv("WDH_MAPPINGS_DIR", "/nonexistent/path")
 
-        with pytest.raises(MappingLoaderError, match="WDH_MAPPINGS_DIR not found or not a directory"):
+        with pytest.raises(
+            MappingLoaderError, match="WDH_MAPPINGS_DIR not found or not a directory"
+        ):
             load_company_branch()
 
     def test_env_override_file_not_directory(self, tmp_path, monkeypatch):
@@ -352,7 +356,9 @@ class TestPortabilityAndEnvironmentOverride:
 
         monkeypatch.setenv("WDH_MAPPINGS_DIR", str(temp_file))
 
-        with pytest.raises(MappingLoaderError, match="WDH_MAPPINGS_DIR not found or not a directory"):
+        with pytest.raises(
+            MappingLoaderError, match="WDH_MAPPINGS_DIR not found or not a directory"
+        ):
             get_mappings_dir()
 
     def test_get_mappings_dir_default_path(self):
@@ -364,7 +370,9 @@ class TestPortabilityAndEnvironmentOverride:
         mappings_dir = get_mappings_dir()
 
         # Should be module-relative path
-        expected_path = Path(__file__).parent.parent.parent / "src" / "work_data_hub" / "config" / "mappings"
+        expected_path = (
+            Path(__file__).parent.parent.parent / "src" / "work_data_hub" / "config" / "mappings"
+        )
 
         # Check that both paths exist and resolve to same location
         assert mappings_dir.exists()

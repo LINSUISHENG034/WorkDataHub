@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 class RuleCategory(Enum):
     """清洗规则分类枚举"""
+
     DATE = "date"
     NUMERIC = "numeric"
     STRING = "string"
@@ -26,6 +27,7 @@ class RuleCategory(Enum):
 @dataclass
 class CleansingRule:
     """清洗规则元数据 - 简化版本，遵循KISS原则"""
+
     name: str
     category: RuleCategory
     func: Callable
@@ -40,7 +42,7 @@ class CleansingRule:
 class CleansingRegistry:
     """
     清洗规则注册表 - 简化版本
-    
+
     负责管理所有清洗规则的注册和基本查找功能。
     遵循KISS原则，移除过度工程化的索引系统。
     """
@@ -57,7 +59,7 @@ class CleansingRegistry:
     def register(self, rule: CleansingRule) -> None:
         """
         注册清洗规则到全局注册表
-        
+
         Args:
             rule: 要注册的清洗规则
         """
@@ -81,10 +83,7 @@ class CleansingRegistry:
 
     def get_statistics(self) -> Dict[str, Any]:
         """获取注册表统计信息"""
-        stats = {
-            "total_rules": len(self._rules),
-            "rules_by_category": {}
-        }
+        stats = {"total_rules": len(self._rules), "rules_by_category": {}}
 
         # 计算每个分类的规则数量
         for category in RuleCategory:
@@ -98,21 +97,17 @@ class CleansingRegistry:
 registry = CleansingRegistry()
 
 
-def rule(
-    name: str,
-    category: RuleCategory,
-    description: str
-):
+def rule(name: str, category: RuleCategory, description: str):
     """
     清洗规则注册装饰器 - 简化版本
-    
+
     遵循KISS原则，专注于核心功能：将函数注册为可复用的清洗规则。
-    
+
     Args:
         name: 规则名称
         category: 规则分类
         description: 规则描述
-    
+
     Example:
         @rule(
             name="decimal_quantization",
@@ -123,14 +118,10 @@ def rule(
             # 清洗逻辑
             return processed_value
     """
+
     def decorator(func: Callable) -> Callable:
         # 创建清洗规则对象
-        rule_obj = CleansingRule(
-            name=name,
-            category=category,
-            func=func,
-            description=description
-        )
+        rule_obj = CleansingRule(name=name, category=category, func=func, description=description)
 
         # 注册到全局注册表
         registry.register(rule_obj)

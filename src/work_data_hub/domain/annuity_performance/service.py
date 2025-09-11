@@ -37,13 +37,35 @@ def get_allowed_columns() -> List[str]:
         List of allowed column names matching DDL schema
     """
     return [
-        "id", "月度", "业务类型", "计划类型", "计划代码", "计划名称",
-        "组合类型", "组合代码", "组合名称", "客户名称", "期初资产规模",
-        "期末资产规模", "供款", "流失(含待遇支付)", "流失", "待遇支付",
-        "投资收益", "当期收益率", "机构代码", "机构名称", "产品线代码",
-        "年金账户号", "年金账户名", "company_id",
+        "id",
+        "月度",
+        "业务类型",
+        "计划类型",
+        "计划代码",
+        "计划名称",
+        "组合类型",
+        "组合代码",
+        "组合名称",
+        "客户名称",
+        "期初资产规模",
+        "期末资产规模",
+        "供款",
+        "流失(含待遇支付)",
+        "流失",
+        "待遇支付",
+        "投资收益",
+        "当期收益率",
+        "机构代码",
+        "机构名称",
+        "产品线代码",
+        "年金账户号",
+        "年金账户名",
+        "company_id",
         # Additional fields that may appear in Excel for processing
-        "年", "月", "公司代码", "报告日期"
+        "年",
+        "月",
+        "公司代码",
+        "报告日期",
     ]
 
 
@@ -67,10 +89,7 @@ def project_columns(rows: List[Dict[str, Any]], allowed_cols: List[str]) -> List
     logger.debug(f"Projecting {len(rows)} rows to allowed columns: {len(allowed_cols)} columns")
 
     # Use dictionary comprehension for memory efficiency
-    projected_rows = [
-        {k: row.get(k) for k in allowed_cols if k in row}
-        for row in rows
-    ]
+    projected_rows = [{k: row.get(k) for k in allowed_cols if k in row} for row in rows]
 
     if projected_rows:
         original_cols = set(rows[0].keys()) if rows else set()
@@ -295,7 +314,9 @@ def _extract_report_date(input_model: AnnuityPerformanceIn, row_index: int) -> O
         try:
             return date(year, month, 1)
         except ValueError as e:
-            logger.debug(f"Row {row_index}: Cannot create date from year={year}, month={month}: {e}")
+            logger.debug(
+                f"Row {row_index}: Cannot create date from year={year}, month={month}: {e}"
+            )
             return None
 
     logger.debug(f"Row {row_index}: No valid date could be extracted")
@@ -367,7 +388,11 @@ def _extract_plan_code(input_model: AnnuityPerformanceIn, row_index: int) -> Opt
     """Extract plan code from input model."""
     # Try Chinese field name first
     if input_model.计划代码:
-        return str(input_model.计划代码).strip()
+        plan_code = str(input_model.计划代码).strip()
+        # Strip ^F prefix if present in 组合代码 context
+        if hasattr(input_model, "组合代码") and input_model.组合代码 and plan_code.startswith("F"):
+            plan_code = plan_code[1:]  # Remove leading 'F'
+        return plan_code
 
     logger.debug(f"Row {row_index}: No plan code found")
     return None
@@ -389,10 +414,9 @@ def _extract_company_code(input_model: AnnuityPerformanceIn, row_index: int) -> 
         # Simple heuristic: use first part of customer name as company code
         customer = str(input_model.客户名称).strip()
         # Remove common company suffixes and take first meaningful part
-        simplified = (customer.replace("有限公司", "")
-                     .replace("股份有限公司", "")
-                     .replace("集团", "")
-                     .strip())
+        simplified = (
+            customer.replace("有限公司", "").replace("股份有限公司", "").replace("集团", "").strip()
+        )
         if simplified:
             return simplified[:20]  # Truncate to reasonable length
 
@@ -400,9 +424,7 @@ def _extract_company_code(input_model: AnnuityPerformanceIn, row_index: int) -> 
     return None
 
 
-def _extract_financial_metrics(
-    input_model: AnnuityPerformanceIn, row_index: int
-) -> Dict[str, Any]:
+def _extract_financial_metrics(input_model: AnnuityPerformanceIn, row_index: int) -> Dict[str, Any]:
     """
     Extract all financial metrics from input model.
 
@@ -417,8 +439,13 @@ def _extract_financial_metrics(
 
     # Extract all financial fields that have direct mappings
     financial_fields = [
-        "期初资产规模", "期末资产规模", "供款", "流失", "待遇支付",
-        "投资收益", "当期收益率"
+        "期初资产规模",
+        "期末资产规模",
+        "供款",
+        "流失",
+        "待遇支付",
+        "投资收益",
+        "当期收益率",
     ]
 
     for field in financial_fields:
@@ -432,9 +459,7 @@ def _extract_financial_metrics(
     return metrics
 
 
-def _extract_metadata_fields(
-    input_model: AnnuityPerformanceIn, row_index: int
-) -> Dict[str, Any]:
+def _extract_metadata_fields(input_model: AnnuityPerformanceIn, row_index: int) -> Dict[str, Any]:
     """
     Extract all metadata and organizational fields from input model.
 
@@ -449,8 +474,18 @@ def _extract_metadata_fields(
 
     # Extract all text/organizational fields
     text_fields = [
-        "业务类型", "计划类型", "计划名称", "组合类型", "组合代码", "组合名称",
-        "客户名称", "机构代码", "机构名称", "产品线代码", "年金账户号", "年金账户名"
+        "业务类型",
+        "计划类型",
+        "计划名称",
+        "组合类型",
+        "组合代码",
+        "组合名称",
+        "客户名称",
+        "机构代码",
+        "机构名称",
+        "产品线代码",
+        "年金账户号",
+        "年金账户名",
     ]
 
     for field in text_fields:
@@ -496,9 +531,7 @@ def validate_input_batch(rows: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any
             if has_date and has_plan and has_company:
                 valid_rows.append(row)
             else:
-                errors.append(
-                    f"Row {i}: missing required fields (date/plan/company)"
-                )
+                errors.append(f"Row {i}: missing required fields (date/plan/company)")
         except ValidationError as e:
             errors.append(f"Row {i}: {e}")
         except Exception as e:

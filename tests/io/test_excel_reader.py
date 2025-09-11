@@ -292,6 +292,48 @@ class TestExcelReader:
         assert "Column 1" in row  # Spaces stripped from column name
         assert "" in row  # None and empty column names become empty string
 
+    def test_header_normalization_removes_newlines_and_tabs(self, tmp_path):
+        """Test Excel header normalization for newlines and tabs."""
+        import pandas as pd
+
+        # Create DataFrame with problematic headers
+        df_bad_headers = pd.DataFrame(
+            {
+                "正常列名": ["value1"],
+                "包含\n换行符": ["value2"],
+                "包含\t制表符": ["value3"],
+                "包含\n\t两者": ["value4"],
+                "多行\n\n\n标题": ["value5"],
+                "\t\t前置制表符": ["value6"],
+                "末尾换行\n": ["value7"],
+            }
+        )
+
+        file_path = tmp_path / "bad_headers.xlsx"
+        df_bad_headers.to_excel(file_path, index=False, engine="openpyxl")
+
+        reader = ExcelReader()
+        rows = reader.read_rows(str(file_path))
+
+        # Verify headers are cleaned
+        first_row = rows[0]
+        assert "正常列名" in first_row, "正常列名应该保持不变"
+        assert "包含换行符" in first_row, "\\n 应该被移除"
+        assert "包含制表符" in first_row, "\\t 应该被移除"
+        assert "包含两者" in first_row, "\\n\\t 都应该被移除"
+        assert "多行标题" in first_row, "多个\\n应该被移除"
+        assert "前置制表符" in first_row, "前置\\t应该被移除"
+        assert "末尾换行" in first_row, "末尾\\n应该被移除"
+
+        # Verify values are still accessible with cleaned headers
+        assert first_row["正常列名"] == "value1"
+        assert first_row["包含换行符"] == "value2"
+        assert first_row["包含制表符"] == "value3"
+        assert first_row["包含两者"] == "value4"
+        assert first_row["多行标题"] == "value5"
+        assert first_row["前置制表符"] == "value6"
+        assert first_row["末尾换行"] == "value7"
+
 
 class TestConvenienceFunction:
     """Test the convenience read_excel_rows function."""

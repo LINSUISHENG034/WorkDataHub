@@ -194,8 +194,10 @@ class ExcelReader:
         cleaned_columns = []
         for col in df.columns:
             col_str = str(col).strip() if col is not None else ""
+            # Remove newlines and tabs from header names
+            col_str = col_str.replace("\n", "").replace("\t", "")
             # Convert "Unnamed: n" columns to empty strings
-            if re.match(r'^Unnamed:\s*\d+', col_str):
+            if re.match(r"^Unnamed:\s*\d+", col_str):
                 cleaned_columns.append("")
             else:
                 cleaned_columns.append(col_str)

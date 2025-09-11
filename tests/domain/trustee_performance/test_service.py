@@ -100,7 +100,9 @@ class TestProcessFunction:
         rows = [invalid_row]
 
         # Should raise TrusteePerformanceTransformationError due to 100% failure rate
-        with pytest.raises(TrusteePerformanceTransformationError, match="Too many processing errors"):
+        with pytest.raises(
+            TrusteePerformanceTransformationError, match="Too many processing errors"
+        ):
             process(rows, data_source="test")
 
     def test_process_mixed_valid_invalid_rows(self, valid_row_chinese, invalid_row):
@@ -396,9 +398,9 @@ class TestPerformanceMetrics:
             "月": "11",
             "计划代码": "PLAN001",
             "公司代码": "COMP001",
-            "净值": 1.0512,      # float from Excel cell
-            "规模": 12000000,     # int from Excel cell
-            "收益率": 0.055,      # float decimal form
+            "净值": 1.0512,  # float from Excel cell
+            "规模": 12000000,  # int from Excel cell
+            "收益率": 0.055,  # float decimal form
         }
 
         result = _transform_single_row(row, "test", 0)
@@ -415,9 +417,9 @@ class TestPerformanceMetrics:
             "月": "11",
             "计划代码": "PLAN001",
             "公司代码": "COMP001",
-            "净值": 1.0512,       # Excel float (was causing error)
-            "规模": 12000000,      # Excel int (was causing error)
-            "收益率": 0.055,        # Excel decimal
+            "净值": 1.0512,  # Excel float (was causing error)
+            "规模": 12000000,  # Excel int (was causing error)
+            "收益率": 0.055,  # Excel decimal
         }
 
         # Should not raise ValidationError
@@ -436,9 +438,9 @@ class TestPerformanceMetrics:
             "月": "11",
             "计划代码": "PLAN001",
             "公司代码": "COMP001",
-            "净值": "1.0512",      # String (existing behavior)
-            "规模": 12000000,       # Numeric (new capability)
-            "收益率": "5.5%",        # String percentage (existing behavior)
+            "净值": "1.0512",  # String (existing behavior)
+            "规模": 12000000,  # Numeric (new capability)
+            "收益率": "5.5%",  # String percentage (existing behavior)
         }
 
         result = _transform_single_row(row, "test", 0)
@@ -448,6 +450,7 @@ class TestPerformanceMetrics:
         assert result.net_asset_value == Decimal("1.0512")
         assert result.fund_scale == Decimal("12000000")
         assert result.return_rate == Decimal("0.055")  # 5.5% -> 0.055
+
 
 class TestDecimalQuantization:
     """Test field-specific decimal quantization in TrusteePerformanceOut."""
@@ -464,7 +467,7 @@ class TestDecimalQuantization:
             plan_code="P001",
             company_code="C001",
             return_rate=0.048799999999999996,  # Float precision tail
-            data_source="test"
+            data_source="test",
         )
 
         # Should be quantized to 6 decimal places
@@ -482,7 +485,7 @@ class TestDecimalQuantization:
             plan_code="P001",
             company_code="C001",
             net_asset_value=1.23456789,  # Should be rounded to 4 places
-            data_source="test"
+            data_source="test",
         )
 
         # Should be quantized to 4 decimal places using ROUND_HALF_UP
@@ -500,7 +503,7 @@ class TestDecimalQuantization:
             plan_code="P001",
             company_code="C001",
             fund_scale=1000.999,  # Should be rounded to 2 places
-            data_source="test"
+            data_source="test",
         )
 
         # Should be quantized to 2 decimal places
@@ -518,7 +521,7 @@ class TestDecimalQuantization:
             plan_code="P001",
             company_code="C001",
             return_rate="0.048799999999999996",  # String input
-            data_source="test"
+            data_source="test",
         )
 
         # Should handle string properly and quantize
@@ -535,7 +538,7 @@ class TestDecimalQuantization:
             plan_code="P001",
             company_code="C001",
             return_rate="4.8799999%",  # Percentage with precision tail
-            data_source="test"
+            data_source="test",
         )
 
         # Should convert to decimal and quantize: 4.8799999% -> 0.048800
@@ -551,10 +554,10 @@ class TestDecimalQuantization:
             report_date="2024-01-01",
             plan_code="P001",
             company_code="C001",
-            return_rate=0.123456789,      # Should be 6 places: 0.123457
+            return_rate=0.123456789,  # Should be 6 places: 0.123457
             net_asset_value=1.123456789,  # Should be 4 places: 1.1235
-            fund_scale=100.123456789,     # Should be 2 places: 100.12
-            data_source="test"
+            fund_scale=100.123456789,  # Should be 2 places: 100.12
+            data_source="test",
         )
 
         assert model.return_rate == Decimal("0.123457")
@@ -572,7 +575,7 @@ class TestDecimalQuantization:
             return_rate=None,
             net_asset_value=None,
             fund_scale=None,
-            data_source="test"
+            data_source="test",
         )
 
         assert model.return_rate is None

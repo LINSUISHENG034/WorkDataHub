@@ -334,13 +334,14 @@ class TestDataSourceConnector:
                 "annuity_performance": {
                     "pattern": r"(?P<year>\d{2}|20\d{2})年(?P<month>0?[1-9]|1[0-2])月.*年金.*终稿数据.*\.(xlsx|xlsm)$",
                     "select": "latest_by_year_month_and_version",
-                    "sheet": "规模明细"
+                    "sheet": "规模明细",
                 }
             }
         }
 
         config_file = tmp_path / "test_config.yml"
         import yaml
+
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_content, f, allow_unicode=True)
 
@@ -358,15 +359,15 @@ class TestDataSourceConnector:
 
         # Check 2024/11 -> V2 (highest version)
         nov_file = files_by_month[(2024, 11)]
-        assert nov_file.metadata['version'] == 2
+        assert nov_file.metadata["version"] == 2
         assert "V2" in nov_file.path
 
         # Check 2024/10 -> V1 (only version)
         oct_file = files_by_month[(2024, 10)]
-        assert oct_file.metadata['version'] == 1
+        assert oct_file.metadata["version"] == 1
         assert "V1" in oct_file.path
 
         # Check 2024/12 -> VX (malformed version = None)
         dec_file = files_by_month[(2024, 12)]
-        assert dec_file.metadata['version'] is None
+        assert dec_file.metadata["version"] is None
         assert "VX" in dec_file.path

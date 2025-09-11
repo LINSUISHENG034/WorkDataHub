@@ -70,17 +70,13 @@ class AnnuityPerformanceIn(BaseModel):
     期末资产规模: Optional[Union[Decimal, float, int, str]] = Field(
         None, description="Final asset scale (期末资产规模)"
     )
-    供款: Optional[Union[Decimal, float, int, str]] = Field(
-        None, description="Contribution (供款)"
-    )
+    供款: Optional[Union[Decimal, float, int, str]] = Field(None, description="Contribution (供款)")
     流失_含待遇支付: Optional[Union[Decimal, float, int, str]] = Field(
         None,
         description="Loss including benefit payment (流失(含待遇支付))",
-        alias="流失(含待遇支付)"
+        alias="流失(含待遇支付)",
     )
-    流失: Optional[Union[Decimal, float, int, str]] = Field(
-        None, description="Loss (流失)"
-    )
+    流失: Optional[Union[Decimal, float, int, str]] = Field(None, description="Loss (流失)")
     待遇支付: Optional[Union[Decimal, float, int, str]] = Field(
         None, description="Benefit payment (待遇支付)"
     )
@@ -128,7 +124,7 @@ class AnnuityPerformanceIn(BaseModel):
     def preprocess_report_date(cls, v):
         """
         Preprocess 月度 field to handle integer dates from Excel.
-        
+
         Excel often returns date fields as integers like 202411.
         This validator converts them to strings so they can be processed
         by the unified date parser in the service layer.
@@ -189,27 +185,17 @@ class AnnuityPerformanceOut(BaseModel):
     期初资产规模: Optional[Decimal] = Field(
         None, decimal_places=4, description="Initial asset scale"
     )
-    期末资产规模: Optional[Decimal] = Field(
-        None, decimal_places=4, description="Final asset scale"
-    )
-    供款: Optional[Decimal] = Field(
-        None, decimal_places=4, description="Contribution"
-    )
+    期末资产规模: Optional[Decimal] = Field(None, decimal_places=4, description="Final asset scale")
+    供款: Optional[Decimal] = Field(None, decimal_places=4, description="Contribution")
     流失_含待遇支付: Optional[Decimal] = Field(
         None,
         decimal_places=4,
         description="Loss including benefit payment",
-        alias="流失(含待遇支付)"
+        alias="流失(含待遇支付)",
     )
-    流失: Optional[Decimal] = Field(
-        None, decimal_places=4, description="Loss"
-    )
-    待遇支付: Optional[Decimal] = Field(
-        None, decimal_places=4, description="Benefit payment"
-    )
-    投资收益: Optional[Decimal] = Field(
-        None, decimal_places=4, description="Investment return"
-    )
+    流失: Optional[Decimal] = Field(None, decimal_places=4, description="Loss")
+    待遇支付: Optional[Decimal] = Field(None, decimal_places=4, description="Benefit payment")
+    投资收益: Optional[Decimal] = Field(None, decimal_places=4, description="Investment return")
     当期收益率: Optional[Decimal] = Field(
         None, decimal_places=6, ge=-1.0, le=10.0, description="Current period return rate"
     )
@@ -256,8 +242,15 @@ class AnnuityPerformanceOut(BaseModel):
         return normalized
 
     @field_validator(
-        "期初资产规模", "期末资产规模", "供款", "流失_含待遇支付",
-        "流失", "待遇支付", "投资收益", "当期收益率", mode="before"
+        "期初资产规模",
+        "期末资产规模",
+        "供款",
+        "流失_含待遇支付",
+        "流失",
+        "待遇支付",
+        "投资收益",
+        "当期收益率",
+        mode="before",
     )
     @classmethod
     def clean_decimal_fields(cls, v, info: Any):
@@ -277,9 +270,7 @@ class AnnuityPerformanceOut(BaseModel):
         }
 
         return comprehensive_decimal_cleaning(
-            value=v,
-            field_name=info.field_name,
-            precision_config=precision_config
+            value=v, field_name=info.field_name, precision_config=precision_config
         )
 
     @model_validator(mode="after")
@@ -306,13 +297,15 @@ class AnnuityPerformanceOut(BaseModel):
     @model_validator(mode="after")
     def set_financial_data_flag(self) -> "AnnuityPerformanceOut":
         """Set flag indicating whether financial metrics are present."""
-        self.has_financial_data = any([
-            self.期初资产规模 is not None,
-            self.期末资产规模 is not None,
-            self.供款 is not None,
-            self.投资收益 is not None,
-            self.当期收益率 is not None,
-        ])
+        self.has_financial_data = any(
+            [
+                self.期初资产规模 is not None,
+                self.期末资产规模 is not None,
+                self.供款 is not None,
+                self.投资收益 is not None,
+                self.当期收益率 is not None,
+            ]
+        )
 
         return self
 
@@ -333,9 +326,12 @@ class AnnuityPerformanceOut(BaseModel):
             warnings.append("Final asset scale is negative")
 
         # Check for logical relationship between initial, final, and flows
-        if (self.期初资产规模 is not None and self.期末资产规模 is not None and
-            self.供款 is not None and self.投资收益 is not None):
-
+        if (
+            self.期初资产规模 is not None
+            and self.期末资产规模 is not None
+            and self.供款 is not None
+            and self.投资收益 is not None
+        ):
             expected_final = self.期初资产规模 + self.供款 + self.投资收益
             流失总额 = (self.流失 or Decimal(0)) + (self.待遇支付 or Decimal(0))
             expected_final -= 流失总额

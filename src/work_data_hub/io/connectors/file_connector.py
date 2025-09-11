@@ -244,8 +244,10 @@ class DataSourceConnector:
                         # Extract version from parent directory (only under "数据采集")
                         version = None
                         parent_path = Path(file_path).parent
-                        if (parent_path.parent.name == "数据采集" and
-                            parent_path.name.upper().startswith("V")):
+                        if (
+                            parent_path.parent.name == "数据采集"
+                            and parent_path.name.upper().startswith("V")
+                        ):
                             try:
                                 version_str = parent_path.name[1:]  # Remove 'V' prefix
                                 version = int(version_str)
@@ -262,11 +264,11 @@ class DataSourceConnector:
                         try:
                             file_metadata = extract_file_metadata(file_path)
                             file_metadata.update(groups)  # Add regex groups to metadata
-                            file_metadata['version'] = version  # Add version to metadata
+                            file_metadata["version"] = version  # Add version to metadata
                         except OSError as e:
                             logger.warning(f"Cannot extract metadata for {file_path}: {e}")
                             file_metadata = groups
-                            file_metadata['version'] = version  # Add version to metadata
+                            file_metadata["version"] = version  # Add version to metadata
 
                         discovered_file = DiscoveredFile(
                             domain=domain_name,
@@ -406,10 +408,13 @@ class DataSourceConnector:
 
             # Within group, select by (version, mtime) descending
             try:
-                best_file = max(group_list, key=lambda f: (
-                    f.metadata.get('version') or 0,  # None versions get 0
-                    Path(f.path).stat().st_mtime
-                ))
+                best_file = max(
+                    group_list,
+                    key=lambda f: (
+                        f.metadata.get("version") or 0,  # None versions get 0
+                        Path(f.path).stat().st_mtime,
+                    ),
+                )
                 selected.append(best_file)
                 logger.debug(
                     f"Selected file with version {best_file.metadata.get('version')} "

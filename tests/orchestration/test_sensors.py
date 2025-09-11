@@ -46,15 +46,8 @@ class TestSensorRunConfig:
             # Verify structure matches expected op config schemas
             expected = {
                 "ops": {
-                    "discover_files_op": {
-                        "config": {"domain": "trustee_performance"}
-                    },
-                    "read_and_process_trustee_files_op": {
-                        "config": {
-                            "sheet": 0,
-                            "max_files": 5
-                        }
-                    },
+                    "discover_files_op": {"config": {"domain": "trustee_performance"}},
+                    "read_and_process_trustee_files_op": {"config": {"sheet": 0, "max_files": 5}},
                     "load_op": {
                         "config": {
                             "table": "trustee_performance",
@@ -79,7 +72,7 @@ class TestFileDiscoverySensor:
             path=path,
             year=2024,
             month=1,
-            metadata={"modified_time": modified_time}
+            metadata={"modified_time": modified_time},
         )
 
     def test_new_files_sensor_no_files_found(self):
@@ -88,7 +81,9 @@ class TestFileDiscoverySensor:
         context = build_sensor_context()
 
         # Mock DataSourceConnector to return empty list
-        with patch("src.work_data_hub.orchestration.sensors.DataSourceConnector") as mock_connector_class:
+        with patch(
+            "src.work_data_hub.orchestration.sensors.DataSourceConnector"
+        ) as mock_connector_class:
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.return_value = []
 
@@ -108,7 +103,9 @@ class TestFileDiscoverySensor:
             self.create_mock_discovered_file("old_file2.xlsx", 800.0),
         ]
 
-        with patch("src.work_data_hub.orchestration.sensors.DataSourceConnector") as mock_connector_class:
+        with patch(
+            "src.work_data_hub.orchestration.sensors.DataSourceConnector"
+        ) as mock_connector_class:
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.return_value = old_files
 
@@ -144,9 +141,12 @@ class TestFileDiscoverySensor:
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
-        with patch("src.work_data_hub.orchestration.sensors.DataSourceConnector") as mock_connector_class, \
-             patch("src.work_data_hub.orchestration.sensors.get_settings") as mock_settings:
-
+        with (
+            patch(
+                "src.work_data_hub.orchestration.sensors.DataSourceConnector"
+            ) as mock_connector_class,
+            patch("src.work_data_hub.orchestration.sensors.get_settings") as mock_settings,
+        ):
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.return_value = new_files
             mock_settings.return_value.data_sources_config = str(config_file)
@@ -159,7 +159,10 @@ class TestFileDiscoverySensor:
 
             # Verify run_config is properly structured
             assert "ops" in result.run_config
-            assert result.run_config["ops"]["discover_files_op"]["config"]["domain"] == "trustee_performance"
+            assert (
+                result.run_config["ops"]["discover_files_op"]["config"]["domain"]
+                == "trustee_performance"
+            )
 
     def test_new_files_sensor_first_run_no_cursor(self, tmp_path):
         """Test sensor behavior on first run with no existing cursor."""
@@ -185,9 +188,12 @@ class TestFileDiscoverySensor:
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
-        with patch("src.work_data_hub.orchestration.sensors.DataSourceConnector") as mock_connector_class, \
-             patch("src.work_data_hub.orchestration.sensors.get_settings") as mock_settings:
-
+        with (
+            patch(
+                "src.work_data_hub.orchestration.sensors.DataSourceConnector"
+            ) as mock_connector_class,
+            patch("src.work_data_hub.orchestration.sensors.get_settings") as mock_settings,
+        ):
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.return_value = files
             mock_settings.return_value.data_sources_config = str(config_file)
@@ -201,7 +207,9 @@ class TestFileDiscoverySensor:
         """Test sensor error handling with DataSourceConnector failures."""
         context = build_sensor_context()
 
-        with patch("src.work_data_hub.orchestration.sensors.DataSourceConnector") as mock_connector_class:
+        with patch(
+            "src.work_data_hub.orchestration.sensors.DataSourceConnector"
+        ) as mock_connector_class:
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.side_effect = Exception("Connection failed")
 
@@ -219,7 +227,9 @@ class TestDataQualitySensor:
         """Test data quality sensor when no files are discovered."""
         context = build_sensor_context()
 
-        with patch("src.work_data_hub.orchestration.sensors.DataSourceConnector") as mock_connector_class:
+        with patch(
+            "src.work_data_hub.orchestration.sensors.DataSourceConnector"
+        ) as mock_connector_class:
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.return_value = []
 
@@ -238,12 +248,15 @@ class TestDataQualitySensor:
             path="/nonexistent/file.xlsx",
             year=2024,
             month=1,
-            metadata={"modified_time": 1000.0}
+            metadata={"modified_time": 1000.0},
         )
 
-        with patch("src.work_data_hub.orchestration.sensors.DataSourceConnector") as mock_connector_class, \
-             patch("pathlib.Path.exists", return_value=False):
-
+        with (
+            patch(
+                "src.work_data_hub.orchestration.sensors.DataSourceConnector"
+            ) as mock_connector_class,
+            patch("pathlib.Path.exists", return_value=False),
+        ):
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.return_value = [mock_file]
 
@@ -262,13 +275,16 @@ class TestDataQualitySensor:
             path="/test/file.xlsx",
             year=2024,
             month=1,
-            metadata={"modified_time": 1000.0}
+            metadata={"modified_time": 1000.0},
         )
 
-        with patch("src.work_data_hub.orchestration.sensors.DataSourceConnector") as mock_connector_class, \
-             patch("pathlib.Path.exists", return_value=True), \
-             patch("src.work_data_hub.orchestration.sensors.build_insert_sql") as mock_build_sql:
-
+        with (
+            patch(
+                "src.work_data_hub.orchestration.sensors.DataSourceConnector"
+            ) as mock_connector_class,
+            patch("pathlib.Path.exists", return_value=True),
+            patch("src.work_data_hub.orchestration.sensors.build_insert_sql") as mock_build_sql,
+        ):
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.return_value = [mock_file]
 
@@ -294,13 +310,16 @@ class TestDataQualitySensor:
             path="/test/file.xlsx",
             year=2024,
             month=1,
-            metadata={"modified_time": 1000.0}
+            metadata={"modified_time": 1000.0},
         )
 
-        with patch("src.work_data_hub.orchestration.sensors.DataSourceConnector") as mock_connector_class, \
-             patch("pathlib.Path.exists", return_value=True), \
-             patch("src.work_data_hub.orchestration.sensors.build_insert_sql") as mock_build_sql:
-
+        with (
+            patch(
+                "src.work_data_hub.orchestration.sensors.DataSourceConnector"
+            ) as mock_connector_class,
+            patch("pathlib.Path.exists", return_value=True),
+            patch("src.work_data_hub.orchestration.sensors.build_insert_sql") as mock_build_sql,
+        ):
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.return_value = [mock_file]
 
@@ -316,7 +335,9 @@ class TestDataQualitySensor:
         """Test data quality sensor exception handling."""
         context = build_sensor_context()
 
-        with patch("src.work_data_hub.orchestration.sensors.DataSourceConnector") as mock_connector_class:
+        with patch(
+            "src.work_data_hub.orchestration.sensors.DataSourceConnector"
+        ) as mock_connector_class:
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.side_effect = Exception("Critical error")
 

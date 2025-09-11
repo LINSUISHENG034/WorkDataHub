@@ -53,9 +53,7 @@ class TestAnnuityPerformanceIn:
 
     def test_special_column_with_parentheses(self):
         """Test handling of special column name with parentheses."""
-        data = {
-            "流失(含待遇支付)": "10000.00"
-        }
+        data = {"流失(含待遇支付)": "10000.00"}
 
         model = AnnuityPerformanceIn(**data)
         assert model.流失_含待遇支付 == "10000.00"
@@ -76,12 +74,12 @@ class TestAnnuityPerformanceIn:
         """Test that date fields are cleaned properly."""
         data = {
             "年": "2024年",  # Contains "年" character
-            "月": "11月",   # Contains "月" character
+            "月": "11月",  # Contains "月" character
         }
 
         model = AnnuityPerformanceIn(**data)
         assert model.年 == "2024"  # Should be cleaned
-        assert model.月 == "11"   # Should be cleaned
+        assert model.月 == "11"  # Should be cleaned
 
     def test_whitespace_stripping(self):
         """Test that string fields strip whitespace."""
@@ -111,9 +109,7 @@ class TestAnnuityPerformanceOut:
     def test_basic_valid_model(self):
         """Test creating a valid model with minimal fields."""
         model = AnnuityPerformanceOut(
-            计划代码="TEST001",
-            公司代码="COMP001",
-            data_source="test_file.xlsx"
+            计划代码="TEST001", 公司代码="COMP001", data_source="test_file.xlsx"
         )
 
         assert model.计划代码 == "TEST001"
@@ -124,11 +120,7 @@ class TestAnnuityPerformanceOut:
 
     def test_code_normalization(self):
         """Test that identifier codes are normalized properly."""
-        model = AnnuityPerformanceOut(
-            计划代码="test-001",
-            公司代码="comp_002",
-            data_source="test"
-        )
+        model = AnnuityPerformanceOut(计划代码="test-001", 公司代码="comp_002", data_source="test")
 
         assert model.计划代码 == "TEST001"  # Uppercase, no separators
         assert model.公司代码 == "COMP002"  # Uppercase, no separators
@@ -194,8 +186,8 @@ class TestDecimalQuantization:
             公司代码="COMP001",
             data_source="test",
             期初资产规模="N/A",  # Placeholder value
-            投资收益="无",      # Chinese placeholder
-            供款="-",          # Dash placeholder
+            投资收益="无",  # Chinese placeholder
+            供款="-",  # Dash placeholder
         )
 
         assert model.期初资产规模 is None
@@ -247,11 +239,7 @@ class TestModelValidators:
     def test_financial_data_flag(self):
         """Test that has_financial_data flag is set correctly."""
         # Model without financial data
-        model1 = AnnuityPerformanceOut(
-            计划代码="TEST001",
-            公司代码="COMP001",
-            data_source="test"
-        )
+        model1 = AnnuityPerformanceOut(计划代码="TEST001", 公司代码="COMP001", data_source="test")
         assert model1.has_financial_data is False
 
         # Model with financial data

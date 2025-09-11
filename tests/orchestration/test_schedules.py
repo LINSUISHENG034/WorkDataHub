@@ -43,15 +43,8 @@ class TestScheduleRunConfig:
             # Verify structure matches expected op config schemas
             expected = {
                 "ops": {
-                    "discover_files_op": {
-                        "config": {"domain": "trustee_performance"}
-                    },
-                    "read_and_process_trustee_files_op": {
-                        "config": {
-                            "sheet": 0,
-                            "max_files": 5
-                        }
-                    },
+                    "discover_files_op": {"config": {"domain": "trustee_performance"}},
+                    "read_and_process_trustee_files_op": {"config": {"sheet": 0, "max_files": 5}},
                     "load_op": {
                         "config": {
                             "table": "trustee_performance",
@@ -109,14 +102,7 @@ class TestScheduleRunConfig:
 
     def test_build_schedule_run_config_execution_mode(self, tmp_path):
         """Test that schedule always configures execution mode (plan_only=False)."""
-        config_data = {
-            "domains": {
-                "trustee_performance": {
-                    "table": "test_table",
-                    "pk": ["id"]
-                }
-            }
-        }
+        config_data = {"domains": {"trustee_performance": {"table": "test_table", "pk": ["id"]}}}
 
         config_file = tmp_path / "test_config.yml"
         with open(config_file, "w", encoding="utf-8") as f:
@@ -147,6 +133,7 @@ class TestTrusteeSchedule:
 
         # Verify the job is correctly configured
         from src.work_data_hub.orchestration.jobs import trustee_performance_multi_file_job
+
         assert schedule.job == trustee_performance_multi_file_job
 
     def test_trustee_daily_schedule_run_config_generation(self, tmp_path):

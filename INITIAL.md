@@ -1,230 +1,161 @@
-# Data Cleansing Framework Optimization (INITIAL.md)
+# INITIAL.md — Cleansing Framework Hardening (KISS/YAGNI) with Minimal Domain Changes
+
+This INITIAL defines a minimal, KISS‑compliant enhancement to the shared cleansing framework and a few domain‑level tweaks so we achieve parity with critical legacy cleansing behavior without over‑engineering.
 
 ## FEATURE
-
-Optimize the existing data cleansing framework architecture to eliminate over-engineering components while preserving core functionality needed to support migration of 21 legacy domains, ensuring the framework adheres to KISS and YAGNI principles.
-
-## PROBLEM BACKGROUND
-
-**Current Issue**: During implementation of the annuity_performance domain, developers discovered duplicate data cleansing logic between domains and created a comprehensive cleansing framework (`src/work_data_hub/cleansing`). This framework needs evaluation and optimization to ensure it follows KISS/YAGNI principles while supporting the confirmed migration requirements.
-
-**Specific Duplication**: 
-- `src/work_data_hub/domain/annuity_performance/models.py:257-336` (80 lines)
-- `src/work_data_hub/domain/trustee_performance/models.py:167-237` (71 lines)
-- Both contain nearly identical `clean_decimal_fields` methods with same logic for currency symbols, percentage conversion, null handling, and precision quantization
-
-**Architecture Context**: This is a complete system rewrite replacing legacy `annuity_hub` with 21 confirmed domain cleaners requiring migration. According to `docs/overview/R-015_LEGACY_INVENTORY.md`, these domains have varying complexity (HIGH: 4, MEDIUM: 8, LOW: 9) and require unified cleansing capabilities.
+Strengthen numeric cleansing and input header normalization to remove cross‑domain duplication and align with legacy behavior, while keeping business‑specific logic in domain or the future Mapping Service.
 
 ## SCOPE
+- In‑scope:
+  - Numeric rules: support negative percentages and full‑width percent sign (％) in `handle_percentage_conversion`; preserve sign and only treat numbers as percent when `abs(value) > 1` for rate fields.
+  - Input layer: normalize Excel header strings by removing newlines and tabs so `project_columns` never drops columns due to formatting.
+  - Annuity domain: strip `^F` prefix from `组合代码` to match legacy behavior.
+  - Keep public cleansing APIs stable (`comprehensive_decimal_cleaning`, `decimal_fields_cleaner`).
+  - Add focused tests for the above.
+- Non‑goals:
+  - Company name normalization, multi‑source `company_id` backfill, special plan‑code replacements, default institution code; these remain in domain or the planned Mapping Service (M2).
+  - No DDL or orchestration changes; no DSL/pipeline engine for rules.
 
-### In-scope:
-- Simplify complex indexing system in `src/work_data_hub/cleansing/registry.py`
-- Preserve and optimize core cleansing functions in `numeric_rules.py`
-- Streamline `pydantic_adapter.py` integration logic
-- Ensure both existing domain models can utilize the optimized framework
-- Create concise cleansing rule registration and lookup mechanism
-- Eliminate the 151 lines of duplicate `clean_decimal_fields` code
-
-### Non-goals:
-- Complete framework rewrite (preserve sound architectural design)
-- Immediate migration of all 21 legacy domains (phased implementation)
-- Removal of all advanced features (retain genuinely needed capabilities)
-- Changes to core business logic or cleansing algorithms
-
-## CONTEXT SNAPSHOT
-
+## CONTEXT SNAPSHOT (optional)
 ```bash
 src/work_data_hub/
-  cleansing/                    # Current framework (893 lines total)
-    __init__.py                 # 137 lines - Framework entry point
-    registry.py                 # 254 lines - Registry and indexing system [SIMPLIFY]
-    rules/
-      numeric_rules.py          # 286 lines - Core cleansing rules [PRESERVE/OPTIMIZE]
-    integrations/
-      pydantic_adapter.py       # 216 lines - Pydantic integration [SIMPLIFY]
+  cleansing/
+    rules/numeric_rules.py              # numeric rules to extend
+    integrations/pydantic_adapter.py    # Pydantic decorator (no API change)
+  io/readers/excel_reader.py            # header normalization to add
   domain/
-    annuity_performance/models.py    # Contains duplicate clean_decimal_fields
-    trustee_performance/models.py    # Contains duplicate clean_decimal_fields
-
-# Legacy reference for context
-docs/overview/R-015_LEGACY_INVENTORY.md  # 21 domain migration requirements
-ROADMAP.md                               # M2 milestone domain migration plan
+    annuity_performance/service.py      # strip ^F from 组合代码
+    trustee_performance/                # already using shared numeric rules
+tests/
+  test_cleansing_framework.py           # strengthen numeric tests
+  domain/annuity_performance/test_service.py
+  io/readers/ ... (add header normalization tests)
 ```
 
-## EXAMPLES
+## EXAMPLES (most important)
+- Path: `src/work_data_hub/cleansing/rules/numeric_rules.py` — reuse the staged flow: null standardization → currency symbol removal → percent handling → decimal quantization.
+- Path: `tests/test_cleansing_framework.py` — mirror test style for currency, percent, null, and quantization assertions.
+- Path: `src/work_data_hub/io/readers/excel_reader.py` — extend `_dataframe_to_rows` column cleaning to include `.replace("\n", "").replace("\t", "")`.
+- Path: `src/work_data_hub/domain/annuity_performance/service.py` — minimally strip `^F` prefix from `组合代码` while leaving other domain logic unchanged.
 
-**Preserve Pattern - Core Cleansing Functions**:
-- Path: `src/work_data_hub/cleansing/rules/numeric_rules.py` — This contains the actual solution to duplication, architecture is sound
-
-**Simplify Pattern - Registry System**:
-- Path: `src/work_data_hub/cleansing/registry.py` — Remove complex indexing, retain basic registration
-
-**Integration Pattern - Domain Usage**:
-- Path: `src/work_data_hub/domain/trustee_performance/models.py:167-237` — Reference existing clean_decimal_fields pattern
-
-**Current Duplication Example**:
+Snippet — negative and full‑width percentage handling (pattern to follow):
 ```python
-# DUPLICATE CODE (to be eliminated)
-# Both domains have this nearly identical 70-line method:
-@field_validator("期初资产规模", "期末资产规模", "供款", mode="before")
-@classmethod
-def clean_decimal_fields(cls, v, info: Any):
-    """Clean and convert financial fields with precision quantization."""
-    # 70 lines of identical logic for:
-    # - Currency symbol removal (¥, $, ￥)
-    # - Percentage conversion (50% -> 0.50)
-    # - Null value handling ("", "-", "N/A", "无", "暂无")
-    # - Decimal precision quantization
-```
+# Example expectation
+from decimal import Decimal
+from src.work_data_hub.cleansing.rules.numeric_rules import comprehensive_decimal_cleaning
 
-**Optimized Registry Design**:
-```python
-# Simplified registry (remove complex indexing)
-class CleansingRegistry:
-    _rules: Dict[str, CleansingRule] = {}
-    
-    def register(self, rule: CleansingRule) -> None:
-        """Register a cleansing rule by name."""
-        self._rules[rule.name] = rule
-    
-    def get_rule(self, name: str) -> Optional[CleansingRule]:
-        """Get rule by name for direct lookup."""
-        return self._rules.get(name)
-    
-    def find_numeric_rules(self) -> List[CleansingRule]:
-        """Find rules for numeric data types."""
-        return [r for r in self._rules.values() if r.category == RuleCategory.NUMERIC]
+assert comprehensive_decimal_cleaning("-5%", "当期收益率") == Decimal("-0.050000")
+assert comprehensive_decimal_cleaning("12.3％", "当期收益率") == Decimal("0.123000")
+assert comprehensive_decimal_cleaning(-12.3, "当期收益率") == Decimal("-0.123000")
 ```
 
 ## DOCUMENTATION
-
-- File: `CLAUDE.md` — Project coding standards and architectural principles
-- File: `docs/overview/R-015_LEGACY_INVENTORY.md` — Complete inventory of 21 domain cleansing requirements
-- File: `docs/overview/MIGRATION_REFERENCE.md` — Migration approach and architecture requirements
-- File: `ROADMAP.md` — M2 milestone domain migration timeline
-- URL: https://docs.pydantic.dev/2.0/ — Pydantic v2 integration patterns
+- File: `README.md` — Developer quickstart and commands
+- File: `ROADMAP.md` — Single source of truth for scope/status (mark this task under current milestone)
+- File: `docs/overview/MIGRATION_REFERENCE.md` — Migration plan and role boundaries (Mapping Service in M2)
+- File: `docs/overview/LEGACY_WORKFLOW_ANALYSIS.md` — Objective legacy behavior reference
+- URL: https://docs.pydantic.dev/2.7/ — Pydantic v2 validators and model config
 
 ## INTEGRATION POINTS
+- Data models: No schema changes; both trustee and annuity models already call the shared numeric pipeline.
+- IO layer: `ExcelReader._dataframe_to_rows` — normalize header strings to avoid column projection issues.
+- Domain logic: Annuity service strips `^F` from `组合代码` (no other domain coupling introduced).
+- Database/DDL: None.
+- Config/ENV: None.
+- API/Routes: None.
+- Jobs/Events: None.
 
-**Data Models**:
-- Preserve existing `CleansingRule` dataclass, simplify metadata fields
-- Retain `RuleCategory` enum, focus primarily on NUMERIC category for current needs
-- Update domain models to use simplified cleansing interface
+## DATA CONTRACTS (schemas & payloads)
+```python
+# Public cleansing API remains unchanged
+from decimal import Decimal
+from typing import Any, Optional, Dict
 
-**Configuration**:
-- Remove complex configuration file-driven approach (`domain_rules.yml` etc.)
-- Maintain code-level cleansing rule definitions for simplicity
-
-**Integration Interfaces**:
-- Simplify `decimal_fields_cleaner` decorator implementation
-- Preserve Pydantic v2 integration for new architecture requirements
-
-## DATA CONTRACTS
+def comprehensive_decimal_cleaning(
+    value: Any,
+    field_name: str = "",
+    precision: int | None = None,
+    handle_percentage: bool = True,
+    precision_config: Optional[Dict[str, int]] = None,
+) -> Optional[Decimal]:
+    ...  # unchanged public contract
+```
 
 ```python
-# Simplified cleansing rule definition
-@dataclass
-class CleansingRule:
-    name: str
-    category: RuleCategory
-    func: Callable
-    description: str
-    # REMOVED: applicable_types, field_patterns, version, author (over-engineering)
+# Pydantic integration stays the same
+from src.work_data_hub.cleansing import decimal_fields_cleaner
 
-# Preserved core cleansing function interface
-def comprehensive_decimal_cleaning(
-    value: Any, 
-    field_name: str = "", 
-    precision: int = 4
-) -> Optional[Decimal]:
-    """
-    Unified decimal field cleansing function to eliminate duplication.
-    
-    Handles:
-    - Currency symbol removal (¥, $, ￥)
-    - Percentage conversion (50% -> 0.50)
-    - Null value standardization ("", "-", "N/A", "无", "暂无")
-    - Decimal precision quantization with ROUND_HALF_UP
-    """
+@decimal_fields_cleaner("期初资产规模", "当期收益率", precision_config={"当期收益率": 6, "期初资产规模": 4})
+class AnnuityModel(BaseModel):
+    ...
 ```
 
 ## GOTCHAS & LIBRARY QUIRKS
-
-- Maintain Pydantic v2 compatibility, avoid v1 `orm_mode`
-- Handle Chinese field names properly (`期初资产规模`, `期末资产规模` etc.)
-- Decimal precision quantization must use `ROUND_HALF_UP` for consistency
-- Percentage conversion logic must distinguish between string "50%" and numeric 50
-- Use `rg` (ripgrep) for searches, not `grep/find` per project standards
+- Pydantic v2 only; use `field_validator(..., mode="before")` appropriately.
+- Chinese field names in validators (e.g., "当期收益率").
+- Full‑width percent sign `％` frequently appears in Excel; treat like `%`.
+- Numeric percent heuristics: only convert numbers to decimals for rate fields when `abs(value) > 1`.
+- Quantization uses `ROUND_HALF_UP`; keep precision from `precision_config`.
+- Prefer `rg` for search; avoid `grep/find`.
 
 ## IMPLEMENTATION NOTES
+- KISS: keep enhancements tiny; do not introduce a rule pipeline/DSL.
+- YAGNI: do not move company name cleaning or mapping rules into the shared component.
+- Put header normalization where the data enters (ExcelReader) to prevent column mismatches early.
+- Keep the annuity `^F` handling in the domain service to avoid over‑generalizing the shared layer.
 
-**Refactoring Strategy**:
-1. **Preserve effective components**: `numeric_rules.py` cleansing functions solve real duplication
-2. **Simplify registration mechanism**: Remove multi-layer indexing, keep basic registration/lookup
-3. **Progressive adoption**: Start with existing 2 domains, validate effectiveness, then expand
-4. **Avoid breaking changes**: Maintain public API stability during optimization
-
-**Architectural Principles**:
-- Follow CLAUDE.md KISS principle: choose simple solutions over complex ones
-- Keep functions under 50 lines, classes under 100 lines per project standards
-- Prefer composition over inheritance
-- Maintain clean separation between Config → IO → Domain → Orchestration → Utils layers
-
-## VALIDATION GATES
-
+## VALIDATION GATES (must pass)
 ```bash
-# Basic validation
+uv venv && uv sync
+uv run ruff format .
 uv run ruff check src/ --fix
 uv run mypy src/
 uv run pytest -v
+```
 
-# Ensure existing functionality works
-uv run pytest tests/test_cleansing_framework.py -v
+Targeted tests:
+```bash
+# Numeric cleansing (negative percent, full‑width percent, currency‑only -> None)
+uv run pytest -v tests/test_cleansing_framework.py -k "percent or percentage or currency"
 
-# Ensure domain model integration works
-uv run pytest tests/domain/ -k "decimal" -v
+# ExcelReader header normalization (newline/tab in headers)
+uv run pytest -v tests/io/readers/test_excel_reader.py -k "header or column or newline or tab"
 
-# Verify no regressions in existing domains
-uv run pytest tests/domain/test_trustee_performance.py -v
-uv run pytest tests/domain/test_annuity_performance.py -v
+# Annuity: strip ^F prefix from 组合代码
+uv run pytest -v tests/domain/annuity_performance/test_service.py -k "组合代码 or portfolio or prefix"
 ```
 
 ## ACCEPTANCE CRITERIA
-
-- [ ] Both existing domain models successfully use optimized cleansing framework
-- [ ] `clean_decimal_fields` duplicate code (151 lines) is eliminated
-- [ ] Registry system complexity reduced while maintaining basic functionality
-- [ ] Core cleansing rule functionality completely preserved
-- [ ] Framework total code lines reduced by 20-30%
-- [ ] All existing tests continue to pass
-- [ ] New simplified API is clearly documented and easy to understand
-- [ ] Integration with Pydantic v2 field validators works seamlessly
-- [ ] Chinese field names and data continue to process correctly
+- [ ] "-5%" → Decimal("-0.050000") for rate fields; `"12.3％"` equals `"12.3%"` result.
+- [ ] Numeric values in rate fields: only `abs(value) > 1` are treated as percentage inputs (e.g., `-12.3` → `-0.123000`).
+- [ ] Non‑rate numeric fields do not get percentage conversion.
+- [ ] Currency/formatting‑only strings become `None` after null/currency normalization as applicable.
+- [ ] ExcelReader returns headers without `\n` or `\t`; `project_columns` no longer drops columns due to header formatting.
+- [ ] Annuity `组合代码` no longer contains leading `F` when present.
+- [ ] All existing tests remain green; new targeted tests pass.
 
 ## ROLLOUT & RISK
+- No feature flags required; changes are local and reversible.
+- Rollback:
+  - Numeric: revert `handle_percentage_conversion` additions.
+  - Header: remove `.replace("\n", "").replace("\t", "")` in ExcelReader.
+  - Annuity: remove the `^F` prefix stripping in the service.
+- Performance impact is negligible (simple string ops and conditionals).
 
-**Implementation Phases**:
-1. **Phase 1**: Simplify registry, remove unnecessary indexing systems
-2. **Phase 2**: Update existing domain models to use optimized framework
-3. **Phase 3**: Provide clean interface for next domain migration
+## APPENDICES (optional snippets)
+```python
+# Test skeleton — Excel header normalization
+def test_header_normalization_removes_newlines_and_tabs(tmp_path):
+    # Arrange: write a tiny XLSX with headers containing \n/\t
+    # Act: read via ExcelReader
+    # Assert: headers no longer contain \n/\t and column projection succeeds
+    assert True
+```
 
-**Risk Controls**:
-- Maintain backward compatibility to ensure existing code remains unaffected
-- Step-by-step refactoring with test validation at each step
-- Preserve rollback option: can quickly revert to current implementation
-- No changes to core business logic or data processing algorithms
+```bash
+# Useful ripgrep searches while implementing
+rg -n "handle_percentage_conversion|comprehensive_decimal_cleaning" src/
+rg -n "_dataframe_to_rows|ExcelReader" src/work_data_hub/io/readers
+rg -n "组合代码" src/work_data_hub/domain/annuity_performance
+```
 
-## IMPLEMENTATION PRIORITY
-
-**High Priority (Execute Immediately)**:
-1. Simplify `CleansingRegistry` class, remove complex indexing
-2. Update both domain models to use framework, eliminating duplication
-
-**Medium Priority (Subsequent Optimization)**:
-1. Streamline `pydantic_adapter.py` decorator logic
-2. Improve test coverage and documentation
-
-**Low Priority (Optional)**:
-1. Prepare additional cleansing rule types for future domain migrations
-
-**Success Outcome**: A cleansing framework that adheres to KISS/YAGNI principles while supporting enterprise-scale domain migration requirements, with 151 lines of duplicate code eliminated and architecture simplified for maintainability.

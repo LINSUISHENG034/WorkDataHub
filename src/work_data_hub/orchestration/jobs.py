@@ -95,9 +95,7 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
     """
     # Single source of truth calculation - execute takes precedence over plan-only
     effective_plan_only = (
-        not args.execute
-        if hasattr(args, "execute")
-        else getattr(args, "plan_only", True)
+        not args.execute if hasattr(args, "execute") else getattr(args, "plan_only", True)
     )
 
     # Load table/pk from data_sources.yml if needed
@@ -136,10 +134,7 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
     if max_files > 1:
         # Use new combined op for multi-file processing
         run_config["ops"]["read_and_process_trustee_files_op"] = {
-            "config": {
-                "sheet": args.sheet,
-                "max_files": max_files
-            }
+            "config": {"sheet": args.sheet, "max_files": max_files}
         }
     else:
         # Use existing separate ops for single-file processing (backward compatibility)
@@ -162,9 +157,7 @@ def main():
     )
 
     # Core arguments
-    parser.add_argument(
-        "--domain", default="trustee_performance", help="Domain to process"
-    )
+    parser.add_argument("--domain", default="trustee_performance", help="Domain to process")
     parser.add_argument(
         "--mode",
         choices=["delete_insert", "append"],
@@ -177,22 +170,20 @@ def main():
         default=True,
         help="Generate execution plan without database connection",
     )
-    parser.add_argument(
-        "--sheet", type=int, default=0, help="Excel sheet index to process"
-    )
+    parser.add_argument("--sheet", type=int, default=0, help="Excel sheet index to process")
 
     parser.add_argument(
         "--execute",
         action="store_true",
         default=False,
-        help="Execute against database (default: plan-only mode for safety)"
+        help="Execute against database (default: plan-only mode for safety)",
     )
 
     parser.add_argument(
         "--max-files",
         type=int,
         default=1,
-        help="Maximum number of discovered files to process (default: 1)"
+        help="Maximum number of discovered files to process (default: 1)",
     )
 
     # Advanced options
@@ -211,9 +202,7 @@ def main():
 
     # Calculate effective execution mode for consistent display and logic
     effective_plan_only = (
-        not args.execute
-        if hasattr(args, "execute")
-        else getattr(args, "plan_only", True)
+        not args.execute if hasattr(args, "execute") else getattr(args, "plan_only", True)
     )
 
     # Build run configuration from CLI arguments
@@ -237,9 +226,9 @@ def main():
         if max_files > 1:
             print(f"Warning: max_files > 1 not yet supported for {args.domain}, using 1")
     elif args.domain == "trustee_performance":
-        selected_job = (trustee_performance_multi_file_job
-                       if max_files > 1
-                       else trustee_performance_job)
+        selected_job = (
+            trustee_performance_multi_file_job if max_files > 1 else trustee_performance_job
+        )
     else:
         raise ValueError(
             f"Unsupported domain: {args.domain}. "

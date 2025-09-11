@@ -42,6 +42,7 @@ from typing import List, Optional
 @dataclass
 class ColumnDef:
     """Column definition for DDL generation."""
+
     name: str
     type: str
     nullable: bool
@@ -52,6 +53,7 @@ class ColumnDef:
 @dataclass
 class IndexDef:
     """Index definition for DDL generation."""
+
     name: str
     columns: List[str]
     unique: bool
@@ -60,6 +62,7 @@ class IndexDef:
 @dataclass
 class ForeignKeyDef:
     """Foreign key definition for DDL generation."""
+
     name: str
     constrained_columns: List[str]
     referred_table: str
@@ -68,18 +71,18 @@ class ForeignKeyDef:
 
 # Type mappings from MySQL to PostgreSQL
 TYPE_MAPPINGS = {
-    'INTEGER': 'INTEGER',
-    'DATE': 'DATE',
-    'DOUBLE': 'double precision',
-    'TEXT': 'TEXT',
-    'BIGINT': 'BIGINT',
-    'SMALLINT': 'SMALLINT',
-    'DECIMAL': 'DECIMAL',
-    'NUMERIC': 'NUMERIC',
-    'TIMESTAMP': 'TIMESTAMP',
-    'TIME': 'TIME',
-    'BOOLEAN': 'BOOLEAN',
-    'BOOL': 'BOOLEAN',
+    "INTEGER": "INTEGER",
+    "DATE": "DATE",
+    "DOUBLE": "double precision",
+    "TEXT": "TEXT",
+    "BIGINT": "BIGINT",
+    "SMALLINT": "SMALLINT",
+    "DECIMAL": "DECIMAL",
+    "NUMERIC": "NUMERIC",
+    "TIMESTAMP": "TIMESTAMP",
+    "TIME": "TIME",
+    "BOOLEAN": "BOOLEAN",
+    "BOOL": "BOOLEAN",
 }
 
 
@@ -88,7 +91,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Generate PostgreSQL DDL from MySQL table definitions in JSON format.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__.split('Usage Examples:')[1] if 'Usage Examples:' in __doc__ else ""
+        epilog=__doc__.split("Usage Examples:")[1] if "Usage Examples:" in __doc__ else "",
     )
     parser.add_argument(
         "--table",
@@ -130,14 +133,14 @@ def mysql_to_postgres_type(mysql_type: str) -> str:
         'double precision'
     """
     # CRITICAL: Strip COLLATE clauses with regex - they're incompatible with PostgreSQL
-    cleaned_type = re.sub(r'\s+COLLATE\s+"[^"]*"', '', mysql_type).strip()
+    cleaned_type = re.sub(r'\s+COLLATE\s+"[^"]*"', "", mysql_type).strip()
 
     # Handle VARCHAR and other types with parameters - preserve them after COLLATE removal
-    if cleaned_type.startswith('VARCHAR') or cleaned_type.startswith('CHAR'):
+    if cleaned_type.startswith("VARCHAR") or cleaned_type.startswith("CHAR"):
         return cleaned_type
 
     # Handle DECIMAL/NUMERIC with precision and scale
-    if cleaned_type.startswith('DECIMAL') or cleaned_type.startswith('NUMERIC'):
+    if cleaned_type.startswith("DECIMAL") or cleaned_type.startswith("NUMERIC"):
         return cleaned_type
 
     # Direct mapping for common types
@@ -183,7 +186,7 @@ def generate_table_ddl(table_name: str, table_def: dict) -> str:
     # CRITICAL: Quote Chinese table name for PostgreSQL compatibility
     quoted_table = f'"{table_name}"'
 
-    lines = [f'CREATE TABLE IF NOT EXISTS {quoted_table} (']
+    lines = [f"CREATE TABLE IF NOT EXISTS {quoted_table} ("]
 
     columns = table_def.get("columns", [])
     if not columns:
@@ -215,10 +218,9 @@ def generate_table_ddl(table_name: str, table_def: dict) -> str:
         pk_def = ", ".join(f'"{col}"' for col in pk_columns)
         col_lines.append(f"  CONSTRAINT pk_{table_name.replace(' ', '_')} PRIMARY KEY ({pk_def})")
 
-    lines.extend([
-        line + ("," if i < len(col_lines) - 1 else "")
-        for i, line in enumerate(col_lines)
-    ])
+    lines.extend(
+        [line + ("," if i < len(col_lines) - 1 else "") for i, line in enumerate(col_lines)]
+    )
     lines.append(");")
 
     return "\n".join(lines)
@@ -345,7 +347,7 @@ def load_json_table_def(json_path: Path, table_name: str) -> dict:
 
     try:
         # CRITICAL: UTF-8 encoding must be explicit for Chinese characters
-        with open(json_path, 'r', encoding='utf-8') as f:
+        with open(json_path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except Exception as e:
         raise ValueError(f"Failed to load JSON file: {e}")
@@ -359,10 +361,9 @@ def load_json_table_def(json_path: Path, table_name: str) -> dict:
         available_tables = []
         if "business" in data:
             available_tables.extend(data["business"].keys())
-        available_tables.extend([
-            k for k in data.keys()
-            if isinstance(data[k], dict) and "columns" in data[k]
-        ])
+        available_tables.extend(
+            [k for k in data.keys() if isinstance(data[k], dict) and "columns" in data[k]]
+        )
 
         raise ValueError(
             f"Table '{table_name}' not found in JSON. "
@@ -450,7 +451,7 @@ def main() -> int:
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
         # CRITICAL: UTF-8 encoding for Chinese characters
-        out_path.write_text(full_ddl, encoding='utf-8')
+        out_path.write_text(full_ddl, encoding="utf-8")
 
         print(f"DDL generated successfully: {out_path}")
         print(f"File size: {out_path.stat().st_size} bytes")

@@ -81,11 +81,30 @@ class TestColumnProjection:
 
         # Should include all DDL columns
         expected_ddl_cols = [
-            "id", "月度", "业务类型", "计划类型", "计划代码", "计划名称",
-            "组合类型", "组合代码", "组合名称", "客户名称", "期初资产规模",
-            "期末资产规模", "供款", "流失(含待遇支付)", "流失", "待遇支付",
-            "投资收益", "当期收益率", "机构代码", "机构名称", "产品线代码",
-            "年金账户号", "年金账户名", "company_id"
+            "id",
+            "月度",
+            "业务类型",
+            "计划类型",
+            "计划代码",
+            "计划名称",
+            "组合类型",
+            "组合代码",
+            "组合名称",
+            "客户名称",
+            "期初资产规模",
+            "期末资产规模",
+            "供款",
+            "流失(含待遇支付)",
+            "流失",
+            "待遇支付",
+            "投资收益",
+            "当期收益率",
+            "机构代码",
+            "机构名称",
+            "产品线代码",
+            "年金账户号",
+            "年金账户名",
+            "company_id",
         ]
 
         for col in expected_ddl_cols:
@@ -122,11 +141,7 @@ class TestColumnProjection:
 
     def test_project_columns_preserves_values(self):
         """Test that column projection preserves values for kept columns."""
-        rows = [{
-            "年": "2024",
-            "计划代码": "TEST001",
-            "extra": "remove_me"
-        }]
+        rows = [{"年": "2024", "计划代码": "TEST001", "extra": "remove_me"}]
         allowed = ["年", "计划代码"]
 
         projected = project_columns(rows, allowed)
@@ -199,7 +214,7 @@ class TestProcess:
                 "月": "12",
                 "计划代码": "PLAN999",
                 "客户名称": "另一个客户",
-            }  # Valid
+            },  # Valid
         ]
 
         result = process(mixed_rows, "test_source.xlsx")
@@ -222,9 +237,11 @@ class TestProcess:
     def test_process_with_column_projection(self, row_with_extra_columns):
         """Test that process applies column projection correctly."""
         # Add required fields to make row valid
-        row_with_extra_columns.update({
-            "客户名称": "测试客户",  # Will be used for company code derivation
-        })
+        row_with_extra_columns.update(
+            {
+                "客户名称": "测试客户",  # Will be used for company code derivation
+            }
+        )
 
         result = process([row_with_extra_columns], "test_source.xlsx")
 
@@ -277,6 +294,48 @@ class TestExtractFunctions:
         result = _extract_plan_code(model, 0)
 
         assert result is None
+
+    def test_extract_plan_code_strips_f_prefix(self):
+        """Test ^F prefix stripping from 组合代码."""
+        # Test with F prefix when 组合代码 is present
+        model = AnnuityPerformanceIn(计划代码="FPLAN001", 组合代码="FPORTFOLIO001")
+        result = _extract_plan_code(model, 0)
+        assert result == "PLAN001", "F prefix should be stripped when 组合代码 is present"
+
+        # Test without F prefix (should not change)
+        model = AnnuityPerformanceIn(计划代码="PLAN002", 组合代码="PORTFOLIO002")
+        result = _extract_plan_code(model, 0)
+        assert result == "PLAN002", "Non-F codes should not change"
+
+        # Test legitimate F in data (not a prefix case)
+        model = AnnuityPerformanceIn(计划代码="FIDELITY001", 组合代码="FUND001")
+        result = _extract_plan_code(model, 0)
+        assert result == "IDELITY001", "Only leading F should be stripped"
+
+        # Test F prefix without 组合代码 field (should not strip)
+        model = AnnuityPerformanceIn(计划代码="FPLAN003")  # No 组合代码
+        result = _extract_plan_code(model, 0)
+        assert result == "FPLAN003", "F prefix should not be stripped without 组合代码 context"
+
+        # Test F prefix with empty 组合代码 (should not strip)
+        model = AnnuityPerformanceIn(计划代码="FPLAN004", 组合代码="")
+        result = _extract_plan_code(model, 0)
+        assert result == "FPLAN004", "F prefix should not be stripped with empty 组合代码"
+
+        # Test F prefix with None 组合代码 (should not strip)
+        model = AnnuityPerformanceIn(计划代码="FPLAN005", 组合代码=None)
+        result = _extract_plan_code(model, 0)
+        assert result == "FPLAN005", "F prefix should not be stripped with None 组合代码"
+
+        # Test single character F (edge case)
+        model = AnnuityPerformanceIn(计划代码="F", 组合代码="PORTFOLIO")
+        result = _extract_plan_code(model, 0)
+        assert result == "", "Single F should result in empty string when stripped"
+
+        # Test lowercase f (should not be stripped)
+        model = AnnuityPerformanceIn(计划代码="fPLAN001", 组合代码="PORTFOLIO")
+        result = _extract_plan_code(model, 0)
+        assert result == "fPLAN001", "Lowercase f should not be stripped"
 
     def test_extract_company_code_from_company_id(self):
         """Test company code extraction from company_id field."""
@@ -370,7 +429,7 @@ class TestValidateInputBatch:
         valid_rows, errors = validate_input_batch(rows)
 
         assert len(valid_rows) == 1  # Only first row is valid
-        assert len(errors) == 2     # Two errors from invalid rows
+        assert len(errors) == 2  # Two errors from invalid rows
 
     def test_validate_input_batch_applies_column_projection(self, row_with_extra_columns):
         """Test that batch validation applies column projection."""

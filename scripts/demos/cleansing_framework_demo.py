@@ -16,13 +16,14 @@ from pydantic import BaseModel, Field
 # 导入新的清洗框架
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.work_data_hub.cleansing import (
     decimal_fields_cleaner,
     registry,
     find_rules_for_field,
-    get_framework_info
+    get_framework_info,
 )
 
 
@@ -47,10 +48,17 @@ def clean_decimal_fields(cls, v, info: Any):
     # 几乎相同的 100+ 行清洗逻辑...
 """
 
+
 # AFTER: 使用统一框架，消除重复
 @decimal_fields_cleaner(
-    "期初资产规模", "期末资产规模", "供款", "流失_含待遇支付",
-    "流失", "待遇支付", "投资收益", "当期收益率",
+    "期初资产规模",
+    "期末资产规模",
+    "供款",
+    "流失_含待遇支付",
+    "流失",
+    "待遇支付",
+    "投资收益",
+    "当期收益率",
     precision_config={
         "当期收益率": 6,  # 收益率需要高精度
         "期初资产规模": 4,  # 金额字段标准精度
@@ -60,16 +68,16 @@ def clean_decimal_fields(cls, v, info: Any):
         "流失": 4,
         "待遇支付": 4,
         "投资收益": 4,
-    }
+    },
 )
 class AnnuityPerformanceOut(BaseModel):
     """年金业绩输出模型 - 使用统一清洗框架"""
-    
+
     # 核心字段
     report_date: str = Field(..., description="报告日期")
     plan_code: str = Field(..., description="计划代码")
     company_code: str = Field(..., description="公司代码")
-    
+
     # 财务字段 - 自动应用清洗规则
     期初资产规模: Optional[Decimal] = Field(None, description="期初资产规模")
     期末资产规模: Optional[Decimal] = Field(None, description="期末资产规模")
@@ -82,21 +90,23 @@ class AnnuityPerformanceOut(BaseModel):
 
 
 @decimal_fields_cleaner(
-    "return_rate", "net_asset_value", "fund_scale",
+    "return_rate",
+    "net_asset_value",
+    "fund_scale",
     precision_config={
-        "return_rate": 6,        # NUMERIC(8,6)
-        "net_asset_value": 4,    # NUMERIC(18,4)  
-        "fund_scale": 2          # NUMERIC(18,2)
-    }
+        "return_rate": 6,  # NUMERIC(8,6)
+        "net_asset_value": 4,  # NUMERIC(18,4)
+        "fund_scale": 2,  # NUMERIC(18,2)
+    },
 )
 class TrusteePerformanceOut(BaseModel):
     """受托业绩输出模型 - 复用相同的清洗框架"""
-    
+
     # 核心字段
     report_date: str = Field(..., description="报告日期")
     plan_code: str = Field(..., description="计划代码")
     company_code: str = Field(..., description="公司代码")
-    
+
     # 财务字段 - 复用相同的清洗逻辑
     return_rate: Optional[Decimal] = Field(None, description="收益率")
     net_asset_value: Optional[Decimal] = Field(None, description="净值")
@@ -139,22 +149,22 @@ print("=== 演示 3: 清洗效果测试 ===\n")
 # 模拟一些需要清洗的数据
 test_data_annuity = {
     "report_date": "2024-11-01",
-    "plan_code": "P001", 
+    "plan_code": "P001",
     "company_code": "C001",
     "期初资产规模": "¥1,234,567.89",  # 包含货币符号和逗号
-    "期末资产规模": "1234567.8912",   # 超过精度
-    "当期收益率": "5.25%",            # 百分比格式
-    "供款": "  123,456.00  ",        # 包含空格
-    "流失": "-",                     # 空值占位符
+    "期末资产规模": "1234567.8912",  # 超过精度
+    "当期收益率": "5.25%",  # 百分比格式
+    "供款": "  123,456.00  ",  # 包含空格
+    "流失": "-",  # 空值占位符
 }
 
 test_data_trustee = {
-    "report_date": "2024-11-01", 
+    "report_date": "2024-11-01",
     "plan_code": "P002",
     "company_code": "C002",
-    "return_rate": "8.5%",          # 百分比格式
-    "net_asset_value": "￥9,876.543", # 中文货币符号
-    "fund_scale": "1000000.999",    # 超过精度
+    "return_rate": "8.5%",  # 百分比格式
+    "net_asset_value": "￥9,876.543",  # 中文货币符号
+    "fund_scale": "1000000.999",  # 超过精度
 }
 
 try:
@@ -166,17 +176,19 @@ try:
     print(f"  供款: '{test_data_annuity['供款']}' -> {annuity_model.供款}")
     print(f"  流失: '{test_data_annuity['流失']}' -> {annuity_model.流失}")
     print()
-    
+
     # 测试受托业绩模型
     print("受托业绩数据清洗测试:")
     trustee_model = TrusteePerformanceOut(**test_data_trustee)
     print(f"  return_rate: {test_data_trustee['return_rate']} -> {trustee_model.return_rate}")
-    print(f"  net_asset_value: {test_data_trustee['net_asset_value']} -> {trustee_model.net_asset_value}")
+    print(
+        f"  net_asset_value: {test_data_trustee['net_asset_value']} -> {trustee_model.net_asset_value}"
+    )
     print(f"  fund_scale: {test_data_trustee['fund_scale']} -> {trustee_model.fund_scale}")
     print()
-    
+
     print("✅ 所有清洗测试通过！")
-    
+
 except Exception as e:
     print(f"❌ 清洗测试失败: {e}")
 
@@ -189,41 +201,38 @@ print("\n=== 演示 4: 框架扩展性 - 新增自定义规则 ===\n")
 
 from src.work_data_hub.cleansing import rule, RuleCategory
 
+
 @rule(
-    name="company_name_standardization", 
+    name="company_name_standardization",
     category=RuleCategory.STRING,
     description="公司名称标准化处理",
     applicable_types={str},
-    field_patterns=["*公司*", "*客户名称", "*企业*"]
+    field_patterns=["*公司*", "*客户名称", "*企业*"],
 )
 def clean_company_name(company_name: str) -> str:
     """
     公司名称标准化处理
-    
+
     演示如何扩展框架添加新的清洗规则
     """
     if not isinstance(company_name, str):
         return company_name
-    
+
     # 移除常见后缀
     suffixes = ["有限公司", "股份有限公司", "有限责任公司", "集团", "（集团）"]
     cleaned = company_name.strip()
-    
+
     for suffix in suffixes:
         if cleaned.endswith(suffix):
-            cleaned = cleaned[:-len(suffix)].strip()
+            cleaned = cleaned[: -len(suffix)].strip()
             break
-    
+
     return cleaned
 
 
 # 测试新规则
 print("新增的公司名称清洗规则测试:")
-test_names = [
-    "中国平安保险集团股份有限公司",
-    "华为技术有限公司", 
-    "阿里巴巴（中国）有限公司"
-]
+test_names = ["中国平安保险集团股份有限公司", "华为技术有限公司", "阿里巴巴（中国）有限公司"]
 
 for name in test_names:
     cleaned = clean_company_name(name)
@@ -237,7 +246,7 @@ for name in test_names:
 print(f"\n=== 框架效果总结 ===")
 print("✅ 消除了重复实现: clean_decimal_fields 逻辑统一")
 print("✅ 提高了代码复用: 相同清洗规则在多个 domain 中复用")
-print("✅ 简化了开发体验: 装饰器替代手写 field_validator")  
+print("✅ 简化了开发体验: 装饰器替代手写 field_validator")
 print("✅ 增强了可维护性: 集中管理清洗规则")
 print("✅ 支持灵活扩展: 新规则自动注册和发现")
 print("✅ 保持向后兼容: 与现有 Pydantic 模型无缝集成")

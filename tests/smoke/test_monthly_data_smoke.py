@@ -1,8 +1,8 @@
 """
 Smoke tests using reference/monthly data - opt-in via marker.
 
-These tests validate the complete trustee_performance pipeline using real 
-reference data and optional database integration. Tests are skipped by 
+These tests validate the complete trustee_performance pipeline using real
+reference data and optional database integration. Tests are skipped by
 default and require explicit marker activation.
 
 Usage:
@@ -53,12 +53,14 @@ class TestMonthlyDataSmoke:
             assert isinstance(discovered_files, list), "Discovery should return a list"
 
             # Log discovery results for debugging
-            print(f"Discovered {len(discovered_files)} trustee_performance files in reference/monthly")
+            print(
+                f"Discovered {len(discovered_files)} trustee_performance files in reference/monthly"
+            )
 
             if discovered_files:
                 # Validate file structure
                 first_file = discovered_files[0]
-                assert hasattr(first_file, 'path'), "Discovered files should have path attribute"
+                assert hasattr(first_file, "path"), "Discovered files should have path attribute"
                 print(f"Sample discovered file: {first_file.path}")
 
     def test_plan_only_smoke(self):
@@ -66,14 +68,10 @@ class TestMonthlyDataSmoke:
         from src.work_data_hub.config.settings import Settings
 
         # Override settings for this test
-        test_settings = Settings(
-            data_base_dir="./reference/monthly",
-            dev_sample_size=None
-        )
+        test_settings = Settings(data_base_dir="./reference/monthly", dev_sample_size=None)
 
         with patch("src.work_data_hub.config.settings.get_settings", return_value=test_settings):
             with patch.dict(os.environ, {"WDH_DATA_BASE_DIR": "./reference/monthly"}):
-
                 # Mock the job execution to avoid actual Dagster machinery
                 mock_context = MagicMock()
                 mock_context.log.info = MagicMock()
@@ -96,7 +94,9 @@ class TestMonthlyDataSmoke:
                     for file_info in limited_files:
                         file_path = Path(file_info.path)
                         assert file_path.exists(), f"Discovered file should exist: {file_path}"
-                        assert file_path.suffix.lower() in ['.xlsx', '.xls'], f"Should be Excel file: {file_path}"
+                        assert file_path.suffix.lower() in [".xlsx", ".xls"], (
+                            f"Should be Excel file: {file_path}"
+                        )
 
                 except Exception as e:
                     pytest.skip(f"Plan-only smoke test failed: {e}")
@@ -110,7 +110,6 @@ class TestMonthlyDataSmoke:
 
         # Override environment for monthly data
         with patch.dict(os.environ, {"WDH_DATA_BASE_DIR": "./reference/monthly"}):
-
             try:
                 # Discovery phase
                 connector = DataSourceConnector()
@@ -133,10 +132,7 @@ class TestMonthlyDataSmoke:
                 print(f"Read {len(excel_rows)} rows from Excel")
 
                 # Process domain transformation
-                processed_records = process(
-                    excel_rows,
-                    source_file=first_file.path
-                )
+                processed_records = process(excel_rows, source_file=first_file.path)
 
                 if not processed_records:
                     pytest.skip("No processed records for database test")
@@ -152,7 +148,7 @@ class TestMonthlyDataSmoke:
                     rows=processed_dicts,
                     mode="delete_insert",
                     pk=["report_date", "plan_code", "company_code"],
-                    conn=None  # Plan-only
+                    conn=None,  # Plan-only
                 )
 
                 assert plan_result is not None, "Plan-only load should return result"
@@ -165,12 +161,14 @@ class TestMonthlyDataSmoke:
                     rows=processed_dicts,
                     mode="delete_insert",
                     pk=["report_date", "plan_code", "company_code"],
-                    conn=db_connection
+                    conn=db_connection,
                 )
 
                 assert execute_result is not None, "Execute load should return result"
-                print(f"Execute result: deleted={execute_result.get('deleted', 0)}, "
-                      f"inserted={execute_result.get('inserted', 0)}")
+                print(
+                    f"Execute result: deleted={execute_result.get('deleted', 0)}, "
+                    f"inserted={execute_result.get('inserted', 0)}"
+                )
 
             except Exception as e:
                 pytest.skip(f"Execute smoke test failed: {e}")

@@ -129,11 +129,9 @@ class TestReadExcelOp:
     def test_read_excel_op_success(self, tmp_path):
         """Test successful Excel reading with metadata logging."""
         # Create test Excel file
-        test_data = pd.DataFrame({
-            "年": ["2024", "2024"],
-            "月": ["11", "11"],
-            "计划代码": ["PLAN001", "PLAN002"]
-        })
+        test_data = pd.DataFrame(
+            {"年": ["2024", "2024"], "月": ["11", "11"], "计划代码": ["PLAN001", "PLAN002"]}
+        )
 
         test_file = tmp_path / "test.xlsx"
         test_data.to_excel(test_file, index=False, engine="openpyxl")
@@ -144,9 +142,7 @@ class TestReadExcelOp:
             {"年": "2024", "月": "11", "计划代码": "PLAN002"},
         ]
 
-        with patch(
-            "src.work_data_hub.orchestration.ops.read_excel_rows"
-        ) as mock_read:
+        with patch("src.work_data_hub.orchestration.ops.read_excel_rows") as mock_read:
             mock_read.return_value = expected_rows
 
             context = build_op_context()
@@ -175,9 +171,7 @@ class TestReadExcelOp:
         test_file = tmp_path / "empty.xlsx"
         pd.DataFrame().to_excel(test_file, index=False, engine="openpyxl")
 
-        with patch(
-            "src.work_data_hub.orchestration.ops.read_excel_rows"
-        ) as mock_read:
+        with patch("src.work_data_hub.orchestration.ops.read_excel_rows") as mock_read:
             mock_read.return_value = []
 
             context = build_op_context()
@@ -201,9 +195,7 @@ class TestProcessTrusteePerformanceOp:
     def test_process_trustee_performance_op_success(self):
         """Test successful domain processing."""
         # Mock input data
-        excel_rows = [
-            {"年": "2024", "月": "11", "计划代码": "PLAN001", "收益率": "5.5%"}
-        ]
+        excel_rows = [{"年": "2024", "月": "11", "计划代码": "PLAN001", "收益率": "5.5%"}]
 
         # Mock processed result
         mock_model = Mock()
@@ -217,9 +209,7 @@ class TestProcessTrusteePerformanceOp:
             mock_process.return_value = [mock_model]
 
             context = build_op_context()
-            result = process_trustee_performance_op(
-                context, excel_rows, ["/path/to/file.xlsx"]
-            )
+            result = process_trustee_performance_op(context, excel_rows, ["/path/to/file.xlsx"])
 
             assert len(result) == 1
             assert result[0]["plan_code"] == "PLAN001"
@@ -298,12 +288,7 @@ class TestLoadOp:
     def test_load_config_validation(self):
         """Test LoadConfig validation."""
         # Valid config
-        config = LoadConfig(
-            table="test_table",
-            mode="delete_insert",
-            pk=["id"],
-            plan_only=True
-        )
+        config = LoadConfig(table="test_table", mode="delete_insert", pk=["id"], plan_only=True)
         assert config.table == "test_table"
 
         # Invalid mode
@@ -341,7 +326,7 @@ class TestLoadOp:
         config_data = {
             "domains": {
                 "trustee_performance": {"table": "trustee_performance"},
-                "annuity_performance": {"table": "annuity_performance"}
+                "annuity_performance": {"table": "annuity_performance"},
             }
         }
         config_file = tmp_path / "test_config.yml"
@@ -406,7 +391,7 @@ class TestLoadOp:
             "table": "test_table",
             "deleted": 1,
             "inserted": 1,
-            "batches": 1
+            "batches": 1,
         }
 
         with patch("src.work_data_hub.orchestration.ops.psycopg2", create=True) as mock_psycopg2:
@@ -433,7 +418,7 @@ class TestLoadOp:
                         rows=processed_rows,
                         mode="delete_insert",
                         pk=["id"],
-                        conn=mock_conn
+                        conn=mock_conn,
                     )
 
                     # Verify connection cleanup
@@ -525,13 +510,14 @@ class TestReadAndProcessTrusteeFilesOp:
         config = ReadProcessConfig(sheet=0, max_files=2)
 
         # Mock read_excel_rows and process functions
-        with patch("src.work_data_hub.orchestration.ops.read_excel_rows") as mock_read, \
-             patch("src.work_data_hub.orchestration.ops.process") as mock_process:
-
+        with (
+            patch("src.work_data_hub.orchestration.ops.read_excel_rows") as mock_read,
+            patch("src.work_data_hub.orchestration.ops.process") as mock_process,
+        ):
             # Configure mock returns for each file
             mock_read.side_effect = [
                 [{"col": "data1"}],  # File 1 rows
-                [{"col": "data2"}]   # File 2 rows
+                [{"col": "data2"}],  # File 2 rows
             ]
 
             # Mock model objects with model_dump method
@@ -542,7 +528,7 @@ class TestReadAndProcessTrusteeFilesOp:
 
             mock_process.side_effect = [
                 [mock_model1],  # File 1 models
-                [mock_model2]   # File 2 models
+                [mock_model2],  # File 2 models
             ]
 
             context = build_op_context()
@@ -571,13 +557,11 @@ class TestReadAndProcessTrusteeFilesOp:
         file_paths = ["/path/file1.xlsx", "/path/file2.xlsx", "/path/file3.xlsx"]
         config = ReadProcessConfig(sheet=0, max_files=2)  # Limit to 2 files
 
-        with patch("src.work_data_hub.orchestration.ops.read_excel_rows") as mock_read, \
-             patch("src.work_data_hub.orchestration.ops.process") as mock_process:
-
-            mock_read.side_effect = [
-                [{"col": "data1"}],
-                [{"col": "data2"}]
-            ]
+        with (
+            patch("src.work_data_hub.orchestration.ops.read_excel_rows") as mock_read,
+            patch("src.work_data_hub.orchestration.ops.process") as mock_process,
+        ):
+            mock_read.side_effect = [[{"col": "data1"}], [{"col": "data2"}]]
 
             mock_model = Mock()
             mock_model.model_dump.return_value = {"processed": "data"}
@@ -605,9 +589,10 @@ class TestReadAndProcessTrusteeFilesOp:
         file_paths = ["/path/file1.xlsx"]
         config = ReadProcessConfig(sheet=1, max_files=1)
 
-        with patch("src.work_data_hub.orchestration.ops.read_excel_rows") as mock_read, \
-             patch("src.work_data_hub.orchestration.ops.process") as mock_process:
-
+        with (
+            patch("src.work_data_hub.orchestration.ops.read_excel_rows") as mock_read,
+            patch("src.work_data_hub.orchestration.ops.process") as mock_process,
+        ):
             mock_read.return_value = [{"col": "data"}]
 
             mock_model = Mock()
@@ -645,7 +630,13 @@ class TestLoadOpConnectionLifecycle:
         processed_rows = [{"col": "value"}]
 
         mock_conn = Mock()
-        mock_result = {"mode": "delete_insert", "table": "test", "deleted": 1, "inserted": 1, "batches": 1}
+        mock_result = {
+            "mode": "delete_insert",
+            "table": "test",
+            "deleted": 1,
+            "inserted": 1,
+            "batches": 1,
+        }
 
         with patch("src.work_data_hub.orchestration.ops.psycopg2", create=True) as mock_psycopg2:
             # CRITICAL: load_op should create bare connection, not use context manager
@@ -655,7 +646,9 @@ class TestLoadOpConnectionLifecycle:
                 mock_load.return_value = mock_result
 
                 with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
-                    mock_settings.return_value.get_database_connection_string.return_value = "postgresql://test"
+                    mock_settings.return_value.get_database_connection_string.return_value = (
+                        "postgresql://test"
+                    )
 
                     context = build_op_context()
                     config = LoadConfig(plan_only=False, table="test", pk=["id"])
@@ -666,7 +659,11 @@ class TestLoadOpConnectionLifecycle:
 
                     # Verify load was called with bare connection
                     mock_load.assert_called_once_with(
-                        table="test", rows=processed_rows, mode="delete_insert", pk=["id"], conn=mock_conn
+                        table="test",
+                        rows=processed_rows,
+                        mode="delete_insert",
+                        pk=["id"],
+                        conn=mock_conn,
                     )
 
                     # Verify connection cleanup in finally block
@@ -687,7 +684,9 @@ class TestLoadOpConnectionLifecycle:
                 mock_load.return_value = mock_result
 
                 with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
-                    mock_settings.return_value.get_database_connection_string.return_value = "postgresql://test"
+                    mock_settings.return_value.get_database_connection_string.return_value = (
+                        "postgresql://test"
+                    )
 
                     context = build_op_context()
                     config = LoadConfig(plan_only=False, table="test", mode="append", pk=[])
@@ -712,7 +711,9 @@ class TestLoadOpConnectionLifecycle:
                 mock_load.side_effect = Exception("Load operation failed")
 
                 with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
-                    mock_settings.return_value.get_database_connection_string.return_value = "postgresql://test"
+                    mock_settings.return_value.get_database_connection_string.return_value = (
+                        "postgresql://test"
+                    )
 
                     context = build_op_context()
                     config = LoadConfig(plan_only=False, table="test", pk=["id"])
@@ -732,7 +733,9 @@ class TestLoadOpConnectionLifecycle:
             mock_psycopg2.connect.side_effect = Exception("Connection refused")
 
             with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
-                mock_settings.return_value.get_database_connection_string.return_value = "postgresql://test"
+                mock_settings.return_value.get_database_connection_string.return_value = (
+                    "postgresql://test"
+                )
 
                 context = build_op_context()
                 config = LoadConfig(plan_only=False, table="test", pk=["id"])
@@ -748,7 +751,13 @@ class TestLoadOpConnectionLifecycle:
         processed_rows = [{"col": "value"}]
 
         mock_conn = Mock()
-        mock_result = {"mode": "delete_insert", "table": "test", "deleted": 1, "inserted": 1, "batches": 1}
+        mock_result = {
+            "mode": "delete_insert",
+            "table": "test",
+            "deleted": 1,
+            "inserted": 1,
+            "batches": 1,
+        }
 
         with patch("src.work_data_hub.orchestration.ops.psycopg2", create=True) as mock_psycopg2:
             mock_psycopg2.connect.return_value = mock_conn
@@ -757,7 +766,9 @@ class TestLoadOpConnectionLifecycle:
                 mock_load.return_value = mock_result
 
                 with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
-                    mock_settings.return_value.get_database_connection_string.return_value = "postgresql://test"
+                    mock_settings.return_value.get_database_connection_string.return_value = (
+                        "postgresql://test"
+                    )
 
                     context = build_op_context()
                     config = LoadConfig(plan_only=False, table="test", pk=["id"])
@@ -769,19 +780,29 @@ class TestLoadOpConnectionLifecycle:
 
                     # Verify that the connection object has NO __enter__ or __exit__ calls
                     # This confirms no context manager nesting
-                    assert not hasattr(mock_conn, '__enter__') or not mock_conn.__enter__.called
-                    assert not hasattr(mock_conn, '__exit__') or not mock_conn.__exit__.called
+                    assert not hasattr(mock_conn, "__enter__") or not mock_conn.__enter__.called
+                    assert not hasattr(mock_conn, "__exit__") or not mock_conn.__exit__.called
 
                     # Verify load was called with bare connection object
                     mock_load.assert_called_once_with(
-                        table="test", rows=processed_rows, mode="delete_insert", pk=["id"], conn=mock_conn
+                        table="test",
+                        rows=processed_rows,
+                        mode="delete_insert",
+                        pk=["id"],
+                        conn=mock_conn,
                     )
 
     def test_load_op_plan_only_mode_no_connection_created(self):
         """Test that plan_only=True doesn't create database connections."""
         processed_rows = [{"col": "value"}]
 
-        mock_result = {"mode": "delete_insert", "table": "test", "deleted": 1, "inserted": 1, "batches": 1}
+        mock_result = {
+            "mode": "delete_insert",
+            "table": "test",
+            "deleted": 1,
+            "inserted": 1,
+            "batches": 1,
+        }
 
         with patch("src.work_data_hub.orchestration.ops.psycopg2", create=True) as mock_psycopg2:
             with patch("src.work_data_hub.orchestration.ops.load") as mock_load:
@@ -816,7 +837,9 @@ class TestLoadOpConnectionLifecycle:
 
                 with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
                     # Test specific DSN format
-                    mock_settings.return_value.get_database_connection_string.return_value = "postgresql://user:pass@localhost:5432/testdb"
+                    mock_settings.return_value.get_database_connection_string.return_value = (
+                        "postgresql://user:pass@localhost:5432/testdb"
+                    )
 
                     context = build_op_context()
                     config = LoadConfig(plan_only=False, table="test", mode="append", pk=[])
@@ -827,7 +850,9 @@ class TestLoadOpConnectionLifecycle:
                     mock_settings.return_value.get_database_connection_string.assert_called_once()
 
                     # Verify psycopg2.connect was called with the correct DSN
-                    mock_psycopg2.connect.assert_called_once_with("postgresql://user:pass@localhost:5432/testdb")
+                    mock_psycopg2.connect.assert_called_once_with(
+                        "postgresql://user:pass@localhost:5432/testdb"
+                    )
 
     # Preserve existing tests with legacy names for backward compatibility
     def test_load_op_db_context_manager_mocked(self):
@@ -835,7 +860,13 @@ class TestLoadOpConnectionLifecycle:
         processed_rows = [{"col": "value", "id": 1}]  # Add missing id field
 
         mock_conn = Mock()
-        mock_result = {"mode": "delete_insert", "table": "test", "deleted": 1, "inserted": 1, "batches": 1}
+        mock_result = {
+            "mode": "delete_insert",
+            "table": "test",
+            "deleted": 1,
+            "inserted": 1,
+            "batches": 1,
+        }
 
         with patch("src.work_data_hub.orchestration.ops.psycopg2", create=True) as mock_psycopg2:
             mock_psycopg2.connect.return_value = mock_conn
@@ -859,7 +890,11 @@ class TestLoadOpConnectionLifecycle:
 
                     # Verify load was called with bare connection
                     mock_load.assert_called_once_with(
-                        table="test", rows=processed_rows, mode="delete_insert", pk=["id"], conn=mock_conn
+                        table="test",
+                        rows=processed_rows,
+                        mode="delete_insert",
+                        pk=["id"],
+                        conn=mock_conn,
                     )
 
                     # Verify connection cleanup

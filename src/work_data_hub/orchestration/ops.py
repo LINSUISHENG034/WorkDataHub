@@ -45,6 +45,7 @@ def _load_valid_domains() -> List[str]:
     # Optional: Validate data_sources.yml for fail-fast behavior
     try:
         from ..config.schema import DataSourcesValidationError, validate_data_sources_config
+
         validate_data_sources_config()
     except DataSourcesValidationError as e:
         logger.error(f"data_sources.yml validation failed: {e}")
@@ -288,9 +289,7 @@ class ReadProcessConfig(Config):
 
 @op
 def read_and_process_trustee_files_op(
-    context: OpExecutionContext,
-    config: ReadProcessConfig,
-    file_paths: List[str]
+    context: OpExecutionContext, config: ReadProcessConfig, file_paths: List[str]
 ) -> List[Dict]:
     """
     Process multiple trustee files and return accumulated results.
@@ -321,8 +320,7 @@ def read_and_process_trustee_files_op(
 
             # Structured logging like existing ops
             context.log.info(
-                f"Processed {file_path}: {len(rows)} rows -> "
-                f"{len(processed_dicts)} records"
+                f"Processed {file_path}: {len(rows)} rows -> {len(processed_dicts)} records"
             )
 
         except Exception as e:
@@ -385,16 +383,12 @@ def load_op(
             global psycopg2  # type: ignore
             if psycopg2 is None:  # type: ignore
                 # Explicitly treated as unavailable (tests may patch to None)
-                raise DataWarehouseLoaderError(
-                    "psycopg2 not available for database operations"
-                )
+                raise DataWarehouseLoaderError("psycopg2 not available for database operations")
             if psycopg2 is _PSYCOPG2_NOT_LOADED:  # type: ignore
                 try:
                     import psycopg2 as _psycopg2  # type: ignore
                 except ImportError:
-                    raise DataWarehouseLoaderError(
-                        "psycopg2 not available for database operations"
-                    )
+                    raise DataWarehouseLoaderError("psycopg2 not available for database operations")
                 psycopg2 = _psycopg2  # type: ignore
 
             settings = get_settings()
@@ -425,8 +419,7 @@ def load_op(
                 conn = psycopg2.connect(dsn)  # type: ignore  # Bare connection, no context manager
             except Exception as e:
                 raise DataWarehouseLoaderError(
-                    f"Database connection failed: {e}. "
-                    "Check WDH_DATABASE__* environment variables."
+                    f"Database connection failed: {e}. Check WDH_DATABASE__* environment variables."
                 ) from e
 
             # Call loader - it handles transactions with 'with conn:'
@@ -465,4 +458,3 @@ def load_op(
         # CRITICAL: Clean up bare connection in finally
         if conn is not None:
             conn.close()
-

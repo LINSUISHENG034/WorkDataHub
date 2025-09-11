@@ -35,15 +35,17 @@ class TestTrusteePerformanceE2E:
     @pytest.fixture
     def sample_excel_data(self):
         """Create sample Excel data for E2E testing."""
-        return pd.DataFrame({
-            "年": ["2024", "2024", "2024"],
-            "月": ["11", "11", "11"],
-            "计划代码": ["PLAN001", "PLAN002", "PLAN003"],
-            "公司代码": ["COMP001", "COMP001", "COMP002"],
-            "收益率": ["5.5%", "4.8%", "6.2%"],
-            "净值": ["1.0512", "1.0448", "1.0623"],
-            "规模": ["12000000.50", "8500000.25", "15600000.75"]
-        })
+        return pd.DataFrame(
+            {
+                "年": ["2024", "2024", "2024"],
+                "月": ["11", "11", "11"],
+                "计划代码": ["PLAN001", "PLAN002", "PLAN003"],
+                "公司代码": ["COMP001", "COMP001", "COMP002"],
+                "收益率": ["5.5%", "4.8%", "6.2%"],
+                "净值": ["1.0512", "1.0448", "1.0623"],
+                "规模": ["12000000.50", "8500000.25", "15600000.75"],
+            }
+        )
 
     @pytest.fixture
     def temp_excel_file(self, sample_excel_data, tmp_path):
@@ -62,7 +64,7 @@ class TestTrusteePerformanceE2E:
                     "select": "latest_by_year_month",
                     "sheet": 0,
                     "table": "trustee_performance",
-                    "primary_key": ["report_date", "plan_code", "company_code"]
+                    "primary_key": ["report_date", "plan_code", "company_code"],
                 }
             }
         }
@@ -79,7 +81,9 @@ class TestTrusteePerformanceE2E:
             mock_settings.return_value.data_sources_config = temp_config_file
 
             # Mock DataSourceConnector
-            with patch("src.work_data_hub.orchestration.ops.DataSourceConnector") as mock_connector_class:
+            with patch(
+                "src.work_data_hub.orchestration.ops.DataSourceConnector"
+            ) as mock_connector_class:
                 mock_discovered = Mock()
                 mock_discovered.path = temp_excel_file
                 mock_discovered.year = 2024
@@ -117,7 +121,7 @@ class TestTrusteePerformanceE2E:
                     table="trustee_performance",
                     mode="delete_insert",
                     pk=["report_date", "plan_code", "company_code"],
-                    plan_only=True
+                    plan_only=True,
                 )
                 load_result = load_op(context, load_config, processed_rows)
 
@@ -135,21 +139,23 @@ class TestTrusteePerformanceE2E:
     def test_pipeline_with_decimal_precision_validation(self, tmp_path):
         """Test E2E pipeline handles decimal precision edge cases correctly."""
         # Create Excel data with problematic float precision values
-        problematic_data = pd.DataFrame({
-            "年": ["2024"],
-            "月": ["11"],
-            "计划代码": ["PLAN001"],
-            "公司代码": ["COMP001"],
-            "收益率": [0.048799999999999996],  # Problematic float precision
-            "净值": [1.0512000000000001],      # Another float edge case
-            "规模": [12000000.003]             # Large number precision issue
-        })
+        problematic_data = pd.DataFrame(
+            {
+                "年": ["2024"],
+                "月": ["11"],
+                "计划代码": ["PLAN001"],
+                "公司代码": ["COMP001"],
+                "收益率": [0.048799999999999996],  # Problematic float precision
+                "净值": [1.0512000000000001],  # Another float edge case
+                "规模": [12000000.003],  # Large number precision issue
+            }
+        )
 
         excel_file = tmp_path / "precision_test.xlsx"
         problematic_data.to_excel(excel_file, index=False, engine="openpyxl")
 
         # Process the data through domain service
-        excel_rows = problematic_data.to_dict('records')
+        excel_rows = problematic_data.to_dict("records")
         processed_models = process(excel_rows, data_source=str(excel_file))
 
         # Verify decimal quantization worked correctly
@@ -157,9 +163,9 @@ class TestTrusteePerformanceE2E:
         model = processed_models[0]
 
         # These should be quantized correctly without causing ValidationError
-        assert model.return_rate == Decimal("0.048800")      # 6 decimal places
-        assert model.net_asset_value == Decimal("1.0512")    # 4 decimal places
-        assert model.fund_scale == Decimal("12000000.00")    # 2 decimal places
+        assert model.return_rate == Decimal("0.048800")  # 6 decimal places
+        assert model.net_asset_value == Decimal("1.0512")  # 4 decimal places
+        assert model.fund_scale == Decimal("12000000.00")  # 2 decimal places
 
         # Test through complete pipeline
         processed_dicts = [model.model_dump() for model in processed_models]
@@ -170,7 +176,7 @@ class TestTrusteePerformanceE2E:
             rows=processed_dicts,
             mode="delete_insert",
             pk=["report_date", "plan_code", "company_code"],
-            conn=None
+            conn=None,
         )
 
         assert load_result["inserted"] == 1
@@ -179,38 +185,40 @@ class TestTrusteePerformanceE2E:
     def test_pipeline_with_jsonb_complex_structures(self):
         """Test E2E pipeline handles JSONB complex data structures."""
         # Create processed rows with complex JSONB data
-        processed_rows = [{
-            "report_date": date(2024, 11, 1),
-            "plan_code": "PLAN001",
-            "company_code": "COMP001",
-            "return_rate": Decimal("0.055"),
-            "data_source": "test_e2e",
-            "validation_warnings": [
-                "High return rate detected: 5.5%",
-                {
-                    "warning_type": "data_quality",
-                    "details": {
-                        "field": "return_rate",
-                        "value": 0.055,
-                        "threshold": 0.05,
-                        "metadata": {
-                            "source_row": 1,
-                            "processing_timestamp": "2024-01-01T12:00:00Z"
-                        }
-                    }
-                }
-            ],
-            "metadata": {
-                "processing_context": {
-                    "data_source": "/path/to/trustee_performance_2024_11.xlsx",
-                    "batch_id": "batch_20241101_001"
+        processed_rows = [
+            {
+                "report_date": date(2024, 11, 1),
+                "plan_code": "PLAN001",
+                "company_code": "COMP001",
+                "return_rate": Decimal("0.055"),
+                "data_source": "test_e2e",
+                "validation_warnings": [
+                    "High return rate detected: 5.5%",
+                    {
+                        "warning_type": "data_quality",
+                        "details": {
+                            "field": "return_rate",
+                            "value": 0.055,
+                            "threshold": 0.05,
+                            "metadata": {
+                                "source_row": 1,
+                                "processing_timestamp": "2024-01-01T12:00:00Z",
+                            },
+                        },
+                    },
+                ],
+                "metadata": {
+                    "processing_context": {
+                        "data_source": "/path/to/trustee_performance_2024_11.xlsx",
+                        "batch_id": "batch_20241101_001",
+                    },
+                    "data_lineage": [
+                        {"step": "extraction", "timestamp": "2024-01-01T11:00:00Z"},
+                        {"step": "validation", "timestamp": "2024-01-01T11:30:00Z"},
+                    ],
                 },
-                "data_lineage": [
-                    {"step": "extraction", "timestamp": "2024-01-01T11:00:00Z"},
-                    {"step": "validation", "timestamp": "2024-01-01T11:30:00Z"}
-                ]
             }
-        }]
+        ]
 
         # Convert to dicts for serialization
         row_dicts = []
@@ -229,7 +237,7 @@ class TestTrusteePerformanceE2E:
             rows=row_dicts,
             mode="delete_insert",
             pk=["report_date", "plan_code", "company_code"],
-            conn=None
+            conn=None,
         )
 
         assert load_result["inserted"] == 1
@@ -247,22 +255,24 @@ class TestTrusteePerformanceE2E:
     def test_pipeline_error_handling_invalid_data(self, tmp_path):
         """Test E2E pipeline error handling with invalid data."""
         # Create Excel data with invalid/problematic values
-        invalid_data = pd.DataFrame({
-            "年": ["invalid_year", "2024", ""],
-            "月": ["invalid_month", "13", "11"],  # Invalid month
-            "计划代码": ["", "PLAN002", "PLAN003"],  # Empty plan code
-            "公司代码": ["COMP001", "", "COMP003"],  # Empty company code
-            "收益率": ["not_a_number", "5.5%", "150%"],  # Invalid/extreme values
-        })
+        invalid_data = pd.DataFrame(
+            {
+                "年": ["invalid_year", "2024", ""],
+                "月": ["invalid_month", "13", "11"],  # Invalid month
+                "计划代码": ["", "PLAN002", "PLAN003"],  # Empty plan code
+                "公司代码": ["COMP001", "", "COMP003"],  # Empty company code
+                "收益率": ["not_a_number", "5.5%", "150%"],  # Invalid/extreme values
+            }
+        )
 
         excel_file = tmp_path / "invalid_data_test.xlsx"
         invalid_data.to_excel(excel_file, index=False, engine="openpyxl")
 
-        excel_rows = invalid_data.to_dict('records')
+        excel_rows = invalid_data.to_dict("records")
 
         # Process should handle errors gracefully
         # Some rows should be filtered out, others should be processed successfully
-        with patch('src.work_data_hub.domain.trustee_performance.service.logger') as mock_logger:
+        with patch("src.work_data_hub.domain.trustee_performance.service.logger") as mock_logger:
             processed_models = process(excel_rows, data_source=str(excel_file))
 
             # Should process at least some valid data (not all rows are completely invalid)
@@ -277,18 +287,26 @@ class TestTrusteePerformanceE2E:
         mixed_rows = [
             # Valid row
             {
-                "年": "2024", "月": "11", "计划代码": "PLAN001", "公司代码": "COMP001",
-                "收益率": "5.5%", "净值": "1.05", "规模": "1000000"
+                "年": "2024",
+                "月": "11",
+                "计划代码": "PLAN001",
+                "公司代码": "COMP001",
+                "收益率": "5.5%",
+                "净值": "1.05",
+                "规模": "1000000",
             },
             # Invalid row (missing critical data)
-            {
-                "年": "2024", "月": "11", "其他字段": "some_value"
-            },
+            {"年": "2024", "月": "11", "其他字段": "some_value"},
             # Another valid row
             {
-                "年": "2024", "月": "11", "计划代码": "PLAN003", "公司代码": "COMP003",
-                "收益率": "4.2%", "净值": "1.03", "规模": "2000000"
-            }
+                "年": "2024",
+                "月": "11",
+                "计划代码": "PLAN003",
+                "公司代码": "COMP003",
+                "收益率": "4.2%",
+                "净值": "1.03",
+                "规模": "2000000",
+            },
         ]
 
         # Process should continue despite errors in some rows
@@ -327,18 +345,20 @@ class TestTrusteePerformanceE2E:
     def test_pipeline_different_load_modes(self, mode, tmp_path):
         """Test E2E pipeline with different load modes."""
         # Create simple test data
-        test_data = pd.DataFrame({
-            "年": ["2024"],
-            "月": ["11"],
-            "计划代码": ["PLAN001"],
-            "公司代码": ["COMP001"],
-            "收益率": ["5.5%"]
-        })
+        test_data = pd.DataFrame(
+            {
+                "年": ["2024"],
+                "月": ["11"],
+                "计划代码": ["PLAN001"],
+                "公司代码": ["COMP001"],
+                "收益率": ["5.5%"],
+            }
+        )
 
         excel_file = tmp_path / f"load_mode_{mode}_test.xlsx"
         test_data.to_excel(excel_file, index=False, engine="openpyxl")
 
-        excel_rows = test_data.to_dict('records')
+        excel_rows = test_data.to_dict("records")
         processed_models = process(excel_rows, data_source=str(excel_file))
         processed_dicts = [model.model_dump() for model in processed_models]
 
@@ -350,7 +370,7 @@ class TestTrusteePerformanceE2E:
             rows=processed_dicts,
             mode=mode,
             pk=pk,
-            conn=None  # Plan-only mode
+            conn=None,  # Plan-only mode
         )
 
         assert load_result["mode"] == mode
@@ -368,13 +388,15 @@ class TestTrusteePerformanceE2E:
         # Create large dataset
         large_dataset = []
         for i in range(2500):  # Larger than default chunk_size
-            large_dataset.append({
-                "年": "2024",
-                "月": "11",
-                "计划代码": f"PLAN{i:04d}",
-                "公司代码": f"COMP{i % 10:03d}",
-                "收益率": f"{(i % 10) * 0.5 + 1.0:.2f}%"
-            })
+            large_dataset.append(
+                {
+                    "年": "2024",
+                    "月": "11",
+                    "计划代码": f"PLAN{i:04d}",
+                    "公司代码": f"COMP{i % 10:03d}",
+                    "收益率": f"{(i % 10) * 0.5 + 1.0:.2f}%",
+                }
+            )
 
         # Process large dataset
         processed_models = process(large_dataset, data_source="large_dataset_test")
@@ -388,7 +410,7 @@ class TestTrusteePerformanceE2E:
             rows=processed_dicts,
             mode="append",
             chunk_size=1000,
-            conn=None
+            conn=None,
         )
 
         assert load_result["inserted"] == 2500
@@ -413,6 +435,7 @@ class TestTrusteePerformanceE2EIntegration:
         if not conn_str:
             try:
                 from src.work_data_hub.config.settings import get_settings
+
                 settings = get_settings()
                 conn_str = settings.get_database_connection_string()
             except Exception:
@@ -451,31 +474,33 @@ class TestTrusteePerformanceE2EIntegration:
     def test_complete_e2e_with_database_execution(self, db_connection, tmp_path):
         """Test complete E2E pipeline with actual database execution."""
         # Create test data with JSONB columns
-        test_data = pd.DataFrame({
-            "年": ["2024", "2024"],
-            "月": ["11", "11"],
-            "计划代码": ["PLAN001", "PLAN002"],
-            "公司代码": ["COMP001", "COMP002"],
-            "收益率": ["5.5%", "4.8%"],
-            "净值": ["1.0512", "1.0448"],
-            "规模": ["12000000.50", "8500000.25"]
-        })
+        test_data = pd.DataFrame(
+            {
+                "年": ["2024", "2024"],
+                "月": ["11", "11"],
+                "计划代码": ["PLAN001", "PLAN002"],
+                "公司代码": ["COMP001", "COMP002"],
+                "收益率": ["5.5%", "4.8%"],
+                "净值": ["1.0512", "1.0448"],
+                "规模": ["12000000.50", "8500000.25"],
+            }
+        )
 
         excel_file = tmp_path / "e2e_integration_test.xlsx"
         test_data.to_excel(excel_file, index=False, engine="openpyxl")
 
         # Process through domain service
-        excel_rows = test_data.to_dict('records')
+        excel_rows = test_data.to_dict("records")
         processed_models = process(excel_rows, data_source=str(excel_file))
 
         # Add JSONB data to test adaptation
         processed_dicts = []
         for i, model in enumerate(processed_models):
             model_dict = model.model_dump()
-            model_dict['validation_warnings'] = [f"Test warning {i+1}"]
-            model_dict['metadata'] = {
+            model_dict["validation_warnings"] = [f"Test warning {i + 1}"]
+            model_dict["metadata"] = {
                 "source_file": str(excel_file),
-                "processing_batch": f"batch_{i+1}"
+                "processing_batch": f"batch_{i + 1}",
             }
             processed_dicts.append(model_dict)
 
@@ -485,7 +510,7 @@ class TestTrusteePerformanceE2EIntegration:
             rows=processed_dicts,
             mode="delete_insert",
             pk=["report_date", "plan_code", "company_code"],
-            conn=db_connection
+            conn=db_connection,
         )
 
         assert load_result["inserted"] == 2
@@ -511,19 +536,22 @@ class TestTrusteePerformanceE2EIntegration:
     def test_database_transaction_rollback_on_error(self, db_connection):
         """Test that database transactions rollback properly on errors."""
         # Create data that will cause a constraint violation
-        invalid_data = [{
-            "report_date": "2024-11-01",
-            "plan_code": "PLAN001",
-            "company_code": "COMP001",
-            "return_rate": Decimal("0.055"),
-            "data_source": "test"
-        }, {
-            "report_date": "2024-11-01",
-            "plan_code": "PLAN001",  # Duplicate primary key
-            "company_code": "COMP001",
-            "return_rate": Decimal("0.048"),
-            "data_source": "test"
-        }]
+        invalid_data = [
+            {
+                "report_date": "2024-11-01",
+                "plan_code": "PLAN001",
+                "company_code": "COMP001",
+                "return_rate": Decimal("0.055"),
+                "data_source": "test",
+            },
+            {
+                "report_date": "2024-11-01",
+                "plan_code": "PLAN001",  # Duplicate primary key
+                "company_code": "COMP001",
+                "return_rate": Decimal("0.048"),
+                "data_source": "test",
+            },
+        ]
 
         # This should fail due to duplicate primary key
         with pytest.raises(DataWarehouseLoaderError):
@@ -531,7 +559,7 @@ class TestTrusteePerformanceE2EIntegration:
                 table="test_trustee_performance",
                 rows=invalid_data,
                 mode="append",  # Will try to insert duplicates
-                conn=db_connection
+                conn=db_connection,
             )
 
         # Verify no data was inserted (transaction rolled back)
@@ -542,13 +570,15 @@ class TestTrusteePerformanceE2EIntegration:
 
     def test_database_connection_lifecycle_integration(self, db_connection):
         """Test database connection lifecycle in realistic scenario."""
-        test_data = [{
-            "report_date": "2024-11-01",
-            "plan_code": "PLAN001",
-            "company_code": "COMP001",
-            "return_rate": Decimal("0.055"),
-            "data_source": "connection_test"
-        }]
+        test_data = [
+            {
+                "report_date": "2024-11-01",
+                "plan_code": "PLAN001",
+                "company_code": "COMP001",
+                "return_rate": Decimal("0.055"),
+                "data_source": "connection_test",
+            }
+        ]
 
         # Mock load_op to test connection handling
         with patch("src.work_data_hub.orchestration.ops.psycopg2") as mock_psycopg2:
@@ -556,14 +586,13 @@ class TestTrusteePerformanceE2EIntegration:
 
             context = build_op_context()
             config = LoadConfig(
-                table="test_trustee_performance",
-                mode="append",
-                pk=[],
-                plan_only=False
+                table="test_trustee_performance", mode="append", pk=[], plan_only=False
             )
 
             with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
-                mock_settings.return_value.get_database_connection_string.return_value = "mocked_dsn"
+                mock_settings.return_value.get_database_connection_string.return_value = (
+                    "mocked_dsn"
+                )
 
                 result = load_op(context, config, test_data)
 

@@ -215,7 +215,9 @@ def _extract_report_date(input_model: TrusteePerformanceIn, row_index: int) -> O
         try:
             return date(year, month, 1)
         except ValueError as e:
-            logger.debug(f"Row {row_index}: Cannot create date from year={year}, month={month}: {e}")
+            logger.debug(
+                f"Row {row_index}: Cannot create date from year={year}, month={month}: {e}"
+            )
             return None
 
     logger.debug(f"Row {row_index}: No valid date could be extracted")
@@ -354,9 +356,7 @@ def validate_input_batch(rows: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any
             if has_date and has_plan and has_company:
                 valid_rows.append(row)
             else:
-                errors.append(
-                    f"Row {i}: missing required fields (date/plan/company)"
-                )
+                errors.append(f"Row {i}: missing required fields (date/plan/company)")
         except ValidationError as e:
             errors.append(f"Row {i}: {e}")
         except Exception as e:

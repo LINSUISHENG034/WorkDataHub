@@ -12,20 +12,20 @@ WorkDataHub 统一数据清洗框架主入口 - 简化版本
 Usage:
     # 1. 使用便捷装饰器替换重复的 field_validator
     from work_data_hub.cleansing import decimal_fields_cleaner
-    
+
     @decimal_fields_cleaner("期初资产规模", "期末资产规模")
     class MyModel(BaseModel):
         期初资产规模: Optional[Decimal] = None
         期末资产规模: Optional[Decimal] = None
-    
+
     # 2. 使用清洗规则注册表
     from work_data_hub.cleansing import registry
-    
+
     rules = registry.find_by_category(RuleCategory.NUMERIC)
-    
+
     # 3. 创建自定义清洗规则
     from work_data_hub.cleansing import rule, RuleCategory
-    
+
     @rule(
         name="my_custom_rule",
         category=RuleCategory.STRING,
@@ -60,18 +60,15 @@ __all__ = [
     "RuleCategory",
     "CleansingRule",
     "CleansingRegistry",
-
     # Pydantic 集成
     "decimal_fields_cleaner",
     "simple_field_validator",
-
     # 常用清洗规则
     "comprehensive_decimal_cleaning",
     "remove_currency_symbols",
     "handle_percentage_conversion",
     "standardize_null_values",
     "decimal_quantization",
-
     # 预配置清洗器
     "annuity_decimal_cleaner",
     "trustee_decimal_cleaner",
@@ -88,7 +85,7 @@ def get_framework_info():
         "total_rules": stats["total_rules"],
         "rules_by_category": stats["rules_by_category"],
         "available_categories": [cat.value for cat in RuleCategory],
-        "description": "简化统一数据清洗框架 - 消除重复实现，提高代码复用性"
+        "description": "简化统一数据清洗框架 - 消除重复实现，提高代码复用性",
     }
 
 
@@ -98,10 +95,12 @@ def list_available_rules():
 
     result = []
     for rule_obj in rules:
-        result.append({
-            "name": rule_obj.name,
-            "category": rule_obj.category.value,
-            "description": rule_obj.description
-        })
+        result.append(
+            {
+                "name": rule_obj.name,
+                "category": rule_obj.category.value,
+                "description": rule_obj.description,
+            }
+        )
 
     return result

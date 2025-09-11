@@ -1,7 +1,7 @@
 """
 Test cases for annuity performance discovery with version-aware file selection.
 
-This module tests the version extraction logic, year normalization, and 
+This module tests the version extraction logic, year normalization, and
 version-aware selection strategy for annuity performance data files
 stored in versioned directories (V1/, V2/, etc.) under "数据采集" directories.
 """
@@ -33,13 +33,14 @@ class TestAnnuityPerformanceDiscovery:
                 "annuity_performance": {
                     "pattern": r"(?P<year>\d{2}|20\d{2})年(?P<month>0?[1-9]|1[0-2])月.*年金.*终稿数据.*\.(xlsx|xlsm)$",
                     "select": "latest_by_year_month_and_version",
-                    "sheet": "规模明细"
+                    "sheet": "规模明细",
                 }
             }
         }
 
         config_file = tmp_path / "config.yml"
         import yaml
+
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_content, f, allow_unicode=True)
 
@@ -50,7 +51,7 @@ class TestAnnuityPerformanceDiscovery:
         files = connector.discover("annuity_performance")
 
         assert len(files) == 1
-        assert files[0].metadata['version'] == 2
+        assert files[0].metadata["version"] == 2
         assert files[0].year == 2024  # Normalized from 24
         assert files[0].month == 11
         assert "V2" in files[0].path
@@ -73,13 +74,14 @@ class TestAnnuityPerformanceDiscovery:
                 "annuity_performance": {
                     "pattern": r"(?P<year>\d{2}|20\d{2})年(?P<month>0?[1-9]|1[0-2])月.*年金.*终稿数据.*\.(xlsx|xlsm)$",
                     "select": "latest_by_year_month_and_version",
-                    "sheet": "规模明细"
+                    "sheet": "规模明细",
                 }
             }
         }
 
         config_file = tmp_path / "config.yml"
         import yaml
+
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_content, f, allow_unicode=True)
 
@@ -91,7 +93,7 @@ class TestAnnuityPerformanceDiscovery:
 
         # Should only return V10 file (highest version)
         assert len(files) == 1
-        assert files[0].metadata['version'] == 10
+        assert files[0].metadata["version"] == 10
         assert "V10" in files[0].path
 
     @patch("src.work_data_hub.config.settings.get_settings")
@@ -118,13 +120,14 @@ class TestAnnuityPerformanceDiscovery:
                 "annuity_performance": {
                     "pattern": r"(?P<year>\d{2}|20\d{2})年(?P<month>0?[1-9]|1[0-2])月.*年金.*终稿数据.*\.(xlsx|xlsm)$",
                     "select": "latest_by_year_month_and_version",
-                    "sheet": "规模明细"
+                    "sheet": "规模明细",
                 }
             }
         }
 
         config_file = tmp_path / "config.yml"
         import yaml
+
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_content, f, allow_unicode=True)
 
@@ -136,7 +139,7 @@ class TestAnnuityPerformanceDiscovery:
 
         # Should return V1 file (valid version beats None version)
         assert len(files) == 1
-        assert files[0].metadata['version'] == 1
+        assert files[0].metadata["version"] == 1
         assert "V1" in files[0].path
 
     @patch("src.work_data_hub.config.settings.get_settings")
@@ -147,7 +150,7 @@ class TestAnnuityPerformanceDiscovery:
 
         # Test different year formats
         test_files = [
-            "24年11月年金终稿数据.xlsx",    # Two-digit year
+            "24年11月年金终稿数据.xlsx",  # Two-digit year
             "2024年12月年金终稿数据.xlsx",  # Four-digit year
         ]
 
@@ -160,13 +163,14 @@ class TestAnnuityPerformanceDiscovery:
                 "annuity_performance": {
                     "pattern": r"(?P<year>\d{2}|20\d{2})年(?P<month>0?[1-9]|1[0-2])月.*年金.*终稿数据.*\.(xlsx|xlsm)$",
                     "select": "latest_by_year_month_and_version",
-                    "sheet": "规模明细"
+                    "sheet": "规模明细",
                 }
             }
         }
 
         config_file = tmp_path / "config.yml"
         import yaml
+
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_content, f, allow_unicode=True)
 
@@ -206,13 +210,14 @@ class TestAnnuityPerformanceDiscovery:
                 "annuity_performance": {
                     "pattern": r"(?P<year>\d{2}|20\d{2})年(?P<month>0?[1-9]|1[0-2])月.*年金.*终稿数据.*\.(xlsx|xlsm)$",
                     "select": "latest_by_year_month_and_version",
-                    "sheet": "规模明细"
+                    "sheet": "规模明细",
                 }
             }
         }
 
         config_file = tmp_path / "config.yml"
         import yaml
+
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_content, f, allow_unicode=True)
 
@@ -229,10 +234,10 @@ class TestAnnuityPerformanceDiscovery:
         other_files = [f for f in files if "其他目录" in f.path]
 
         if data_collection_files:
-            assert data_collection_files[0].metadata['version'] == 3
+            assert data_collection_files[0].metadata["version"] == 3
 
         if other_files:
-            assert other_files[0].metadata['version'] is None
+            assert other_files[0].metadata["version"] is None
 
     @patch("src.work_data_hub.config.settings.get_settings")
     def test_multiple_year_month_groups(self, mock_settings, tmp_path):
@@ -256,13 +261,14 @@ class TestAnnuityPerformanceDiscovery:
                 "annuity_performance": {
                     "pattern": r"(?P<year>\d{2}|20\d{2})年(?P<month>0?[1-9]|1[0-2])月.*年金.*终稿数据.*\.(xlsx|xlsm)$",
                     "select": "latest_by_year_month_and_version",
-                    "sheet": "规模明细"
+                    "sheet": "规模明细",
                 }
             }
         }
 
         config_file = tmp_path / "config.yml"
         import yaml
+
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_content, f, allow_unicode=True)
 
@@ -283,15 +289,15 @@ class TestAnnuityPerformanceDiscovery:
 
         # Check 2024/10 -> V2
         assert (2024, 10) in files_by_month
-        assert files_by_month[(2024, 10)].metadata['version'] == 2
+        assert files_by_month[(2024, 10)].metadata["version"] == 2
 
         # Check 2024/11 -> V1
         assert (2024, 11) in files_by_month
-        assert files_by_month[(2024, 11)].metadata['version'] == 1
+        assert files_by_month[(2024, 11)].metadata["version"] == 1
 
         # Check 2023/12 -> V3
         assert (2023, 12) in files_by_month
-        assert files_by_month[(2023, 12)].metadata['version'] == 3
+        assert files_by_month[(2023, 12)].metadata["version"] == 3
 
     @patch("src.work_data_hub.config.settings.get_settings")
     def test_chinese_filename_handling(self, mock_settings, tmp_path):
@@ -315,13 +321,14 @@ class TestAnnuityPerformanceDiscovery:
                 "annuity_performance": {
                     "pattern": r"(?P<year>\d{2}|20\d{2})年(?P<month>0?[1-9]|1[0-2])月.*年金.*终稿数据.*\.(xlsx|xlsm)$",
                     "select": "latest_by_year_month_and_version",
-                    "sheet": "规模明细"
+                    "sheet": "规模明细",
                 }
             }
         }
 
         config_file = tmp_path / "config.yml"
         import yaml
+
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_content, f, allow_unicode=True)
 
@@ -338,7 +345,7 @@ class TestAnnuityPerformanceDiscovery:
         for file in files:
             assert "年金" in file.path
             assert "终稿数据" in file.path
-            assert file.metadata['version'] == 1  # All under V1
+            assert file.metadata["version"] == 1  # All under V1
 
     @patch("src.work_data_hub.config.settings.get_settings")
     def test_empty_version_fallback_to_mtime(self, mock_settings, tmp_path):
@@ -360,13 +367,14 @@ class TestAnnuityPerformanceDiscovery:
                 "annuity_performance": {
                     "pattern": r"(?P<year>\d{2}|20\d{2})年(?P<month>0?[1-9]|1[0-2])月.*年金.*终稿数据.*\.(xlsx|xlsm)$",
                     "select": "latest_by_year_month_and_version",
-                    "sheet": "规模明细"
+                    "sheet": "规模明细",
                 }
             }
         }
 
         config_file = tmp_path / "config.yml"
         import yaml
+
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_content, f, allow_unicode=True)
 
@@ -381,5 +389,4 @@ class TestAnnuityPerformanceDiscovery:
 
         # Both files should have version=None
         for file in files:
-            assert file.metadata['version'] is None
-
+            assert file.metadata["version"] is None

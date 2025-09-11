@@ -44,9 +44,7 @@ class DiscoveryConfig(BaseModel):
 class DataSourcesConfig(BaseModel):
     """Schema for complete data_sources.yml structure."""
 
-    domains: Dict[str, DomainConfig] = Field(
-        ..., min_length=1, description="Domain configurations"
-    )
+    domains: Dict[str, DomainConfig] = Field(..., min_length=1, description="Domain configurations")
     discovery: Optional[DiscoveryConfig] = Field(None, description="Global discovery settings")
 
 

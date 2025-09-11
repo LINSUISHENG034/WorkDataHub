@@ -51,15 +51,8 @@ def _build_schedule_run_config() -> Dict[str, Any]:
     # Build run_config matching the multi-file job pattern
     return {
         "ops": {
-            "discover_files_op": {
-                "config": {"domain": "trustee_performance"}
-            },
-            "read_and_process_trustee_files_op": {
-                "config": {
-                    "sheet": 0,
-                    "max_files": 5
-                }
-            },
+            "discover_files_op": {"config": {"domain": "trustee_performance"}},
+            "read_and_process_trustee_files_op": {"config": {"sheet": 0, "max_files": 5}},
             "load_op": {
                 "config": {
                     "table": table,
@@ -75,7 +68,7 @@ def _build_schedule_run_config() -> Dict[str, Any]:
 @schedule(
     cron_schedule="0 2 * * *",  # 02:00 daily
     job=trustee_performance_multi_file_job,
-    execution_timezone="Asia/Shanghai"
+    execution_timezone="Asia/Shanghai",
 )
 def trustee_daily_schedule(_context):
     """
