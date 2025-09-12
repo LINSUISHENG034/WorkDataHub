@@ -92,7 +92,7 @@ class AnnuityPerformanceIn(BaseModel):
     # Organizational fields
     机构代码: Optional[str] = Field(None, description="Institution code (机构代码)")
     机构名称: Optional[str] = Field(
-        None, 
+        None,
         description="Institution name (机构名称)",
         # Support both '机构' and '机构名称' column names from Excel
         alias="机构"

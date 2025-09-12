@@ -297,7 +297,8 @@ def load(
 
     # Build SQL operations
     operations = []
-    total_deleted = 0
+    # Number of keys scheduled for deletion (estimate prior to execution)
+    estimated_deleted = 0
 
     if mode == "delete_insert":
         # pk is guaranteed to be not None due to validation above
@@ -325,13 +326,13 @@ def load(
         # Deduplicate and sort for determinism
         unique_tuples: list[tuple[Any, ...]] = sorted(list(set(pk_tuples_raw)))
 
-        # Estimate deletions
-        total_deleted = len(unique_tuples)
+        # Estimate deletions (number of unique key tuples targeted)
+        estimated_deleted = len(unique_tuples)
 
         if unique_tuples:
             quoted_table = quote_ident(table)
-            quoted_cols = ",".join(quote_ident(c) for c in pk)
-            cols_tuple = f"({quoted_cols})"
+            quoted_pk_cols = ",".join(quote_ident(c) for c in pk)
+            cols_tuple = f"({quoted_pk_cols})"
 
             # Number of PK tuples per DELETE; reuse chunk_size to keep configuration simple
             delete_chunk = max(1, min(chunk_size, 1000))
@@ -362,7 +363,9 @@ def load(
     result = {
         "mode": mode,
         "table": table,
-        "deleted": total_deleted,
+        # deleted will be set to actual rows deleted if executing against DB;
+        # otherwise remains the estimated number of key tuples targeted.
+        "deleted": estimated_deleted,
         "inserted": total_inserted,
         "batches": batches,
     }
@@ -374,11 +377,18 @@ def load(
 
     # Execute with database connection (manual transaction management for broad compatibility)
     try:
+        executed_deleted_total = 0
         with conn.cursor() as cursor:
             for op_type, sql, params in operations:
                 if op_type == "DELETE":
                     cursor.execute(sql, params)
-                    logger.info(f"Deleted {cursor.rowcount} rows from {table}")
+                    # Accumulate actual number of rows deleted by the database
+                    try:
+                        rc = int(getattr(cursor, "rowcount", 0))
+                    except Exception:
+                        rc = 0
+                    executed_deleted_total += max(0, rc)
+                    logger.info(f"Deleted {rc} rows from {table}")
                 elif op_type == "INSERT":
                     # Use execute_values for performance
                     try:
@@ -411,6 +421,9 @@ def load(
         except Exception:
             # If commit not supported in mocked connection, ignore
             pass
+
+        # Overwrite deleted estimate with actual rows deleted after successful commit
+        result["deleted"] = executed_deleted_total
 
     except Exception as e:
         # Rollback on error when possible

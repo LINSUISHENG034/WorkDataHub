@@ -5,7 +5,7 @@ reference/claude-code-full-guide/
 
 # Ignore folders
 deprecated/
-/legacy/
+/legacy/docs/
 archive/
 .kiro/
 .serena/

@@ -84,14 +84,14 @@ class CleansingRegistry:
     def get_statistics(self) -> Dict[str, Any]:
         """获取注册表统计信息"""
         rules_by_category: Dict[str, int] = {}
-        
+
         # 计算每个分类的规则数量
         for category in RuleCategory:
             count = len([r for r in self._rules.values() if r.category == category])
             rules_by_category[category.value] = count
 
         stats = {
-            "total_rules": len(self._rules), 
+            "total_rules": len(self._rules),
             "rules_by_category": rules_by_category
         }
         return stats

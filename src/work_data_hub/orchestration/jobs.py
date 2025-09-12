@@ -7,8 +7,9 @@ comprehensive argument support and structured output.
 """
 
 import argparse
+import re
 import sys
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import yaml
 from dagster import DagsterInstance, job
@@ -83,6 +84,22 @@ def annuity_performance_job():
     load_op(processed_data)  # No return needed
 
 
+def _parse_pk_override(pk_arg: Any) -> List[str]:
+    """Parse CLI --pk override into a clean list of column names.
+
+    Accepts comma/semicolon separated string or list-like; ignores empty items.
+    """
+    if pk_arg is None:
+        return []
+    # If already a list, normalize and return
+    if isinstance(pk_arg, list):
+        return [str(x).strip() for x in pk_arg if str(x).strip()]
+    # Otherwise split by comma/semicolon
+    text = str(pk_arg)
+    parts = re.split(r"[,;]", text)
+    return [p.strip() for p in parts if p.strip()]
+
+
 def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
     """
     Build Dagster run_config from CLI arguments.
@@ -108,6 +125,11 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
         domain_config = data_sources.get("domains", {}).get(args.domain, {})
         table = domain_config.get("table", args.domain)  # Fallback to domain name
         pk = domain_config.get("pk", [])  # Empty list if not defined
+
+        # Runtime override via --pk (only affects delete_insert mode)
+        pk_override = _parse_pk_override(getattr(args, "pk", None))
+        if pk_override:
+            pk = pk_override
 
     except Exception as e:
         print(f"Warning: Could not load data sources config: {e}")
@@ -186,6 +208,16 @@ def main():
         help="Maximum number of discovered files to process (default: 1)",
     )
 
+    # Runtime override for composite key used by delete_insert mode
+    parser.add_argument(
+        "--pk",
+        type=str,
+        help=(
+            "Override composite key for delete_insert mode. "
+            "Comma or semicolon separated (e.g., '月度,计划代码,company_id')."
+        ),
+    )
+
     # Advanced options
     parser.add_argument(
         "--debug",
@@ -227,7 +259,9 @@ def main():
             print(f"Warning: max_files > 1 not yet supported for {args.domain}, using 1")
     elif args.domain == "sample_trustee_performance":
         selected_job = (
-            sample_trustee_performance_multi_file_job if max_files > 1 else sample_trustee_performance_job
+            sample_trustee_performance_multi_file_job
+            if max_files > 1
+            else sample_trustee_performance_job
         )
     else:
         raise ValueError(

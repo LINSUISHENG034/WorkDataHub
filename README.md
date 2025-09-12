@@ -18,6 +18,15 @@ WorkDataHub is a reliable, declarative, and testable data processing platform re
 - Orchestration: Dagster‑style ops and jobs (discover → read → transform → load).
 - Utils: typed helpers and common types.
 
+## Utils vs Cleansing
+
+- `utils/`: Generic, structural utilities. Stateless, domain‑agnostic, broadly reusable, no registry/config required.
+  - Examples: `utils/column_normalizer.py` (header normalization; structural), `utils/date_parser.py` (Chinese date parsing → standard `date`).
+- `cleansing/`: Value‑level cleansing rules with a lightweight registry. Composable, replaceable, and measurable by category.
+  - Examples: `cleansing/rules/numeric_rules.py` (null normalization, currency/thousand separators removal, percentage → decimal, ROUND_HALF_UP quantization).
+- Dependencies: domain/ops/io can use both utils and cleansing; cleansing can call utils; utils must not depend on domain/cleansing (no cycles).
+- Why `date_parser.py` lives in utils/: it’s a generic parser (not a switchable “rule”), needs no registry/toggles (KISS/YAGNI). If domain/scene‑specific date strategies are needed later, add rules under `cleansing/rules/` that reuse `utils.date_parser` internally.
+
 ## Workflow (High‑Level)
 
 A structural view of the end‑to‑end pipeline from trigger to data load. This focuses on orchestration and dataflow, independent of domain‑specific rules.
@@ -45,7 +54,13 @@ Key characteristics
 - Discovery: configuration‑driven patterns and selection strategies determine inputs.
 - Reading: resilient Excel ingestion producing normalized row records.
 - Processing: domain services apply validation and transformations.
-- Loading: plan‑only returns SQL plans; execute mode performs transactional writes.
+- Loading: plan-only returns SQL plans; execute mode performs transactional writes.
+
+## Orchestration Modes (KISS/YAGNI)
+
+- CLI‑first (current): trigger via `uv run python -m src.work_data_hub.orchestration.jobs`; use `--plan-only` for safe dry‑run and `--execute` for actual writes. No Dagster services required; jobs run in‑process.
+- Simple scheduling (as needed): use system schedulers/cron to invoke the CLI for daily/hourly runs and retries (wrap in a small script).
+- Dagster UI/Daemon (defer until needed): deploy only when gates are met (multi‑domain, backfill/event triggers, observability/auditing, non‑engineer UI needs). For local exploration: `uv run dagster dev -f src/work_data_hub/orchestration/repository.py`.
 
 ## Code Map (stable entry points)
 
@@ -154,11 +169,27 @@ uv run python -m src.work_data_hub.orchestration.jobs \
   --max-files 1 \
   --mode delete_insert
 
+# Override composite key (runtime) for delete_insert mode
+# Use comma/semicolon separated list (e.g., 月度,计划代码,company_id — Chinese column names)
+uv run python -m src.work_data_hub.orchestration.jobs \
+  --domain annuity_performance \
+  --execute \
+  --mode delete_insert \
+  --pk "月度,计划代码,company_id" \
+  --max-files 1
+
+# Temporarily disable overwrite behavior (append mode)
+uv run python -m src.work_data_hub.orchestration.jobs \
+  --domain annuity_performance \
+  --execute \
+  --mode append \
+  --max-files 1
+
 # With specific sheet name (optional - configured in data_sources.yml)
 uv run python -m src.work_data_hub.orchestration.jobs \
   --domain annuity_performance \
   --plan-only \
-  --sheet "规模明细" \
+  --sheet "规模明细" \  # sheet name in Chinese: "Scale Details"
   --max-files 1
 ```
 
@@ -176,6 +207,21 @@ uv run pytest tests/
 
 # Run with environment override
 WDH_DATA_BASE_DIR=./reference/monthly uv run pytest -m legacy_data -v
+```
+
+### Generate Small Test Datasets (from real sample)
+
+To speed up overwrite/append tests with realistic data, generate small subsets from the large sample Excel:
+
+```bash
+uv run python -m scripts.testdata.make_annuity_subsets \
+  --src tests/fixtures/sample_data/【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx \
+  --sheet 规模明细  # sheet name in Chinese: "Scale Details"
+
+# Output files (sheet name: "规模明细") under tests/fixtures/sample_data/annuity_subsets/:
+#   - 2024年11月年金终稿数据_subset_distinct_5.xlsx
+#   - 2024年11月年金终稿数据_subset_overlap_pk_6.xlsx
+#   - 2024年11月年金终稿数据_subset_append_3.xlsx
 ```
 
 ## DDL Management (Single Source of Truth)

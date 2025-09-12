@@ -132,6 +132,15 @@ Vertical value: Demonstrable parity with auditable reports is a tangible outcome
 
 <!-- Add more milestones as needed -->
 
+### C-050 Gate — Dagster 部署触发条件与当前结论
+
+- 当前结论：保持 CLI-first，不部署 Dagster UI/daemon（服务面）。当且仅当以下任一条件满足再推进部署与运维接入：
+  - 域数量≥3，且存在稳定的日常/小时级定时与回填需求；
+  - 需要文件到达即触发（sensors）或跨域依赖/并发/资源队列治理；
+  - 需要非工程用户通过 UI 查看运行历史、重跑/回填与故障定位；
+  - 需要系统化失败告警、重试策略与审计追踪（run history/lineage）。
+- 现状达成度：未触发上述门槛；继续使用 `uv run python -m src.work_data_hub.orchestration.jobs` 作为统一入口；如需简单定时，使用系统计划任务/cron 调用 CLI。
+
 ## **Key**
 
 ### **ID Prefix**

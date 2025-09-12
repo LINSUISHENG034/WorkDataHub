@@ -67,7 +67,8 @@
       "Bash(WDH_DATA_BASE_DIR=\"./reference/monthly\" uv run python -m src.work_data_hub.orchestration.jobs --domain annuity_performance --plan-only --max-files 1)",
       "Bash(psql:*)",
       "Bash(WDH_DATA_BASE_DIR=\"./reference/monthly\" uv run python -m src.work_data_hub.orchestration.jobs --domain annuity_performance --execute --max-files 1 --mode delete_insert)",
-      "Bash(echo $WDH_DATA_BASE_DIR)"
+      "Bash(echo $WDH_DATA_BASE_DIR)",
+      "Bash(WDH_DATA_BASE_DIR=\"./reference/monthly\" uv run python -m src.work_data_hub.orchestration.jobs --domain annuity_performance --mode append --plan-only --max-files 1)"
     ],
     "deny": []
   }

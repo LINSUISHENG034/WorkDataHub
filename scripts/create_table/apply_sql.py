@@ -22,8 +22,8 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from urllib.parse import urlparse
 from typing import Optional
+from urllib.parse import urlparse
 
 import yaml
 

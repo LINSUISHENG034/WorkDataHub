@@ -9,23 +9,23 @@
 - AFTER: 使用统一框架，一次定义，多处复用
 """
 
-from decimal import Decimal
-from typing import Optional
-from pydantic import BaseModel, Field
+import os
 
 # 导入新的清洗框架
 import sys
-import os
+from decimal import Decimal
+from typing import Optional
+
+from pydantic import BaseModel, Field
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.work_data_hub.cleansing import (
     decimal_fields_cleaner,
-    registry,
     find_rules_for_field,
     get_framework_info,
+    registry,
 )
-
 
 # ========================================
 # 演示 1: 替换重复的 field_validator
@@ -199,7 +199,7 @@ except Exception as e:
 
 print("\n=== 演示 4: 框架扩展性 - 新增自定义规则 ===\n")
 
-from src.work_data_hub.cleansing import rule, RuleCategory
+from src.work_data_hub.cleansing import RuleCategory, rule
 
 
 @rule(
@@ -243,7 +243,7 @@ for name in test_names:
 # 总结
 # ========================================
 
-print(f"\n=== 框架效果总结 ===")
+print("\n=== 框架效果总结 ===")
 print("✅ 消除了重复实现: clean_decimal_fields 逻辑统一")
 print("✅ 提高了代码复用: 相同清洗规则在多个 domain 中复用")
 print("✅ 简化了开发体验: 装饰器替代手写 field_validator")

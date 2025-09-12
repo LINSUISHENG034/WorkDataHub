@@ -19,21 +19,24 @@ import argparse
 import sys
 import tempfile
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
+
 import pandas as pd
 
 # 添加项目路径
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 try:
+    from decimal import Decimal
+
+    import psycopg2
+
     from src.work_data_hub.cleansing.rules.numeric_rules import comprehensive_decimal_cleaning
-    from src.work_data_hub.io.readers.excel_reader import ExcelReader
-    from src.work_data_hub.io.connectors.file_connector import DataSourceConnector
+    from src.work_data_hub.config.settings import get_settings
     from src.work_data_hub.domain.annuity_performance.models import AnnuityPerformanceIn
     from src.work_data_hub.domain.annuity_performance.service import _extract_plan_code, process
-    from src.work_data_hub.config.settings import get_settings
-    import psycopg2
-    from decimal import Decimal
+    from src.work_data_hub.io.connectors.file_connector import DataSourceConnector
+    from src.work_data_hub.io.readers.excel_reader import ExcelReader
 except ImportError as e:
     print(f"❌ 导入错误: {e}")
     print("请确保在项目根目录运行此脚本")
@@ -401,8 +404,8 @@ def run_full_pipeline(data_dir: str, plan_only: bool = True, max_files: Optional
     print(f"\n🚀 运行完整数据处理流程 ({action})\n")
 
     try:
-        import subprocess
         import os
+        import subprocess
 
         # 构建命令
         cmd = [

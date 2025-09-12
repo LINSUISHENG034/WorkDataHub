@@ -69,7 +69,7 @@ def _emit_table_sql(
     lines: List[str] = []
     q = lambda s: f'"{s.replace("\"", "\"\"")}"'
 
-    lines.append(f"-- Auto-generated baseline DDL (initial seed).")
+    lines.append("-- Auto-generated baseline DDL (initial seed).")
     lines.append(f"-- Entity: {entity} | Table: {table_name}")
     lines.append("")
     lines.append(f"DROP TABLE IF EXISTS {q(table_name)} CASCADE;")
