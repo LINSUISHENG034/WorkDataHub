@@ -44,6 +44,41 @@ def quote_ident(name: str) -> str:
     return f'"{escaped}"'
 
 
+def quote_qualified(schema: Optional[str], table: str) -> str:
+    """
+    Quote PostgreSQL identifier with optional schema qualification.
+
+    Args:
+        schema: Optional schema name
+        table: Table name (required)
+
+    Returns:
+        Qualified identifier: "schema"."table" or "table"
+
+    Raises:
+        ValueError: If table is empty or invalid
+
+    Examples:
+        >>> quote_qualified("public", "年金计划")
+        '"public"."年金计划"'
+        >>> quote_qualified(None, "年金计划")
+        '"年金计划"'
+        >>> quote_qualified("", "年金计划")
+        '"年金计划"'
+    """
+    # Validate required table name (reuse quote_ident validation logic)
+    if not table or not isinstance(table, str):
+        raise ValueError("Table name must be non-empty string")
+
+    # Handle schema qualification
+    if schema and str(schema).strip():
+        # Both schema and table need individual quoting
+        return f"{quote_ident(str(schema))}.{quote_ident(table)}"
+    else:
+        # Schema is None/empty - return table only
+        return quote_ident(table)
+
+
 def _ensure_list_of_dicts(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Validate and normalize row data."""
     if not isinstance(rows, list):
@@ -252,6 +287,7 @@ def insert_missing(
     rows: List[Dict[str, Any]],
     conn: Any,
     chunk_size: int = 1000,
+    schema: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Insert rows that don't conflict with existing keys using ON CONFLICT DO NOTHING.
@@ -266,6 +302,7 @@ def insert_missing(
         rows: List of dictionaries with row data
         conn: psycopg2 connection object (None = return plan only)
         chunk_size: Rows per batch for chunking
+        schema: Optional schema name for qualified table reference
 
     Returns:
         Dictionary with execution metadata:
@@ -293,7 +330,7 @@ def insert_missing(
         )
 
     # Build SQL with ON CONFLICT clause
-    quoted_table = quote_ident(table)
+    quoted_table = quote_qualified(schema, table)
     all_cols = _get_column_order(rows)
     quoted_cols = [quote_ident(col) for col in all_cols]
     col_list = ",".join(quoted_cols)
@@ -342,11 +379,31 @@ def insert_missing(
                         rc = len(row_data)
                     inserted_total += max(0, rc)
                     logger.info(
-                        f"Insert missing (ON CONFLICT): attempted {len(chunk)} rows for {table}, inserted ~{rc}"
+                        f"Insert missing (ON CONFLICT): attempted {len(chunk)} rows for "
+                        f"{table}, inserted ~{rc}"
                     )
                 except Exception as e:
+                    # Robust detection of missing unique/exclusion constraint for ON CONFLICT
                     msg = str(e)
-                    if "ON CONFLICT" in msg and "constraint" in msg:
+                    pgcode = getattr(e, "pgcode", None)
+                    should_fallback = False
+                    # PostgreSQL error code 42P10 often used for:
+                    # no unique or exclusion constraint matching ON CONFLICT
+                    if pgcode == "42P10":
+                        should_fallback = True
+                    # Message-based heuristics (multi-language)
+                    if (
+                        "ON CONFLICT" in msg
+                        and (
+                            "constraint" in msg
+                            or "唯一" in msg  # Chinese: unique
+                            or "排除" in msg  # Chinese: exclusion
+                            or "约束" in msg  # Chinese: constraint
+                        )
+                    ):
+                        should_fallback = True
+
+                    if should_fallback:
                         # Fallback: SELECT existing keys, then plain INSERT for missing only
                         key_tuples = [tuple(r.get(k) for k in key_cols) for r in chunk]
                         existing_set = set()
@@ -365,7 +422,8 @@ def insert_missing(
                             existing_set = set(tuple(row) for row in (cursor.fetchall() or []))
 
                         to_insert = [
-                            r for r in chunk if tuple(r.get(k) for k in key_cols) not in existing_set
+                            r for r in chunk
+                            if tuple(r.get(k) for k in key_cols) not in existing_set
                         ]
                         if to_insert:
                             simple_sql = f"INSERT INTO {quoted_table} ({col_list}) VALUES %s"
@@ -386,11 +444,13 @@ def insert_missing(
                                 rc2 = len(simple_data)
                             inserted_total += max(0, rc2)
                             logger.info(
-                                f"Insert missing (fallback): inserted {rc2}/{len(to_insert)} rows into {table}"
+                                f"Insert missing (fallback): inserted {rc2}/{len(to_insert)} "
+                                f"rows into {table}"
                             )
                         else:
                             logger.info(
-                                f"Insert missing (fallback): all {len(chunk)} keys already exist in {table}"
+                                f"Insert missing (fallback): all {len(chunk)} keys "
+                                f"already exist in {table}"
                             )
                     else:
                         # Unknown error: re-raise
@@ -411,6 +471,7 @@ def fill_null_only(
     rows: List[Dict[str, Any]],
     updatable_cols: List[str],
     conn: Any,
+    schema: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Update only NULL columns for existing rows, preserving non-NULL values.
@@ -421,6 +482,7 @@ def fill_null_only(
         rows: List of dictionaries with row data
         updatable_cols: Columns that can be updated when NULL
         conn: psycopg2 connection object (None = return plan only)
+        schema: Optional schema name for qualified table reference
 
     Returns:
         Dictionary with execution metadata:
@@ -447,7 +509,7 @@ def fill_null_only(
             f"Missing columns in rows: {'; '.join(missing_cols)}"
         )
 
-    quoted_table = quote_ident(table)
+    quoted_table = quote_qualified(schema, table)
     operations = []
     updated_total = 0
 

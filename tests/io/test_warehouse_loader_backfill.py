@@ -13,6 +13,7 @@ from src.work_data_hub.io.loader.warehouse_loader import (
     insert_missing,
     fill_null_only,
     quote_ident,
+    quote_qualified,  # NEW: import the new function
 )
 
 
@@ -431,3 +432,126 @@ class TestBackfillIntegration:
         assert '"组合计划"' in portfolio_sql
         assert "ON CONFLICT" in plan_sql
         assert "ON CONFLICT" in portfolio_sql
+
+
+class TestQuoteQualified:
+    """Test quote_qualified function for schema-aware SQL generation."""
+
+    def test_quote_qualified_with_schema(self):
+        """Test quote_qualified with schema produces qualified name."""
+        result = quote_qualified("public", "年金计划")
+        assert result == '"public"."年金计划"'
+
+    def test_quote_qualified_without_schema(self):
+        """Test quote_qualified with None schema produces table only."""
+        result = quote_qualified(None, "年金计划")
+        assert result == '"年金计划"'
+
+        result = quote_qualified("", "年金计划")
+        assert result == '"年金计划"'
+
+    def test_quote_qualified_empty_schema(self):
+        """Test quote_qualified with empty string schema produces table only."""
+        result = quote_qualified("", "年金计划")
+        assert result == '"年金计划"'
+
+        result = quote_qualified("  ", "年金计划")  # whitespace only
+        assert result == '"年金计划"'
+
+    def test_quote_qualified_chinese_identifiers(self):
+        """Test quote_qualified with Chinese table and schema names."""
+        result = quote_qualified("公共", "年金计划")
+        assert result == '"公共"."年金计划"'
+
+    def test_quote_qualified_invalid_table(self):
+        """Test quote_qualified with invalid table name."""
+        with pytest.raises(ValueError, match="Table name must be non-empty string"):
+            quote_qualified("public", "")
+
+        with pytest.raises(ValueError, match="Table name must be non-empty string"):
+            quote_qualified("public", None)
+
+
+class TestInsertMissingWithSchema:
+    """Test insert_missing function with schema support."""
+
+    def test_insert_missing_with_schema(self):
+        """Test insert_missing generates qualified SQL when schema provided."""
+        rows = [{"年金计划号": "PLAN001", "计划全称": "Test Plan A"}]
+
+        result = insert_missing(
+            table="年金计划",
+            schema="public",
+            key_cols=["年金计划号"],
+            rows=rows,
+            conn=None,
+        )
+
+        sql = result["sql_plans"][0][1]
+        assert '"public"."年金计划"' in sql
+        assert "INSERT INTO" in sql
+        assert "ON CONFLICT" in sql
+
+    def test_insert_missing_without_schema(self):
+        """Test insert_missing generates unqualified SQL when schema is None."""
+        rows = [{"年金计划号": "PLAN001", "计划全称": "Test Plan A"}]
+
+        result = insert_missing(
+            table="年金计划",
+            schema=None,
+            key_cols=["年金计划号"],
+            rows=rows,
+            conn=None,
+        )
+
+        sql = result["sql_plans"][0][1]
+        assert '"年金计划"' in sql
+        assert '"public"."年金计划"' not in sql  # Should not be qualified
+        assert "INSERT INTO" in sql
+        assert "ON CONFLICT" in sql
+
+
+class TestFillNullOnlyWithSchema:
+    """Test fill_null_only function with schema support."""
+
+    def test_fill_null_only_with_schema(self):
+        """Test fill_null_only generates qualified SQL when schema provided."""
+        rows = [{"年金计划号": "PLAN001", "计划全称": "Test Plan A", "客户名称": "Client A"}]
+
+        result = fill_null_only(
+            table="年金计划",
+            schema="public",
+            key_cols=["年金计划号"],
+            rows=rows,
+            updatable_cols=["计划全称", "客户名称"],
+            conn=None,
+        )
+
+        # Should have operations for columns with non-null values
+        operations = result["sql_plans"]
+        assert len(operations) >= 1
+
+        # Check that at least one operation has qualified table name
+        has_qualified_table = any('"public"."年金计划"' in op[1] for op in operations)
+        assert has_qualified_table
+
+    def test_fill_null_only_without_schema(self):
+        """Test fill_null_only generates unqualified SQL when schema is None."""
+        rows = [{"年金计划号": "PLAN001", "计划全称": "Test Plan A"}]
+
+        result = fill_null_only(
+            table="年金计划",
+            schema=None,
+            key_cols=["年金计划号"],
+            rows=rows,
+            updatable_cols=["计划全称"],
+            conn=None,
+        )
+
+        operations = result["sql_plans"]
+        assert len(operations) >= 1
+
+        # Should have unqualified table name
+        for _, sql, _ in operations:
+            assert '"年金计划"' in sql
+            assert '"public"."年金计划"' not in sql  # Should not be qualified

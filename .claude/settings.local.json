@@ -69,7 +69,16 @@
       "Bash(WDH_DATA_BASE_DIR=\"./reference/monthly\" uv run python -m src.work_data_hub.orchestration.jobs --domain annuity_performance --execute --max-files 1 --mode delete_insert)",
       "Bash(echo $WDH_DATA_BASE_DIR)",
       "Bash(WDH_DATA_BASE_DIR=\"./reference/monthly\" uv run python -m src.work_data_hub.orchestration.jobs --domain annuity_performance --mode append --plan-only --max-files 1)",
-      "Bash(WDH_DATA_BASE_DIR=\"tests/fixtures/sample_data/annuity_subsets\" uv run python -m src.work_data_hub.orchestration.jobs --domain annuity_performance --plan-only --max-files 1 --backfill-refs all --backfill-mode insert_missing)"
+      "Bash(WDH_DATA_BASE_DIR=\"tests/fixtures/sample_data/annuity_subsets\" uv run python -m src.work_data_hub.orchestration.jobs --domain annuity_performance --plan-only --max-files 1 --backfill-refs all --backfill-mode insert_missing)",
+      "Bash(set WDH_DATA_BASE_DIR=testsfixturessample_dataannuity_subsets)",
+      "Bash(WDH_DATA_BASE_DIR=\"tests\\fixtures\\sample_data\\annuity_subsets\" uv run python -m src.work_data_hub.orchestration.jobs --domain annuity_performance --plan-only --max-files 1 --backfill-refs all --backfill-mode insert_missing --sheet \"规模明细\" --debug)",
+      "Bash(WDH_DATA_BASE_DIR=\"tests\\fixtures\\sample_data\\annuity_subsets\" uv run python -m src.work_data_hub.orchestration.jobs --domain annuity_performance --plan-only --max-files 1 --backfill-refs all --backfill-mode insert_missing --sheet \"坏名字\" --debug)",
+      "Bash(set WDH_DATABASE__URI=postgres://postgres:Post.169828@localhost:5432/postgres)",
+      "Bash(WDH_DATA_BASE_DIR=\"tests\\fixtures\\sample_data\\annuity_subsets\" WDH_DATABASE__URI=\"postgres://postgres:Post.169828@localhost:5432/postgres\" uv run python -m src.work_data_hub.orchestration.jobs --domain annuity_performance --execute --max-files 1 --backfill-refs all --backfill-mode insert_missing --sheet \"规模明细\" --mode append --debug)",
+      "Bash(WDH_DATA_BASE_DIR=\"tests/fixtures/sample_data/annuity_subsets\" uv run python -m src.work_data_hub.orchestration.jobs --domain annuity_performance --plan-only --backfill-refs all --backfill-mode insert_missing --skip-facts --sheet \"规模明细\" --debug)",
+      "Bash(WDH_DATA_BASE_DIR=\"tests/fixtures/sample_data/annuity_subsets\" uv run python -m src.work_data_hub.orchestration.jobs --domain annuity_performance --plan-only --backfill-refs all --backfill-mode insert_missing --sheet \"规模明细\" --max-files 1)",
+      "Bash(WDH_DATA_BASE_DIR=\"tests/fixtures/sample_data/annuity_subsets\" WDH_DATABASE__URI=\"postgres://postgres:Post.169828@localhost:5432/postgres\" uv run python -m src.work_data_hub.orchestration.jobs --domain annuity_performance --execute --backfill-refs plans --backfill-mode insert_missing --sheet \"规模明细\" --mode append --max-files 1 --skip-facts)",
+      "Bash(WDH_DATA_BASE_DIR=\"tests/fixtures/sample_data/annuity_subsets\" uv run python -m src.work_data_hub.orchestration.jobs --domain annuity_performance --execute --backfill-refs all --skip-facts --sheet \"规模明细\" --debug --max-files 1)"
     ],
     "deny": []
   }

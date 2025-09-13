@@ -74,14 +74,14 @@ class TestScheduleRunConfig:
 
             # Verify fallback values are used
             load_config = result["ops"]["load_op"]["config"]
-        assert load_config["table"] == "sample_trustee_performance"
+            assert load_config["table"] == "sample_trustee_performance"
             assert load_config["pk"] == ["report_date", "plan_code", "company_code"]
             assert load_config["mode"] == "delete_insert"
             assert load_config["plan_only"] is False
 
             # Verify other ops have correct config
             discover_config = result["ops"]["discover_files_op"]["config"]
-        assert discover_config["domain"] == "sample_trustee_performance"
+            assert discover_config["domain"] == "sample_trustee_performance"
 
             read_config = result["ops"]["read_and_process_trustee_files_op"]["config"]
             assert read_config["sheet"] == 0

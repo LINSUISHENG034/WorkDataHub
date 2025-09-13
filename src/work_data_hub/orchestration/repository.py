@@ -13,9 +13,9 @@ from dagster import Definitions
 
 # Import jobs from the jobs module
 from .jobs import (
+    annuity_performance_job,
     sample_trustee_performance_job,
     sample_trustee_performance_multi_file_job,
-    annuity_performance_job,
 )
 
 # Import schedules

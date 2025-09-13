@@ -161,6 +161,7 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
                     "mode": args.mode,
                     "pk": pk,
                     "plan_only": effective_plan_only,  # Use effective flag
+                    "skip": getattr(args, "skip_facts", False),  # NEW: skip flag
                 }
             },
         }
@@ -176,7 +177,13 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
         }
     else:
         # Use existing separate ops for single-file processing (backward compatibility)
-        run_config["ops"]["read_excel_op"] = {"config": {"sheet": args.sheet}}
+        # Coerce sheet: if it's a digit-like string, pass as int; else pass as name
+        sheet_cfg: Any
+        try:
+            sheet_cfg = int(args.sheet)
+        except Exception:
+            sheet_cfg = args.sheet
+        run_config["ops"]["read_excel_op"] = {"config": {"sheet": sheet_cfg}}
         # process_trustee_performance_op has no config
 
     # Add backfill configuration (always include, but empty targets when disabled)
@@ -226,7 +233,13 @@ def main():
         default=True,
         help="Generate execution plan without database connection",
     )
-    parser.add_argument("--sheet", type=int, default=0, help="Excel sheet index to process")
+    # Sheet can be an index or a name (string)
+    parser.add_argument(
+        "--sheet",
+        type=str,
+        default="0",
+        help="Excel sheet to process (index like '0' or name like '规模明细')",
+    )
 
     parser.add_argument(
         "--execute",
@@ -264,6 +277,12 @@ def main():
         default="insert_missing",
         help="Backfill mode: insert_missing (default) or fill_null_only",
     )
+    parser.add_argument(
+        "--skip-facts",
+        action="store_true",
+        default=False,
+        help="Skip fact loading, run backfill only",
+    )
 
     # Advanced options
     parser.add_argument(
@@ -294,6 +313,7 @@ def main():
     print(f"   Plan-only: {effective_plan_only}")
     print(f"   Sheet: {args.sheet}")
     print(f"   Max files: {args.max_files}")
+    print(f"   Skip facts: {getattr(args, 'skip_facts', False)}")  # NEW: skip facts status
     if hasattr(args, 'backfill_refs') and args.backfill_refs:
         print(f"   Backfill refs: {args.backfill_refs}")
         print(f"   Backfill mode: {args.backfill_mode}")
@@ -333,6 +353,13 @@ def main():
 
         if result.success:
             # Extract and display execution summary
+            # Backfill summary (if configured)
+            try:
+                backfill_result = result.output_for_node("backfill_refs_op")
+            except Exception:
+                backfill_result = None
+
+            # Load summary
             load_result = result.output_for_node("load_op")
 
             if effective_plan_only and "sql_plans" in load_result:
@@ -345,7 +372,23 @@ def main():
                         print(f"   Parameters: {len(params)} values")
                     print()
 
-            # Display execution statistics
+            # Display backfill execution statistics (if available)
+            if backfill_result:
+                print("\n📥 Reference Backfill Summary:")
+                print(f"   Plan-only: {backfill_result.get('plan_only', False)}")
+                ops = backfill_result.get("operations", []) or []
+                if not ops:
+                    print("   Operations: 0 (skipped or no candidates)")
+                for op in ops:
+                    table = op.get("table")
+                    inserted = op.get("inserted")
+                    updated = op.get("updated")
+                    if inserted is not None:
+                        print(f"   {table}: inserted={inserted}")
+                    if updated is not None:
+                        print(f"   {table}: updated={updated}")
+
+            # Display execution statistics for facts
             print("\n📊 Execution Summary:")
             print(f"   Table: {load_result.get('table', 'N/A')}")
             print(f"   Mode: {load_result.get('mode', 'N/A')}")

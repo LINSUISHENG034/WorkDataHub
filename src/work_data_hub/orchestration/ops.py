@@ -138,15 +138,24 @@ def discover_files_op(context: OpExecutionContext, config: DiscoverFilesConfig) 
 class ReadExcelConfig(Config):
     """Configuration for Excel reading operation."""
 
-    sheet: int = 0
+    # Accept sheet index (int) or sheet name (str)
+    sheet: Any = 0
 
     @field_validator("sheet")
     @classmethod
-    def validate_sheet(cls, v: int) -> int:
-        """Validate sheet index is non-negative."""
-        if v < 0:
+    def validate_sheet(cls, v: Any) -> Any:
+        """Validate sheet index/name."""
+        # Allow string sheet names as-is
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+        # Allow non-negative integers
+        try:
+            iv = int(v)
+        except Exception:
+            raise ValueError("Sheet must be a non-negative integer or a non-empty string name")
+        if iv < 0:
             raise ValueError("Sheet index must be non-negative")
-        return v
+        return iv
 
 
 @op
@@ -355,6 +364,7 @@ class LoadConfig(Config):
     mode: str = "delete_insert"
     pk: List[str] = ["report_date", "plan_code", "company_code"]
     plan_only: bool = True
+    skip: bool = False  # NEW: skip flag for early return
 
     @field_validator("mode")
     @classmethod
@@ -420,6 +430,18 @@ def load_op(
     Returns:
         Dictionary with execution metadata or SQL plans
     """
+    # NEW: Check skip flag and early return
+    if config.skip:
+        context.log.info("Fact loading skipped due to --skip-facts flag")
+        return {
+            "table": config.table,
+            "mode": config.mode,
+            "skipped": True,
+            "inserted": 0,
+            "deleted": 0,
+            "batches": 0,
+        }
+
     conn = None
     try:
         if not config.plan_only:
@@ -640,51 +662,148 @@ def backfill_refs_op(
             context.log.info("Reference backfill skipped - no targets specified")
             return result
 
+        # Read refs configuration from data_sources.yml
+        settings = get_settings()
+        refs_config = {}
+        try:
+            with open(settings.data_sources_config, "r", encoding="utf-8") as f:
+                data_sources = yaml.safe_load(f)
+
+            # Extract refs for current domain (annuity_performance)
+            domain = "annuity_performance"  # TODO: could be passed from discover_files_op context
+            refs_config = data_sources.get("domains", {}).get(domain, {}).get("refs", {})
+        except Exception as e:
+            context.log.warning(f"Could not load refs config: {e}, using defaults")
+
+        # Get plans configuration with fallbacks
+        plans_config = refs_config.get("plans", {})
+        plans_schema = plans_config.get("schema")  # None if not specified
+        plans_table = plans_config.get("table", "年金计划")  # fallback to hardcoded
+        plans_key = plans_config.get("key", ["年金计划号"])  # fallback
+        plans_updatable = plans_config.get(
+            "updatable", ["计划全称", "计划类型", "客户名称", "company_id"]
+        )
+
+        # Get portfolios configuration with fallbacks
+        portfolios_config = refs_config.get("portfolios", {})
+        portfolios_schema = portfolios_config.get("schema")  # None if not specified
+        portfolios_table = portfolios_config.get("table", "组合计划")  # fallback to hardcoded
+        portfolios_key = portfolios_config.get("key", ["组合代码"])  # fallback
+        portfolios_updatable = portfolios_config.get(
+            "updatable", ["组合名称", "组合类型", "运作开始日"]
+        )
+
         # Execute backfill for plans
         if ("plans" in config.targets or "all" in config.targets) and plan_candidates:
-            if config.mode == "insert_missing":
-                plan_result = insert_missing(
-                    table="年金计划",
-                    key_cols=["年金计划号"],
-                    rows=plan_candidates,
-                    conn=conn,
-                    chunk_size=config.chunk_size,
-                )
-            elif config.mode == "fill_null_only":
-                plan_result = fill_null_only(
-                    table="年金计划",
-                    key_cols=["年金计划号"],
-                    rows=plan_candidates,
-                    updatable_cols=["计划全称", "计划类型", "客户名称", "company_id"],
-                    conn=conn,
-                )
-            else:
-                raise DataWarehouseLoaderError(f"Unsupported backfill mode: {config.mode}")
+            try:
+                # Begin a savepoint for plans operation
+                if conn:
+                    with conn.cursor() as cursor:
+                        cursor.execute("SAVEPOINT plans_backfill")
 
-            result["operations"].append({"table": "年金计划", **plan_result})
+                if config.mode == "insert_missing":
+                    plan_result = insert_missing(
+                        table=plans_table,
+                        key_cols=plans_key,
+                        rows=plan_candidates,
+                        conn=conn,
+                        chunk_size=config.chunk_size,
+                        schema=plans_schema,  # NEW: pass schema
+                    )
+                elif config.mode == "fill_null_only":
+                    plan_result = fill_null_only(
+                        table=plans_table,
+                        key_cols=plans_key,
+                        rows=plan_candidates,
+                        updatable_cols=plans_updatable,
+                        conn=conn,
+                        schema=plans_schema,  # NEW: pass schema
+                    )
+                else:
+                    raise DataWarehouseLoaderError(f"Unsupported backfill mode: {config.mode}")
+
+                # Release savepoint on success
+                if conn:
+                    with conn.cursor() as cursor:
+                        cursor.execute("RELEASE SAVEPOINT plans_backfill")
+
+                result["operations"].append({"table": plans_table, **plan_result})
+                context.log.info(f"Plans backfill completed successfully: {plans_table}")
+
+            except Exception as plans_error:
+                context.log.warning(f"Plans backfill failed: {plans_error}")
+                # Rollback to savepoint on failure
+                if conn:
+                    try:
+                        with conn.cursor() as cursor:
+                            cursor.execute("ROLLBACK TO SAVEPOINT plans_backfill")
+                            cursor.execute("RELEASE SAVEPOINT plans_backfill")
+                    except Exception:
+                        pass
+
+                # Add error result but continue with portfolios
+                result["operations"].append({
+                    "table": plans_table,
+                    "error": str(plans_error),
+                    "inserted": 0,
+                    "batches": 0
+                })
 
         # Execute backfill for portfolios
         if ("portfolios" in config.targets or "all" in config.targets) and portfolio_candidates:
-            if config.mode == "insert_missing":
-                portfolio_result = insert_missing(
-                    table="组合计划",
-                    key_cols=["组合代码"],
-                    rows=portfolio_candidates,
-                    conn=conn,
-                    chunk_size=config.chunk_size,
-                )
-            elif config.mode == "fill_null_only":
-                portfolio_result = fill_null_only(
-                    table="组合计划",
-                    key_cols=["组合代码"],
-                    rows=portfolio_candidates,
-                    updatable_cols=["组合名称", "组合类型", "运作开始日"],
-                    conn=conn,
-                )
-            else:
-                raise DataWarehouseLoaderError(f"Unsupported backfill mode: {config.mode}")
+            try:
+                # Begin a savepoint for portfolios operation
+                if conn:
+                    with conn.cursor() as cursor:
+                        cursor.execute("SAVEPOINT portfolios_backfill")
 
-            result["operations"].append({"table": "组合计划", **portfolio_result})
+                if config.mode == "insert_missing":
+                    portfolio_result = insert_missing(
+                        table=portfolios_table,
+                        key_cols=portfolios_key,
+                        rows=portfolio_candidates,
+                        conn=conn,
+                        chunk_size=config.chunk_size,
+                        schema=portfolios_schema,  # NEW: pass schema
+                    )
+                elif config.mode == "fill_null_only":
+                    portfolio_result = fill_null_only(
+                        table=portfolios_table,
+                        key_cols=portfolios_key,
+                        rows=portfolio_candidates,
+                        updatable_cols=portfolios_updatable,
+                        conn=conn,
+                        schema=portfolios_schema,  # NEW: pass schema
+                    )
+                else:
+                    raise DataWarehouseLoaderError(f"Unsupported backfill mode: {config.mode}")
+
+                # Release savepoint on success
+                if conn:
+                    with conn.cursor() as cursor:
+                        cursor.execute("RELEASE SAVEPOINT portfolios_backfill")
+
+                result["operations"].append({"table": portfolios_table, **portfolio_result})
+                context.log.info(f"Portfolios backfill completed successfully: {portfolios_table}")
+
+            except Exception as portfolios_error:
+                context.log.warning(f"Portfolios backfill failed: {portfolios_error}")
+                # Rollback to savepoint on failure
+                if conn:
+                    try:
+                        with conn.cursor() as cursor:
+                            cursor.execute("ROLLBACK TO SAVEPOINT portfolios_backfill")
+                            cursor.execute("RELEASE SAVEPOINT portfolios_backfill")
+                    except Exception:
+                        pass
+
+                # Add error result
+                result["operations"].append({
+                    "table": portfolios_table,
+                    "error": str(portfolios_error),
+                    "inserted": 0,
+                    "batches": 0
+                })
 
         # Enhanced logging with execution mode
         mode_text = "EXECUTED" if not config.plan_only else "PLAN-ONLY"
@@ -698,6 +817,14 @@ def backfill_refs_op(
                 "portfolio_candidates": len(portfolio_candidates),
             },
         )
+
+        # Final commit for successful operations
+        if conn and not config.plan_only:
+            try:
+                conn.commit()
+                context.log.info("Reference backfill transaction committed")
+            except Exception as final_commit_error:
+                context.log.warning(f"Final commit warning: {final_commit_error}")
 
         return result
 

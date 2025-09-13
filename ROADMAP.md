@@ -84,6 +84,7 @@ TASK BREAKDOWN PHILOSOPHY:
 | C-036 | M2 | 文档对齐（README/VALIDATION/ROADMAP）与命令统一 | COMPLETED ✅ | C-034, C-035 | - |
 | C-028 | M2 | Cleansing framework hardening (negative/full-width percent, Excel header normalization, annuity portfolio-code ^F stripping) | VALIDATING | C-020, C-022, C-024 | P-023, P-024 |
 | F-039 | M2 | Reference backfill for annuity (plans/portfolios) | COMPLETED ✅ | F-013, F-014 | P-026 |
+| C-041 | M2 | Reference backfill validation & hardening (SQLSTATE fallback, sheet name) | COMPLETED ✅ | F-039 | P-027 |
 | R-016 | M2 | Research ingestion connectors (HTTP/SFTP) and auth strategy | READY_FOR_PRP | - | - |
 | F-032 | M2 | Implement HTTP crawler connector + retries/auth + CLI | PENDING | R-016 | - |
 | F-033 | M2 | Implement SFTP/FTP downloader connector | PENDING | R-016 | - |
