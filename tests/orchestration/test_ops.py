@@ -18,11 +18,15 @@ from dagster import build_op_context
 
 from src.work_data_hub.io.loader.warehouse_loader import DataWarehouseLoaderError
 from src.work_data_hub.orchestration.ops import (
+    BackfillRefsConfig,
     DiscoverFilesConfig,
     LoadConfig,
     ReadExcelConfig,
     ReadProcessConfig,
     _load_valid_domains,
+    backfill_refs_op,
+    derive_plan_refs_op,
+    derive_portfolio_refs_op,
     discover_files_op,
     load_op,
     process_sample_trustee_performance_op,

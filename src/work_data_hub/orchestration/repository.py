@@ -12,7 +12,11 @@ code location registration.
 from dagster import Definitions
 
 # Import jobs from the jobs module
-from .jobs import sample_trustee_performance_job, sample_trustee_performance_multi_file_job
+from .jobs import (
+    sample_trustee_performance_job,
+    sample_trustee_performance_multi_file_job,
+    annuity_performance_job,
+)
 
 # Import schedules
 from .schedules import trustee_daily_schedule
@@ -26,6 +30,7 @@ defs = Definitions(
     jobs=[
         sample_trustee_performance_job,
         sample_trustee_performance_multi_file_job,
+        annuity_performance_job,
     ],
     schedules=[
         trustee_daily_schedule,

@@ -246,6 +246,253 @@ def _adapt_param(v):
     return v
 
 
+def insert_missing(
+    table: str,
+    key_cols: List[str],
+    rows: List[Dict[str, Any]],
+    conn: Any,
+    chunk_size: int = 1000,
+) -> Dict[str, Any]:
+    """
+    Insert rows that don't conflict with existing keys using ON CONFLICT DO NOTHING.
+
+    Falls back to SELECT-filter + plain INSERT when ON CONFLICT target constraint is
+    not available in the database, preserving correctness in environments without
+    unique indexes.
+
+    Args:
+        table: Target table name
+        key_cols: Primary key columns for conflict detection
+        rows: List of dictionaries with row data
+        conn: psycopg2 connection object (None = return plan only)
+        chunk_size: Rows per batch for chunking
+
+    Returns:
+        Dictionary with execution metadata:
+        {
+            "inserted": int,
+            "batches": int,
+            "sql_plans": list  # If conn is None
+        }
+
+    Raises:
+        DataWarehouseLoaderError: For validation or execution errors
+    """
+    if not rows:
+        return {"inserted": 0, "batches": 0}
+
+    # Validate key columns exist in rows
+    missing_keys = []
+    for i, row in enumerate(rows[:5]):  # Check first 5 rows for efficiency
+        for col in key_cols:
+            if col not in row:
+                missing_keys.append(f"Row {i} missing key column '{col}'")
+    if missing_keys:
+        raise DataWarehouseLoaderError(
+            f"Missing key columns in rows: {'; '.join(missing_keys)}"
+        )
+
+    # Build SQL with ON CONFLICT clause
+    quoted_table = quote_ident(table)
+    all_cols = _get_column_order(rows)
+    quoted_cols = [quote_ident(col) for col in all_cols]
+    col_list = ",".join(quoted_cols)
+
+    # ON CONFLICT clause for composite keys
+    pk_cols = ",".join(quote_ident(col) for col in key_cols)
+
+    operations = []
+    inserted_total = 0
+    batches = 0
+
+    for i in range(0, len(rows), chunk_size):
+        chunk = rows[i : i + chunk_size]
+
+        # Build VALUES clause with proper parameter adaptation
+        row_data = [[_adapt_param(row.get(col)) for col in all_cols] for row in chunk]
+
+        # CRITICAL: Use ON CONFLICT DO NOTHING for concurrent safety
+        sql = (
+            f"INSERT INTO {quoted_table} ({col_list}) VALUES %s "
+            f"ON CONFLICT ({pk_cols}) DO NOTHING"
+        )
+
+        if conn is None:
+            # Plan-only mode: return SQL plans and optimistic inserted count
+            operations.append(("INSERT_MISSING", sql, row_data))
+            inserted_total += len(chunk)
+        else:
+            # Execute mode: try ON CONFLICT fast-path, fallback when constraint missing
+            try:
+                from psycopg2.extras import execute_values
+            except ImportError:
+                raise DataWarehouseLoaderError("psycopg2 not available for bulk operations")
+
+            with conn.cursor() as cursor:
+                try:
+                    execute_values(
+                        cursor, sql, row_data, page_size=min(len(chunk), 1000)
+                    )
+                    # Prefer actual rowcount when available (accounts for conflicts)
+                    try:
+                        rc = int(getattr(cursor, "rowcount", 0))
+                    except Exception:
+                        rc = 0
+                    if rc is None or rc < 0:
+                        rc = len(row_data)
+                    inserted_total += max(0, rc)
+                    logger.info(
+                        f"Insert missing (ON CONFLICT): attempted {len(chunk)} rows for {table}, inserted ~{rc}"
+                    )
+                except Exception as e:
+                    msg = str(e)
+                    if "ON CONFLICT" in msg and "constraint" in msg:
+                        # Fallback: SELECT existing keys, then plain INSERT for missing only
+                        key_tuples = [tuple(r.get(k) for k in key_cols) for r in chunk]
+                        existing_set = set()
+                        if key_tuples:
+                            sel_cols = ",".join(quote_ident(k) for k in key_cols)
+                            tuple_placeholder = "(" + ",".join(["%s"] * len(key_cols)) + ")"
+                            placeholders = ",".join([tuple_placeholder] * len(key_tuples))
+                            sel_sql = (
+                                f"SELECT {sel_cols} FROM {quoted_table} "
+                                f"WHERE ({sel_cols}) IN ({placeholders})"
+                            )
+                            params: List[Any] = []
+                            for t in key_tuples:
+                                params.extend(list(t))
+                            cursor.execute(sel_sql, params)
+                            existing_set = set(tuple(row) for row in (cursor.fetchall() or []))
+
+                        to_insert = [
+                            r for r in chunk if tuple(r.get(k) for k in key_cols) not in existing_set
+                        ]
+                        if to_insert:
+                            simple_sql = f"INSERT INTO {quoted_table} ({col_list}) VALUES %s"
+                            simple_data = [
+                                [_adapt_param(r.get(c)) for c in all_cols] for r in to_insert
+                            ]
+                            execute_values(
+                                cursor,
+                                simple_sql,
+                                simple_data,
+                                page_size=min(len(simple_data), 1000),
+                            )
+                            try:
+                                rc2 = int(getattr(cursor, "rowcount", 0))
+                            except Exception:
+                                rc2 = 0
+                            if rc2 is None or rc2 < 0:
+                                rc2 = len(simple_data)
+                            inserted_total += max(0, rc2)
+                            logger.info(
+                                f"Insert missing (fallback): inserted {rc2}/{len(to_insert)} rows into {table}"
+                            )
+                        else:
+                            logger.info(
+                                f"Insert missing (fallback): all {len(chunk)} keys already exist in {table}"
+                            )
+                    else:
+                        # Unknown error: re-raise
+                        raise
+
+        batches += 1
+
+    result: Dict[str, Any] = {"inserted": inserted_total, "batches": batches}
+    if conn is None:
+        result["sql_plans"] = operations
+
+    return result
+
+
+def fill_null_only(
+    table: str,
+    key_cols: List[str],
+    rows: List[Dict[str, Any]],
+    updatable_cols: List[str],
+    conn: Any,
+) -> Dict[str, Any]:
+    """
+    Update only NULL columns for existing rows, preserving non-NULL values.
+
+    Args:
+        table: Target table name
+        key_cols: Primary key columns for row identification
+        rows: List of dictionaries with row data
+        updatable_cols: Columns that can be updated when NULL
+        conn: psycopg2 connection object (None = return plan only)
+
+    Returns:
+        Dictionary with execution metadata:
+        {
+            "updated": int,
+            "sql_plans": list  # If conn is None
+        }
+
+    Raises:
+        DataWarehouseLoaderError: For validation or execution errors
+    """
+    if not rows:
+        return {"updated": 0}
+
+    # Validate columns exist in rows
+    all_required_cols = set(key_cols + updatable_cols)
+    missing_cols = []
+    for i, row in enumerate(rows[:5]):  # Check first 5 rows
+        for col in all_required_cols:
+            if col not in row:
+                missing_cols.append(f"Row {i} missing column '{col}'")
+    if missing_cols:
+        raise DataWarehouseLoaderError(
+            f"Missing columns in rows: {'; '.join(missing_cols)}"
+        )
+
+    quoted_table = quote_ident(table)
+    operations = []
+    updated_total = 0
+
+    for col in updatable_cols:
+        # Filter rows that have non-null values for this column
+        update_rows = [row for row in rows if row.get(col) is not None]
+        if not update_rows:
+            continue
+
+        # Build parameterized UPDATE for this column
+        quoted_col = quote_ident(col)
+        key_conditions = " AND ".join(f"{quote_ident(k)} = %s" for k in key_cols)
+
+        sql = (
+            f"UPDATE {quoted_table} SET {quoted_col} = %s "
+            f"WHERE {key_conditions} AND {quoted_col} IS NULL"
+        )
+
+        if conn is None:
+            # Plan-only mode: return SQL plans
+            params_list = []
+            for row in update_rows:
+                params = [_adapt_param(row[col])] + [_adapt_param(row[k]) for k in key_cols]
+                params_list.append(params)
+            operations.append(("UPDATE_NULL_ONLY", sql, params_list))
+        else:
+            # Execute mode
+            with conn.cursor() as cursor:
+                for row in update_rows:
+                    params = [_adapt_param(row[col])] + [_adapt_param(row[k]) for k in key_cols]
+                    cursor.execute(sql, params)
+                    updated_total += cursor.rowcount if hasattr(cursor, "rowcount") else 0
+
+            logger.info(
+                f"Fill null only: updated {len(update_rows)} rows "
+                f"for column {col} in {table}"
+            )
+
+    result: Dict[str, Any] = {"updated": updated_total}
+    if conn is None:
+        result["sql_plans"] = operations
+
+    return result
+
+
 def load(
     table: str,
     rows: List[Dict[str, Any]],

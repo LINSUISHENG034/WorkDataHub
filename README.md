@@ -169,6 +169,51 @@ uv run python -m src.work_data_hub.orchestration.jobs \
   --max-files 1 \
   --mode delete_insert
 
+# Reference Backfill (insert missing plans/portfolios before loading facts)
+# Plan-only preview (no DB changes):
+uv run python -m src.work_data_hub.orchestration.jobs \
+  --domain annuity_performance \
+  --plan-only \
+  --max-files 1 \
+  --backfill-refs all \
+  --backfill-mode insert_missing
+
+# Execute backfill then load facts (requires DB):
+uv run python -m src.work_data_hub.orchestration.jobs \
+  --domain annuity_performance \
+  --execute \
+  --max-files 1 \
+  --backfill-refs plans \
+  --backfill-mode insert_missing \
+  --mode delete_insert
+
+# Note: insert_missing currently uses "ON CONFLICT DO NOTHING" per key columns. A unique
+# index/constraint on the target key(s) is required to avoid errors at runtime.
+# If your environment lacks such constraints, prefer plan-only to preview and consider
+# adding a unique index or implementing a SELECT-filter fallback.
+
+### Reference Backfill DB Indexes (recommended)
+
+For the fast‑path `ON CONFLICT DO NOTHING` to work efficiently and safely, create unique
+indexes on the natural keys of the reference tables. If you cannot add indexes in your
+environment, the loader will automatically fall back to a SELECT‑filter strategy, but
+unique indexes are still recommended for performance and concurrency safety.
+
+```sql
+-- Annuity Plan
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_年金计划_年金计划号"
+  ON "年金计划" ("年金计划号");
+
+-- Portfolio Plan
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_组合计划_组合代码"
+  ON "组合计划" ("组合代码");
+```
+
+Guidelines
+- Always run a plan‑only backfill first to preview SQL and candidate counts.
+- Apply the indexes on test/staging first; verify backfill executes without constraint errors.
+- If unique indexes cannot be added, rely on the built‑in fallback (SELECT‑filter) and monitor logs.
+
 # Override composite key (runtime) for delete_insert mode
 # Use comma/semicolon separated list (e.g., 月度,计划代码,company_id — Chinese column names)
 uv run python -m src.work_data_hub.orchestration.jobs \

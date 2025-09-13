@@ -16,6 +16,9 @@ from dagster import DagsterInstance, job
 
 from ..config.settings import get_settings
 from .ops import (
+    backfill_refs_op,
+    derive_plan_refs_op,
+    derive_portfolio_refs_op,
     discover_files_op,
     load_op,
     process_annuity_performance_op,
@@ -67,13 +70,15 @@ def sample_trustee_performance_multi_file_job():
 @job
 def annuity_performance_job():
     """
-    End-to-end annuity performance processing job.
+    End-to-end annuity performance processing job with optional reference backfill.
 
     This job orchestrates the complete ETL pipeline for Chinese "规模明细" data:
     1. Discover files matching domain patterns
     2. Read Excel data from discovered files (sheet="规模明细")
     3. Process data through annuity performance domain service with column projection
-    4. Load data to database or generate execution plan
+    4. Derive reference candidates (plans and portfolios) from processed data
+    5. Backfill missing references to database (if enabled)
+    6. Load fact data to database or generate execution plan
     """
     # Wire ops together - Dagster handles dependency graph
     discovered_paths = discover_files_op()
@@ -81,7 +86,18 @@ def annuity_performance_job():
     # Read Excel data and process through annuity performance service
     excel_rows = read_excel_op(discovered_paths)
     processed_data = process_annuity_performance_op(excel_rows, discovered_paths)
-    load_op(processed_data)  # No return needed
+
+    # Derive reference candidates from processed data
+    plan_candidates = derive_plan_refs_op(processed_data)
+    portfolio_candidates = derive_portfolio_refs_op(processed_data)
+
+    # Optional: backfill references before loading facts
+    # This op will only execute if backfill_refs_op config is provided in run_config
+    backfill_refs_op(plan_candidates, portfolio_candidates)
+
+    # Load fact data (depends on backfill completion for referential integrity)
+    # Dagster ensures backfill_result completes before load_op starts
+    load_op(processed_data)
 
 
 def _parse_pk_override(pk_arg: Any) -> List[str]:
@@ -163,6 +179,24 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
         run_config["ops"]["read_excel_op"] = {"config": {"sheet": args.sheet}}
         # process_trustee_performance_op has no config
 
+    # Add backfill configuration (always include, but empty targets when disabled)
+    backfill_refs = getattr(args, "backfill_refs", None)
+    backfill_mode = getattr(args, "backfill_mode", "insert_missing")
+
+    if backfill_refs:
+        targets = [backfill_refs] if backfill_refs != "all" else ["all"]
+    else:
+        targets = []  # Empty targets = no backfill
+
+    run_config["ops"]["backfill_refs_op"] = {
+        "config": {
+            "targets": targets,
+            "mode": backfill_mode,
+            "plan_only": effective_plan_only,
+            "chunk_size": 1000,
+        }
+    }
+
     return run_config
 
 
@@ -218,6 +252,19 @@ def main():
         ),
     )
 
+    # Reference backfill arguments
+    parser.add_argument(
+        "--backfill-refs",
+        choices=["plans", "portfolios", "all"],
+        help="Enable reference backfill for missing plan/portfolio references",
+    )
+    parser.add_argument(
+        "--backfill-mode",
+        choices=["insert_missing", "fill_null_only"],
+        default="insert_missing",
+        help="Backfill mode: insert_missing (default) or fill_null_only",
+    )
+
     # Advanced options
     parser.add_argument(
         "--debug",
@@ -247,6 +294,9 @@ def main():
     print(f"   Plan-only: {effective_plan_only}")
     print(f"   Sheet: {args.sheet}")
     print(f"   Max files: {args.max_files}")
+    if hasattr(args, 'backfill_refs') and args.backfill_refs:
+        print(f"   Backfill refs: {args.backfill_refs}")
+        print(f"   Backfill mode: {args.backfill_mode}")
     print("=" * 50)
 
     # Select appropriate job based on domain and max_files parameter

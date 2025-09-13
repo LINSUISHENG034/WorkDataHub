@@ -16,9 +16,15 @@ from pydantic import field_validator, model_validator
 
 from ..config.settings import get_settings
 from ..domain.annuity_performance.service import process as process_annuity
+from ..domain.reference_backfill.service import derive_plan_candidates, derive_portfolio_candidates
 from ..domain.sample_trustee_performance.service import process
 from ..io.connectors.file_connector import DataSourceConnector
-from ..io.loader.warehouse_loader import DataWarehouseLoaderError, load
+from ..io.loader.warehouse_loader import (
+    DataWarehouseLoaderError,
+    fill_null_only,
+    insert_missing,
+    load,
+)
 from ..io.readers.excel_reader import read_excel_rows
 
 logger = logging.getLogger(__name__)
@@ -367,6 +373,36 @@ class LoadConfig(Config):
         return self
 
 
+class BackfillRefsConfig(Config):
+    """Configuration for reference backfill operation."""
+
+    targets: List[str] = []  # Empty list means no backfill
+    mode: str = "insert_missing"  # or "fill_null_only"
+    plan_only: bool = True
+    chunk_size: int = 1000
+
+    @field_validator("targets")
+    @classmethod
+    def validate_targets(cls, v: List[str]) -> List[str]:
+        """Validate backfill targets are supported."""
+        if not v:  # Allow empty list to disable backfill
+            return v
+        valid = ["plans", "portfolios", "all"]
+        for target in v:
+            if target not in valid:
+                raise ValueError(f"Invalid target: {target}. Valid: {valid}")
+        return v
+
+    @field_validator("mode")
+    @classmethod
+    def validate_mode(cls, v: str) -> str:
+        """Validate backfill mode is supported."""
+        valid_modes = ["insert_missing", "fill_null_only"]
+        if v not in valid_modes:
+            raise ValueError(f"Mode '{v}' not supported. Valid: {valid_modes}")
+        return v
+
+
 @op
 def load_op(
     context: OpExecutionContext,
@@ -464,5 +500,210 @@ def load_op(
         raise
     finally:
         # CRITICAL: Clean up bare connection in finally
+        if conn is not None:
+            conn.close()
+
+
+@op
+def derive_plan_refs_op(
+    context: OpExecutionContext,
+    processed_rows: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """
+    Derive plan reference candidates from processed fact data.
+
+    Args:
+        context: Dagster execution context
+        processed_rows: Processed annuity performance fact data
+
+    Returns:
+        List of plan candidate dictionaries ready for backfill
+    """
+    try:
+        candidates = derive_plan_candidates(processed_rows)
+
+        context.log.info(
+            "Plan candidate derivation completed",
+            extra={
+                "input_rows": len(processed_rows),
+                "unique_plans": len(candidates),
+                "domain": "annuity_performance",
+            },
+        )
+
+        return candidates
+
+    except Exception as e:
+        context.log.error(f"Plan candidate derivation failed: {e}")
+        raise
+
+
+@op
+def derive_portfolio_refs_op(
+    context: OpExecutionContext,
+    processed_rows: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """
+    Derive portfolio reference candidates from processed fact data.
+
+    Args:
+        context: Dagster execution context
+        processed_rows: Processed annuity performance fact data
+
+    Returns:
+        List of portfolio candidate dictionaries ready for backfill
+    """
+    try:
+        candidates = derive_portfolio_candidates(processed_rows)
+
+        context.log.info(
+            "Portfolio candidate derivation completed",
+            extra={
+                "input_rows": len(processed_rows),
+                "unique_portfolios": len(candidates),
+                "domain": "annuity_performance",
+            },
+        )
+
+        return candidates
+
+    except Exception as e:
+        context.log.error(f"Portfolio candidate derivation failed: {e}")
+        raise
+
+
+@op
+def backfill_refs_op(
+    context: OpExecutionContext,
+    config: BackfillRefsConfig,
+    plan_candidates: List[Dict[str, Any]],
+    portfolio_candidates: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    Execute reference backfill operations for plans and/or portfolios.
+
+    Args:
+        context: Dagster execution context
+        config: Backfill configuration
+        plan_candidates: Plan candidate dictionaries
+        portfolio_candidates: Portfolio candidate dictionaries
+
+    Returns:
+        Dictionary with backfill execution metadata
+    """
+    conn = None
+    try:
+        # Mirror load_op connection handling pattern
+        if not config.plan_only:
+            global psycopg2  # type: ignore
+            if psycopg2 is None:  # type: ignore
+                raise DataWarehouseLoaderError("psycopg2 not available for database operations")
+            if psycopg2 is _PSYCOPG2_NOT_LOADED:  # type: ignore
+                try:
+                    import psycopg2 as _psycopg2  # type: ignore
+                except ImportError:
+                    raise DataWarehouseLoaderError("psycopg2 not available for database operations")
+                psycopg2 = _psycopg2  # type: ignore
+
+            settings = get_settings()
+
+            # Primary DSN retrieval with fallback for test compatibility
+            dsn = None
+            if hasattr(settings, "get_database_connection_string"):
+                try:
+                    dsn = settings.get_database_connection_string()
+                except Exception:
+                    dsn = None
+            if not isinstance(dsn, str) and hasattr(settings, "database"):
+                try:
+                    dsn = settings.database.get_connection_string()  # type: ignore[attr-defined]
+                except Exception:
+                    pass
+            if not isinstance(dsn, str) or not dsn:
+                raise DataWarehouseLoaderError(
+                    "Database connection failed: invalid DSN resolved from settings"
+                )
+
+            context.log.info("Connecting to database for reference backfill execution")
+
+            try:
+                conn = psycopg2.connect(dsn)  # type: ignore
+            except Exception as e:
+                raise DataWarehouseLoaderError(
+                    f"Database connection failed: {e}. Check WDH_DATABASE__* environment variables."
+                ) from e
+
+        result: Dict[str, Any] = {"operations": [], "plan_only": config.plan_only}
+
+        # Early return if no backfill targets specified
+        if not config.targets:
+            context.log.info("Reference backfill skipped - no targets specified")
+            return result
+
+        # Execute backfill for plans
+        if ("plans" in config.targets or "all" in config.targets) and plan_candidates:
+            if config.mode == "insert_missing":
+                plan_result = insert_missing(
+                    table="年金计划",
+                    key_cols=["年金计划号"],
+                    rows=plan_candidates,
+                    conn=conn,
+                    chunk_size=config.chunk_size,
+                )
+            elif config.mode == "fill_null_only":
+                plan_result = fill_null_only(
+                    table="年金计划",
+                    key_cols=["年金计划号"],
+                    rows=plan_candidates,
+                    updatable_cols=["计划全称", "计划类型", "客户名称", "company_id"],
+                    conn=conn,
+                )
+            else:
+                raise DataWarehouseLoaderError(f"Unsupported backfill mode: {config.mode}")
+
+            result["operations"].append({"table": "年金计划", **plan_result})
+
+        # Execute backfill for portfolios
+        if ("portfolios" in config.targets or "all" in config.targets) and portfolio_candidates:
+            if config.mode == "insert_missing":
+                portfolio_result = insert_missing(
+                    table="组合计划",
+                    key_cols=["组合代码"],
+                    rows=portfolio_candidates,
+                    conn=conn,
+                    chunk_size=config.chunk_size,
+                )
+            elif config.mode == "fill_null_only":
+                portfolio_result = fill_null_only(
+                    table="组合计划",
+                    key_cols=["组合代码"],
+                    rows=portfolio_candidates,
+                    updatable_cols=["组合名称", "组合类型", "运作开始日"],
+                    conn=conn,
+                )
+            else:
+                raise DataWarehouseLoaderError(f"Unsupported backfill mode: {config.mode}")
+
+            result["operations"].append({"table": "组合计划", **portfolio_result})
+
+        # Enhanced logging with execution mode
+        mode_text = "EXECUTED" if not config.plan_only else "PLAN-ONLY"
+        context.log.info(
+            f"Reference backfill completed ({mode_text})",
+            extra={
+                "targets": config.targets,
+                "mode": config.mode,
+                "operations": len(result["operations"]),
+                "plan_candidates": len(plan_candidates),
+                "portfolio_candidates": len(portfolio_candidates),
+            },
+        )
+
+        return result
+
+    except Exception as e:
+        context.log.error(f"Reference backfill failed: {e}")
+        raise
+    finally:
         if conn is not None:
             conn.close()

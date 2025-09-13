@@ -1,130 +1,156 @@
-# INITIAL.md — 覆盖/非覆盖写入端到端测试（年金规模明细）
+# INITIAL.md — Reference Backfill (Annuity Plans & Portfolios) — Insert Missing and Optional Fill-Null-Only
 
-本 INITIAL 指导 Claude 基于“真实样本派生小数据集”完成覆盖写入（delete_insert）与非覆盖写入（append）的端到端与单元测试，确保功能可观测、可复现、可回归。
+This INITIAL guides Claude to implement a safe, observable “reference backfill” step driven by facts from the Annuity Scale Details domain. The goal is to insert missing reference rows for Annuity Plans and Portfolios (and optionally fill only null fields) based on the current fact batch, without overwriting human‑maintained fields.
 
 ## FEATURE
-使用真实业务样本（年金规模明细）派生多个小规模数据集，构建覆盖/非覆盖写入测试矩阵，校验 `--mode delete_insert/append` 与 `--pk` 运行时覆盖键的语义正确性与稳定性。
+Introduce Reference Backfill for Annuity:
+- Derive candidate reference rows (Annuity Plan, Portfolio) from the processed fact batch (规模明细).
+- Backfill references before loading facts: insert missing keys; optionally fill null‑only for selected columns.
+- Provide plan‑only preview (no DB changes) and execute modes, with clear summaries and candidate listings.
 
 ## SCOPE
 - In‑scope:
-  - 生成小数据集：从 `tests/fixtures/sample_data/【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx` 派生 3 个子集（5/6/3 行）。
-  - E2E 计划模式测试：验证按默认 PK 与运行时 `--pk` 覆盖时的 DELETE/INSERT 计划（计数、SQL 形态）。
-  - Loader 单元测试：delete_insert 缺失 PK 报错；append 模式不依赖 PK。
-  - CLI 覆盖键：`--pk` 可在运行时覆盖 `data_sources.yml` 的组合键。
+  - Add derivation of plan candidates (key: 年金计划号) and portfolio candidates (key: 组合代码, + 年金计划号) from processed annuity fact rows.
+  - Add loader support for reference backfill:
+    - Mode: insert_missing (default) — insert only non‑existing keys.
+    - Mode: fill_null_only (optional) — update existing rows only where target fields are NULL.
+  - CLI flags to enable backfill and choose mode; plan‑only preview that prints candidate summary and SQL plan.
+  - Wire the backfill step before fact load within the existing Dagster job/CLI flow.
 - Non‑goals:
-  - 引入 upsert（ON CONFLICT DO UPDATE）模式。
-  - 修改领域转换或 DDL/表结构。
-  - 部署 Dagster 服务端（UI/daemon）。
+  - Do not implement full upsert (arbitrary column overwrite) or business mapping logic.
+  - Do not enforce DB foreign keys; this is about enabling downstream apps while keeping facts independent.
+  - No Dagster deployment; keep CLI‑first.
 
 ## CONTEXT SNAPSHOT
 ```bash
-tests/fixtures/sample_data/
-  【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx  # 大样本
-  annuity_subsets/                                            # 由脚本生成
-    2024年11月年金终稿数据_subset_distinct_5.xlsx
-    2024年11月年金终稿数据_subset_overlap_pk_6.xlsx
-    2024年11月年金终稿数据_subset_append_3.xlsx
-
 src/work_data_hub/
   orchestration/
-    jobs.py        # CLI + run_config（含 --pk 覆盖）
-    ops.py         # discover/read/process/load 薄封装
+    ops.py          # add: derive_*_refs ops, backfill_refs op
+    jobs.py         # CLI flags, run_config plumbing, call backfill ops before fact load
   io/
-    readers/excel_reader.py
-    loader/warehouse_loader.py
-  domain/annuity_performance/service.py
-scripts/testdata/make_annuity_subsets.py   # 本次新增的小集生成脚本
+    loader/warehouse_loader.py  # add insert_missing + optional fill_null_only helpers
+  domain/annuity_performance/
+    service.py      # provides processed fact rows to derive references from
+  utils/
+    date_parser.py  # reused by domain service
+
+reference/db_migration/db_structure.json  # reference schemas (Chinese columns)
+tests/fixtures/sample_data/annuity_subsets/
+  2024年11月年金终稿数据_subset_distinct_5.xlsx
+  2024年11月年金终稿数据_subset_overlap_pk_6.xlsx
+  2024年11月年金终稿数据_subset_append_3.xlsx
 ```
 
-## EXAMPLES（最重要）
-- 生成小数据集：
-```bash
-uv run python -m scripts.testdata.make_annuity_subsets \
-  --src tests/fixtures/sample_data/【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx \
-  --sheet 规模明细
-```
-- E2E 计划模式（默认 PK）：
-```bash
-export WDH_DATA_BASE_DIR=tests/fixtures/sample_data/annuity_subsets
-uv run python -m src.work_data_hub.orchestration.jobs \
-  --domain annuity_performance --plan-only --max-files 1
-```
-- E2E 计划模式（运行时覆盖 PK）：
+## EXAMPLES (most important)
+- Plan‑only backfill (candidates + SQL plan only):
 ```bash
 export WDH_DATA_BASE_DIR=tests/fixtures/sample_data/annuity_subsets
 uv run python -m src.work_data_hub.orchestration.jobs \
   --domain annuity_performance --plan-only --max-files 1 \
-  --mode delete_insert --pk "月度,计划代码"
+  --backfill-refs all --backfill-mode insert_missing
 ```
-- 非覆盖写入（append）：
+- Execute backfill (insert missing only), then load facts:
 ```bash
 export WDH_DATA_BASE_DIR=tests/fixtures/sample_data/annuity_subsets
 uv run python -m src.work_data_hub.orchestration.jobs \
-  --domain annuity_performance --plan-only --max-files 1 \
-  --mode append
+  --domain annuity_performance --execute --max-files 1 \
+  --backfill-refs all --backfill-mode insert_missing --mode delete_insert
+```
+- Execute with fill‑null‑only (optional, if implemented):
+```bash
+export WDH_DATA_BASE_DIR=tests/fixtures/sample_data/annuity_subsets
+uv run python -m src.work_data_hub.orchestration.jobs \
+  --domain annuity_performance --execute --max-files 1 \
+  --backfill-refs plans --backfill-mode fill_null_only
 ```
 
 ## DOCUMENTATION
-- `README.md`（生成子集与 CLI 用法）
-- `src/work_data_hub/config/data_sources.yml`（annuity_performance 的表名与默认 PK）
-- `CLAUDE.md`（命名/DDL 规范）
+- Internal:
+  - `reference/db_migration/db_structure.json` (Chinese schemas; keys and columns)
+  - `src/work_data_hub/io/loader/warehouse_loader.py` (new helpers)
+  - `src/work_data_hub/orchestration/ops.py` (new ops)
+  - `src/work_data_hub/orchestration/jobs.py` (CLI flags + wiring)
+- Conventions: `CLAUDE.md` (quoting Chinese identifiers, naming)
 
 ## INTEGRATION POINTS
-- ExcelReader → Domain Service（annuity）→ Loader（warehouse_loader）
-- Orchestration（ops/jobs）与 Settings（`WDH_DATA_BASE_DIR`）
+- From facts (processed rows) → derive plan/portfolio candidates
+- Loader executes reference backfill before fact `load_op`
+- CLI flags control behavior; plan‑only path prints SQL and candidate summary
 
-## DATA CONTRACTS
-- delete_insert：需要 `pk=["月度","计划代码","company_id"]`（或运行时 `--pk` 覆盖）。
-- append：不需要 PK。
-- 处理后输出包含：`月度`、`计划代码`、`company_id`、若干财务/元数据字段；ops 以别名序列化并投影到允许列。
+## DATA CONTRACTS (schemas & payloads)
+- Derived candidates from fact rows (example fields):
+  - Annuity Plan (table: "年金计划", key: 年金计划号)
+    - Keys: 年金计划号 (from 计划代码)
+    - Optional fields (fill if available from facts): 计划全称 (from 计划名称), 计划类型, 客户名称, company_id
+  - Portfolio (table: "组合计划", key: 组合代码)
+    - Keys: 组合代码 (processed/f‑prefix corrected), 年金计划号 (from 计划代码)
+    - Optional fields: 组合名称, 组合类型, 运作开始日
+- Output to loader:
+  - insert_missing: row dicts with key + optional fields; ignore if key exists
+  - fill_null_only (optional): update existing rows only where target field IS NULL
 
-## GOTCHAS & QUIRKS
-- 子集文件名需匹配 annuity 的 pattern（已用 `2024年11月年金终稿数据_subset_*.xlsx`）。
-- Windows/PowerShell 环境变量设定与转义需注意（建议在 pytest 中用 `monkeypatch.setenv`）。
-- 计划模式只返回 SQL 计划，不连接数据库；执行模式请仅用于本地测试数据库并打上 `-m postgres` 标记。
+## GOTCHAS & LIBRARY QUIRKS
+- Do not rely on DB unique constraints; pre‑check existing keys via SELECT and filter before INSERT (works even without ON CONFLICT).
+- Chinese identifiers must be quoted via existing `quote_ident` helper in loader.
+- Keep backfill idempotent and side‑effect minimal: no deletes, no overwrites of non‑null fields.
+- F‑prefix on portfolios is already handled in domain service; reuse the processed value.
 
-## IMPLEMENTATION NOTES（测试设计）
-建议新增测试文件：`tests/e2e/test_annuity_overwrite_append_small_subsets.py`
-- 准备：调用 subset 生成脚本或假定已生成子集；在测试中 `monkeypatch.setenv('WDH_DATA_BASE_DIR', subset_dir)`。
-- 用例 A（distinct_5）：
-  - delete_insert：期望 deleted == 子集中按默认 PK 的唯一组合数；inserted == 5；存在一条 DELETE 计划 + INSERT 计划。
-  - append：期望 deleted == 0；inserted == 5；仅 INSERT 计划。
-- 用例 B（overlap_pk_6）：
-  - delete_insert：期望 deleted == 3（唯一组合数）；inserted == 6；DELETE + INSERT。
-  - append：期望 deleted == 0；inserted == 6。
-- 用例 C（pk 覆盖）：对 overlap_pk_6 用 `--pk "月度,计划代码"`，期望 deleted == 以两列聚合的唯一对数；inserted == 6。
-- Loader 单测：
-  - 构造 rows（含/不含某 PK 列），调用 `warehouse_loader.load(..., mode='delete_insert', pk=[...])`：缺失 PK → `DataWarehouseLoaderError`；`mode='append'` 正常（不校验 PK）。
+## IMPLEMENTATION NOTES
+- Files to touch:
+  - `src/work_data_hub/orchestration/ops.py`:
+    - `derive_plan_refs_op(processed_rows) -> List[Dict]`
+    - `derive_portfolio_refs_op(processed_rows) -> List[Dict]`
+    - `backfill_refs_op(candidates, config)` with config: {table, key_cols, mode: [insert_missing|fill_null_only], plan_only: bool}
+  - `src/work_data_hub/io/loader/warehouse_loader.py`:
+    - Add helpers: `insert_missing(table, key_cols, rows, conn)` and optional `fill_null_only(table, key_cols, rows, updatable_cols, conn)`
+      - Approach: SELECT existing keys IN (...), compute missing; batch INSERT missing via `execute_values`.
+      - For fill‑null‑only: per updatable col, UPDATE ... SET col = %s WHERE key match AND col IS NULL.
+  - `src/work_data_hub/orchestration/jobs.py`:
+    - CLI flags: `--backfill-refs` (choices: plans|portfolios|all), `--backfill-mode` (choices: insert_missing|fill_null_only|both)
+    - Wire: discover → read → process → derive candidates (per flag) → backfill (per mode) → load facts
+- Candidate mapping:
+  - Plan: {年金计划号=计划代码, 计划全称=计划名称, 计划类型, 客户名称, company_id}
+  - Portfolio: {组合代码=组合代码, 年金计划号=计划代码, 组合名称, 组合类型, 运作开始日}
+- Config surface:
+  - Put target table names and key columns in a small config dict (inline or extend data_sources.yml under annuity with `refs:` block) for discoverability.
 
-可选：再补 1 条 E2E 执行模式（`-m postgres`）验证 delete_insert 真实删除/插入计数（需准备测试库与 DDL）。
-
-## VALIDATION GATES
+## VALIDATION GATES (must pass)
 ```bash
 uv run ruff check src/ --fix
 uv run mypy src/
-uv run pytest -v -k annuity_overwrite_append
-```
-可选覆盖：
-```bash
-uv run pytest --cov=src --cov-report=term-missing -k annuity_overwrite_append
+uv run pytest -v -k reference_backfill
+
+# Plan-only preview on subsets
+WDH_DATA_BASE_DIR=tests/fixtures/sample_data/annuity_subsets \
+  uv run python -m src.work_data_hub.orchestration.jobs \
+  --domain annuity_performance --plan-only --max-files 1 \
+  --backfill-refs all --backfill-mode insert_missing
 ```
 
 ## ACCEPTANCE CRITERIA
-- 子集生成：成功生成 3 个文件（5/6/3 行），sheet 名为“规模明细”。
-- E2E 计划模式：
-  - distinct_5：delete_insert 的 deleted == 唯一 PK 组合数；append 的 deleted == 0；inserted == 5。
-  - overlap_pk_6：delete_insert 的 deleted == 3；append 的 deleted == 0；inserted == 6。
-  - pk 覆盖：`--pk "月度,计划代码"` 时 deleted == 以两列聚合的唯一对数。
-- Loader 单测：缺失 PK（delete_insert）抛出 `DataWarehouseLoaderError`；append 不抛错。
-- CI 门：ruff/mypy/pytest 全绿；测试在默认（非 postgres）环境下仅使用计划模式，不依赖数据库。
+- Derivation:
+  - Correctly extracts candidate keys and optional fields from processed fact rows.
+  - Deduplicates candidates; logs counts per reference type.
+- insert_missing:
+  - Plan‑only shows SQL plan and candidate summaries; no DB changes.
+  - Execute inserts only non‑existing keys; does not modify existing rows.
+  - Summary includes inserted counts per table (plans, portfolios).
+- fill_null_only (optional if implemented):
+  - Updates only NULL fields; does not overwrite non‑null values; summary shows updated counts per column.
+- Pipeline:
+  - When enabled, backfill runs before fact load and succeeds on subsets; fact load remains unchanged.
+- CI gates green: ruff, mypy, pytest.
 
 ## ROLLOUT & RISK
-- 风险：真实样本字段异构导致子集不含所需列 → 脚本已采用多级候选键并在缺少时回落；测试计算期望 deleted 时以 `ExcelReader` 结果自适应聚合。
-- 风险：文件命名不匹配 pattern → 已统一 `2024年11月年金终稿数据_subset_*.xlsx`；若后续变更，更新 `data_sources.yml` 或命名规则。
+- No FK enforcement: reference backfill reduces missing references but does not require FK; later we can enable FK progressively.
+- Data quality variability: some optional fields may be absent in facts; treat them as nullable and do not block insert_missing.
+- Concurrency: insert_missing should SELECT‑filter keys to avoid duplicate inserts; ON CONFLICT DO NOTHING can be used only if a unique index exists.
 
-## REFERENCES
-- `README.md` — 小集生成与 CLI 用法
-- `src/work_data_hub/config/data_sources.yml` — annuity 配置（sheet、表、PK）
-- `src/work_data_hub/io/loader/warehouse_loader.py` — delete_insert/append 逻辑
-- `src/work_data_hub/orchestration/jobs.py` — `--pk` 覆盖实现
+## APPENDICES (optional snippets)
+```python
+# Example key filtering (insert_missing)
+existing = select_existing_keys(conn, table, key_cols, candidates)
+to_insert = [r for r in candidates if tuple(r[k] for k in key_cols) not in existing]
+bulk_insert(conn, table, to_insert)
+```
 
