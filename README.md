@@ -269,12 +269,20 @@ uv run python -m scripts.testdata.make_annuity_subsets \
 #   - 2024年11月年金终稿数据_subset_append_3.xlsx
 ```
 
-## DDL Management (Single Source of Truth)
+### DDL Management (Single Source of Truth)
 
 - Source: `reference/db_migration/db_structure.json` — describes physical columns from legacy; generator applies our conventions.
 - Manifest: `scripts/create_table/manifest.yml` — maps domain → table/entity/delete_scope_key/ddl path.
 - Generator: `scripts/create_table/generate_from_json.py` — produces normalized, idempotent PostgreSQL DDL.
 - Apply: `scripts/create_table/apply_sql.py` — applies DDL using `.env` (or `--dsn`).
+
+#### Database Conventions Applied
+
+- **Primary Key**: Uses `{entity}_id` as auto-increment identity column (e.g., `annuity_plans_id`, `portfolio_plans_id`)
+- **Legacy ID Field**: Original `id` fields from source JSON are excluded to follow project naming conventions
+- **Audit Fields**: `created_at`, `updated_at` timestamps with auto-update triggers
+- **Delete Scope Keys**: Non-unique composite indexes for efficient deletion operations
+- **Data Types**: MySQL types mapped to PostgreSQL equivalents (TINYINT → SMALLINT, etc.)
 
 Commands
 

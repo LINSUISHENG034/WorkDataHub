@@ -53,6 +53,7 @@ def _pg_type(vendor_type: str) -> str:
         "DATETIME": "TIMESTAMP",
         "TIMESTAMP": "TIMESTAMP",
         "TEXT": "TEXT",
+        "TINYINT": "SMALLINT",  # PostgreSQL equivalent of TINYINT
     }
     # VARCHAR(N)
     if t.startswith("VARCHAR"):
@@ -67,7 +68,9 @@ def _emit_table_sql(
     delete_scope_key: List[str],
 ) -> str:
     lines: List[str] = []
-    q = lambda s: f'"{s.replace("\"", "\"\"")}"'
+    def q(s):
+        escaped = s.replace('"', '""')
+        return f'"{escaped}"'
 
     lines.append("-- Auto-generated baseline DDL (initial seed).")
     lines.append(f"-- Entity: {entity} | Table: {table_name}")
@@ -79,11 +82,14 @@ def _emit_table_sql(
         f"  {q(entity + '_id')}    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,"
     )
 
-    # Emit business columns
+    # Emit business columns (exclude original 'id' field per project conventions)
     normalized_seen = set()
     for col in columns:
         raw = col.get("name", "").strip()
         if not raw:
+            continue
+        # Skip original 'id' field - we use {entity}_id as primary key
+        if raw.lower() == "id":
             continue
         normalized = normalize_column_name(raw) or raw
         if normalized in normalized_seen:
@@ -110,19 +116,33 @@ def _emit_table_sql(
     lines.append(");")
     lines.append("")
 
-    # Common indexes
-    for idx_col in ["月度", "计划代码", "company_id", "机构代码", "产品线代码", "年金账户号"]:
-        lines.append(
-            f"CREATE INDEX IF NOT EXISTS {q('idx_' + table_name + '_' + idx_col)} ON {q(table_name)} ({q(idx_col)});"
-        )
-    # Composite indexes
-    lines.append(
-        f"CREATE INDEX IF NOT EXISTS {q('idx_' + table_name + '_月度_计划代码')} ON {q(table_name)} ({q('月度')}, {q('计划代码')});"
-    )
-    lines.append(
-        f"CREATE INDEX IF NOT EXISTS {q('idx_' + table_name + '_月度_company_id')} ON {q(table_name)} ({q('月度')}, {q('company_id')});"
-    )
-    if delete_scope_key:
+    # Common indexes - only for columns that exist
+    existing_columns = {col["name"] for col in columns}
+    common_idx_cols = ["月度", "计划代码", "company_id", "机构代码", "产品线代码", "年金账户号", "年金计划号", "组合代码"]
+    
+    for idx_col in common_idx_cols:
+        if idx_col in existing_columns:
+            lines.append(
+                f"CREATE INDEX IF NOT EXISTS {q('idx_' + table_name + '_' + idx_col)} ON {q(table_name)} ({q(idx_col)});"
+            )
+    
+    # Composite indexes - only for columns that exist
+    composite_indexes = [
+        ("月度", "计划代码"),
+        ("月度", "company_id"),
+        ("年金计划号", "组合代码"),
+        ("年金计划号", "company_id")
+    ]
+    
+    for col1, col2 in composite_indexes:
+        if col1 in existing_columns and col2 in existing_columns:
+            idx_name = 'idx_' + table_name + '_' + col1 + '_' + col2
+            lines.append(
+                f"CREATE INDEX IF NOT EXISTS {q(idx_name)} ON {q(table_name)} ({q(col1)}, {q(col2)});"
+            )
+    
+    # Delete scope key index
+    if delete_scope_key and all(col in existing_columns for col in delete_scope_key):
         idx_name = 'idx_' + table_name + '_' + '_'.join(delete_scope_key)
         cols = ", ".join(q(c) for c in delete_scope_key)
         lines.append(
@@ -190,8 +210,15 @@ def main() -> int:
     delete_scope_key = dom.get("delete_scope_key", [])
 
     struct = _load_structure()
-    tables = struct
-    if table_name not in tables:
+    
+    # Search for table in nested structure
+    tables = None
+    for category in struct.values():
+        if isinstance(category, dict) and table_name in category:
+            tables = category
+            break
+    
+    if not tables or table_name not in tables:
         print(f"Table not found in db_structure.json: {table_name}")
         return 2
     cols = tables[table_name].get("columns", [])
