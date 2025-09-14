@@ -20,6 +20,7 @@ from .ops import (
     derive_plan_refs_op,
     derive_portfolio_refs_op,
     discover_files_op,
+    gate_after_backfill,
     load_op,
     process_annuity_performance_op,
     process_sample_trustee_performance_op,
@@ -91,13 +92,10 @@ def annuity_performance_job():
     plan_candidates = derive_plan_refs_op(processed_data)
     portfolio_candidates = derive_portfolio_refs_op(processed_data)
 
-    # Optional: backfill references before loading facts
-    # This op will only execute if backfill_refs_op config is provided in run_config
-    backfill_refs_op(plan_candidates, portfolio_candidates)
-
-    # Load fact data (depends on backfill completion for referential integrity)
-    # Dagster ensures backfill_result completes before load_op starts
-    load_op(processed_data)
+    # Backfill references and gate before loading facts (FK‑safe ordering)
+    backfill_result = backfill_refs_op(plan_candidates, portfolio_candidates)
+    gated_rows = gate_after_backfill(processed_data, backfill_result)
+    load_op(gated_rows)
 
 
 def _parse_pk_override(pk_arg: Any) -> List[str]:

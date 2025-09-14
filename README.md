@@ -200,9 +200,9 @@ environment, the loader will automatically fall back to a SELECT‑filter strate
 unique indexes are still recommended for performance and concurrency safety.
 
 ```sql
--- Annuity Plan
-CREATE UNIQUE INDEX IF NOT EXISTS "uq_年金计划_年金计划号"
-  ON "年金计划" ("年金计划号");
+-- Annuity Plan (align with production FK)
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_年金计划_计划代码"
+  ON "年金计划" ("计划代码");
 
 -- Portfolio Plan
 CREATE UNIQUE INDEX IF NOT EXISTS "uq_组合计划_组合代码"
@@ -210,9 +210,195 @@ CREATE UNIQUE INDEX IF NOT EXISTS "uq_组合计划_组合代码"
 ```
 
 Guidelines
+- Align `refs.plans.key` with your production FK target column (often `计划代码`).
+- Prefer dual‑fill identifiers in candidates (e.g., set both `年金计划号` and `计划代码` to the same value) to support heterogeneous environments.
 - Always run a plan‑only backfill first to preview SQL and candidate counts.
 - Apply the indexes on test/staging first; verify backfill executes without constraint errors.
 - If unique indexes cannot be added, rely on the built‑in fallback (SELECT‑filter) and monitor logs.
+
+### Reference Configuration (Schema, Table, Key Management)
+
+The reference backfill system uses configuration‑driven schema and table management via `data_sources.yml`. Each domain can specify schema qualification, table names, primary keys, and updatable columns for plans and portfolios.
+
+#### Configuration Structure
+
+```yaml
+annuity_performance:
+  # Fact table configuration
+  table: "规模明细"
+  pk: ["月度", "计划代码", "company_id"]
+
+  # Reference table configuration
+  refs:
+    plans:
+      schema: public                    # Optional: schema qualification
+      table: "年金计划"                # Required: target table name
+      key: ["年金计划号"]           # Required: primary key columns
+      updatable: [                      # Required: columns that can be updated
+        "计划全称",
+        "计划类型",
+        "客户名称",
+        "company_id",
+        "主拓代码",
+        "主拓机构",
+        "备注",
+        "资格"
+      ]
+    portfolios:
+      schema: public
+      table: "组合计划"
+      key: ["组合代码"]
+      updatable: ["组合名称", "组合类型", "运作开始日"]
+```
+
+#### Schema Qualification Benefits
+
+- **Qualified SQL Generation**: When schema is specified, the warehouse loader generates qualified SQL: `INSERT INTO "public"."年金计划" (...)`
+- **Multi‑Schema Support**: Different reference tables can live in different schemas
+- **Environment Isolation**: Development/staging can use different schemas than production
+
+#### Usage Examples
+
+```bash
+# Schema‑qualified backfill (uses configuration schema)
+uv run python ‑m src.work_data_hub.orchestration.jobs \
+  ‑‑domain annuity_performance \
+  ‑‑execute \
+  ‑‑backfill‑refs all \
+  ‑‑backfill‑mode insert_missing
+
+# Plan‑only preview shows qualified table names
+uv run python ‑m src.work_data_hub.orchestration.jobs \
+  ‑‑domain annuity_performance \
+  ‑‑plan‑only \
+  ‑‑backfill‑refs plans
+```
+
+### Enhanced Plan Derivation Logic
+
+The reference backfill system includes sophisticated business logic for deriving annuity plan references from fact data. This enhanced derivation handles tie‑breaking, aggregation, and formatting according to specific business requirements.
+
+#### Business Rules Applied
+
+1. **客户名称 (Client Name)**:
+   - Most frequent value across all rows for the plan
+   - Tie‑breaking: Select value from row with maximum 期末资产规模 (End Asset Scale)
+   - Deterministic and reproducible results
+
+2. **主拓代码, 主拓机构 (Primary Extension Code/Organization)**:
+   - Values taken from the single row with maximum 期末资产规模
+   - Ensures consistency between related fields
+
+3. **备注 (Remarks)**:
+   - Formatted as `YYMM_新建` from the 月度 (Monthly) field
+   - Handles various date input formats: YYYYMM integers, date strings, datetime objects
+   - Graceful degradation for invalid dates
+
+4. **资格 (Qualifications)**:
+   - Filtered business types in specific predefined order
+   - Allowed types: `企年受托`, `年`, `企年投资`, `职年受托`, `职年投资`
+   - Joined with '+' separator: `企年受托+年+职年投资`
+   - Invalid business types are filtered out
+
+#### Implementation Features
+
+- **Deterministic Tie‑Breaking**: Uses stable sorting and first‑occurrence selection
+- **Robust Date Parsing**: Handles multiple date formats with comprehensive error handling
+- **Edge Case Handling**: Gracefully processes null values, empty inputs, and invalid data
+- **Numeric Safety**: Safe conversion of asset scale values with fallback handling
+
+#### Example Enhanced Derivation
+
+```python
+# Input: Multiple rows for plan PLAN001 with different client names and asset scales
+input_rows = [
+    {"계획코드": "PLAN001", "고객명": "Client A", "기말자산규모": 2000000, "业务类型": "기업연수탁"},
+    {"계획코드": "PLAN001", "고객명": "Client A", "기말자산규모": 1000000, "업무유형": "연"},
+    {"계획코드": "PLAN001", "고객명": "Client B", "기말자산규모": 1500000, "업무유형": "직업연투자"},
+]
+
+# Output: Single plan candidate with enhanced derivation
+candidate = {
+    "연금계획번호": "PLAN001",
+    "고객명": "Client A",           # Most frequent, won tie‑break with max asset scale
+    "주획코드": "AGENT001",        # From row with max asset scale (2M)
+    "주획기관": "BRANCH001",       # From row with max asset scale (2M)
+    "비고": "2411_신규",             # Formatted from 월도 202411
+    "자격": "기업연수탁+연+직업연투자",  # Ordered business types
+}
+```
+
+### Skip‑Facts Mode (Backfill‑Only Execution)
+
+The skip‑facts mode enables running reference backfill operations without loading fact data. This is useful for:
+
+- Populating reference tables before fact loading
+- Testing reference derivation logic independently
+- Incremental reference updates without fact processing
+- Development and validation workflows
+
+#### Usage Examples
+
+```bash
+# Skip facts: Only run reference backfill, no fact loading
+uv run python ‑m src.work_data_hub.orchestration.jobs \
+  ‑‑domain annuity_performance \
+  ‑‑execute \
+  ‑‑backfill‑refs all \
+  ‑‑skip‑facts \
+  ‑‑max‑files 1
+
+# Plan‑only skip‑facts: Preview backfill operations only
+uv run python ‑m src.work_data_hub.orchestration.jobs \
+  ‑‑domain annuity_performance \
+  ‑‑plan‑only \
+  ‑‑backfill‑refs plans \
+  ‑‑skip‑facts
+
+# Skip facts with specific sheet and debug logging
+uv run python ‑m src.work_data_hub.orchestration.jobs \
+  ‑‑domain annuity_performance \
+  ‑‑execute \
+  ‑‑backfill‑refs all \
+  ‑‑backfill‑mode insert_missing \
+  ‑‑skip‑facts \
+  ‑‑sheet "规模明细" \
+  ‑‑debug
+```
+
+#### Expected Output
+
+When using skip‑facts mode, you'll see:
+
+1. **Job Summary**: `Skip facts: True` in the initial job parameters
+2. **Reference Backfill Summary**: Shows plan and portfolio operations executed
+3. **Fact Loading Summary**: Shows 0 deleted, 0 inserted, 0 batches (skipped)
+4. **Debug Logs**: "Fact loading skipped due to ‑‑skip‑facts flag" message
+
+```bash
+🚀 Starting annuity_performance job...
+   Skip facts: True
+   Backfill refs: all
+==================================================
+📥 Reference Backfill Summary:
+   Plan‑only: False
+   연금계획: inserted=5
+   조합계획: inserted=12
+
+📊 Execution Summary:
+   Table: 스케일디테일
+   Mode: delete_insert
+   Deleted: 0 rows      # Facts were skipped
+   Inserted: 0 rows     # Facts were skipped
+   Batches: 0
+```
+
+#### Integration with Other Features
+
+- **Compatible with all backfill modes**: `insert_missing`, `fill_null_only`
+- **Works with schema qualification**: Qualified SQL generated for reference tables
+- **Supports enhanced derivations**: All sophisticated business rules applied
+- **Plan‑only compatible**: Can preview skip‑facts execution without database changes
 
 # Override composite key (runtime) for delete_insert mode
 # Use comma/semicolon separated list (e.g., 月度,计划代码,company_id — Chinese column names)

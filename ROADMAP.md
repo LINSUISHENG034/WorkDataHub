@@ -85,6 +85,7 @@ TASK BREAKDOWN PHILOSOPHY:
 | C-028 | M2 | Cleansing framework hardening (negative/full-width percent, Excel header normalization, annuity portfolio-code ^F stripping) | VALIDATING | C-020, C-022, C-024 | P-023, P-024 |
 | F-039 | M2 | Reference backfill for annuity (plans/portfolios) | COMPLETED ✅ | F-013, F-014 | P-026 |
 | C-041 | M2 | Reference backfill validation & hardening (SQLSTATE fallback, sheet name) | COMPLETED ✅ | F-039 | P-027 |
+| C-042 | M2 | Align refs.key with production FK (计划代码) + dual-fill identifiers | COMPLETED ✅ | C-041 | P-029 |
 | R-016 | M2 | Research ingestion connectors (HTTP/SFTP) and auth strategy | READY_FOR_PRP | - | - |
 | F-032 | M2 | Implement HTTP crawler connector + retries/auth + CLI | PENDING | R-016 | - |
 | F-033 | M2 | Implement SFTP/FTP downloader connector | PENDING | R-016 | - |

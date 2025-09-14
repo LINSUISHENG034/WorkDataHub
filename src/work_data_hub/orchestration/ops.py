@@ -834,3 +834,23 @@ def backfill_refs_op(
     finally:
         if conn is not None:
             conn.close()
+
+
+@op
+def gate_after_backfill(
+    context: OpExecutionContext,
+    processed_rows: List[Dict[str, Any]],
+    backfill_summary: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """
+    Dependency gate to ensure backfill completes before fact loading.
+
+    This op simply forwards processed_rows, but establishes an explicit
+    dependency on backfill_refs_op so that load_op cannot start before
+    reference backfill has finished (important when FK constraints exist).
+    """
+    ops = backfill_summary.get("operations", []) if isinstance(backfill_summary, dict) else []
+    context.log.info(
+        f"Backfill completed; gating fact load. operations={len(ops)}"
+    )
+    return processed_rows
