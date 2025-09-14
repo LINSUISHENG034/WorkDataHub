@@ -1,4 +1,17 @@
-# INITIAL.CI-002F — 真实 Provider（EQC）实现与密钥管理
+# CI-002F — 真实 Provider（EQC）实现与密钥管理
+
+## 背景与定位
+- 目标：将 EQC 接入 Provider 体系，提供生产可用的外部查询能力（限流/重试/安全）。
+- 关系：在 A（接口）完成后落地；可与 D（异步回填）联动验证端到端。
+
+## 依赖与前置
+- 配置：`WDH_ENTERPRISE_PROVIDER=eqc`，`WDH_PROVIDER_EQC_TOKEN`。
+- 安全：遵循 `docs/security/SECRETS_POLICY.md`；日志禁用明文 Token。
+
+## 相关文档
+- 主文：`docs/company_id/PROBLEM.CI-000_问题定义与解决方案.md`
+- 蓝图：`docs/company_id/CI-002_企业信息查询集成与客户ID富化闭环_蓝图.md`
+- 配置：`docs/company_id/CONFIG.CI-ENV.md`
 
 目的：提供可用于生产的 EQC Provider 实现，纳入 `EnterpriseInfoProvider` 协议体系，统一密钥管理、速率/重试控制与响应规范化。
 
@@ -31,4 +44,3 @@ uv run pytest -v -k eqc_provider
 
 ## RISKS
 - EQC 接口变更：封装解析层，集中维护字段映射；必要时引入版本标识。
-

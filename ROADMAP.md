@@ -135,6 +135,25 @@ Vertical value: Demonstrable parity with auditable reports is a tangible outcome
 
 <!-- Add more milestones as needed -->
 
+## **Milestone 1.5: Company ID Enrichment (Cross‑Domain)**
+
+| ID | Epic | Feature/Task | Status | Dependencies | PRP_Link |
+| :---- | :---- | :---- | :---- | :---- | :---- |
+| R-020 | M1.5 | Company ID problem definition and solution doc | COMPLETED ✅ | - | - |
+| F-060 | M1.5 | Provider & Gateway minimal loop | READY_FOR_PRP | R-020 | - |
+| F-061 | M1.5 | Cache + Name Index + Request Queue (DDL/DAO) | READY_FOR_PRP | R-020 | - |
+| F-062 | M1.5 | Async backfill CLI (queue consumer) | READY_FOR_PRP | F-060, F-061 | - |
+| C-060 | M1.5 | Observability & run summaries (enrichment metrics) | READY_FOR_PRP | F-060, F-062 | - |
+| F-063 | M1.5 | Real Provider (EQC) with key mgmt | READY_FOR_PRP | F-060 | - |
+| C-061 | M1.5 | Legacy crawler adapter & de‑side‑effects | READY_FOR_PRP | R-020 | - |
+| C-062 | M1.5 | Legacy data import (Mongo/MySQL → Postgres cache) | READY_FOR_PRP | F-061 | - |
+| F-064 | M1.5 | Optional sync‑budget enrichment in pipeline | READY_FOR_PRP | F-060, F-061 | - |
+
+References
+
+- Blueprint and tasks: see `docs/company_id/CI-002_企业信息查询集成与客户ID富化闭环_蓝图.md` and sub‑docs under `docs/company_id/`.
+- Problem definition (guiding doc): `docs/company_id/PROBLEM.CI-000_问题定义与解决方案.md`.
+
 ### C-050 Gate — Dagster 部署触发条件与当前结论
 
 - 当前结论：保持 CLI-first，不部署 Dagster UI/daemon（服务面）。当且仅当以下任一条件满足再推进部署与运维接入：

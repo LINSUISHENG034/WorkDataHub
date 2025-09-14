@@ -9,6 +9,7 @@ WorkDataHub is a reliable, declarative, and testable data processing platform re
 ## Status
 
 - Project plan and current status: see [ROADMAP.md](ROADMAP.md).
+- Company ID guidance (problem → blueprint → tasks): see `docs/company_id/README.md`.
 
 ## Architecture at a Glance
 
@@ -102,6 +103,12 @@ uv run pytest -k sample_trustee_performance -v
 
 # Optional: pre-commit hooks (only if configured)
 # uv run pre-commit run --all-files
+
+## Company ID (Enrichment) — Where to Start
+
+- Read the guiding doc: `docs/company_id/PROBLEM.CI-000_问题定义与解决方案.md`.
+- See the blueprint and task docs: `docs/company_id/CI-002_企业信息查询集成与客户ID富化闭环_蓝图.md` and sub‑docs.
+- Environment variables: `docs/company_id/CONFIG.CI-ENV.md` (e.g., `WDH_ALIAS_SALT`, `WDH_ENRICH_COMPANY_ID`, `WDH_ENTERPRISE_PROVIDER`).
 ```
 
 ## Sample Domain (Trustee Performance)
@@ -273,6 +280,33 @@ uv run python ‑m src.work_data_hub.orchestration.jobs \
   ‑‑plan‑only \
   ‑‑backfill‑refs plans
 ```
+
+#### Align refs with existing FK (diagnostics)
+
+If you see FK violations like:
+
+错误: 插入或更新表 "规模明细" 违反外键约束 "fk_performance_plan"\nDETAIL: 键值对(计划代码)=(Z0005)没有在表"年金计划"中出现.
+
+Run this in psql to discover the exact referenced schema/table/columns:
+
+```sql
+SELECT
+  tc.constraint_name,
+  kcu.table_schema   AS fact_schema,
+  kcu.table_name     AS fact_table,
+  kcu.column_name    AS fact_col,
+  ccu.table_schema   AS ref_schema,
+  ccu.table_name     AS ref_table,
+  ccu.column_name    AS ref_col
+FROM information_schema.table_constraints tc
+JOIN information_schema.key_column_usage kcu
+  ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+JOIN information_schema.constraint_column_usage ccu
+  ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema
+WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.constraint_name = 'fk_performance_plan';
+```
+
+Then set `refs.plans.schema = ref_schema` and `refs.plans.key = [ref_col]` in `data_sources.yml`. Prefer dual‑fill of identifiers in candidates (`年金计划号` and `计划代码`) to support heterogeneous environments.
 
 ### Enhanced Plan Derivation Logic
 

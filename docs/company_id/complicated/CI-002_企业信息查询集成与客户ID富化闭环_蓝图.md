@@ -1,18 +1,18 @@
-# INITIAL.CI-002 — 外部企业信息查询集成 + company_id 富化闭环（同步预算 + 异步回填）
+# CI-002 — 外部企业信息查询集成 + company_id 富化闭环（蓝图 | 同步预算 可选 + 异步回填）
 
 本 INITIAL 针对“规模明细”事实中的 `company_id` 归属判定提出全新架构：将外部企业信息查询系统纳入数据闭环，结合缓存与回填机制，提高客户主数据质量与解析命中率。方案聚焦动机与目标（而非复刻 legacy 实现细节），在保持 CLI-first 与最小侵入的前提下，实现“同步小预算 + 异步批量回填”的高效工作流。
 
-注意：为便于追踪与逐步交付，CI-002 已拆分为以下结构化子任务（各自有独立 INITIAL）：
-- CI-002A — Provider 与 Gateway 最小闭环
-- CI-002B — 缓存与名称索引 + 请求队列（DDL/DAO）
-- CI-002C — 同步小预算富化集成（接入 annuity_performance）
-- CI-002D — 异步回填作业（队列消费者 CLI）
-- CI-002E — 可观测性与运营指标（命中率提升验证）
- - CI-002F — 真实 Provider 实现（EQC）与密钥管理
- - CI-002G — Legacy 爬虫适配与去副作用（Provider 化/输出规范）
- - CI-002H — 存量数据迁移与兼容导入（Mongo/MySQL → Postgres 缓存）
+注意：为便于追踪与逐步交付，CI-002 已拆分为以下结构化子任务（各自有独立文档）：
+- CI-002A_Provider与Gateway最小闭环.md
+- CI-002B_缓存与名称索引与请求队列.md
+- CI-002D_异步回填作业与队列消费者.md
+- CI-002E_可观测性与运营指标.md
+- CI-002F_真实Provider(EQC)实现与密钥管理.md
+- CI-002G_Legacy爬虫适配与去副作用.md
+- CI-002H_存量数据迁移与兼容导入(Mongo-MySQL到Postgres缓存).md
+- CI-002C_同步小预算富化集成.md（可选，默认关闭）
 
-请以以上子 INITIAL 为执行单元开展 PRP 与实现，本文保留为总体蓝图与索引。
+请以以上子文档为执行单元开展 PRP 与实现，本文保留为总体蓝图与索引。
 
 参照：KISS、YAGNI；README/ROADMAP；MIGRATION_REFERENCE；LEGACY_WORKFLOW_ANALYSIS。
 

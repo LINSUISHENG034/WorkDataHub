@@ -24,7 +24,7 @@ def derive_plan_candidates(processed_rows: List[Dict[str, Any]]) -> List[Dict[st
     - 客户名称: Most frequent value with tie-breaking by maximum 期末资产规模
     - 主拓代码, 主拓机构: From the row with maximum 期末资产规模
     - 备注: Date formatted as YYMM_新建 from 月度 field
-    - 资格: Filtered business types in specific order joined with '+'
+    - 管理资格: Filtered business types in specific order joined with '+'
 
     Args:
         processed_rows: List of processed annuity performance fact dictionaries
@@ -60,8 +60,7 @@ def derive_plan_candidates(processed_rows: List[Dict[str, Any]]) -> List[Dict[st
             month_value = next((r.get("月度") for r in rows if r.get("月度") is not None), None)
 
             candidate = {
-                # Dual-fill codes for compatibility across environments
-                "计划代码": plan_code,
+                # FIXED: Use only the actual database field, remove duplicate 计划代码
                 "年金计划号": plan_code,
 
                 # BUSINESS RULE: Most frequent 客户名称, tie-break by max 期末资产规模
@@ -70,15 +69,15 @@ def derive_plan_candidates(processed_rows: List[Dict[str, Any]]) -> List[Dict[st
                 ),
 
                 # BUSINESS RULE: From row with max 期末资产规模
-                # 主拓代码 <- 该行的 计划代码； 主拓机构 <- 该行的 机构名称
-                "主拓代码": (str(max_row.get("计划代码")).strip() if max_row and max_row.get("计划代码") else None),
+                # 主拓代码 <- 该行的 机构代码； 主拓机构 <- 该行的 机构名称
+                "主拓代码": (str(max_row.get("机构代码")).strip() if max_row and max_row.get("机构代码") else None),
                 "主拓机构": (str(max_row.get("机构名称")).strip() if max_row and max_row.get("机构名称") else None),
 
                 # BUSINESS RULE: Format as YYMM_新建 from 月度 (first non-null)
                 "备注": _format_remark_from_date(month_value),
 
-                # BUSINESS RULE: Filter and order business types
-                "资格": _format_qualification_from_business_types(
+                # BUSINESS RULE: Filter and order business types (FIXED: use actual database field)
+                "管理资格": _format_qualification_from_business_types(
                     {row.get("业务类型") for row in rows}
                 ),
 
@@ -270,7 +269,7 @@ def _format_qualification_from_business_types(
         return None
 
     # BUSINESS RULE: Specific order must be preserved
-    ALLOWED_ORDER = ["企年受托", "年", "企年投资", "职年受托", "职年投资"]
+    ALLOWED_ORDER = ["企年受托", "企年投资", "职年受托", "职年投资"]
 
     # PATTERN: Iterate through order list, not input set
     filtered = [bt for bt in ALLOWED_ORDER if bt in cleaned_set]
@@ -305,10 +304,15 @@ def _safe_numeric(value: Any) -> float:
 
 def derive_portfolio_candidates(processed_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Derive unique portfolio candidates from processed fact data.
+    Derive unique portfolio candidates from processed fact data with enhanced business logic.
 
-    Extracts unique portfolio references by 组合代码 and 年金计划号 combination.
-    Each portfolio must be associated with a plan.
+    Business rules for portfolio derivation:
+    - 年金计划号: From 计划代码 field in fact data
+    - 组合代码: From 组合代码 field in fact data (primary key)
+    - 组合名称: From 组合名称 field in fact data
+    - 组合类型: From 组合类型 field in fact data
+    - 备注: Generated from 月度 field, formatted as "YYMM_新建"
+    - 运作开始日: Not derived, remains NULL
 
     Args:
         processed_rows: List of processed annuity performance fact dictionaries
@@ -326,61 +330,56 @@ def derive_portfolio_candidates(processed_rows: List[Dict[str, Any]]) -> List[Di
     if not isinstance(processed_rows, list):
         raise ValueError("Processed rows must be a list")
 
-    portfolio_map = {}  # Key: 组合代码, Value: candidate dict
-
-    for row_index, row in enumerate(processed_rows):
-        try:
-            # Extract required fields
-            portfolio_code = row.get("组合代码")
-            plan_code = row.get("计划代码")
-
-            if not portfolio_code or not plan_code:
-                logger.debug(
-                    f"Row {row_index}: skipping due to missing 组合代码 or 计划代码"
-                )
-                continue
-
-            # Normalize codes
+    # Group by portfolio code for aggregation
+    grouped_data = defaultdict(list)
+    for row in processed_rows:
+        portfolio_code = row.get("组合代码")
+        if portfolio_code:
             portfolio_code = str(portfolio_code).strip()
-            plan_code = str(plan_code).strip()
+            if portfolio_code:
+                grouped_data[portfolio_code].append(row)
 
-            if not portfolio_code or not plan_code:
-                logger.debug(
-                    f"Row {row_index}: skipping due to empty codes after normalization"
-                )
+    candidates = []
+    for portfolio_code, rows in grouped_data.items():
+        try:
+            # Pick first non-null 月度 for remark generation
+            month_value = next((r.get("月度") for r in rows if r.get("月度") is not None), None)
+            
+            # Get plan code from first available row
+            plan_code = next((r.get("计划代码") for r in rows if r.get("计划代码")), None)
+            if not plan_code:
+                logger.debug(f"Portfolio {portfolio_code}: skipping due to missing 计划代码")
                 continue
 
-            # Build candidate (portfolio code should be unique per plan)
-            if portfolio_code not in portfolio_map:
-                portfolio_map[portfolio_code] = {
-                    "组合代码": portfolio_code,
-                    "年金计划号": plan_code,
-                    "组合名称": row.get("组合名称"),
-                    "组合类型": row.get("组合类型"),
-                    "运作开始日": None,  # Not available in fact data, keep NULL
-                }
-            else:
-                # If portfolio code already exists, verify plan consistency
-                existing = portfolio_map[portfolio_code]
-                if existing["年金计划号"] != plan_code:
-                    logger.warning(
-                        f"Row {row_index}: Portfolio {portfolio_code} mapped to different plans: "
-                        f"{existing['年金计划号']} vs {plan_code}. Keeping first."
-                    )
-                else:
-                    # Same plan, merge additional fields (last non-null wins)
-                    merge_fields = ["组合名称", "组合类型"]
-                    for field in merge_fields:
-                        if row.get(field) and not existing.get(field):
-                            existing[field] = row[field]
+            candidate = {
+                # Primary key
+                "组合代码": portfolio_code,
+                
+                # Foreign key to 年金计划 table
+                "年金计划号": str(plan_code).strip(),
+                
+                # Portfolio attributes from first available non-null values
+                "组合名称": next(
+                    (row.get("组合名称") for row in rows if row.get("组合名称")), None
+                ),
+                "组合类型": next(
+                    (row.get("组合类型") for row in rows if row.get("组合类型")), None
+                ),
+                
+                # BUSINESS RULE: Format as YYMM_新建 from 月度 (first non-null)
+                "备注": _format_remark_from_date(month_value),
+                
+                # Not derived from fact data, remains NULL for backfill
+                "运作开始日": None,
+            }
+            candidates.append(candidate)
 
         except Exception as e:
-            logger.warning(f"Error processing row {row_index} for portfolio candidates: {e}")
+            logger.warning(f"Error processing portfolio {portfolio_code} candidates: {e}")
             continue
 
-    candidates = list(portfolio_map.values())
     logger.info(
-        f"Derived {len(candidates)} unique portfolio candidates "
+        f"Derived {len(candidates)} enhanced portfolio candidates "
         f"from {len(processed_rows)} processed rows"
     )
 

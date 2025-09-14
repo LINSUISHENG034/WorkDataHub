@@ -1,4 +1,16 @@
-# INITIAL.CI-002H — 存量数据迁移与兼容导入（Mongo/MySQL → Postgres 缓存）
+# CI-002H — 存量数据迁移与兼容导入（Mongo/MySQL → Postgres 缓存）
+
+## 背景与定位
+- 目标：将 legacy Mongo/MySQL 存量数据导入到新的缓存/索引表中，以快速提升初始命中率并保持历史一致性。
+- 关系：与 D（异步回填）协同，先“提纯历史”，再“增量回填”。
+
+## 依赖与前置
+- 输入：`legacy` 中相关来源（如 company_id_mapping/base_info 等）经导出为 CSV/JSON，或直连只读访问。
+- 目标：`enterprise.company_master` 与 `enterprise.company_name_index`（来自 CI-002B）。
+
+## 相关文档
+- 主文：`docs/company_id/PROBLEM.CI-000_问题定义与解决方案.md`
+- 蓝图：`docs/company_id/CI-002_企业信息查询集成与客户ID富化闭环_蓝图.md`
 
 目的：将 legacy Mongo/MySQL 中与企业信息相关的存量数据（如 base_info、company_id_mapping、annuity_account_mapping）迁移/导入到新架构的 Postgres 缓存表，以便立即提升命中率并保持历史一致性。
 
@@ -36,4 +48,3 @@ uv run python -m scripts.company_id.import_legacy --from-mysql ./exports/company
 
 ## RISKS
 - 字段/编码差异：在导入器层面集中做规范化和异常隔离；必要时提供问题行导出。
-

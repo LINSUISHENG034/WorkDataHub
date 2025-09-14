@@ -1,4 +1,16 @@
-# INITIAL.CI-002G — Legacy 爬虫适配与去副作用（Provider 化/输出规范）
+# CI-002G — Legacy 爬虫适配与去副作用（Provider 化/输出规范）
+
+## 背景与定位
+- 目标：以适配层或规范化输出方式，将 legacy 爬虫接入新架构，去除交互式与直写数据库的副作用。
+- 关系：与 F（真实 Provider）互补；在未能直接使用 EQC API 时仍可复用存量逻辑与结果。
+
+## 依赖与前置
+- 路径：`legacy/annuity_hub/crawler/` 下现有代码可复用其抓取/解析；需要去副作用化。
+- 配置：与 F 共用密钥管理与安全要求。
+
+## 相关文档
+- 主文：`docs/company_id/PROBLEM.CI-000_问题定义与解决方案.md`
+- 蓝图：`docs/company_id/CI-002_企业信息查询集成与客户ID富化闭环_蓝图.md`
 
 目的：将 legacy 爬虫能力以适配层方式纳入新架构 Provider 体系，移除交互式与直写数据库的副作用，统一为“标准输出/文件 + 导入器”的无副作用形态。
 
@@ -35,4 +47,3 @@ uv run pytest -v -k legacy_adapter
 
 ## RISKS
 - legacy 模块耦合度高：优先“包裹而非重写”，逐步减法。
-

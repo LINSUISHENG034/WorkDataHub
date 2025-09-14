@@ -69,9 +69,9 @@ domains:
       plans:
         schema: public
         table: "年金计划"
-        # Align key with production FK target; use 计划代码 as the natural key
-        key: ["计划代码"]
-        # Allow fill_null_only to set/patch these fields including dual-fill codes
+        # Align key with production FK target; use 年金计划号 as the actual database field
+        key: ["年金计划号"]
+        # Allow fill_null_only to set/patch these fields (removed non-existent 计划代码)
         updatable: [
           "计划全称",
           "计划类型",
@@ -82,13 +82,12 @@ domains:
           "备注",
           "资格",
           "年金计划号",
-          "计划代码",
         ]
       portfolios:
         schema: public
         table: "组合计划"
         key: ["组合代码"]
-        updatable: ["组合名称", "组合类型", "运作开始日"]
+        updatable: ["组合名称", "组合类型", "运作开始日", "备注", "年金计划号"]
 
     # Data quality requirements
     required_columns:
