@@ -14,11 +14,12 @@ dependencies = [
     "PyYAML",
     "pydantic-settings>=2.10.1",
     "playwright>=1.55.0",
+    "playwright-stealth>=2.0.0",
 ]
-
-[project.packages]
-find = {}
-
+ 
+[tool.setuptools.packages.find]
+where = ["src"]
+ 
 [project.optional-dependencies]
 dev = [
     "pytest",
@@ -52,6 +53,7 @@ dev = [
     "ruff>=0.12.12",
     "types-psycopg2>=2.9.21.20250809",
     "types-pyyaml>=6.0.12.20250822",
+    "types-requests>=2.32.4.20250913",
 ]
 
 [tool.mypy]

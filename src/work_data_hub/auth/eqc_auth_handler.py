@@ -10,6 +10,7 @@ from typing import Optional
 
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
+from playwright_stealth import Stealth
 
 # Configuration constants - make these configurable for easy maintenance
 LOGIN_URL = "https://eqc.pingan.com/"
@@ -19,7 +20,15 @@ DEFAULT_TIMEOUT_SECONDS = 300  # 5 minutes
 logger = logging.getLogger(__name__)
 
 
-async def get_auth_token_interactively(timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS) -> Optional[str]:
+class AuthTimeoutError(Exception):
+    """Custom exception for authentication timeouts."""
+
+    pass
+
+
+async def get_auth_token_interactively(
+    timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
+) -> Optional[str]:
     """
     Launch browser, allow user login, capture authentication token.
 
@@ -41,7 +50,7 @@ async def get_auth_token_interactively(timeout_seconds: int = DEFAULT_TIMEOUT_SE
         ... else:
         ...     print("Authentication failed")
     """
-    logger.info("Starting interactive EQC authentication...")
+    logger.info("Starting interactive EQC authentication with enhanced stealth options...")
     logger.info(f"Timeout set to {timeout_seconds} seconds")
 
     try:
@@ -51,8 +60,42 @@ async def get_auth_token_interactively(timeout_seconds: int = DEFAULT_TIMEOUT_SE
             browser = await playwright.chromium.launch(headless=False)
 
             try:
-                context = await browser.new_context()
+                # --- START: 浏览器伪装配置 ---
+
+                # 1. 设置一个真实的User-Agent
+                user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36"
+
+                # 2. 设置常规的视口大小
+                viewport_size = {"width": 1920, "height": 1080}
+
+                context = await browser.new_context(
+                    user_agent=user_agent,
+                    viewport=viewport_size,
+                    # 可以考虑同时设置屏幕大小和色彩深度
+                    screen=viewport_size,
+                    color_scheme="light",
+                    java_script_enabled=True,
+                )
+
                 page = await context.new_page()
+
+                # --- 核心改动 ---
+                # 2. 在所有操作之前，应用stealth补丁
+                # 这会自动处理几十个浏览器指纹问题
+                stealth = Stealth()
+                await stealth.apply_stealth_async(page)
+                # -----------------
+
+                # 3. 注入JS脚本，隐藏自动化特征 (关键步骤)
+                # 这段脚本会在页面加载任何其他脚本之前执行
+                js_stealth = """
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => false,
+                });
+                """
+                await page.add_init_script(js_stealth)
+
+                # --- END: 浏览器伪装配置 ---
 
                 # Use Future for cross-coroutine communication
                 token_future: asyncio.Future[str] = asyncio.Future()
@@ -128,6 +171,7 @@ async def get_auth_token_interactively(timeout_seconds: int = DEFAULT_TIMEOUT_SE
     except Exception as e:
         logger.error(f"Unexpected authentication error: {e}")
         return None
+
 
 def run_get_token(timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS) -> Optional[str]:
     """

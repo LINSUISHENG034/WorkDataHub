@@ -121,6 +121,31 @@ Notes
 - Token is sent in header `token` (not `Authorization`).
 - Keep it simple — avoid slider “enhancements” unless strictly needed. See `docs/company_id/simplified/` for context and optional paths.
 
+## EQC Client (S‑002)
+
+- Library: `src/work_data_hub/io/connectors/eqc_client.py`
+- Models: `src/work_data_hub/domain/company_enrichment/models.py` (`CompanySearchResult`, `CompanyDetail`)
+- Settings: `WDH_EQC_TOKEN`, `WDH_EQC_TIMEOUT`, `WDH_EQC_RATE_LIMIT`, `WDH_EQC_RETRY_MAX`, `WDH_EQC_BASE_URL` (see `src/work_data_hub/config/settings.py`)
+
+Usage
+
+```python
+from src.work_data_hub.io.connectors.eqc_client import EQCClient
+
+# export WDH_EQC_TOKEN=... (30-minute token)
+client = EQCClient(timeout=30, retry_max=3, rate_limit=10)
+
+results = client.search_company("中国平安")
+if results:
+    detail = client.get_company_detail(results[0].company_id)
+    print(detail.official_name, detail.unite_code)
+```
+
+Notes
+- Sends token in `token` header (not `Authorization`).
+- Includes simple rate limiting and exponential backoff with jitter.
+- See tests under `tests/io/connectors/test_eqc_client.py` for examples and edge cases.
+
 ## Sample Domain (Trustee Performance)
 
 The `sample_trustee_performance` domain is a normative sample used for unit/integration tests and plan-only runs. It is not a production model and does not ship a DDL. For end‑to‑end database writes, use the `annuity_performance` domain instead.

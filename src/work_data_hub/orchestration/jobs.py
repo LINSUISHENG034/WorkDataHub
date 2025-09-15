@@ -15,6 +15,11 @@ import yaml
 from dagster import DagsterInstance, job
 
 from ..config.settings import get_settings
+from ..io.loader.company_mapping_loader import (
+    extract_legacy_mappings,
+    generate_load_plan,
+    load_company_mappings,
+)
 from .ops import (
     backfill_refs_op,
     derive_plan_refs_op,
@@ -26,11 +31,6 @@ from .ops import (
     process_sample_trustee_performance_op,
     read_and_process_sample_trustee_files_op,
     read_excel_op,
-)
-from ..io.loader.company_mapping_loader import (
-    extract_legacy_mappings,
-    generate_load_plan,
-    load_company_mappings
 )
 
 
@@ -242,12 +242,13 @@ def _execute_company_mapping_job(args: argparse.Namespace):
     pattern. Instead it goes directly from legacy extraction to database loading.
     """
     import psycopg2
+
     from ..domain.company_enrichment.service import validate_mapping_consistency
     from ..io.loader.company_mapping_loader import CompanyMappingLoaderError
 
     effective_plan_only = not args.execute if hasattr(args, "execute") else True
 
-    print(f"🚀 Starting company mapping migration...")
+    print("🚀 Starting company mapping migration...")
     print(f"   Domain: {args.domain}")
     print(f"   Mode: {args.mode}")
     print(f"   Execute: {args.execute}")

@@ -27,7 +27,6 @@ except ImportError:
 from work_data_hub.domain.company_enrichment.models import CompanyMappingRecord
 from work_data_hub.io.loader.warehouse_loader import (
     DataWarehouseLoaderError,
-    _ensure_list_of_dicts,
     _get_column_order,
     build_delete_sql,
     build_insert_sql,

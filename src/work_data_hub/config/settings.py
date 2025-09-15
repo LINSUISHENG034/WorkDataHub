@@ -104,6 +104,27 @@ class Settings(BaseSettings):
         default=None, description="Limit processing to N rows for development (None = no limit)"
     )
 
+    # EQC Configuration - Enterprise Query Center API settings
+    eqc_enabled: bool = Field(
+        default=True, description="Enable EQC API integration"
+    )
+
+    eqc_timeout: int = Field(
+        default=30, description="EQC API request timeout in seconds"
+    )
+
+    eqc_rate_limit: int = Field(
+        default=10, description="EQC API rate limit (requests per minute)"
+    )
+
+    eqc_retry_max: int = Field(
+        default=3, description="Maximum retry attempts for EQC API requests"
+    )
+
+    eqc_base_url: str = Field(
+        default="https://eqc.pingan.com", description="EQC API base URL"
+    )
+
     # Database configuration - nested settings with WDH_DATABASE__ prefix
     database_host: str = Field(default="localhost", description="Database host")
     database_port: int = Field(default=5432, description="Database port")

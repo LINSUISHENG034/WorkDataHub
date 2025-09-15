@@ -1,14 +1,17 @@
 """
 Pydantic v2 data models for company enrichment domain.
 
-This module defines the data contracts for company ID mapping and resolution,
-providing robust validation and type safety for the migration from legacy
-5-layer COMPANY_ID mapping structure to unified PostgreSQL-based system.
+This module defines the data contracts for:
+1. Company ID mapping and resolution (internal system)
+2. EQC API integration for external company data enrichment
+
+Provides robust validation and type safety for both legacy mapping migration
+and modern EQC client integration.
 """
 
 import logging
 from datetime import datetime, timezone
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -180,3 +183,141 @@ class CompanyResolutionResult(BaseModel):
             logger.warning(f"Non-numeric company_id detected: {v}")
 
         return v
+
+
+# ===== EQC API Models =====
+# These models define the data contracts for EQC (Enterprise Query Center) API integration
+
+
+class CompanySearchResult(BaseModel):
+    """
+    Result from EQC company search API.
+
+    Maps to the response structure from EQC's searchAll endpoint,
+    providing validated company search results with scoring.
+    """
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        validate_default=True,
+        extra="forbid",
+    )
+
+    company_id: str = Field(
+        ...,
+        min_length=1,
+        description="EQC company ID as string"
+    )
+    official_name: str = Field(
+        ...,
+        min_length=1,
+        max_length=500,
+        description="Official company name from EQC"
+    )
+    unite_code: Optional[str] = Field(
+        None,
+        max_length=100,
+        description="Unified social credit code (统一社会信用代码)"
+    )
+    match_score: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Search relevance score (0.0-1.0)"
+    )
+
+    @field_validator("company_id", mode="before")
+    @classmethod
+    def normalize_company_id(cls, v):
+        """Normalize company ID to string format."""
+        if v is None:
+            return v
+        return str(v).strip()
+
+    @field_validator("unite_code", mode="before")
+    @classmethod
+    def normalize_unite_code(cls, v):
+        """Normalize and validate unite code format."""
+        if v is None or str(v).strip() == "":
+            return None
+
+        # Clean whitespace and return
+        cleaned = str(v).strip()
+        return cleaned if cleaned else None
+
+
+class CompanyDetail(BaseModel):
+    """
+    Detailed company information from EQC findDepart API.
+
+    Maps to the businessInfodto response structure providing
+    comprehensive company details for enrichment purposes.
+    """
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        validate_default=True,
+        extra="forbid",
+    )
+
+    company_id: str = Field(
+        ...,
+        min_length=1,
+        description="EQC company ID as string"
+    )
+    official_name: str = Field(
+        ...,
+        min_length=1,
+        max_length=500,
+        description="Official company name from EQC"
+    )
+    unite_code: Optional[str] = Field(
+        None,
+        max_length=100,
+        description="Unified social credit code (统一社会信用代码)"
+    )
+    aliases: List[str] = Field(
+        default_factory=list,
+        description="Alternative company names and aliases"
+    )
+    business_status: Optional[str] = Field(
+        None,
+        max_length=100,
+        description="Current business operating status"
+    )
+
+    @field_validator("company_id", mode="before")
+    @classmethod
+    def normalize_company_id(cls, v):
+        """Normalize company ID to string format."""
+        if v is None:
+            return v
+        return str(v).strip()
+
+    @field_validator("unite_code", mode="before")
+    @classmethod
+    def normalize_unite_code(cls, v):
+        """Normalize and validate unite code format."""
+        if v is None or str(v).strip() == "":
+            return None
+
+        cleaned = str(v).strip()
+        return cleaned if cleaned else None
+
+    @field_validator("aliases", mode="before")
+    @classmethod
+    def normalize_aliases(cls, v):
+        """Normalize aliases list, filtering out empty values."""
+        if v is None:
+            return []
+
+        if isinstance(v, str):
+            # Single string - convert to list
+            cleaned = v.strip()
+            return [cleaned] if cleaned else []
+
+        if isinstance(v, list):
+            # Filter out None and empty strings
+            return [str(alias).strip() for alias in v if alias and str(alias).strip()]
+
+        return []

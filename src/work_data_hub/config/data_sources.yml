@@ -9,7 +9,7 @@
 
 domains:
   # Trustee Performance Reports
-  # Handles files with patterns like: "2024_11_受托业绩报告.xlsx", "2023-12-受托业绩数据.xlsx"
+  # Handles files with patterns like: "xxxx受托业绩报告.xlsx"
   sample_trustee_performance:
     description: "Sample (non-production) trustee performance domain for tests and demos"
     
@@ -43,7 +43,7 @@ domains:
       max_file_age_days: 365
 
   # Annuity Performance Reports
-  # Handles files with patterns like: "24年11月年金终稿数据.xlsx", "2024年12月年金终稿数据.xlsx"
+  # Handles files with patterns like: "xx年xx月年金终稿数据.xlsx"
   annuity_performance:
     description: "Annuity performance (规模明细) with version-aware selection"
 

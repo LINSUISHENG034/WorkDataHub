@@ -344,7 +344,7 @@ def derive_portfolio_candidates(processed_rows: List[Dict[str, Any]]) -> List[Di
         try:
             # Pick first non-null 月度 for remark generation
             month_value = next((r.get("月度") for r in rows if r.get("月度") is not None), None)
-            
+
             # Get plan code from first available row
             plan_code = next((r.get("计划代码") for r in rows if r.get("计划代码")), None)
             if not plan_code:
@@ -354,10 +354,10 @@ def derive_portfolio_candidates(processed_rows: List[Dict[str, Any]]) -> List[Di
             candidate = {
                 # Primary key
                 "组合代码": portfolio_code,
-                
+
                 # Foreign key to 年金计划 table
                 "年金计划号": str(plan_code).strip(),
-                
+
                 # Portfolio attributes from first available non-null values
                 "组合名称": next(
                     (row.get("组合名称") for row in rows if row.get("组合名称")), None
@@ -365,10 +365,10 @@ def derive_portfolio_candidates(processed_rows: List[Dict[str, Any]]) -> List[Di
                 "组合类型": next(
                     (row.get("组合类型") for row in rows if row.get("组合类型")), None
                 ),
-                
+
                 # BUSINESS RULE: Format as YYMM_新建 from 月度 (first non-null)
                 "备注": _format_remark_from_date(month_value),
-                
+
                 # Not derived from fact data, remains NULL for backfill
                 "运作开始日": None,
             }

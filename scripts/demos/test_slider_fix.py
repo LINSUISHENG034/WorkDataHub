@@ -10,11 +10,12 @@ import asyncio
 import sys
 
 try:
-    # 使用最简的交互式token捕获函数
-    from src.work_data_hub.auth.eqc_auth_handler import get_auth_token_interactively
-except Exception as e:
+    # Use absolute import from the package root
+    from work_data_hub.auth.eqc_auth_handler import get_auth_token_interactively
+except ImportError as e:
     print(f"❌ 导入错误: {e}")
-    print("请从项目根目录运行：uv run python scripts/demos/test_slider_fix.py")
+    print("请确保已在项目根目录执行 `uv pip install -e .` 以便脚本能找到模块。")
+    print("然后运行: uv run python scripts/demos/test_slider_fix.py")
     sys.exit(1)
 
 
@@ -43,7 +44,7 @@ async def run_simple_authentication():
         token = await get_auth_token_interactively(timeout_seconds=300)
         if token:
             print("🎉 认证成功！")
-            print(f"Token 前缀: {token[:8]}...")
+            print(f"Token 前缀: {token}...")
             print(f"Token 长度: {len(token)} 字符")
             return True
         else:
