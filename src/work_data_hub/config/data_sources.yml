@@ -100,6 +100,40 @@ domains:
       min_rows: 1
       max_file_age_days: 365
 
+  # Company ID Mapping Management
+  # Administrative domain for company mapping import/export operations
+  company_mapping:
+    description: "Company ID mapping management (enterprise.company_mapping table)"
+
+    # No file pattern - this is database-only domain for mapping operations
+    # Used for CLI commands: --job import_company_mappings
+
+    # Database table configuration for loader
+    table: "company_mapping"
+    schema: "enterprise"
+    pk: ["alias_name", "match_type"]  # Compound primary key
+
+    # Operation modes supported
+    modes: ["delete_insert", "append"]  # delete_insert for migration, append for updates
+
+    # Performance configuration
+    chunk_size: 1000  # Batch size for INSERT operations
+
+    # Data validation
+    required_fields:
+      - "alias_name"      # Source identifier
+      - "canonical_id"    # Target company_id
+      - "match_type"      # Mapping category
+      - "priority"        # Search priority
+
+    # Match types supported (with priority mapping)
+    match_types:
+      plan: 1           # 计划代码 -> COMPANY_ID1_MAPPING
+      account: 2        # 集团企业客户号 -> COMPANY_ID2_MAPPING
+      hardcode: 3       # Hardcoded mappings -> COMPANY_ID3_MAPPING
+      name: 4           # 客户名称 -> COMPANY_ID4_MAPPING
+      account_name: 5   # 年金账户名 -> COMPANY_ID5_MAPPING
+
 # Global file discovery settings
 discovery:
   # File types to scan for

@@ -17,3 +17,9 @@ domains:
     delete_scope_key: ["年金计划号", "组合代码"]
     ddl: "scripts/create_table/ddl/portfolio_plans.sql"
 
+  company_mapping:
+    table: "enterprise.company_mapping"
+    entity: "company_mapping"
+    delete_scope_key: ["alias_name", "match_type"]
+    ddl: "scripts/create_table/ddl/company_mapping.sql"
+
