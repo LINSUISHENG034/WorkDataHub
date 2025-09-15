@@ -144,7 +144,7 @@ Vertical value: Demonstrable parity with auditable reports is a tangible outcome
 | F-061 | M1.5 | Cache + Name Index + Request Queue (DDL/DAO) | READY_FOR_PRP | R-020 | - |
 | F-062 | M1.5 | Async backfill CLI (queue consumer) | READY_FOR_PRP | F-060, F-061 | - |
 | C-060 | M1.5 | Observability & run summaries (enrichment metrics) | READY_FOR_PRP | F-060, F-062 | - |
-| F-063 | M1.5 | Real Provider (EQC) with key mgmt | READY_FOR_PRP | F-060 | - |
+| F-063 | M1.5 | Real Provider (EQC) with key mgmt | COMPLETED ✅ | F-060 | P-S02 |
 | C-061 | M1.5 | Legacy crawler adapter & de‑side‑effects | READY_FOR_PRP | R-020 | - |
 | C-062 | M1.5 | Legacy data import (Mongo/MySQL → Postgres cache) | READY_FOR_PRP | F-061 | - |
 | F-064 | M1.5 | Optional sync‑budget enrichment in pipeline | READY_FOR_PRP | F-060, F-061 | - |

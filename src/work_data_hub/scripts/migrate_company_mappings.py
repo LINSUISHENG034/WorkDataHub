@@ -20,9 +20,9 @@ import argparse
 import json
 import logging
 import sys
-from typing import Optional
-import psycopg2
 from pathlib import Path
+
+import psycopg2
 
 # Add project root to path for imports
 project_root = Path(__file__).parent.parent.parent.parent
@@ -34,7 +34,7 @@ from src.work_data_hub.io.loader.company_mapping_loader import (
     CompanyMappingLoaderError,
     extract_legacy_mappings,
     generate_load_plan,
-    load_company_mappings
+    load_company_mappings,
 )
 
 # Configure logging

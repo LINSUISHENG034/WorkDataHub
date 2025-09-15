@@ -111,6 +111,16 @@ uv run pytest -k sample_trustee_performance -v
 - Environment variables: `docs/company_id/CONFIG.CI-ENV.md` (e.g., `WDH_ALIAS_SALT`, `WDH_ENRICH_COMPANY_ID`, `WDH_ENTERPRISE_PROVIDER`).
 ```
 
+## EQC Token (Company ID MVP)
+
+- Minimal flow: interactive Playwright login to capture the EQC token (no extra layers).
+- Demo: `uv run python scripts/demos/test_slider_fix.py` (launches a browser; login and perform one search to auto-capture the token).
+- Programmatic example: `uv run python src/work_data_hub/scripts/eqc_integration_example.py`.
+
+Notes
+- Token is sent in header `token` (not `Authorization`).
+- Keep it simple — avoid slider “enhancements” unless strictly needed. See `docs/company_id/simplified/` for context and optional paths.
+
 ## Sample Domain (Trustee Performance)
 
 The `sample_trustee_performance` domain is a normative sample used for unit/integration tests and plan-only runs. It is not a production model and does not ship a DDL. For end‑to‑end database writes, use the `annuity_performance` domain instead.
