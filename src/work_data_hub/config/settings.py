@@ -125,6 +125,27 @@ class Settings(BaseSettings):
         default="https://eqc.pingan.com", description="EQC API base URL"
     )
 
+    # Company Enrichment Configuration - service and queue settings
+    company_enrichment_enabled: bool = Field(
+        default=True, description="Enable company enrichment service functionality"
+    )
+
+    company_sync_lookup_limit: int = Field(
+        default=5, description="Default budget for synchronous EQC lookups per request"
+    )
+
+    lookup_queue_batch_size: int = Field(
+        default=50, description="Batch size for processing lookup queue requests"
+    )
+
+    lookup_retry_max: int = Field(
+        default=3, description="Maximum retry attempts for failed lookup requests"
+    )
+
+    lookup_retry_delay: int = Field(
+        default=300, description="Delay in seconds between lookup retry attempts"
+    )
+
     # Database configuration - nested settings with WDH_DATABASE__ prefix
     database_host: str = Field(default="localhost", description="Database host")
     database_port: int = Field(default=5432, description="Database port")

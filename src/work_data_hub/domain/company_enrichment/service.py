@@ -1,15 +1,22 @@
 """
-Company enrichment service layer with pure transformation functions.
+Company enrichment service layer with pure transformation functions and unified service.
 
 This module provides the core business logic for company ID resolution,
 replicating the exact priority-based lookup logic from legacy _update_company_id
-method while providing a clean, testable interface.
+method while providing a clean, testable interface. Also includes the unified
+CompanyEnrichmentService with EQC integration, caching, and async queue processing.
 """
 
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 
-from .models import CompanyMappingQuery, CompanyMappingRecord, CompanyResolutionResult
+from .models import (
+    CompanyIdResult,
+    CompanyMappingQuery,
+    CompanyMappingRecord,
+    CompanyResolutionResult,
+    ResolutionStatus,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -260,3 +267,422 @@ def validate_mapping_consistency(mappings: List[CompanyMappingRecord]) -> List[s
         )
 
     return warnings
+
+
+# ===== Unified Company Enrichment Service =====
+# This service integrates internal mappings with EQC lookups, caching, and queue processing
+
+class CompanyEnrichmentService:
+    """
+    Unified company enrichment service with EQC integration and caching.
+
+    Provides priority-based company ID resolution combining internal mappings
+    with external EQC lookups, result caching, and asynchronous queue processing
+    for scalable operations.
+
+    Resolution Priority Flow (matches INITIAL.S-003.md exactly):
+    1. Internal mapping lookup (highest priority)
+    2. EQC search + detail + cache (if budget allows)
+    3. Queue for async processing (if budget exhausted or EQC fails)
+    4. Generate temporary ID (if customer_name is empty)
+
+    Examples:
+        >>> from work_data_hub.io.connectors.eqc_client import EQCClient
+        >>> from work_data_hub.io.loader.company_enrichment_loader import CompanyEnrichmentLoader
+        >>> from work_data_hub.domain.company_enrichment.lookup_queue import LookupQueue
+        >>>
+        >>> loader = CompanyEnrichmentLoader(connection)
+        >>> queue = LookupQueue(connection)
+        >>> eqc_client = EQCClient()
+        >>> service = CompanyEnrichmentService(loader, queue, eqc_client, sync_lookup_budget=5)
+        >>>
+        >>> result = service.resolve_company_id(customer_name="中国平安", sync_lookup_budget=1)
+        >>> print(f"Status: {result.status}, ID: {result.company_id}")
+    """
+
+    def __init__(
+        self,
+        loader,  # CompanyEnrichmentLoader
+        queue,   # LookupQueue
+        eqc_client,  # EQCClient
+        *,
+        sync_lookup_budget: int = 0
+    ):
+        """
+        Initialize company enrichment service with dependency injection.
+
+        Args:
+            loader: CompanyEnrichmentLoader instance for caching operations
+            queue: LookupQueue instance for async processing
+            eqc_client: EQCClient instance for EQC API operations
+            sync_lookup_budget: Default budget for synchronous EQC lookups
+        """
+        self.loader = loader
+        self.queue = queue
+        self.eqc_client = eqc_client
+        self.sync_lookup_budget = sync_lookup_budget
+
+        logger.info(
+            "CompanyEnrichmentService initialized",
+            extra={
+                "default_sync_budget": sync_lookup_budget,
+                "has_loader": bool(loader),
+                "has_queue": bool(queue),
+                "has_eqc_client": bool(eqc_client)
+            }
+        )
+
+    def resolve_company_id(
+        self,
+        *,
+        plan_code: Optional[str] = None,
+        customer_name: Optional[str] = None,
+        account_name: Optional[str] = None,
+        sync_lookup_budget: Optional[int] = None
+    ) -> CompanyIdResult:
+        """
+        Resolve company ID using priority-based lookup with EQC integration.
+
+        Implements the exact specification from INITIAL.S-003.md with priority flow:
+        1. Internal mapping lookup (using existing resolve_company_id function)
+        2. EQC search + detail + cache result (if budget > 0)
+        3. Queue for async processing (if budget = 0 or EQC fails)
+        4. Generate temporary ID (if customer_name is empty)
+
+        Args:
+            plan_code: Plan code for priority 1 lookup (计划代码)
+            customer_name: Customer name for priority 4 lookup (客户名称)
+            account_name: Account name for priority 5 lookup (年金账户名)
+            sync_lookup_budget: Budget for synchronous EQC lookups (overrides instance default)
+
+        Returns:
+            CompanyIdResult with resolved ID and status information
+
+        Raises:
+            Exception: Re-raises critical errors that prevent resolution
+
+        Examples:
+            >>> # Internal mapping hit
+            >>> result = service.resolve_company_id(plan_code="AN001")
+            >>> result.status == ResolutionStatus.SUCCESS_INTERNAL
+
+            >>> # EQC lookup with budget
+            >>> result = service.resolve_company_id(customer_name="中国平安", sync_lookup_budget=1)
+            >>> result.status == ResolutionStatus.SUCCESS_EXTERNAL
+
+            >>> # Queued for async processing
+            >>> result = service.resolve_company_id(
+            ...     customer_name="Test Company", sync_lookup_budget=0
+            ... )
+            >>> result.status == ResolutionStatus.PENDING_LOOKUP
+
+            >>> # Temporary ID generation
+            >>> result = service.resolve_company_id(plan_code="UNKNOWN")
+            >>> result.status == ResolutionStatus.TEMP_ASSIGNED
+        """
+        # Use instance or parameter budget
+        budget = sync_lookup_budget if sync_lookup_budget is not None else self.sync_lookup_budget
+
+        logger.debug(
+            "Starting unified company ID resolution",
+            extra={
+                "plan_code": plan_code,
+                "customer_name": customer_name,
+                "account_name": account_name,
+                "sync_lookup_budget": budget
+            }
+        )
+
+        # Step 1: Try internal mappings first (highest priority)
+        try:
+            mappings = self.loader.load_mappings()
+            query = CompanyMappingQuery(
+                plan_code=plan_code,
+                account_number=None,
+                customer_name=customer_name,
+                account_name=account_name
+            )
+            internal_result = resolve_company_id(mappings, query)
+
+            if internal_result.company_id:
+                logger.info(
+                    "Company ID resolved via internal mappings",
+                    extra={
+                        "company_id": internal_result.company_id,
+                        "match_type": internal_result.match_type,
+                        "priority": internal_result.priority
+                    }
+                )
+                return CompanyIdResult(
+                    company_id=internal_result.company_id,
+                    status=ResolutionStatus.SUCCESS_INTERNAL,
+                    source=internal_result.match_type,
+                    temp_id=None
+                )
+
+        except Exception as e:
+            logger.warning(f"Internal mapping lookup failed, continuing with EQC: {e}")
+
+        # Step 2: Try EQC lookup if budget allows and customer_name exists
+        if budget > 0 and customer_name and customer_name.strip():
+            try:
+                logger.debug(
+                    "Attempting EQC lookup with budget",
+                    extra={"customer_name": customer_name, "budget": budget}
+                )
+
+                # EQC search
+                search_results = self.eqc_client.search_company(customer_name.strip())
+
+                if search_results:
+                    # Take first result and get details
+                    best_result = search_results[0]
+                    detail = self.eqc_client.get_company_detail(best_result.company_id)
+
+                    # Cache result for future lookups
+                    try:
+                        self.loader.cache_company_mapping(
+                            alias_name=customer_name.strip(),
+                            canonical_id=detail.company_id,
+                            source="EQC"
+                        )
+                        logger.debug(f"Cached EQC result for '{customer_name}'")
+                    except Exception as cache_error:
+                        logger.warning(f"Failed to cache EQC result: {cache_error}")
+
+                    logger.info(
+                        "Company ID resolved via EQC lookup",
+                        extra={
+                            "company_id": detail.company_id,
+                            "official_name": detail.official_name,
+                            "customer_name": customer_name
+                        }
+                    )
+
+                    return CompanyIdResult(
+                        company_id=detail.company_id,
+                        status=ResolutionStatus.SUCCESS_EXTERNAL,
+                        source="EQC",
+                        temp_id=None
+                    )
+                else:
+                    logger.debug(f"EQC search returned no results for '{customer_name}'")
+
+            except Exception as e:
+                # CRITICAL: Don't block main flow on EQC errors
+                logger.warning(
+                    f"EQC lookup failed, will queue for async processing: {e}",
+                    extra={"customer_name": customer_name, "error_type": type(e).__name__}
+                )
+
+        # Step 3: Queue for async processing (if customer_name exists)
+        if customer_name and customer_name.strip():
+            try:
+                from .lookup_queue import normalize_name
+                normalized = normalize_name(customer_name.strip())
+                self.queue.enqueue(customer_name.strip(), normalized)
+
+                logger.info(
+                    "Company lookup queued for async processing",
+                    extra={"customer_name": customer_name, "normalized_name": normalized}
+                )
+
+                return CompanyIdResult(
+                    company_id=None,
+                    status=ResolutionStatus.PENDING_LOOKUP,
+                    source="queued",
+                    temp_id=None
+                )
+
+            except Exception as e:
+                logger.error(f"Failed to queue lookup request: {e}")
+                # Continue to temp ID generation as fallback
+
+        # Step 4: Generate temp ID when customer_name is empty or queueing failed
+        try:
+            temp_id = self.queue.get_next_temp_id()
+
+            logger.info(
+                "Generated temporary company ID",
+                extra={
+                    "temp_id": temp_id,
+                    "reason": "empty_customer_name" if not customer_name else "queue_failed"
+                }
+            )
+
+            return CompanyIdResult(
+                company_id=temp_id,
+                status=ResolutionStatus.TEMP_ASSIGNED,
+                source="generated",
+                temp_id=temp_id
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to generate temporary ID: {e}")
+            # Final fallback - return None result
+            return CompanyIdResult(
+                company_id=None,
+                status=ResolutionStatus.TEMP_ASSIGNED,
+                source="fallback",
+                temp_id=None
+            )
+
+    def process_lookup_queue(self, *, batch_size: Optional[int] = None) -> int:
+        """
+        Process pending lookup requests in the queue using EQC API.
+
+        Dequeues pending requests in batches, performs EQC lookups,
+        caches successful results, and updates request status appropriately.
+        Designed for scheduled/async execution scenarios.
+
+        Args:
+            batch_size: Maximum number of requests to process (uses queue default if None)
+
+        Returns:
+            Number of requests successfully processed
+
+        Raises:
+            Exception: Re-raises critical errors that prevent queue processing
+
+        Examples:
+            >>> processed_count = service.process_lookup_queue(batch_size=50)
+            >>> logger.info(f"Processed {processed_count} lookup requests")
+        """
+        processed_count = 0
+
+        logger.info(
+            "Starting lookup queue processing",
+            extra={"requested_batch_size": batch_size}
+        )
+
+        try:
+            # Process requests in batches until queue is empty
+            while True:
+                # Atomic dequeue operation
+                requests = self.queue.dequeue(batch_size or 50)
+
+                if not requests:
+                    logger.debug("No more pending requests in queue")
+                    break
+
+                logger.info(
+                    f"Processing batch of {len(requests)} lookup requests",
+                    extra={"batch_size": len(requests)}
+                )
+
+                # Process each request in the batch
+                for request in requests:
+                    try:
+                        logger.debug(
+                            f"Processing lookup request {request.id}: '{request.name}'"
+                        )
+
+                        # Perform EQC lookup
+                        search_results = self.eqc_client.search_company(request.name)
+
+                        if search_results:
+                            # Take first result and get details
+                            best_result = search_results[0]
+                            detail = self.eqc_client.get_company_detail(best_result.company_id)
+
+                            # Cache result for future lookups
+                            try:
+                                self.loader.cache_company_mapping(
+                                    alias_name=request.name,
+                                    canonical_id=detail.company_id,
+                                    source="EQC"
+                                )
+                                logger.debug(
+                                    f"Cached EQC result for request {request.id}"
+                                )
+                            except Exception as cache_error:
+                                logger.warning(
+                                    f"Failed to cache result for request {request.id}: "
+                                    f"{cache_error}"
+                                )
+
+                            # Mark request as successfully processed
+                            self.queue.mark_done(request.id)
+                            processed_count += 1
+
+                            logger.info(
+                                "Lookup request processed successfully",
+                                extra={
+                                    "request_id": request.id,
+                                    "name": request.name,
+                                    "company_id": detail.company_id,
+                                    "official_name": detail.official_name
+                                }
+                            )
+
+                        else:
+                            # No EQC results found
+                            error_msg = f"No EQC search results found for '{request.name}'"
+                            self.queue.mark_failed(
+                                request.id,
+                                error_msg,
+                                request.attempts + 1
+                            )
+
+                            logger.warning(
+                                "Lookup request failed - no EQC results",
+                                extra={
+                                    "request_id": request.id,
+                                    "name": request.name,
+                                    "attempts": request.attempts + 1
+                                }
+                            )
+
+                    except Exception as e:
+                        # EQC lookup or processing error
+                        error_msg = f"EQC lookup error: {str(e)}"
+                        try:
+                            self.queue.mark_failed(
+                                request.id,
+                                error_msg,
+                                request.attempts + 1
+                            )
+                        except Exception as mark_error:
+                            logger.error(f"Failed to mark request as failed: {mark_error}")
+
+                        logger.error(
+                            "Lookup request processing failed",
+                            extra={
+                                "request_id": request.id,
+                                "name": request.name,
+                                "error": str(e),
+                                "attempts": request.attempts + 1
+                            }
+                        )
+
+                # Continue processing next batch
+
+        except Exception as e:
+            logger.error(f"Queue processing interrupted by error: {e}")
+            raise
+
+        logger.info(
+            "Lookup queue processing completed",
+            extra={"processed_count": processed_count}
+        )
+
+        return processed_count
+
+    def get_queue_status(self) -> Dict[str, int]:
+        """
+        Get current queue processing statistics.
+
+        Returns:
+            Dictionary with queue status counts by state
+
+        Examples:
+            >>> status = service.get_queue_status()
+            >>> print(f"Pending: {status['pending']}, Processing: {status['processing']}")
+        """
+        try:
+            stats = self.queue.get_queue_stats()
+            logger.debug("Retrieved queue status", extra={"stats": stats})
+            return stats
+        except Exception as e:
+            logger.error(f"Failed to get queue status: {e}")
+            return {"pending": 0, "processing": 0, "done": 0, "failed": 0}

@@ -4,13 +4,15 @@ Pydantic v2 data models for company enrichment domain.
 This module defines the data contracts for:
 1. Company ID mapping and resolution (internal system)
 2. EQC API integration for external company data enrichment
+3. Company enrichment service with caching and queue processing
 
 Provides robust validation and type safety for both legacy mapping migration
-and modern EQC client integration.
+and modern EQC client integration with comprehensive service architecture.
 """
 
 import logging
 from datetime import datetime, timezone
+from enum import Enum
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -321,3 +323,133 @@ class CompanyDetail(BaseModel):
             return [str(alias).strip() for alias in v if alias and str(alias).strip()]
 
         return []
+
+
+# ===== Company Enrichment Service Models =====
+# These models define the data contracts for the CompanyEnrichmentService
+# with caching, queue processing, and unified resolution capabilities
+
+class ResolutionStatus(str, Enum):
+    """Status enumeration for company ID resolution operations."""
+
+    SUCCESS_INTERNAL = "success_internal"      # Found in internal mappings
+    SUCCESS_EXTERNAL = "success_external"      # Found via EQC lookup + cached
+    PENDING_LOOKUP = "pending_lookup"          # Queued for async lookup
+    TEMP_ASSIGNED = "temp_assigned"            # Assigned temporary ID
+
+
+class CompanyIdResult(BaseModel):
+    """
+    Result model for company ID resolution operations.
+
+    Provides comprehensive result information from CompanyEnrichmentService
+    with status tracking, source attribution, and temporary ID handling.
+    """
+
+    model_config = ConfigDict(
+        validate_default=True,
+        extra="forbid",
+    )
+
+    company_id: Optional[str] = Field(
+        None,
+        description="Resolved company_id or temp ID"
+    )
+    status: ResolutionStatus = Field(
+        ...,
+        description="Resolution status indicating the resolution path taken"
+    )
+    source: Optional[str] = Field(
+        None,
+        description="Source of resolution (internal/EQC/temp/queued)"
+    )
+    temp_id: Optional[str] = Field(
+        None,
+        description="Generated temporary ID if applicable"
+    )
+
+    @field_validator("temp_id", mode="after")
+    @classmethod
+    def validate_temp_id_format(cls, v):
+        """Validate temporary ID format if provided."""
+        if v is None:
+            return v
+
+        # Temp IDs should follow TEMP_NNNNNN format
+        if not v.startswith("TEMP_") or len(v) != 11:
+            logger.warning(f"Invalid temp ID format: {v}")
+
+        return v
+
+
+class LookupRequest(BaseModel):
+    """
+    Model for queued lookup requests in the async processing system.
+
+    Maps directly to enterprise.lookup_requests table structure,
+    providing validation and transformation for queue processing operations.
+    """
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        validate_default=True,
+        from_attributes=True,
+        extra="forbid",
+    )
+
+    id: Optional[int] = None
+    name: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description="Original company name to lookup via EQC API"
+    )
+    normalized_name: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description="Normalized version of name for duplicate detection"
+    )
+    status: str = Field(
+        default="pending",
+        description="Queue processing status"
+    )
+    attempts: int = Field(
+        default=0,
+        ge=0,
+        description="Number of processing attempts for retry logic"
+    )
+    last_error: Optional[str] = Field(
+        None,
+        description="Last error message from failed processing attempt"
+    )
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Request creation timestamp"
+    )
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Last status update timestamp"
+    )
+
+    @field_validator("status", mode="after")
+    @classmethod
+    def validate_status_enum(cls, v):
+        """Validate status is one of the allowed queue states."""
+        allowed_statuses = {"pending", "processing", "done", "failed"}
+        if v not in allowed_statuses:
+            raise ValueError(f"Status must be one of {allowed_statuses}, got: {v}")
+        return v
+
+    @field_validator("name", "normalized_name", mode="before")
+    @classmethod
+    def clean_name_fields(cls, v):
+        """Clean and normalize name fields."""
+        if v is None:
+            return v
+
+        # Convert to string and strip whitespace
+        cleaned = str(v).strip()
+
+        # Empty string validation will be handled by min_length constraint
+        return cleaned if cleaned else None
