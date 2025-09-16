@@ -13,7 +13,7 @@ from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
 
 # Configuration constants - make these configurable for easy maintenance
-LOGIN_URL = "https://eqc.pingan.com/"
+LOGIN_URL = "https://eqc.pingan.com/#/login?redirect=%2Fhome"
 TARGET_API_PATH = "/kg-api-hfd/api/search/"
 DEFAULT_TIMEOUT_SECONDS = 300  # 5 minutes
 

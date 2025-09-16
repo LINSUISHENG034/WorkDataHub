@@ -146,6 +146,52 @@ Notes
 - Includes simple rate limiting and exponential backoff with jitter.
 - See tests under `tests/io/connectors/test_eqc_client.py` for examples and edge cases.
 
+## Company Enrichment (S‑003)
+
+Unifies internal mappings and EQC lookups with basic caching and an async queue for scalable resolution.
+
+- Service: `src/work_data_hub/domain/company_enrichment/service.py` (`CompanyEnrichmentService`)
+- DAO: `src/work_data_hub/domain/company_enrichment/lookup_queue.py` (enqueue/dequeue/mark/temp id)
+- Loader: `src/work_data_hub/io/loader/company_enrichment_loader.py` (UPSERT to `enterprise.company_mapping`)
+- DDL: `scripts/create_table/ddl/lookup_requests.sql` (queue + `temp_id_sequence`)
+- Settings (env):
+  - `WDH_COMPANY_ENRICHMENT_ENABLED=true`
+  - `WDH_COMPANY_SYNC_LOOKUP_LIMIT=5`
+  - `WDH_LOOKUP_QUEUE_BATCH_SIZE=50`
+  - `WDH_LOOKUP_RETRY_MAX=3`
+  - `WDH_LOOKUP_RETRY_DELAY=300`
+
+Quickstart
+
+```bash
+# Apply queue DDL to your Postgres
+psql "$WDH_DATABASE__URI" -f scripts/create_table/ddl/lookup_requests.sql
+
+# Run focused tests for enrichment service and queue
+uv run pytest -v -k "enrichment_service or lookup_queue"
+```
+
+Example (pseudo‑wiring)
+
+```python
+from src.work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
+from src.work_data_hub.domain.company_enrichment.lookup_queue import LookupQueue
+from src.work_data_hub.io.loader.company_enrichment_loader import CompanyEnrichmentLoader
+from src.work_data_hub.io.connectors.eqc_client import EQCClient
+
+# Assume psycopg2 connection created from settings
+loader = CompanyEnrichmentLoader(connection)
+queue = LookupQueue(connection)
+eqc = EQCClient()
+
+svc = CompanyEnrichmentService(loader, queue, eqc, sync_lookup_budget=1)
+res = svc.resolve_company_id(customer_name="测试公司")
+print(res.status, res.company_id)
+
+# Later, consume queued lookups (batch)
+processed = svc.process_lookup_queue(batch_size=50)
+```
+
 ## Sample Domain (Trustee Performance)
 
 The `sample_trustee_performance` domain is a normative sample used for unit/integration tests and plan-only runs. It is not a production model and does not ship a DDL. For end‑to‑end database writes, use the `annuity_performance` domain instead.

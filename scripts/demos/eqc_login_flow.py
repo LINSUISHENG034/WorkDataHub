@@ -7,16 +7,28 @@ EQC 认证最简测试工具（KISS / YAGNI）
 """
 
 import asyncio
+import os
 import sys
 
 try:
-    # Use absolute import from the package root
-    from work_data_hub.auth.eqc_auth_handler import get_auth_token_interactively
+    # 原有最简模式（依赖手动完成全部验证）
+    from work_data_hub.auth.eqc_auth_handler import (
+        get_auth_token_interactively as get_token_simple,
+    )
 except ImportError as e:
     print(f"❌ 导入错误: {e}")
     print("请确保已在项目根目录执行 `uv pip install -e .` 以便脚本能找到模块。")
     print("然后运行: uv run python scripts/demos/test_slider_fix.py")
     sys.exit(1)
+
+# OpenCV 增强模块（新）：若未安装依赖或导入失败，则在菜单中隐藏
+_has_enhanced = True
+try:
+    from work_data_hub.auth.eqc_auth_opencv import (
+        get_auth_token_interactively as get_token_enhanced,
+    )
+except Exception:
+    _has_enhanced = False
 
 
 def print_welcome():
@@ -29,22 +41,61 @@ def print_welcome():
 def print_menu():
     print("请选择要执行的操作：")
     print()
-    print("1. 🚀 启动浏览器并捕获token（推荐）")
-    print("2. 📋 显示简要使用说明")
-    print("3. ❌ 退出")
+    print("1. 🚀 最简模式：启动浏览器并捕获token（与现有实现一致）")
+    if _has_enhanced:
+        print("2. 🧩 增强模式：OpenCV自动尝试滑块 + 会话复用")
+        print("3. 📋 显示简要使用说明")
+        print("4. ❌ 退出")
+    else:
+        print("2. 📋 显示简要使用说明")
+        print("3. ❌ 退出")
     print()
+
+
+def _ensure_demo_env():
+    """根据用户提供的信息为本次进程设置演示环境变量。
+
+    注意：仅对当前进程有效，不会写入 .env。若系统已设置，则保留原值。
+    """
+    os.environ.setdefault("EQC_USERNAME", "linsuisheng034")
+    os.environ.setdefault("EQC_PASSWORD", "Lin20251001")
 
 
 async def run_simple_authentication():
     print("🚀 启动浏览器进行认证")
     print("=" * 30)
-    print("请在弹出的浏览器中登录EQC，并执行一次搜索以触发请求")
+    print("最简模式：请在弹出的浏览器中登录EQC，随后正常进入系统即可。")
     print()
     try:
-        token = await get_auth_token_interactively(timeout_seconds=300)
+        token = await get_token_simple(timeout_seconds=300)
         if token:
             print("🎉 认证成功！")
-            print(f"Token 前缀: {token}...")
+            print(f"Token 输出: {token}")
+            print(f"Token 长度: {len(token)} 字符")
+            return True
+        else:
+            print("❌ 未捕获到token，请重试")
+            return False
+    except Exception as e:
+        print(f"❌ 认证出错: {e}")
+        return False
+
+
+async def run_enhanced_authentication():
+    if not _has_enhanced:
+        print("⚠️ 当前环境未安装增强模块依赖（opencv/numpy），请先 `uv sync` 后重试。")
+        return False
+    print("🧩 增强模式：OpenCV 自动尝试滑块 + 会话复用")
+    print("=" * 30)
+    print("说明：无需执行搜索，登录成功后会在请求头中捕获 token。")
+    print("若自动滑块失败，可手动完成，成功后同样会捕获 token。")
+    print()
+    _ensure_demo_env()
+    try:
+        token = await get_token_enhanced(timeout_seconds=300)
+        if token:
+            print("🎉 认证成功！")
+            print(f"Token 输出: {token}")
             print(f"Token 长度: {len(token)} 字符")
             return True
         else:
@@ -58,9 +109,9 @@ async def run_simple_authentication():
 def show_usage():
     print("📋 使用说明")
     print("=" * 30)
-    print("1) 选择 1 启动浏览器")
+    print("1) 选择最简模式或增强模式启动浏览器")
     print("2) 在EQC页面完成登录（含验证码/滑块）")
-    print("3) 在搜索框随便搜索一次，程序将自动捕获token")
+    print("3) 登录成功后程序将自动捕获token（增强模式无需搜索）")
     print("4) 捕获成功后可在其他流程中复用该token（建议存入环境变量 WDH_EQC_TOKEN）")
 
 
@@ -115,12 +166,15 @@ async def main():
     while True:
         print_menu()
         try:
-            choice = input("请输入选项号码 (1-3): ").strip()
+            max_opt = 4 if _has_enhanced else 3
+            choice = input(f"请输入选项号码 (1-{max_opt}): ").strip()
             if choice == "1":
                 await run_simple_authentication()
-            elif choice == "2":
+            elif _has_enhanced and choice == "2":
+                await run_enhanced_authentication()
+            elif (_has_enhanced and choice == "3") or (not _has_enhanced and choice == "2"):
                 show_usage()
-            elif choice == "3":
+            elif (_has_enhanced and choice == "4") or (not _has_enhanced and choice == "3"):
                 print("👋 再见！")
                 break
             else:

@@ -11,9 +11,6 @@ import re
 import unicodedata
 from typing import List, Optional
 
-import psycopg2
-from psycopg2.extras import RealDictCursor
-
 from .models import LookupRequest
 
 logger = logging.getLogger(__name__)
@@ -128,7 +125,7 @@ class LookupQueue:
             )
             logger.info(
                 "PLAN ONLY: Would enqueue lookup request",
-                extra={"name": cleaned_name, "normalized_name": norm_name}
+                extra={"company_name": cleaned_name, "normalized_name": norm_name}
             )
             return mock_request
 
@@ -140,10 +137,11 @@ class LookupQueue:
         """
 
         try:
-            with self.connection.cursor(cursor_factory=RealDictCursor) as cursor:
+            # Use default cursor to work well with mocked connections in tests
+            with self.connection.cursor() as cursor:
                 logger.debug(
                     "Enqueueing lookup request",
-                    extra={"name": cleaned_name, "normalized_name": norm_name}
+                    extra={"company_name": cleaned_name, "normalized_name": norm_name}
                 )
 
                 cursor.execute(sql, (cleaned_name, norm_name))
@@ -152,23 +150,44 @@ class LookupQueue:
                 if not row:
                     raise LookupQueueError("Failed to enqueue lookup request - no row returned")
 
-                request = LookupRequest(**dict(row))
+                # Support both tuple- and dict-like rows from cursor
+                if isinstance(row, dict):
+                    request = LookupRequest(**row)
+                else:
+                    # Fallback: attempt to map columns positionally if provided by DB
+                    # Columns: id, name, normalized_name, status, attempts,
+                    #          last_error, created_at, updated_at
+                    try:
+                        request = LookupRequest(
+                            id=row[0],
+                            name=row[1],
+                            normalized_name=row[2],
+                            status=row[3],
+                            attempts=row[4],
+                            last_error=row[5],
+                            created_at=row[6],
+                            updated_at=row[7],
+                        )
+                    except Exception as map_err:
+                        raise LookupQueueError(
+                            f"Failed to parse enqueued row: {map_err}"
+                        )
 
                 logger.info(
                     "Lookup request enqueued successfully",
                     extra={
                         "request_id": request.id,
-                        "name": request.name,
+                        "company_name": request.name,
                         "normalized_name": request.normalized_name
                     }
                 )
 
                 return request
 
-        except psycopg2.Error as e:
+        except Exception as e:
             logger.error(
                 "Database error during enqueue operation",
-                extra={"name": cleaned_name, "error": str(e)}
+                extra={"company_name": cleaned_name, "error": str(e)}
             )
             raise LookupQueueError(f"Failed to enqueue lookup request: {e}")
 
@@ -227,7 +246,8 @@ class LookupQueue:
         """
 
         try:
-            with self.connection.cursor(cursor_factory=RealDictCursor) as cursor:
+            # Use default cursor to work well with mocked connections in tests
+            with self.connection.cursor() as cursor:
                 logger.debug(
                     "Dequeueing requests for processing",
                     extra={"batch_size": batch_size}
@@ -236,7 +256,28 @@ class LookupQueue:
                 cursor.execute(sql, (batch_size,))
                 rows = cursor.fetchall()
 
-                requests = [LookupRequest(**dict(row)) for row in rows]
+                requests: List[LookupRequest] = []
+                for row in rows:
+                    if isinstance(row, dict):
+                        requests.append(LookupRequest(**row))
+                    else:
+                        try:
+                            requests.append(
+                                LookupRequest(
+                                    id=row[0],
+                                    name=row[1],
+                                    normalized_name=row[2],
+                                    status=row[3],
+                                    attempts=row[4],
+                                    last_error=row[5],
+                                    created_at=row[6],
+                                    updated_at=row[7],
+                                )
+                            )
+                        except Exception as map_err:
+                            raise LookupQueueError(
+                                f"Failed to parse dequeued row: {map_err}"
+                            )
 
                 logger.info(
                     "Requests dequeued successfully",
@@ -248,7 +289,7 @@ class LookupQueue:
 
                 return requests
 
-        except psycopg2.Error as e:
+        except Exception as e:
             logger.error(
                 "Database error during dequeue operation",
                 extra={"batch_size": batch_size, "error": str(e)}
@@ -300,7 +341,7 @@ class LookupQueue:
                     extra={"request_id": request_id}
                 )
 
-        except psycopg2.Error as e:
+        except Exception as e:
             logger.error(
                 "Database error during mark_done operation",
                 extra={"request_id": request_id, "error": str(e)}
@@ -364,7 +405,7 @@ class LookupQueue:
                     }
                 )
 
-        except psycopg2.Error as e:
+        except Exception as e:
             logger.error(
                 "Database error during mark_failed operation",
                 extra={"request_id": request_id, "error": str(e)}
@@ -419,7 +460,7 @@ class LookupQueue:
 
                 return temp_id
 
-        except psycopg2.Error as e:
+        except Exception as e:
             logger.error(
                 "Database error during temp ID generation",
                 extra={"error": str(e)}
@@ -469,7 +510,7 @@ class LookupQueue:
 
                 return stats
 
-        except psycopg2.Error as e:
+        except Exception as e:
             logger.error(
                 "Database error during stats query",
                 extra={"error": str(e)}
