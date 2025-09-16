@@ -2,6 +2,7 @@
 monthly/
 db_migration/
 reference/claude-code-full-guide/
+reference/patoken/
 
 # Ignore folders
 deprecated/

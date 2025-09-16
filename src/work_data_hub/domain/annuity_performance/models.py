@@ -9,10 +9,10 @@ Handles Chinese column names from "规模明细" Excel sheets.
 import logging
 from datetime import date
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 
 if TYPE_CHECKING:
-    pass
+    from work_data_hub.domain.company_enrichment.models import ResolutionStatus
 
 from pydantic import (
     BaseModel,
@@ -301,3 +301,59 @@ class AnnuityPerformanceOut(BaseModel):
                 pass
 
         return self
+
+
+# ===== Company Enrichment Integration Models =====
+# These models support optional company enrichment functionality
+
+class EnrichmentStats(BaseModel):
+    """Statistics collection for company enrichment operations."""
+
+    model_config = ConfigDict(
+        validate_default=True,
+        extra="forbid",
+    )
+
+    total_records: int = 0
+    success_internal: int = 0      # Resolved via internal mappings
+    success_external: int = 0      # Resolved via EQC lookup + cached
+    pending_lookup: int = 0        # Queued for async processing
+    temp_assigned: int = 0         # Assigned temporary ID
+    failed: int = 0               # Resolution failed completely
+    sync_budget_used: int = 0     # EQC lookups consumed from budget
+    processing_time_ms: int = 0   # Total enrichment processing time
+
+    def record(self, status: "ResolutionStatus", source: Optional[str] = None):
+        """Record a resolution result for statistics tracking."""
+        # Import here to avoid circular import
+        from work_data_hub.domain.company_enrichment.models import ResolutionStatus
+
+        self.total_records += 1
+        if status == ResolutionStatus.SUCCESS_INTERNAL:
+            self.success_internal += 1
+        elif status == ResolutionStatus.SUCCESS_EXTERNAL:
+            self.success_external += 1
+            self.sync_budget_used += 1
+        elif status == ResolutionStatus.PENDING_LOOKUP:
+            self.pending_lookup += 1
+        elif status == ResolutionStatus.TEMP_ASSIGNED:
+            self.temp_assigned += 1
+        else:
+            self.failed += 1
+
+
+class ProcessingResultWithEnrichment(BaseModel):
+    """Extended processing result including enrichment statistics and exports."""
+
+    model_config = ConfigDict(
+        validate_default=True,
+        extra="forbid",
+    )
+
+    records: List[AnnuityPerformanceOut] = Field(
+        ..., description="Processed annuity performance records"
+    )
+    enrichment_stats: EnrichmentStats = Field(default_factory=EnrichmentStats)
+    unknown_names_csv: Optional[str] = Field(None, description="Path to exported unknown names CSV")
+    data_source: str = Field("unknown", description="Source file or identifier")
+    processing_time_ms: int = Field(0, description="Total processing time")

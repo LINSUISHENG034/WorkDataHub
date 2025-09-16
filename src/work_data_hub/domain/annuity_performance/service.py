@@ -7,14 +7,24 @@ free and fully testable. Includes column projection to prevent SQL column mismat
 """
 
 import logging
+import time
 from datetime import date
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    from work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
 
 from pydantic import ValidationError
 
 from work_data_hub.utils.date_parser import parse_chinese_date
 
-from .models import AnnuityPerformanceIn, AnnuityPerformanceOut
+from .csv_export import write_unknowns_csv
+from .models import (
+    AnnuityPerformanceIn,
+    AnnuityPerformanceOut,
+    EnrichmentStats,
+    ProcessingResultWithEnrichment,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -97,21 +107,33 @@ def project_columns(rows: List[Dict[str, Any]], allowed_cols: List[str]) -> List
 
 
 def process(
-    rows: List[Dict[str, Any]], data_source: str = "unknown"
-) -> List[AnnuityPerformanceOut]:
+    rows: List[Dict[str, Any]],
+    data_source: str = "unknown",
+    enrichment_service: Optional["CompanyEnrichmentService"] = None,
+    sync_lookup_budget: int = 0,
+    export_unknown_names: bool = True,
+) -> ProcessingResultWithEnrichment:
     """
-    Process raw Excel rows into validated annuity performance output models.
+    Process raw Excel rows into validated annuity performance output models
+    with optional enrichment.
 
     This is the main entry point for the annuity performance domain service.
     It transforms raw dictionary data from "规模明细" Excel sheets into fully
     validated AnnuityPerformanceOut models ready for data warehouse loading.
 
+    When enrichment_service is provided, performs company ID resolution using
+    internal mappings, EQC lookups, and async queue processing according to the
+    configured budget and export settings.
+
     Args:
         rows: List of dictionaries representing Excel rows
         data_source: Identifier for the source file or system
+        enrichment_service: Optional CompanyEnrichmentService for company ID resolution
+        sync_lookup_budget: Budget for synchronous EQC lookups per processing session
+        export_unknown_names: Whether to export unknown company names to CSV
 
     Returns:
-        List of validated AnnuityPerformanceOut models
+        ProcessingResultWithEnrichment with processed records, statistics, and optional CSV export
 
     Raises:
         AnnuityPerformanceTransformationError: If transformation fails
@@ -119,13 +141,19 @@ def process(
     """
     if not rows:
         logger.info("No rows provided for processing")
-        return []
+        return ProcessingResultWithEnrichment(
+            records=[],
+            data_source=data_source
+        )
 
     if not isinstance(rows, list):
         raise ValueError("Rows must be provided as a list")
 
     logger.info(f"Processing {len(rows)} rows from data source: {data_source}")
 
+    start_time = time.time()
+    stats = EnrichmentStats()
+    unknown_names: List[str] = []
     processed_records = []
     processing_errors = []
 
@@ -134,10 +162,39 @@ def process(
     # Output models already map to DB columns, and ops will serialize by alias.
     for row_index, raw_row in enumerate(rows):
         try:
-            # Transform single row
+            # Transform single row (existing logic)
             processed_record = _transform_single_row(raw_row, data_source, row_index)
 
             if processed_record:
+                # Optional enrichment integration
+                if enrichment_service:
+                    try:
+                        # Call enrichment service with proper field mapping
+                        # Extract fields from raw_row since processed_record
+                        # may not have all original fields
+                        result = enrichment_service.resolve_company_id(
+                            plan_code=raw_row.get("计划代码"),
+                            customer_name=raw_row.get("客户名称"),
+                            account_name=raw_row.get("年金账户名"),
+                            sync_lookup_budget=sync_lookup_budget,
+                        )
+
+                        # Update record with resolved company_id
+                        if result.company_id:
+                            processed_record.company_id = result.company_id
+
+                        # Record statistics
+                        stats.record(result.status, result.source)
+
+                        # Collect unknown names for CSV export
+                        if not result.company_id and raw_row.get("客户名称"):
+                            unknown_names.append(raw_row.get("客户名称"))
+
+                    except Exception as e:
+                        # CRITICAL: Never fail main pipeline on enrichment errors
+                        logger.warning(f"Enrichment failed for row {row_index}: {e}")
+                        stats.failed += 1
+
                 processed_records.append(processed_record)
             else:
                 logger.debug(f"Row {row_index} was filtered out during transformation")
@@ -168,7 +225,45 @@ def process(
                 f"First error: {processing_errors[0]}"
             )
 
-    return processed_records
+    # Generate CSV export if requested and unknowns exist
+    csv_path = None
+    if export_unknown_names and unknown_names:
+        try:
+            csv_path = write_unknowns_csv(unknown_names, data_source)
+            logger.info(f"Exported {len(unknown_names)} unknown company names to: {csv_path}")
+        except Exception as e:
+            # Don't fail processing for CSV export errors
+            logger.warning(f"Failed to export unknown names CSV: {e}")
+
+    # Calculate processing time
+    processing_time_ms = int((time.time() - start_time) * 1000)
+    stats.processing_time_ms = processing_time_ms
+
+    # Log enrichment statistics if enrichment was used
+    if enrichment_service and stats.total_records > 0:
+        logger.info(
+            "Enrichment processing completed",
+            extra={
+                "total_records": stats.total_records,
+                "internal_hits": stats.success_internal,
+                "external_hits": stats.success_external,
+                "pending_lookup": stats.pending_lookup,
+                "temp_assigned": stats.temp_assigned,
+                "failed": stats.failed,
+                "sync_budget_used": stats.sync_budget_used,
+                "processing_time_ms": processing_time_ms,
+                "unknown_names_count": len(unknown_names),
+                "csv_exported": bool(csv_path)
+            }
+        )
+
+    return ProcessingResultWithEnrichment(
+        records=processed_records,
+        enrichment_stats=stats,
+        unknown_names_csv=csv_path,
+        data_source=data_source,
+        processing_time_ms=processing_time_ms,
+    )
 
 
 def _transform_single_row(

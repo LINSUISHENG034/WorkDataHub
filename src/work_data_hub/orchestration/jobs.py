@@ -28,6 +28,7 @@ from .ops import (
     gate_after_backfill,
     load_op,
     process_annuity_performance_op,
+    process_company_lookup_queue_op,
     process_sample_trustee_performance_op,
     read_and_process_sample_trustee_files_op,
     read_excel_op,
@@ -124,6 +125,28 @@ def import_company_mappings_job():
     # discover -> read -> process -> load pattern. It goes directly from
     # legacy extraction to database loading.
     pass
+
+
+@job
+def process_company_lookup_queue_job():
+    """
+    Company lookup queue processing job.
+
+    This job processes pending company lookup requests from the queue using EQC API.
+    Designed for scheduled/async execution to handle company name resolution
+    that was queued during enrichment operations.
+
+    Operations:
+    1. Dequeue pending lookup requests in configurable batches
+    2. Perform EQC lookups for each company name
+    3. Cache successful results for future use
+    4. Update request status (done/failed) appropriately
+    5. Generate processing statistics and queue status reports
+
+    This is a database-only job with no file discovery or Excel processing.
+    """
+    # Single op job - process the lookup queue
+    process_company_lookup_queue_op()
 
 
 def _parse_pk_override(pk_arg: Any) -> List[str]:
@@ -229,6 +252,16 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
             "chunk_size": 1000,
         }
     }
+
+    # Add enrichment configuration for annuity_performance domain
+    if args.domain == "annuity_performance":
+        run_config["ops"]["process_annuity_performance_op"] = {
+            "config": {
+                "enrichment_enabled": getattr(args, "enrichment_enabled", False),
+                "enrichment_sync_budget": getattr(args, "enrichment_sync_budget", 0),
+                "export_unknown_names": getattr(args, "export_unknown_names", True),
+            }
+        }
 
     return run_config
 
@@ -357,6 +390,75 @@ def _execute_company_mapping_job(args: argparse.Namespace):
             raise
 
 
+def _execute_queue_processing_job(args: argparse.Namespace):
+    """
+    Execute company lookup queue processing job with direct queue operations.
+
+    This function handles queue processing outside of the standard
+    Dagster job framework, executing the process_company_lookup_queue_job
+    with appropriate configuration and error handling.
+    """
+    effective_plan_only = not args.execute if hasattr(args, "execute") else True
+    batch_size = getattr(args, "batch_size", 50)
+
+    print("🚀 Starting company lookup queue processing...")
+    print(f"   Batch size: {batch_size}")
+    print(f"   Execute: {args.execute}")
+    print(f"   Plan-only: {effective_plan_only}")
+    print("=" * 50)
+
+    try:
+        # Build run configuration for queue processing
+        run_config = {
+            "ops": {
+                "process_company_lookup_queue_op": {
+                    "config": {
+                        "batch_size": batch_size,
+                        "plan_only": effective_plan_only,
+                    }
+                }
+            }
+        }
+
+        # Execute queue processing job
+        instance = DagsterInstance.ephemeral() if args.debug else None
+
+        result = process_company_lookup_queue_job.execute_in_process(
+            run_config=run_config, instance=instance, raise_on_error=args.raise_on_error
+        )
+
+        # Report results
+        print(f"✅ Queue processing completed successfully: {result.success}")
+
+        if result.success:
+            # Extract queue processing results
+            output_data = result.output_for_node("process_company_lookup_queue_op")
+
+            if output_data:
+                processed_count = output_data.get("processed_count", 0)
+                queue_status = output_data.get("queue_status", {})
+
+                print("QUEUE PROCESSING RESULTS:")
+                print(f"  Processed requests: {processed_count}")
+                print(f"  Remaining pending: {queue_status.get('pending', 0)}")
+                print(f"  Failed requests: {queue_status.get('failed', 0)}")
+                print(f"  Completed requests: {queue_status.get('done', 0)}")
+
+        print("=" * 50)
+        if effective_plan_only:
+            print("✅ Queue processing plan complete - no database changes made")
+        else:
+            print("🎉 QUEUE PROCESSING SUCCESS - Pending requests processed")
+        print("=" * 50)
+
+    except KeyboardInterrupt:
+        print("⚠️ Queue processing interrupted by user")
+    except Exception as e:
+        print(f"❌ Unexpected queue processing failure: {e}")
+        if args.raise_on_error:
+            raise
+
+
 def main():
     """
     CLI entry point for local execution.
@@ -434,6 +536,34 @@ def main():
         help="Skip fact loading, run backfill only",
     )
 
+    # Queue processing arguments
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=50,
+        help="Batch size for queue processing operations (default: 50)",
+    )
+
+    # Enrichment arguments
+    parser.add_argument(
+        "--enrichment-enabled",
+        action="store_true",
+        default=False,
+        help="Enable company enrichment during processing",
+    )
+    parser.add_argument(
+        "--enrichment-sync-budget",
+        type=int,
+        default=0,
+        help="Budget for synchronous EQC lookups per processing session (default: 0)",
+    )
+    parser.add_argument(
+        "--export-unknown-names",
+        action="store_true",
+        default=True,
+        help="Export unknown company names to CSV for manual review",
+    )
+
     # Advanced options
     parser.add_argument(
         "--debug",
@@ -486,10 +616,14 @@ def main():
     elif args.domain == "company_mapping":
         # Special handling for company mapping migration
         return _execute_company_mapping_job(args)
+    elif args.domain == "company_lookup_queue":
+        # Special handling for company lookup queue processing
+        return _execute_queue_processing_job(args)
     else:
         raise ValueError(
             f"Unsupported domain: {args.domain}. "
-            f"Supported: sample_trustee_performance, annuity_performance, company_mapping"
+            f"Supported: sample_trustee_performance, annuity_performance, "
+            f"company_mapping, company_lookup_queue"
         )
 
     # Execute job with appropriate settings

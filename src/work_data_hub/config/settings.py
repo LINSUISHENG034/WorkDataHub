@@ -146,6 +146,10 @@ class Settings(BaseSettings):
         default=300, description="Delay in seconds between lookup retry attempts"
     )
 
+    enrichment_export_unknowns: bool = Field(
+        default=True, description="Export unknown company names to CSV for manual review"
+    )
+
     # Database configuration - nested settings with WDH_DATABASE__ prefix
     database_host: str = Field(default="localhost", description="Database host")
     database_port: int = Field(default=5432, description="Database port")

@@ -158,6 +158,22 @@ class ReadExcelConfig(Config):
         return iv
 
 
+class ProcessingConfig(Config):
+    """Configuration for processing operations with optional enrichment."""
+
+    enrichment_enabled: bool = False
+    enrichment_sync_budget: int = 0
+    export_unknown_names: bool = True
+
+    @field_validator("enrichment_sync_budget")
+    @classmethod
+    def validate_sync_budget(cls, v: int) -> int:
+        """Validate sync budget is non-negative."""
+        if v < 0:
+            raise ValueError("Sync budget must be non-negative")
+        return v
+
+
 @op
 def read_excel_op(
     context: OpExecutionContext, config: ReadExcelConfig, file_paths: List[str]
@@ -240,16 +256,21 @@ def process_sample_trustee_performance_op(
 
 @op
 def process_annuity_performance_op(
-    context: OpExecutionContext, excel_rows: List[Dict[str, Any]], file_paths: List[str]
+    context: OpExecutionContext,
+    config: ProcessingConfig,
+    excel_rows: List[Dict[str, Any]],
+    file_paths: List[str]
 ) -> List[Dict[str, Any]]:
     """
-    Process annuity performance data and return validated records as dicts.
+    Process annuity performance data with optional enrichment and return validated records as dicts.
 
     Handles Chinese "规模明细" Excel data with column projection to prevent
-    SQL column mismatch errors.
+    SQL column mismatch errors. When enrichment is enabled, performs company ID
+    resolution using internal mappings, EQC lookups, and async queue processing.
 
     Args:
         context: Dagster execution context
+        config: Processing configuration including enrichment settings
         excel_rows: Raw Excel row data
         file_paths: List of file paths (uses first one for data_source metadata)
 
@@ -259,21 +280,102 @@ def process_annuity_performance_op(
     # Use first file path for data_source metadata
     file_path = file_paths[0] if file_paths else "unknown"
 
+    # Conditional enrichment service setup
+    enrichment_service = None
+    if config.enrichment_enabled:
+        try:
+            # Import enrichment components (lazy import to avoid circular dependencies)
+            from work_data_hub.domain.company_enrichment.lookup_queue import LookupQueue
+            from work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
+            from work_data_hub.io.connectors.eqc_client import EQCClient
+            from work_data_hub.io.loader.company_enrichment_loader import CompanyEnrichmentLoader
+
+            # Only setup enrichment for execution (not plan-only)
+            # Note: we don't have plan_only in ProcessingConfig, so we check global settings
+            settings = get_settings()
+
+            # Check if we should setup database connections
+            # For now, always setup enrichment service when enabled
+            # In production, this could be controlled by additional config
+
+            # Lazy import psycopg2 for database connection
+            global psycopg2  # type: ignore
+            if psycopg2 is _PSYCOPG2_NOT_LOADED:  # type: ignore
+                try:
+                    import psycopg2 as _psycopg2  # type: ignore
+                    psycopg2 = _psycopg2  # type: ignore
+                except ImportError:
+                    context.log.warning("psycopg2 not available for enrichment database operations")
+                    # Continue without enrichment
+                    config.enrichment_enabled = False
+
+            if config.enrichment_enabled and psycopg2 is not _PSYCOPG2_NOT_LOADED:
+                # Get database connection string
+                dsn = settings.get_database_connection_string()
+                conn = psycopg2.connect(dsn)  # type: ignore
+
+                # Setup enrichment service components
+                loader = CompanyEnrichmentLoader(conn)
+                queue = LookupQueue(conn)
+                eqc_client = EQCClient()  # Uses settings for auth
+
+                enrichment_service = CompanyEnrichmentService(
+                    loader=loader,
+                    queue=queue,
+                    eqc_client=eqc_client,
+                    sync_lookup_budget=config.enrichment_sync_budget
+                )
+
+                context.log.info(
+                    "Enrichment service setup completed",
+                    extra={
+                        "sync_budget": config.enrichment_sync_budget,
+                        "export_unknowns": config.export_unknown_names
+                    }
+                )
+
+        except Exception as e:
+            # CRITICAL: Log error but continue without enrichment
+            context.log.warning(f"Failed to setup enrichment service: {e}")
+            enrichment_service = None
+
     try:
-        # Process using annuity performance domain service with column projection
-        processed_models = process_annuity(excel_rows, data_source=file_path)
+        # Process using extended annuity performance domain service
+        result = process_annuity(
+            excel_rows,
+            data_source=file_path,
+            enrichment_service=enrichment_service,
+            sync_lookup_budget=config.enrichment_sync_budget,
+            export_unknown_names=config.export_unknown_names,
+        )
 
         # Convert Pydantic models to JSON-serializable dicts
         # mode="json" ensures date/datetime/Decimal become JSON friendly types
         result_dicts = [
-            model.model_dump(mode="json", by_alias=True, exclude_none=True)
-            for model in processed_models
+            record.model_dump(mode="json", by_alias=True, exclude_none=True)
+            for record in result.records
         ]
+
+        # Log enrichment statistics if enrichment was used
+        if enrichment_service and result.enrichment_stats.total_records > 0:
+            context.log.info(
+                "Enrichment completed",
+                extra={
+                    "total": result.enrichment_stats.total_records,
+                    "internal_hits": result.enrichment_stats.success_internal,
+                    "external_hits": result.enrichment_stats.success_external,
+                    "pending": result.enrichment_stats.pending_lookup,
+                    "temp_assigned": result.enrichment_stats.temp_assigned,
+                    "failed": result.enrichment_stats.failed,
+                    "budget_used": result.enrichment_stats.sync_budget_used,
+                    "csv_exported": bool(result.unknown_names_csv),
+                }
+            )
 
         context.log.info(
             f"Domain processing completed - source: {file_path}, "
             f"input_rows: {len(excel_rows)}, output_records: {len(result_dicts)}, "
-            f"domain: annuity_performance"
+            f"domain: annuity_performance, enrichment_enabled: {config.enrichment_enabled}"
         )
 
         return result_dicts
@@ -854,3 +956,146 @@ def gate_after_backfill(
         f"Backfill completed; gating fact load. operations={len(ops)}"
     )
     return processed_rows
+
+
+class QueueProcessingConfig(Config):
+    """Configuration for company lookup queue processing operation."""
+
+    batch_size: int = 50
+    plan_only: bool = True
+
+    @field_validator("batch_size")
+    @classmethod
+    def validate_batch_size(cls, v: int) -> int:
+        """Validate batch size is positive and reasonable."""
+        if v < 1:
+            raise ValueError("Batch size must be at least 1")
+        if v > 500:  # Reasonable upper bound to avoid memory issues
+            raise ValueError("Batch size cannot exceed 500")
+        return v
+
+
+@op
+def process_company_lookup_queue_op(
+    context: OpExecutionContext,
+    config: QueueProcessingConfig,
+) -> Dict[str, Any]:
+    """
+    Process pending company lookup requests from the queue using EQC API.
+
+    Dequeues pending requests in batches, performs EQC lookups,
+    caches successful results, and updates request status appropriately.
+    Designed for scheduled/async execution scenarios.
+
+    Args:
+        context: Dagster execution context
+        config: Queue processing configuration
+
+    Returns:
+        Dictionary with processing statistics
+    """
+    conn = None
+    try:
+        if not config.plan_only:
+            # Lazy import psycopg2 into module-global for test compatibility
+            global psycopg2  # type: ignore
+            if psycopg2 is None:  # type: ignore
+                # Explicitly treated as unavailable (tests may patch to None)
+                raise DataWarehouseLoaderError("psycopg2 not available for database operations")
+            if psycopg2 is _PSYCOPG2_NOT_LOADED:  # type: ignore
+                try:
+                    import psycopg2 as _psycopg2  # type: ignore
+                except ImportError:
+                    raise DataWarehouseLoaderError("psycopg2 not available for database operations")
+                psycopg2 = _psycopg2  # type: ignore
+
+            # Import enrichment components (lazy import to avoid circular dependencies)
+            from work_data_hub.domain.company_enrichment.lookup_queue import LookupQueue
+            from work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
+            from work_data_hub.io.connectors.eqc_client import EQCClient
+            from work_data_hub.io.loader.company_enrichment_loader import CompanyEnrichmentLoader
+
+            settings = get_settings()
+
+            # Primary DSN retrieval with fallback for test compatibility
+            dsn = None
+            # Primary: consolidated accessor
+            if hasattr(settings, "get_database_connection_string"):
+                try:
+                    dsn = settings.get_database_connection_string()
+                except Exception:
+                    dsn = None
+            if not isinstance(dsn, str) or not dsn:
+                raise DataWarehouseLoaderError(
+                    "Database connection failed: invalid DSN resolved from settings"
+                )
+
+            context.log.info(
+                f"Connecting to database for queue processing "
+                f"(batch_size: {config.batch_size})"
+            )
+
+            # CRITICAL: Only catch psycopg2.connect failures
+            try:
+                conn = psycopg2.connect(dsn)  # type: ignore  # Bare connection, no context manager
+            except Exception as e:
+                raise DataWarehouseLoaderError(
+                    f"Database connection failed: {e}. Check WDH_DATABASE__* environment variables."
+                ) from e
+
+            # Setup enrichment service components
+            loader = CompanyEnrichmentLoader(conn)
+            queue = LookupQueue(conn)
+            eqc_client = EQCClient()  # Uses settings for auth
+
+            enrichment_service = CompanyEnrichmentService(
+                loader=loader,
+                queue=queue,
+                eqc_client=eqc_client,
+                sync_lookup_budget=0  # No sync budget for queue processing
+            )
+
+            # Process the queue
+            processed_count = enrichment_service.process_lookup_queue(batch_size=config.batch_size)
+
+            # Get final queue status
+            queue_status = enrichment_service.get_queue_status()
+
+            result = {
+                "processed_count": processed_count,
+                "batch_size": config.batch_size,
+                "plan_only": config.plan_only,
+                "queue_status": queue_status,
+            }
+
+        else:
+            # Plan-only: simulate queue processing
+            context.log.info(
+                f"Queue processing plan - batch_size: {config.batch_size} (no database operations)"
+            )
+            result = {
+                "processed_count": 0,
+                "batch_size": config.batch_size,
+                "plan_only": config.plan_only,
+                "queue_status": {"pending": 0, "processing": 0, "done": 0, "failed": 0},
+            }
+
+        # Enhanced logging with execution mode
+        mode_text = "EXECUTED" if not config.plan_only else "PLAN-ONLY"
+        context.log.info(
+            f"Queue processing completed ({mode_text}) - "
+            f"processed: {result['processed_count']}, "
+            f"batch_size: {result['batch_size']}, "
+            f"pending: {result['queue_status'].get('pending', 0)}, "
+            f"failed: {result['queue_status'].get('failed', 0)}"
+        )
+
+        return result
+
+    except Exception as e:
+        context.log.error(f"Queue processing operation failed: {e}")
+        raise
+    finally:
+        # CRITICAL: Clean up bare connection in finally
+        if conn is not None:
+            conn.close()

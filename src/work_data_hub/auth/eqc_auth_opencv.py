@@ -33,6 +33,7 @@ import numpy as np
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
+
 from .eqc_settings import settings
 
 logger = logging.getLogger(__name__)

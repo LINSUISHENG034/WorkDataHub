@@ -149,6 +149,7 @@ Vertical value: Demonstrable parity with auditable reports is a tangible outcome
 | C-062 | M1.5 | Legacy data import (Mongo/MySQL → Postgres cache) | READY_FOR_PRP | F-061 | - |
 | F-064 | M1.5 | Optional sync‑budget enrichment in pipeline | READY_FOR_PRP | F-060, F-061 | - |
 | S-003 | M1.5 | Company Enrichment Service: Basic Caching & Core Service | COMPLETED ✅ | F-061, F-063 | P-S03 |
+| S-004 | M1.5 | annuity_performance enrichment MVP (E2E validation) | VALIDATING | S-003 | P-S04 |
 | C-063 | M1.5 | Apply queue DDL and wire settings (WDH_*) | COMPLETED ✅ | S-003 | P-S03 |
 
 | C-064 | M1.5 | Consolidate repo-wide lint/format policy (ruff line-length, scripts) | READY_FOR_PRP | - | - |
