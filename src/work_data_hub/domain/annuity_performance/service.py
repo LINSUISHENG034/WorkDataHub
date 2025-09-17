@@ -106,7 +106,41 @@ def project_columns(rows: List[Dict[str, Any]], allowed_cols: List[str]) -> List
     return projected_rows
 
 
+
 def process(
+    rows: List[Dict[str, Any]],
+    data_source: str = "unknown",
+    enrichment_service: Optional["CompanyEnrichmentService"] = None,
+    sync_lookup_budget: int = 0,
+    export_unknown_names: bool = True,
+) -> List[AnnuityPerformanceOut]:
+    """
+    Process raw Excel rows into validated annuity performance output models.
+
+    BACKWARD COMPATIBLE: Returns list of processed records only.
+    For enrichment metadata and statistics, use process_with_enrichment().
+
+    Args:
+        rows: List of dictionaries representing Excel rows
+        data_source: Identifier for the source file or system
+        enrichment_service: Optional CompanyEnrichmentService for company ID resolution
+        sync_lookup_budget: Budget for synchronous EQC lookups per processing session
+        export_unknown_names: Whether to export unknown company names to CSV
+
+    Returns:
+        List of AnnuityPerformanceOut records
+
+    Raises:
+        AnnuityPerformanceTransformationError: If transformation fails
+        ValueError: If input data is invalid or cannot be processed
+    """
+    result = process_with_enrichment(
+        rows, data_source, enrichment_service, sync_lookup_budget, export_unknown_names
+    )
+    return result.records
+
+
+def process_with_enrichment(
     rows: List[Dict[str, Any]],
     data_source: str = "unknown",
     enrichment_service: Optional["CompanyEnrichmentService"] = None,
@@ -117,7 +151,7 @@ def process(
     Process raw Excel rows into validated annuity performance output models
     with optional enrichment.
 
-    This is the main entry point for the annuity performance domain service.
+    This is the full-featured entry point for the annuity performance domain service.
     It transforms raw dictionary data from "规模明细" Excel sheets into fully
     validated AnnuityPerformanceOut models ready for data warehouse loading.
 
@@ -143,7 +177,9 @@ def process(
         logger.info("No rows provided for processing")
         return ProcessingResultWithEnrichment(
             records=[],
-            data_source=data_source
+            data_source=data_source,
+            unknown_names_csv=None,
+            processing_time_ms=0
         )
 
     if not isinstance(rows, list):
@@ -188,7 +224,9 @@ def process(
 
                         # Collect unknown names for CSV export
                         if not result.company_id and raw_row.get("客户名称"):
-                            unknown_names.append(raw_row.get("客户名称"))
+                            customer_name = raw_row.get("客户名称")
+                            if customer_name is not None:
+                                unknown_names.append(str(customer_name))
 
                     except Exception as e:
                         # CRITICAL: Never fail main pipeline on enrichment errors

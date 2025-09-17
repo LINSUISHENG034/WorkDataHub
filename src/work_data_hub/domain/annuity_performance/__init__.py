@@ -6,6 +6,6 @@ containing Chinese "规模明细" data into PostgreSQL.
 """
 
 from .models import AnnuityPerformanceIn, AnnuityPerformanceOut
-from .service import process
+from .service import process, process_with_enrichment
 
-__all__ = ["AnnuityPerformanceIn", "AnnuityPerformanceOut", "process"]
+__all__ = ["AnnuityPerformanceIn", "AnnuityPerformanceOut", "process", "process_with_enrichment"]

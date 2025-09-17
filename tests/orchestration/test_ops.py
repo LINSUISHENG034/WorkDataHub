@@ -21,6 +21,7 @@ from src.work_data_hub.orchestration.ops import (
     BackfillRefsConfig,
     DiscoverFilesConfig,
     LoadConfig,
+    ProcessingConfig,
     ReadExcelConfig,
     ReadProcessConfig,
     _load_valid_domains,
@@ -29,6 +30,7 @@ from src.work_data_hub.orchestration.ops import (
     derive_portfolio_refs_op,
     discover_files_op,
     load_op,
+    process_annuity_performance_op,
     process_sample_trustee_performance_op,
     read_and_process_sample_trustee_files_op,
     read_excel_op,
@@ -923,3 +925,81 @@ class TestLoadOpConnectionLifecycle:
 
                 with pytest.raises(Exception, match="Database connection failed"):
                     load_op(context, config, processed_rows)
+
+
+class TestProcessAnnuityPerformanceOp:
+    """Test process_annuity_performance_op functionality with plan-only mode."""
+
+    def test_process_annuity_performance_op_plan_only_no_connections(self):
+        """Test plan-only mode doesn't create database connections."""
+        context = build_op_context()
+        config = ProcessingConfig(
+            enrichment_enabled=True,
+            plan_only=True,
+            enrichment_sync_budget=5,
+            export_unknown_names=True
+        )
+        excel_rows = []
+        file_paths = ["test_file.xlsx"]
+
+        # Mock the process_with_enrichment function to avoid import issues
+        with patch("src.work_data_hub.orchestration.ops.process_with_enrichment") as mock_process:
+            # Setup mock result
+            mock_result = Mock()
+            mock_result.records = []
+            mock_result.enrichment_stats.total_records = 0
+            mock_process.return_value = mock_result
+
+            # Mock psycopg2 to verify it's not called in plan-only mode
+            with patch("src.work_data_hub.orchestration.ops.psycopg2") as mock_psycopg2:
+                result = process_annuity_performance_op(context, config, excel_rows, file_paths)
+
+                # Should not attempt database connection in plan-only mode
+                mock_psycopg2.connect.assert_not_called()
+
+                # Should still call processing without enrichment service
+                mock_process.assert_called_once_with(
+                    excel_rows,
+                    data_source="test_file.xlsx",
+                    enrichment_service=None,  # No enrichment service in plan-only mode
+                    sync_lookup_budget=5,
+                    export_unknown_names=True,
+                )
+
+                assert result == []
+
+    def test_process_annuity_performance_op_enrichment_disabled_plan_only(self):
+        """Test plan-only mode with enrichment disabled works correctly."""
+        context = build_op_context()
+        config = ProcessingConfig(
+            enrichment_enabled=False,  # Disabled
+            plan_only=True,
+            enrichment_sync_budget=0,
+            export_unknown_names=True
+        )
+        excel_rows = [{"计划代码": "TEST001", "客户名称": "Test Client"}]
+        file_paths = ["test_file.xlsx"]
+
+        # Mock the process_with_enrichment function
+        with patch("src.work_data_hub.orchestration.ops.process_with_enrichment") as mock_process:
+            # Setup mock result with some processed records
+            mock_result = Mock()
+            mock_record = Mock()
+            mock_record.model_dump.return_value = {"plan_code": "TEST001", "client": "Test Client"}
+            mock_result.records = [mock_record]
+            mock_result.enrichment_stats.total_records = 0
+            mock_process.return_value = mock_result
+
+            result = process_annuity_performance_op(context, config, excel_rows, file_paths)
+
+            # Should call processing without enrichment service
+            mock_process.assert_called_once_with(
+                excel_rows,
+                data_source="test_file.xlsx",
+                enrichment_service=None,  # No enrichment service when disabled
+                sync_lookup_budget=0,
+                export_unknown_names=True,
+            )
+
+            # Should return serialized records
+            assert result == [{"plan_code": "TEST001", "client": "Test Client"}]

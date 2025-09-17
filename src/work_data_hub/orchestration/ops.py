@@ -15,7 +15,7 @@ from dagster import Config, OpExecutionContext, op
 from pydantic import field_validator, model_validator
 
 from ..config.settings import get_settings
-from ..domain.annuity_performance.service import process as process_annuity
+from ..domain.annuity_performance.service import process_with_enrichment
 from ..domain.reference_backfill.service import derive_plan_candidates, derive_portfolio_candidates
 from ..domain.sample_trustee_performance.service import process
 from ..io.connectors.file_connector import DataSourceConnector
@@ -164,6 +164,7 @@ class ProcessingConfig(Config):
     enrichment_enabled: bool = False
     enrichment_sync_budget: int = 0
     export_unknown_names: bool = True
+    plan_only: bool = True
 
     @field_validator("enrichment_sync_budget")
     @classmethod
@@ -270,7 +271,7 @@ def process_annuity_performance_op(
 
     Args:
         context: Dagster execution context
-        config: Processing configuration including enrichment settings
+        config: Processing configuration including enrichment and plan_only settings
         excel_rows: Raw Excel row data
         file_paths: List of file paths (uses first one for data_source metadata)
 
@@ -282,66 +283,53 @@ def process_annuity_performance_op(
 
     # Conditional enrichment service setup
     enrichment_service = None
-    if config.enrichment_enabled:
-        try:
+    conn = None
+
+    try:
+        # GUARD: Only setup enrichment in execute mode
+        if not config.plan_only and config.enrichment_enabled:
             # Import enrichment components (lazy import to avoid circular dependencies)
             from work_data_hub.domain.company_enrichment.lookup_queue import LookupQueue
             from work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
             from work_data_hub.io.connectors.eqc_client import EQCClient
             from work_data_hub.io.loader.company_enrichment_loader import CompanyEnrichmentLoader
 
-            # Only setup enrichment for execution (not plan-only)
-            # Note: we don't have plan_only in ProcessingConfig, so we check global settings
-            settings = get_settings()
-
-            # Check if we should setup database connections
-            # For now, always setup enrichment service when enabled
-            # In production, this could be controlled by additional config
-
-            # Lazy import psycopg2 for database connection
+            # Lazy import psycopg2 for database connection (following load_op pattern)
             global psycopg2  # type: ignore
             if psycopg2 is _PSYCOPG2_NOT_LOADED:  # type: ignore
                 try:
                     import psycopg2 as _psycopg2  # type: ignore
                     psycopg2 = _psycopg2  # type: ignore
                 except ImportError:
-                    context.log.warning("psycopg2 not available for enrichment database operations")
-                    # Continue without enrichment
-                    config.enrichment_enabled = False
+                    raise DataWarehouseLoaderError("psycopg2 not available for enrichment database operations")
 
-            if config.enrichment_enabled and psycopg2 is not _PSYCOPG2_NOT_LOADED:
-                # Get database connection string
-                dsn = settings.get_database_connection_string()
-                conn = psycopg2.connect(dsn)  # type: ignore
+            # Create database connection only in execute mode
+            settings = get_settings()
+            dsn = settings.get_database_connection_string()
+            conn = psycopg2.connect(dsn)  # type: ignore
 
-                # Setup enrichment service components
-                loader = CompanyEnrichmentLoader(conn)
-                queue = LookupQueue(conn)
-                eqc_client = EQCClient()  # Uses settings for auth
+            # Setup enrichment service components with connection
+            loader = CompanyEnrichmentLoader(conn)
+            queue = LookupQueue(conn)
+            eqc_client = EQCClient()  # Uses settings for auth
 
-                enrichment_service = CompanyEnrichmentService(
-                    loader=loader,
-                    queue=queue,
-                    eqc_client=eqc_client,
-                    sync_lookup_budget=config.enrichment_sync_budget
-                )
+            enrichment_service = CompanyEnrichmentService(
+                loader=loader,
+                queue=queue,
+                eqc_client=eqc_client,
+                sync_lookup_budget=config.enrichment_sync_budget
+            )
 
-                context.log.info(
-                    "Enrichment service setup completed",
-                    extra={
-                        "sync_budget": config.enrichment_sync_budget,
-                        "export_unknowns": config.export_unknown_names
-                    }
-                )
+            context.log.info(
+                "Enrichment service setup completed",
+                extra={
+                    "sync_budget": config.enrichment_sync_budget,
+                    "export_unknowns": config.export_unknown_names
+                }
+            )
 
-        except Exception as e:
-            # CRITICAL: Log error but continue without enrichment
-            context.log.warning(f"Failed to setup enrichment service: {e}")
-            enrichment_service = None
-
-    try:
-        # Process using extended annuity performance domain service
-        result = process_annuity(
+        # Call service with enrichment metadata support
+        result = process_with_enrichment(
             excel_rows,
             data_source=file_path,
             enrichment_service=enrichment_service,
@@ -349,8 +337,7 @@ def process_annuity_performance_op(
             export_unknown_names=config.export_unknown_names,
         )
 
-        # Convert Pydantic models to JSON-serializable dicts
-        # mode="json" ensures date/datetime/Decimal become JSON friendly types
+        # Serialize only the records for downstream compatibility
         result_dicts = [
             record.model_dump(mode="json", by_alias=True, exclude_none=True)
             for record in result.records
@@ -372,8 +359,10 @@ def process_annuity_performance_op(
                 }
             )
 
+        # Enhanced logging with execution mode
+        mode_text = "EXECUTED" if not config.plan_only else "PLAN-ONLY"
         context.log.info(
-            f"Domain processing completed - source: {file_path}, "
+            f"Domain processing completed ({mode_text}) - source: {file_path}, "
             f"input_rows: {len(excel_rows)}, output_records: {len(result_dicts)}, "
             f"domain: annuity_performance, enrichment_enabled: {config.enrichment_enabled}"
         )
@@ -383,6 +372,10 @@ def process_annuity_performance_op(
     except Exception as e:
         context.log.error(f"Domain processing failed: {e}")
         raise
+    finally:
+        # CRITICAL: Always cleanup connection
+        if conn is not None:
+            conn.close()
 
 
 class ReadProcessConfig(Config):

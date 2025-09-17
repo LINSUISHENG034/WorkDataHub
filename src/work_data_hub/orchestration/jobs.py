@@ -260,6 +260,7 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
                 "enrichment_enabled": getattr(args, "enrichment_enabled", False),
                 "enrichment_sync_budget": getattr(args, "enrichment_sync_budget", 0),
                 "export_unknown_names": getattr(args, "export_unknown_names", True),
+                "plan_only": effective_plan_only,  # Use effective flag
             }
         }
 
