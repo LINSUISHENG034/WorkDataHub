@@ -51,9 +51,12 @@ TASK BREAKDOWN PHILOSOPHY:
 | ID | Epic | Feature/Task | Status | Dependencies | PRP_Link |
 | :---- | :---- | :---- | :---- | :---- | :---- |
 | R-015 | M2 | Inventory legacy cleaners/domains and produce migration plan | COMPLETED ✅ | - | P-015 |
-| C-014 | M2 | Build intelligent MappingService with DB-driven rules engine | READY_FOR_PRP | R-015 | - |
-| F-018 | M2 | Create BaseDomainService framework and utilities | READY_FOR_PRP | R-015 | - |
+| C-014 | M2 | Centralize domain mapping/default rules (MappingService reused by pipelines) | READY_FOR_PRP | R-015 | - |
+| F-018 | M2 | Deliver shared domain pipeline base (TransformStep builder, config loader, orchestration hooks) | READY_FOR_PRP | R-015 | - |
 | F-019 | M2 | Migrate AnnuityPerformance domain (规模明细) - HIGH complexity | PENDING | C-014, F-018 | - |
+| C-065 | M2 | Define reusable cleansing pipeline framework (TransformStep API + config contract) | PENDING | F-018 | - |
+| F-065 | M2 | Refactor annuity_performance to pipeline-based architecture with enrichment adapter & parity tests | PENDING | C-065, S-003 | - |
+| C-066 | M2 | Establish golden dataset regression suite comparing pipeline vs legacy cleaners | PENDING | F-065 | - |
 | F-025 | M2 | Migrate AnnuityIncome domain (收入明细) - HIGH complexity | PENDING | C-014, F-018 | - |
 | F-026 | M2 | Migrate GroupRetirement domain (团养缴费) - MEDIUM complexity | PENDING | C-014, F-018 | - |
 | F-027 | M2 | Migrate TrusteeAward/Loss domains (受托中标/流失) - LOW complexity | PENDING | C-014, F-018 | - |
@@ -149,7 +152,7 @@ Vertical value: Demonstrable parity with auditable reports is a tangible outcome
 | C-062 | M1.5 | Legacy data import (Mongo/MySQL → Postgres cache) | READY_FOR_PRP | F-061 | - |
 | F-064 | M1.5 | Optional sync‑budget enrichment in pipeline | READY_FOR_PRP | F-060, F-061 | - |
 | S-003 | M1.5 | Company Enrichment Service: Basic Caching & Core Service | COMPLETED ✅ | F-061, F-063 | P-S03 |
-| S-004 | M1.5 | annuity_performance enrichment MVP (E2E validation) | VALIDATING | S-003 | P-S04 |
+| S-004 | M1.5 | annuity_performance enrichment MVP (E2E validation) | VALIDATING | S-003 | P-S04-3 |
 | C-063 | M1.5 | Apply queue DDL and wire settings (WDH_*) | COMPLETED ✅ | S-003 | P-S03 |
 
 | C-064 | M1.5 | Consolidate repo-wide lint/format policy (ruff line-length, scripts) | READY_FOR_PRP | - | - |

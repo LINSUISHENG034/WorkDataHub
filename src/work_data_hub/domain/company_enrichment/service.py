@@ -380,9 +380,9 @@ class CompanyEnrichmentService:
             >>> result = service.resolve_company_id(plan_code="UNKNOWN")
             >>> result.status == ResolutionStatus.TEMP_ASSIGNED
         """
-        # Budget policy: if a per-call budget is provided, use it; otherwise default to 0
-        # This keeps the default path cost-free unless the caller opts in.
-        budget = sync_lookup_budget if sync_lookup_budget is not None else 0
+        # Budget policy: if a per-call budget is provided, use it; otherwise use instance default
+        # This preserves the instance-level budget setting when no override is provided
+        budget = sync_lookup_budget if sync_lookup_budget is not None else self.sync_lookup_budget
 
         logger.debug(
             "Starting unified company ID resolution",

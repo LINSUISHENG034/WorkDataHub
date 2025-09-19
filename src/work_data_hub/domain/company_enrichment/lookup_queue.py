@@ -230,19 +230,21 @@ class LookupQueue:
             )
             return mock_requests
 
-        # Atomic dequeue with status update using FOR UPDATE SKIP LOCKED
+        # Atomic dequeue with status update using CTE pattern to avoid FOR UPDATE in subquery
         sql = """
-            UPDATE enterprise.lookup_requests
-            SET status = 'processing', updated_at = now()
-            WHERE id IN (
+            WITH pending AS (
                 SELECT id FROM enterprise.lookup_requests
                 WHERE status = 'pending'
                 ORDER BY created_at ASC
                 LIMIT %s
                 FOR UPDATE SKIP LOCKED
             )
-            RETURNING id, name, normalized_name, status, attempts, last_error,
-                      created_at, updated_at
+            UPDATE enterprise.lookup_requests
+            SET status = 'processing', updated_at = now()
+            FROM pending
+            WHERE enterprise.lookup_requests.id = pending.id
+            RETURNING enterprise.lookup_requests.id, name, normalized_name, status,
+                      attempts, last_error, created_at, updated_at
         """
 
         try:
@@ -436,28 +438,62 @@ class LookupQueue:
 
         sql = """
             UPDATE enterprise.temp_id_sequence
-            SET id = id + 1
-            RETURNING id
+            SET last_number = last_number + 1, updated_at = now()
+            RETURNING last_number
         """
 
         try:
             with self.connection.cursor() as cursor:
+                def _extract_sequence_value(result):
+                    """Normalize cursor row into an integer sequence value."""
+                    if result is None:
+                        return None
+                    if isinstance(result, dict):
+                        value = result.get("last_number")
+                        if value is not None:
+                            return value
+                        if len(result) == 1:
+                            try:
+                                return next(iter(result.values()))
+                            except StopIteration:
+                                return None
+                        return None
+                    try:
+                        return result[0]
+                    except (IndexError, TypeError):
+                        return None
+
                 cursor.execute(sql)
                 row = cursor.fetchone()
+                sequence_value = _extract_sequence_value(row)
 
-                if not row:
+                if sequence_value is None:
+                    logger.debug(
+                        "Temp ID sequence empty - seeding initial row",
+                        extra={"bootstrap": True}
+                    )
+                    cursor.execute(
+                        """
+                        INSERT INTO enterprise.temp_id_sequence (last_number, updated_at)
+                        SELECT 0, now()
+                        WHERE NOT EXISTS (SELECT 1 FROM enterprise.temp_id_sequence)
+                        """
+                    )
+                    cursor.execute(sql)
+                    row = cursor.fetchone()
+                    sequence_value = _extract_sequence_value(row)
+
+                if sequence_value is None:
                     raise LookupQueueError(
                         "Failed to generate temp ID - no sequence value returned"
                     )
 
-                sequence_value = row[0]
                 temp_id = f"TEMP_{sequence_value:06d}"
 
                 logger.debug(
                     "Generated temporary ID",
                     extra={"temp_id": temp_id, "sequence_value": sequence_value}
                 )
-
                 return temp_id
 
         except Exception as e:

@@ -31,12 +31,12 @@ def mock_connection():
 
     # Setup cursor context manager
     cursor.__enter__ = Mock(return_value=cursor)
-    cursor.__exit__ = Mock()
+    cursor.__exit__ = Mock(return_value=False)
     connection.cursor.return_value = cursor
 
     # Setup connection context manager
     connection.__enter__ = Mock(return_value=connection)
-    connection.__exit__ = Mock()
+    connection.__exit__ = Mock(return_value=False)
 
     return connection
 
@@ -203,7 +203,7 @@ class TestDequeueAtomicOperations:
     """Test atomic dequeue operations with FOR UPDATE SKIP LOCKED."""
 
     def test_dequeue_successful_batch(self, lookup_queue, mock_connection):
-        """Test successful atomic dequeue operation."""
+        """Test successful atomic dequeue operation using CTE pattern."""
         # Setup cursor to return multiple rows
         mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
         mock_rows = [
@@ -232,11 +232,15 @@ class TestDequeueAtomicOperations:
 
         results = lookup_queue.dequeue(batch_size=10)
 
-        # Verify SQL includes FOR UPDATE SKIP LOCKED
+        # Verify SQL uses CTE pattern to avoid FOR UPDATE in subquery
         mock_cursor.execute.assert_called_once()
         sql_call = mock_cursor.execute.call_args[0]
+        assert "WITH pending AS (" in sql_call[0]
+        assert "SELECT id FROM enterprise.lookup_requests" in sql_call[0]
         assert "FOR UPDATE SKIP LOCKED" in sql_call[0]
         assert "UPDATE enterprise.lookup_requests" in sql_call[0]
+        assert "FROM pending" in sql_call[0]
+        assert "WHERE enterprise.lookup_requests.id = pending.id" in sql_call[0]
         assert "SET status = 'processing'" in sql_call[0]
 
         # Verify batch_size parameter
@@ -371,15 +375,37 @@ class TestTempIdGeneration:
 
         temp_id = lookup_queue.get_next_temp_id()
 
-        # Verify SQL uses UPDATE...RETURNING for atomicity
+        # Verify SQL uses UPDATE...RETURNING for atomicity with new schema
         mock_cursor.execute.assert_called_once()
         sql_call = mock_cursor.execute.call_args[0]
         assert "UPDATE enterprise.temp_id_sequence" in sql_call[0]
-        assert "SET id = id + 1" in sql_call[0]
-        assert "RETURNING id" in sql_call[0]
+        assert "SET last_number = last_number + 1, updated_at = now()" in sql_call[0]
+        assert "RETURNING last_number" in sql_call[0]
 
         # Verify formatted temp ID
         assert temp_id == "TEMP_000042"
+
+    def test_get_next_temp_id_handles_dict_row(self, lookup_queue, mock_connection):
+        """Test temp ID generation works with dict-like cursor rows."""
+        mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
+        mock_cursor.fetchone.return_value = {"last_number": 7}
+
+        temp_id = lookup_queue.get_next_temp_id()
+
+        assert temp_id == "TEMP_000007"
+        mock_cursor.execute.assert_called_once()
+
+    def test_get_next_temp_id_bootstraps_empty_sequence(self, lookup_queue, mock_connection):
+        """Test sequence table is seeded when empty."""
+        mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
+        mock_cursor.fetchone.side_effect = [None, {"last_number": 1}]
+
+        temp_id = lookup_queue.get_next_temp_id()
+
+        assert temp_id == "TEMP_000001"
+        sql_calls = [call_args[0][0] for call_args in mock_cursor.execute.call_args_list]
+        assert any("INSERT INTO enterprise.temp_id_sequence" in sql for sql in sql_calls)
+        assert mock_cursor.execute.call_count == 3
 
     def test_get_next_temp_id_uniqueness_sequential(self, lookup_queue, mock_connection):
         """Test temp ID generation produces unique sequential IDs."""
@@ -416,10 +442,14 @@ class TestTempIdGeneration:
     def test_get_next_temp_id_no_sequence_value(self, lookup_queue, mock_connection):
         """Test temp ID generation when no sequence value returned."""
         mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
-        mock_cursor.fetchone.return_value = None
+        mock_cursor.fetchone.side_effect = [None, None]
 
         with pytest.raises(LookupQueueError, match="no sequence value returned"):
             lookup_queue.get_next_temp_id()
+
+        sql_calls = [call_args[0][0] for call_args in mock_cursor.execute.call_args_list]
+        assert any("INSERT INTO enterprise.temp_id_sequence" in sql for sql in sql_calls)
+        assert mock_cursor.execute.call_count == 3
 
 
 class TestConcurrentAccess:

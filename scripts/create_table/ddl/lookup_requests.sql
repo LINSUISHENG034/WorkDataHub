@@ -37,13 +37,21 @@ CREATE TABLE enterprise.lookup_requests (
 );
 
 -- Create temporary ID sequence table for atomic TEMP_* ID generation
+-- MIGRATION NOTE: For existing deployments, run:
+-- ALTER TABLE enterprise.temp_id_sequence RENAME COLUMN id TO last_number;
+-- ALTER TABLE enterprise.temp_id_sequence ADD COLUMN updated_at TIMESTAMPTZ DEFAULT now();
+-- UPDATE enterprise.temp_id_sequence SET updated_at = now();
+-- INSERT INTO enterprise.temp_id_sequence (last_number, updated_at)
+-- SELECT 0, now() WHERE NOT EXISTS (SELECT 1 FROM enterprise.temp_id_sequence);
 CREATE TABLE enterprise.temp_id_sequence (
-    id INTEGER NOT NULL DEFAULT 1,
-    PRIMARY KEY (id)
+    last_number INTEGER DEFAULT 0 NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
--- Initialize temp_id_sequence with starting value
-INSERT INTO enterprise.temp_id_sequence (id) VALUES (1);
+-- Seed initial sequence row to keep UPDATE...RETURNING stable
+INSERT INTO enterprise.temp_id_sequence (last_number)
+SELECT 0
+WHERE NOT EXISTS (SELECT 1 FROM enterprise.temp_id_sequence);
 
 -- Performance indexes for queue processing operations
 -- Status-based index for atomic dequeue operations (pending -> processing)

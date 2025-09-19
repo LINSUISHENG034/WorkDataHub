@@ -14,6 +14,18 @@ from typing import Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Determine project root for resolving .env by default
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_ENV_FILE = PROJECT_ROOT / ".env"
+ENV_FILE_OVERRIDE = os.getenv("WDH_ENV_FILE")
+if ENV_FILE_OVERRIDE:
+    env_file_candidate = Path(ENV_FILE_OVERRIDE).expanduser()
+    if not env_file_candidate.is_absolute():
+        env_file_candidate = PROJECT_ROOT / env_file_candidate
+    SETTINGS_ENV_FILE = env_file_candidate
+else:
+    SETTINGS_ENV_FILE = DEFAULT_ENV_FILE
+
 
 class DatabaseSettings:
     """
@@ -194,12 +206,10 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="WDH_",
-        env_file=".env",
+        env_file=str(SETTINGS_ENV_FILE),
         env_file_encoding="utf-8",
         case_sensitive=False,
-        # Nested settings using double underscore
         env_nested_delimiter="__",
-        # Accept additional env inputs (e.g., WDH_DATABASE__URI)
         extra="ignore",
     )
 

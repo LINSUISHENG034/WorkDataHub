@@ -308,6 +308,96 @@ class TestBudgetExhaustionQueuing:
             assert result.source == "generated"
             assert result.temp_id == "TEMP_000001"
 
+class TestBudgetDefaultBehavior:
+    """Test budget default and override behavior."""
+
+    def test_resolve_company_id_uses_instance_budget_when_no_override(self, mock_loader, mock_queue, mock_eqc_client):
+        """Test that resolve_company_id uses instance budget when sync_lookup_budget is not provided."""
+        # Create service with non-zero instance budget
+        service = CompanyEnrichmentService(
+            loader=mock_loader,
+            queue=mock_queue,
+            eqc_client=mock_eqc_client,
+            sync_lookup_budget=5
+        )
+        
+        # Setup: no internal mappings, so it will attempt EQC lookup
+        mock_loader.load_mappings.return_value = []
+        
+        with patch('src.work_data_hub.domain.company_enrichment.service.resolve_company_id') as mock_resolve:
+            mock_resolve.return_value = CompanyResolutionResult(company_id=None, match_type=None)
+            
+            # Call without sync_lookup_budget parameter - should use instance default of 5
+            result = service.resolve_company_id(customer_name="Test Company")
+            
+            # Verify EQC client was called (budget > 0)
+            mock_eqc_client.search_company.assert_called_once_with("Test Company")
+            
+            # Verify result indicates EQC lookup was attempted
+            assert result.status == ResolutionStatus.SUCCESS_EXTERNAL
+            assert result.company_id == "614810477"
+            assert result.source == "EQC"
+
+    def test_resolve_company_id_uses_override_budget_when_provided(self, mock_loader, mock_queue, mock_eqc_client):
+        """Test that resolve_company_id uses provided sync_lookup_budget when explicitly set."""
+        # Create service with non-zero instance budget
+        service = CompanyEnrichmentService(
+            loader=mock_loader,
+            queue=mock_queue,
+            eqc_client=mock_eqc_client,
+            sync_lookup_budget=5
+        )
+        
+        # Setup: no internal mappings, so it will attempt EQC lookup or queue
+        mock_loader.load_mappings.return_value = []
+        
+        with patch('src.work_data_hub.domain.company_enrichment.service.resolve_company_id') as mock_resolve:
+            mock_resolve.return_value = CompanyResolutionResult(company_id=None, match_type=None)
+            
+            # Call with sync_lookup_budget=0 - should override instance default and queue instead
+            result = service.resolve_company_id(
+                customer_name="Test Company",
+                sync_lookup_budget=0
+            )
+            
+            # Verify EQC client was NOT called (budget = 0)
+            mock_eqc_client.search_company.assert_not_called()
+            
+            # Verify request was queued instead
+            mock_queue.enqueue.assert_called_once()
+            assert result.status == ResolutionStatus.PENDING_LOOKUP
+            assert result.source == "queued"
+
+    def test_resolve_company_id_zero_instance_budget_with_override(self, mock_loader, mock_queue, mock_eqc_client):
+        """Test that resolve_company_id respects override even with zero instance budget."""
+        # Create service with zero instance budget
+        service = CompanyEnrichmentService(
+            loader=mock_loader,
+            queue=mock_queue,
+            eqc_client=mock_eqc_client,
+            sync_lookup_budget=0
+        )
+        
+        # Setup: no internal mappings, so it will attempt EQC lookup
+        mock_loader.load_mappings.return_value = []
+        
+        with patch('src.work_data_hub.domain.company_enrichment.service.resolve_company_id') as mock_resolve:
+            mock_resolve.return_value = CompanyResolutionResult(company_id=None, match_type=None)
+            
+            # Call with sync_lookup_budget=1 - should override instance default and use EQC
+            result = service.resolve_company_id(
+                customer_name="Test Company", 
+                sync_lookup_budget=1
+            )
+            
+            # Verify EQC client was called (budget = 1)
+            mock_eqc_client.search_company.assert_called_once_with("Test Company")
+            
+            # Verify result indicates EQC lookup was attempted
+            assert result.status == ResolutionStatus.SUCCESS_EXTERNAL
+            assert result.company_id == "614810477"
+            assert result.source == "EQC"
+
 
 class TestTempIdGeneration:
     """Test temporary ID generation (TEMP_ASSIGNED status)."""

@@ -384,6 +384,89 @@ class TestPostgreSQLLoading:
         assert stats["deleted"] >= 0
         assert stats["inserted"] >= 0
 
+    def test_load_company_mappings_append_mode(self):
+        """Test append mode uses conflict handling to prevent duplicates."""
+        mappings = [
+            CompanyMappingRecord(alias_name="AN001", canonical_id="111", match_type="plan", priority=1),
+            CompanyMappingRecord(alias_name="AN002", canonical_id="222", match_type="plan", priority=1)
+        ]
+
+        mock_cursor = MagicMock()
+        mock_cursor.rowcount = 2  # Both records inserted (no conflicts)
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_conn.__enter__.return_value = mock_conn
+
+        stats = load_company_mappings(mappings, mock_conn, mode="append")
+
+        # Should have called execute (INSERT with ON CONFLICT)
+        mock_cursor.execute.assert_called()
+        
+        # Verify SQL includes conflict handling
+        sql_call = mock_cursor.execute.call_args[0][0]
+        assert "INSERT INTO" in sql_call
+        assert "ON CONFLICT" in sql_call
+        assert "DO NOTHING" in sql_call
+
+        # Should not perform any deletes in append mode
+        assert stats["deleted"] == 0
+        assert stats["inserted"] == 2
+        assert stats["batches"] > 0
+
+    def test_load_company_mappings_append_mode_with_conflicts(self):
+        """Test append mode handles conflicts correctly with accurate stats."""
+        mappings = [
+            CompanyMappingRecord(alias_name="AN001", canonical_id="111", match_type="plan", priority=1),
+            CompanyMappingRecord(alias_name="AN002", canonical_id="222", match_type="plan", priority=1),
+            CompanyMappingRecord(alias_name="AN003", canonical_id="333", match_type="plan", priority=1)
+        ]
+
+        mock_cursor = MagicMock()
+        mock_cursor.rowcount = 1  # Only 1 record inserted due to conflicts
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_conn.__enter__.return_value = mock_conn
+
+        stats = load_company_mappings(mappings, mock_conn, mode="append")
+
+        # Verify conflict-aware SQL is used
+        sql_call = mock_cursor.execute.call_args[0][0]
+        assert "ON CONFLICT (\"alias_name\",\"match_type\") DO NOTHING" in sql_call
+
+        # Stats should reflect actual inserts, not attempts
+        assert stats["deleted"] == 0
+        assert stats["inserted"] == 1  # Only actual inserts counted
+        assert stats["batches"] > 0
+
+    def test_load_company_mappings_append_mode_chunking(self):
+        """Test append mode works with chunking for large datasets."""
+        # Create more mappings than chunk size
+        mappings = [
+            CompanyMappingRecord(alias_name=f"AN{i:03d}", canonical_id=str(100 + i), 
+                               match_type="plan", priority=1)
+            for i in range(5)  # 5 records
+        ]
+
+        mock_cursor = MagicMock()
+        mock_cursor.rowcount = 2  # 2 records per chunk
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_conn.__enter__.return_value = mock_conn
+
+        stats = load_company_mappings(mappings, mock_conn, mode="append", chunk_size=2)
+
+        # Should have called execute multiple times for chunks
+        assert mock_cursor.execute.call_count >= 2  # At least 2 chunks (5 records / 2 per chunk)
+        
+        # All calls should use conflict handling
+        for call in mock_cursor.execute.call_args_list:
+            sql = call[0][0]
+            assert "ON CONFLICT" in sql
+            assert "DO NOTHING" in sql
+
+        assert stats["deleted"] == 0
+        assert stats["batches"] >= 3  # 3 batches for 5 records with chunk_size=2  # 3 batches for 5 records with chunk_size=2
+
 
 class TestModelTransformation:
     """Test transformation between legacy data and Pydantic models."""

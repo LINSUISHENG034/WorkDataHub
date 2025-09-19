@@ -160,6 +160,69 @@ def build_insert_sql(
 
     return sql, params
 
+def build_insert_sql_with_conflict(
+    table: str,
+    cols: List[str],
+    rows: List[Dict[str, Any]],
+    conflict_cols: Optional[List[str]] = None,
+    conflict_action: str = "DO NOTHING"
+) -> Tuple[Optional[str], List[Any]]:
+    """
+    Build parameterized INSERT SQL with conflict resolution for bulk operations.
+
+    Args:
+        table: Target table name
+        cols: Column names in desired order
+        rows: List of dictionaries with row data
+        conflict_cols: Columns to check for conflicts (for ON CONFLICT clause)
+        conflict_action: Action to take on conflict ("DO NOTHING" or "DO UPDATE SET ...")
+
+    Returns:
+        Tuple of (sql_string, flattened_parameters)
+
+    Example:
+        >>> sql, params = build_insert_sql_with_conflict(
+        ...     "users", ["id", "name"], [{"id": 1, "name": "John"}],
+        ...     conflict_cols=["id"], conflict_action="DO NOTHING"
+        ... )
+        >>> sql
+        'INSERT INTO "users" ("id","name") VALUES (%s,%s) ON CONFLICT ("id") DO NOTHING'
+    """
+    if not table:
+        raise ValueError("Table name is required")
+    if not cols:
+        raise ValueError("Column list cannot be empty")
+    if conflict_cols and not isinstance(conflict_cols, list):
+        raise ValueError("conflict_cols must be a list")
+
+    rows = _ensure_list_of_dicts(rows)
+    if not rows:
+        return None, []
+
+    # Quote table and column identifiers
+    quoted_table = quote_ident(table)
+    quoted_cols = [quote_ident(col) for col in cols]
+
+    # Build SQL template
+    col_list = ",".join(quoted_cols)
+    value_template = "(" + ",".join(["%s"] * len(cols)) + ")"
+
+    sql = f"INSERT INTO {quoted_table} ({col_list}) VALUES {value_template}"
+
+    # Add conflict resolution if specified
+    if conflict_cols:
+        quoted_conflict_cols = [quote_ident(col) for col in conflict_cols]
+        conflict_col_list = ",".join(quoted_conflict_cols)
+        sql += f" ON CONFLICT ({conflict_col_list}) {conflict_action}"
+
+    # Flatten parameters in row-major order
+    params = []
+    for row in rows:
+        for col in cols:
+            params.append(row.get(col))  # None if key missing
+
+    return sql, params
+
 
 def build_delete_sql(
     table: str, pk_cols: List[str], rows: List[Dict[str, Any]]

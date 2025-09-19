@@ -30,6 +30,7 @@ from work_data_hub.io.loader.warehouse_loader import (
     _get_column_order,
     build_delete_sql,
     build_insert_sql,
+    build_insert_sql_with_conflict,
     quote_qualified,
 )
 
@@ -366,13 +367,27 @@ def load_company_mappings(
                     finally:
                         cursor.close()
 
+            elif mode == "append":
+                # For append mode, we'll use conflict handling in the insert logic below
+                logger.debug("Using append mode with conflict handling")
+
             # Insert new records in chunks
             total_inserted = 0
             batch_count = 0
 
             for i in range(0, len(mapping_dicts), chunk_size):
                 chunk = mapping_dicts[i:i + chunk_size]
-                insert_sql, insert_params = build_insert_sql(qualified_table, cols, chunk)
+
+                if mode == "append":
+                    # Use conflict-aware SQL for append mode
+                    insert_sql, insert_params = build_insert_sql_with_conflict(
+                        qualified_table, cols, chunk,
+                        conflict_cols=pk_cols,
+                        conflict_action="DO NOTHING"
+                    )
+                else:
+                    # Use regular SQL for delete_insert mode
+                    insert_sql, insert_params = build_insert_sql(qualified_table, cols, chunk)
 
                 if insert_sql:
                     cursor = conn.cursor()
