@@ -1,4 +1,4 @@
-# CLAUDE.md v1.02
+# CLAUDE.md v1.03
 
 This file provides comprehensive guidance to Claude Code when working with Python code in this repository.
 
@@ -82,6 +82,8 @@ Dependencies Rule
 ## 🛠️ Development Environment
 
 ### UV Package Management
+
+**CRITICAL** Environment-specific paths: When in a Linux Shell (including WSL), the virtual environment path is ~/.virtualenvs/work-data-hub. Do not make any changes to the project's root .venv directory.
 
 This project uses UV for blazing-fast Python package and environment management.
 

@@ -103,6 +103,61 @@ uv run pytest -k sample_trustee_performance -v
 
 # Optional: pre-commit hooks (only if configured)
 # uv run pre-commit run --all-files
+```
+
+## Pipeline Framework Validation
+
+The shared pipeline framework provides an alternative transformation path for annuity performance processing. Use these commands to validate pipeline parity and functionality:
+
+```bash
+# Generate golden baseline from legacy cleaner (required for parity testing)
+uv run python scripts/tools/run_legacy_annuity_cleaner.py \
+  --inputs tests/fixtures/sample_data/annuity_subsets \
+  --output tests/fixtures/annuity_performance/golden_legacy.parquet \
+  --mappings tests/fixtures/sample_legacy_mappings.json
+
+# Run parity test to ensure pipeline matches legacy exactly
+uv run pytest tests/e2e/test_pipeline_vs_legacy.py::test_pipeline_vs_legacy_parity -v
+
+# Run basic pipeline functionality test
+uv run pytest tests/e2e/test_pipeline_vs_legacy.py::test_pipeline_basic_functionality -v
+
+# Run all end-to-end tests
+uv run pytest tests/e2e/ -v
+
+# Test with pipeline enabled (new transformation path)
+uv run python -m src.work_data_hub.orchestration.jobs \
+  --domain annuity_performance \
+  --plan-only \
+  --use-pipeline \
+  --max-files 1
+
+# Test with pipeline disabled (legacy transformation path)
+uv run python -m src.work_data_hub.orchestration.jobs \
+  --domain annuity_performance \
+  --plan-only \
+  --no-use-pipeline \
+  --max-files 1
+
+# Compare outputs directly (debugging)
+uv run python tests/e2e/test_pipeline_vs_legacy.py
+```
+
+### Configuration Options
+
+- **Environment setting**: `WDH_ANNUITY_PIPELINE_ENABLED=true` (default: true)
+- **CLI override**: `--use-pipeline` / `--no-use-pipeline` (overrides environment setting)
+- **Service parameter**: `process_with_enrichment(..., use_pipeline=True/False/None)`
+
+### Validation Gates
+
+Before merging pipeline changes, ensure all validation commands pass:
+
+1. ✅ Linting: `uv run ruff check src/ --fix`
+2. ✅ Type checking: `uv run mypy src/`
+3. ✅ Unit tests: `uv run pytest tests/domain/annuity_performance/ -v`
+4. ✅ Parity test: `uv run pytest tests/e2e/test_pipeline_vs_legacy.py::test_pipeline_vs_legacy_parity -v`
+5. ✅ End-to-end: `uv run pytest tests/e2e/ -v`
 
 ## Company ID (Enrichment) — Where to Start
 

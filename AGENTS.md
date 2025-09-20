@@ -1,10 +1,12 @@
-# AGENTS.md v1.03
+# AGENTS.md v1.04
 
 This file is a README for agents. It gives any AI coding assistant a predictable, minimal set of rules and commands to work effectively in this repository.
 
 Scope: This guide targets the supporting agent that maintains ROADMAP/README, prepares INITIAL.md, and reviews Claude’s PRP and code. Claude runs the fixed “Generate PRP” and “Execute PRP” flows.
 
 ## Development Tips
+
+**CRITICAL** Environment-specific paths: When in a Linux Shell (including WSL), the virtual environment path is ~/.virtualenvs/work-data-hub. Do not make any changes to the project's root .venv directory.
 
 - Package management: use `uv` for all dependencies and virtualenvs.
 - Virtualenv usage: prefer `uv run <command>` over manual activation.

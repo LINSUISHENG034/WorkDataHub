@@ -52,9 +52,9 @@ TASK BREAKDOWN PHILOSOPHY:
 | :---- | :---- | :---- | :---- | :---- | :---- |
 | R-015 | M2 | Inventory legacy cleaners/domains and produce migration plan | COMPLETED ✅ | - | P-015 |
 | C-014 | M2 | Centralize domain mapping/default rules (MappingService reused by pipelines) | READY_FOR_PRP | R-015 | - |
-| F-018 | M2 | Deliver shared domain pipeline base (TransformStep builder, config loader, orchestration hooks) | READY_FOR_PRP | R-015 | - |
+| F-018 | M2 | Deliver shared domain pipeline base (TransformStep builder, config loader, orchestration hooks) | COMPLETED ✅ | R-015 | P-030 |
 | F-019 | M2 | Migrate AnnuityPerformance domain (规模明细) - HIGH complexity | PENDING | C-014, F-018 | - |
-| C-065 | M2 | Define reusable cleansing pipeline framework (TransformStep API + config contract) | PENDING | F-018 | - |
+| C-065 | M2 | Define reusable cleansing pipeline framework (TransformStep API + config contract) | COMPLETED ✅ | F-018 | P-030 |
 | F-065 | M2 | Refactor annuity_performance to pipeline-based architecture with enrichment adapter & parity tests | PENDING | C-065, S-003 | - |
 | C-066 | M2 | Establish golden dataset regression suite comparing pipeline vs legacy cleaners | PENDING | F-065 | - |
 | F-025 | M2 | Migrate AnnuityIncome domain (收入明细) - HIGH complexity | PENDING | C-014, F-018 | - |
@@ -188,3 +188,5 @@ References
 5. VALIDATING: Code is complete, agent is running validation loops.  
 6. COMPLETED ✅: All validation gates passed.  
 7. BLOCKED: Progress is impeded. Requires human review.
+
+
