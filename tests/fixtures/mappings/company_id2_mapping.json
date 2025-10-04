@@ -1,0 +1,10 @@
+{
+  "data": {},
+  "metadata": {
+    "description": "Account numbers (priority=2) from annuity_account_mapping table",
+    "export_timestamp": "2025-09-22T14:30:00.000000",
+    "extractor_version": "1.0",
+    "row_count": 0,
+    "source": "database_missing"
+  }
+}

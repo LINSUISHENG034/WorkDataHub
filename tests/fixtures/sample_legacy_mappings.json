@@ -74,6 +74,51 @@
         "建设银行年金管理账户": "604809109",
         "农业银行年金托管账户": "602790403"
       }
+    },
+    "business_type_code_mapping": {
+      "description": "Business type -> code mappings mirrored from legacy MySQL table",
+      "source": "curated_fixture",
+      "data": {
+        "企年受托": "BUSINESS_003",
+        "企年投资": "BUSINESS_004",
+        "职年受托": "BUSINESS_001",
+        "职年投资": "BUSINESS_002"
+      }
+    },
+    "default_portfolio_code_mapping": {
+      "description": "Default portfolio codes used when source is blank",
+      "source": "curated_fixture",
+      "data": {
+        "集合计划": "QTAN001",
+        "单一计划": "QTAN002",
+        "职业年金": "QTAN003"
+      }
+    },
+    "company_branch_mapping": {
+      "description": "Institution name -> code mapping subset required for test fixtures",
+      "source": "curated_fixture",
+      "data": {
+        "总部": "G00",
+        "北京": "G01",
+        "上海": "G02",
+        "深圳": "G05",
+        "广东": "G04",
+        "江苏": "G10",
+        "浙江": "G12",
+        "福建": "G13",
+        "海南": "G15",
+        "重庆": "G18",
+        "山东": "G21",
+        "江西": "G22",
+        "新疆": "G23",
+        "安徽": "G25",
+        "宁波": "G29",
+        "甘肃": "G34",
+        "贵州": "G35",
+        "深圳分公司": "G05",
+        "广州": "G04",
+        "青岛": "G11"
+      }
     }
   },
   "test_cases": {

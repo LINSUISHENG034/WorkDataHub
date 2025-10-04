@@ -8,7 +8,7 @@ and proper error handling.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import yaml
 from dagster import Config, OpExecutionContext, op
@@ -165,6 +165,7 @@ class ProcessingConfig(Config):
     enrichment_sync_budget: int = 0
     export_unknown_names: bool = True
     plan_only: bool = True
+    use_pipeline: Optional[bool] = None  # CLI override for pipeline framework (None=respect setting)
 
     @field_validator("enrichment_sync_budget")
     @classmethod
@@ -335,6 +336,7 @@ def process_annuity_performance_op(
             enrichment_service=enrichment_service,
             sync_lookup_budget=config.enrichment_sync_budget,
             export_unknown_names=config.export_unknown_names,
+            use_pipeline=config.use_pipeline,  # Pass CLI override to service
         )
 
         # Serialize only the records for downstream compatibility

@@ -162,6 +162,11 @@ class Settings(BaseSettings):
         default=True, description="Export unknown company names to CSV for manual review"
     )
 
+    # Pipeline Framework Configuration - shared transformation pipeline settings
+    annuity_pipeline_enabled: bool = Field(
+        default=True, description="Use shared pipeline framework for annuity performance processing"
+    )
+
     # Database configuration - nested settings with WDH_DATABASE__ prefix
     database_host: str = Field(default="localhost", description="Database host")
     database_port: int = Field(default=5432, description="Database port")

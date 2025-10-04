@@ -261,6 +261,7 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
                 "enrichment_sync_budget": getattr(args, "enrichment_sync_budget", 0),
                 "export_unknown_names": getattr(args, "export_unknown_names", True),
                 "plan_only": effective_plan_only,  # Use effective flag
+                "use_pipeline": getattr(args, "use_pipeline", None),  # CLI override for pipeline framework
             }
         }
 
@@ -485,6 +486,14 @@ def main():
         action="store_true",
         default=True,
         help="Generate execution plan without database connection",
+    )
+
+    # Pipeline framework toggle
+    parser.add_argument(
+        "--use-pipeline",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Use shared pipeline framework for annuity performance processing (overrides WDH_ANNUITY_PIPELINE_ENABLED setting)",
     )
     # Sheet can be an index or a name (string)
     parser.add_argument(

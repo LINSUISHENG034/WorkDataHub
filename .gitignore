@@ -121,3 +121,6 @@ htmlcov/
 .dmypy.json
 dmypy.json
 
+# BMAD (local only)
+.bmad-core/
+.bmad-*/

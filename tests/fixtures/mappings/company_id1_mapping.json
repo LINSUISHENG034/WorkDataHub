@@ -1,0 +1,14 @@
+{
+  "data": {
+    "Z0003": "600001001",
+    "Z0004": "600001002",
+    "Z0005": "600001003"
+  },
+  "metadata": {
+    "description": "Plan codes (priority=1) from 年金计划 table",
+    "export_timestamp": "2025-09-22T14:30:00.000000",
+    "extractor_version": "1.0",
+    "row_count": 3,
+    "source": "年金计划"
+  }
+}

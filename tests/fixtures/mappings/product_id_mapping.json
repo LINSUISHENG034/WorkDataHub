@@ -1,0 +1,10 @@
+{
+  "data": {},
+  "metadata": {
+    "description": "Product -> ID mappings from 产品明细 table",
+    "export_timestamp": "2025-09-22T14:30:00.000000",
+    "extractor_version": "1.0",
+    "row_count": 0,
+    "source": "database_missing"
+  }
+}

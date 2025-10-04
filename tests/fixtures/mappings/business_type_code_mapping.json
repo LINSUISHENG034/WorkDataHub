@@ -1,0 +1,24 @@
+{
+  "data": {
+    "企年投资": "PL201", 
+    "企年受托": "PL202", 
+    "职年投资": "PL203", 
+    "职年受托": "PL204", 
+    "自有险资": "PL205", 
+    "直投": "PL206", 
+    "三方": "PL207", 
+    "团养": "PL208", 
+    "企康": "PL209", 
+    "企业年金": "PL210", 
+    "职业年金": "PL211", 
+    "其他": "PL301"
+  }
+,
+  "metadata": {
+    "description": "Business type -> code mappings from 产品线 table",
+    "export_timestamp": "2025-09-22T14:30:00.000000",
+    "extractor_version": "1.0",
+    "row_count": 4,
+    "source": "规模明细"
+  }
+}
