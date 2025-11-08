@@ -1,0 +1,164 @@
+# WorkDataHub Data Sources Configuration
+#
+# This file defines the configuration for discovering and processing data files
+# from different business domains. Each domain specifies:
+# - pattern: Unicode-aware regex for filename matching with named groups
+# - select: Strategy for choosing between multiple matching files
+# - sheet: Excel sheet to process (0-indexed or sheet name)
+# - description: Human-readable description of the domain
+
+domains:
+  # Trustee Performance Reports
+  # Handles files with patterns like: "xxxx受托业绩报告.xlsx"
+  sample_trustee_performance:
+    description: "Sample (non-production) trustee performance domain for tests and demos"
+    
+    # Unicode-aware regex pattern with named groups for year/month extraction
+    # Matches patterns: YYYY[separator]MM*受托业绩*.xlsx
+    # Separators: -, _, /, or none
+    # Month: 1-12 with optional leading zero
+    pattern: "(?P<year>20\\d{2})[-_/]?(?P<month>0?[1-9]|1[0-2]).*受托业绩.*\\.xlsx$"
+    
+    # Selection strategy when multiple files match
+    # - "latest_by_year_month": Select file with highest (year, month) tuple
+    # - "latest_by_mtime": Select file with most recent modification time
+    select: "latest_by_year_month"
+    
+    # Excel sheet to process (0 = first sheet)
+    sheet: 0
+    
+    # Database table configuration for loader
+    table: "sample_trustee_performance"
+    pk: ["report_date", "plan_code", "company_code"]
+    
+    # Data quality requirements
+    required_columns:
+      - "年"           # Year column
+      - "月"           # Month column
+      - "计划代码"     # Plan code
+    
+    # Optional validation rules
+    validation:
+      min_rows: 1
+      max_file_age_days: 365
+
+  # Annuity Performance Reports
+  # Handles files with patterns like: "xx年xx月年金终稿数据.xlsx"
+  annuity_performance:
+    description: "Annuity performance (规模明细) with version-aware selection"
+
+    # Unicode-aware regex pattern with named groups for year/month extraction
+    # Matches patterns: YY年MM月*年金*终稿数据*.xlsx or YYYY年MM月*年金*终稿数据*.xlsx
+    # Supports both 2-digit years (24 → 2024) and 4-digit years
+    # Month: 1-12 with optional leading zero
+    pattern: "(?P<year>\\d{2}|20\\d{2})年(?P<month>0?[1-9]|1[0-2])月.*年金.*终稿数据.*\\.(xlsx|xlsm)$"
+
+    # Selection strategy when multiple files match
+    # - "latest_by_year_month": Groups by (year, month), selects highest version within each group
+    select: "latest_by_year_month"
+
+    # Excel sheet to process (use sheet name for consistency)
+    sheet: "规模明细"
+
+    # Database table configuration for loader
+    table: "规模明细"
+    pk: ["月度", "计划代码", "company_id"]  # Business composite key for delete_insert operations
+
+    # Reference backfill configuration
+    refs:
+      plans:
+        schema: public
+        table: "年金计划"
+        # Align key with production FK target; use 年金计划号 as the actual database field
+        key: ["年金计划号"]
+        # Allow fill_null_only to set/patch these fields (removed non-existent 计划代码)
+        updatable: [
+          "计划全称",
+          "计划类型",
+          "客户名称",
+          "company_id",
+          "主拓代码",
+          "主拓机构",
+          "备注",
+          "资格",
+          "年金计划号",
+        ]
+      portfolios:
+        schema: public
+        table: "组合计划"
+        key: ["组合代码"]
+        updatable: ["组合名称", "组合类型", "运作开始日", "备注", "年金计划号"]
+
+    # Data quality requirements
+    required_columns:
+      - "年"           # Year column
+      - "月"           # Month column
+      - "计划代码"     # Plan code
+
+    # Optional validation rules
+    validation:
+      min_rows: 1
+      max_file_age_days: 365
+
+  # Company ID Mapping Management
+  # Administrative domain for company mapping import/export operations
+  company_mapping:
+    description: "Company ID mapping management (enterprise.company_mapping table)"
+
+    # No file pattern - this is database-only domain for mapping operations
+    # Used for CLI commands: --job import_company_mappings
+    pattern: "(?!)"               # 负预测先行，确保文件扫描不会命中任何东西
+    select: "latest_by_mtime"     # 随便选一个合法枚举，实际不会走到
+
+    # Database table configuration for loader
+    table: "company_mapping"
+    schema: "enterprise"
+    pk: ["alias_name", "match_type"]  # Compound primary key
+
+    # Operation modes supported
+    modes: ["delete_insert", "append"]  # delete_insert for migration, append for updates
+
+    # Performance configuration
+    chunk_size: 1000  # Batch size for INSERT operations
+
+    # Data validation
+    required_fields:
+      - "alias_name"      # Source identifier
+      - "canonical_id"    # Target company_id
+      - "match_type"      # Mapping category
+      - "priority"        # Search priority
+
+    # Match types supported (with priority mapping)
+    match_types:
+      plan: 1           # 计划代码 -> COMPANY_ID1_MAPPING
+      account: 2        # 集团企业客户号 -> COMPANY_ID2_MAPPING
+      hardcode: 3       # Hardcoded mappings -> COMPANY_ID3_MAPPING
+      name: 4           # 客户名称 -> COMPANY_ID4_MAPPING
+      account_name: 5   # 年金账户名 -> COMPANY_ID5_MAPPING
+
+# Global file discovery settings
+discovery:
+  # File types to scan for
+  file_extensions:
+    - ".xlsx"
+    - ".xlsm"
+  
+  # Directories to exclude from scanning
+  exclude_directories:
+    - "temp"
+    - "backup"
+    - "archive"
+    - ".git"
+    - "__pycache__"
+  
+  # File patterns to ignore
+  ignore_patterns:
+    - "~$*"        # Excel temp files
+    - "*.tmp"      # Temporary files
+    - "*.bak"      # Backup files
+    - "*.eml"      # Email files
+    - ".*"         # Hidden files
+  
+  # Recursion settings
+  max_depth: 10         # Maximum directory depth to scan
+  follow_symlinks: false # Whether to follow symbolic links

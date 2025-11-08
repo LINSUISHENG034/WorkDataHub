@@ -1,0 +1,14 @@
+{
+  "data": {
+    "北京市（贰号）职业年金计划": "600001001",
+    "湖北省（肆号）职业年金计划": "600001002",
+    "新疆维吾尔自治区叁号职业年金计划": "600001003"
+  },
+  "metadata": {
+    "description": "Customer names (priority=4) from company_id_mapping table",
+    "export_timestamp": "2025-09-22T14:30:00.000000",
+    "extractor_version": "1.0",
+    "row_count": 3,
+    "source": "年金计划"
+  }
+}

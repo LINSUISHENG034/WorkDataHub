@@ -1,0 +1,25 @@
+domains:
+  annuity_performance:
+    table: "规模明细"
+    entity: "annuity_performance"
+    delete_scope_key: ["月度", "计划代码", "company_id"]
+    ddl: "scripts/create_table/ddl/annuity_performance.sql"
+
+  annuity_plans:
+    table: "年金计划"
+    entity: "annuity_plans"
+    delete_scope_key: ["年金计划号", "company_id"]
+    ddl: "scripts/create_table/ddl/annuity_plans.sql"
+
+  portfolio_plans:
+    table: "组合计划"
+    entity: "portfolio_plans"
+    delete_scope_key: ["年金计划号", "组合代码"]
+    ddl: "scripts/create_table/ddl/portfolio_plans.sql"
+
+  company_mapping:
+    table: "enterprise.company_mapping"
+    entity: "company_mapping"
+    delete_scope_key: ["alias_name", "match_type"]
+    ddl: "scripts/create_table/ddl/company_mapping.sql"
+

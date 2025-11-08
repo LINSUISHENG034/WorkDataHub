@@ -1,0 +1,137 @@
+# 忽略 docs 文件夹下（不含子目录）所有 bmm- 开头、.md 结尾的文件
+docs/bmm-*.md
+docs/implementation-*.md
+docs/validation-*.md
+
+# Claude Code settings
+monthly/
+db_migration/
+reference/claude-code-full-guide/
+reference/patoken/
+
+# Ignore folders
+deprecated/
+/legacy/docs/
+archive/
+.kiro/
+.serena/
+.trae/
+.ruff_cache/
+.devcontainer/
+sample_data/
+bmad/
+.claude/
+.gemini/
+.github/
+docs/sprint*.md
+
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Virtual environments
+.venv
+.venv_win
+.venv_linux
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific
+data/
+storage/
+temp/
+downloads/
+
+# Logs
+logs/
+*.log
+
+# Environment variables
+.env*
+!.env.example
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker
+.dockerignore
+
+# MinIO data
+minio-data/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Coverage reports
+.coverage
+coverage.xml
+htmlcov/
+
+# Pytest
+.pytest_cache/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# BMAD (local only)
+.bmad-core/
+.bmad-*/

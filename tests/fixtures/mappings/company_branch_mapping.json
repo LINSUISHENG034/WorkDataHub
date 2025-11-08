@@ -1,0 +1,20 @@
+{
+  "data": {
+    "北京": "G01",
+    "湖北": "G09",
+    "新疆": "G23",
+    "总部": "G00",
+    "上海": "G02",
+    "深圳": "G05",
+    "广东": "G04",
+    "江苏": "G10",
+    "浙江": "G12"
+  },
+  "metadata": {
+    "description": "Institution -> code mapping from 组织架构 table",
+    "export_timestamp": "2025-09-22T14:30:00.000000",
+    "extractor_version": "1.0",
+    "row_count": 9,
+    "source": "年金计划"
+  }
+}

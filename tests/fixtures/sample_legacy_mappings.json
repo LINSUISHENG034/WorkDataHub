@@ -1,0 +1,372 @@
+{
+  "description": "Sample legacy mapping data for testing company ID migration",
+  "version": "1.0",
+  "test_scenarios": {
+    "priority_testing": "Test data covers all 5 priority levels with realistic examples",
+    "chinese_characters": "Includes real Chinese company names and account names for UTF-8 testing",
+    "edge_cases": "Null/empty values, whitespace, special characters",
+    "conflict_scenarios": "Duplicate mappings for validation testing"
+  },
+  "mappings": {
+    "company_id1_mapping": {
+      "description": "Plan codes (priority=1) from 年金计划 table",
+      "source_table": "mapping.年金计划",
+      "data": {
+        "AN001": "614810477",
+        "AN003": "608349737",
+        "P0290": "610081428",
+        "P0807": "603968573",
+        "FP0100": "601038164",
+        "SC001": "604809109",
+        "XNP001": "602790403"
+      }
+    },
+    "company_id2_mapping": {
+      "description": "Account numbers (priority=2) from annuity_account_mapping table",
+      "source_table": "enterprise.annuity_account_mapping",
+      "data": {
+        "123456789": "614810477",
+        "987654321": "608349737",
+        "456789123": "610081428",
+        "789123456": "603968573",
+        "321654987": "601038164"
+      }
+    },
+    "company_id3_mapping": {
+      "description": "Hardcoded mappings (priority=3) from mappings.py",
+      "source": "hardcoded_dictionary",
+      "data": {
+        "FP0001": "614810477",
+        "FP0002": "614810477",
+        "FP0003": "610081428",
+        "P0809": "608349737",
+        "SC002": "604809109",
+        "SC007": "602790403",
+        "XNP466": "603968573",
+        "XNP467": "603968573",
+        "XNP596": "601038164"
+      }
+    },
+    "company_id4_mapping": {
+      "description": "Customer names (priority=4) from company_id_mapping table",
+      "source_table": "enterprise.company_id_mapping",
+      "data": {
+        "中国平安保险股份有限公司": "614810477",
+        "上海银行股份有限公司": "608349737",
+        "北京银行股份有限公司": "610081428",
+        "中国工商银行股份有限公司": "603968573",
+        "招商银行股份有限公司": "601038164",
+        "中国建设银行股份有限公司": "604809109",
+        "中国农业银行股份有限公司": "602790403",
+        "Test Company Ltd": "600866900",
+        "Another Test Corp": "600866901"
+      }
+    },
+    "company_id5_mapping": {
+      "description": "Account names (priority=5) from 规模明细 table",
+      "source_table": "business.规模明细",
+      "data": {
+        "平安保险年金计划账户": "614810477",
+        "上海银行企业年金账户": "608349737",
+        "北京银行年金专户": "610081428",
+        "工商银行集合计划账户": "603968573",
+        "招商银行年金投资账户": "601038164",
+        "建设银行年金管理账户": "604809109",
+        "农业银行年金托管账户": "602790403"
+      }
+    },
+    "business_type_code_mapping": {
+      "description": "Business type -> code mappings mirrored from legacy MySQL table",
+      "source": "curated_fixture",
+      "data": {
+        "企年受托": "BUSINESS_003",
+        "企年投资": "BUSINESS_004",
+        "职年受托": "BUSINESS_001",
+        "职年投资": "BUSINESS_002"
+      }
+    },
+    "default_portfolio_code_mapping": {
+      "description": "Default portfolio codes used when source is blank",
+      "source": "curated_fixture",
+      "data": {
+        "集合计划": "QTAN001",
+        "单一计划": "QTAN002",
+        "职业年金": "QTAN003"
+      }
+    },
+    "company_branch_mapping": {
+      "description": "Institution name -> code mapping subset required for test fixtures",
+      "source": "curated_fixture",
+      "data": {
+        "总部": "G00",
+        "北京": "G01",
+        "上海": "G02",
+        "深圳": "G05",
+        "广东": "G04",
+        "江苏": "G10",
+        "浙江": "G12",
+        "福建": "G13",
+        "海南": "G15",
+        "重庆": "G18",
+        "山东": "G21",
+        "江西": "G22",
+        "新疆": "G23",
+        "安徽": "G25",
+        "宁波": "G29",
+        "甘肃": "G34",
+        "贵州": "G35",
+        "深圳分公司": "G05",
+        "广州": "G04",
+        "青岛": "G11"
+      }
+    }
+  },
+  "test_cases": {
+    "priority_resolution": [
+      {
+        "name": "plan_takes_priority_over_name",
+        "query": {
+          "plan_code": "AN001",
+          "customer_name": "中国平安保险股份有限公司"
+        },
+        "expected": {
+          "company_id": "614810477",
+          "match_type": "plan",
+          "source_value": "AN001",
+          "priority": 1
+        }
+      },
+      {
+        "name": "account_takes_priority_over_hardcode",
+        "query": {
+          "account_number": "123456789",
+          "plan_code": "FP0001"
+        },
+        "expected": {
+          "company_id": "614810477",
+          "match_type": "account",
+          "source_value": "123456789",
+          "priority": 2
+        }
+      },
+      {
+        "name": "hardcode_uses_plan_code_as_key",
+        "query": {
+          "plan_code": "FP0001",
+          "customer_name": "some name"
+        },
+        "expected": {
+          "company_id": "614810477",
+          "match_type": "hardcode",
+          "source_value": "FP0001",
+          "priority": 3
+        }
+      },
+      {
+        "name": "customer_name_fallback",
+        "query": {
+          "customer_name": "中国平安保险股份有限公司"
+        },
+        "expected": {
+          "company_id": "614810477",
+          "match_type": "name",
+          "source_value": "中国平安保险股份有限公司",
+          "priority": 4
+        }
+      },
+      {
+        "name": "account_name_last_priority",
+        "query": {
+          "account_name": "平安保险年金计划账户",
+          "customer_name": "has value to prevent default"
+        },
+        "expected": {
+          "company_id": "614810477",
+          "match_type": "account_name",
+          "source_value": "平安保险年金计划账户",
+          "priority": 5
+        }
+      }
+    ],
+    "default_fallback": [
+      {
+        "name": "null_customer_name_triggers_default",
+        "query": {
+          "customer_name": null
+        },
+        "expected": {
+          "company_id": "600866980",
+          "match_type": "default",
+          "source_value": null,
+          "priority": null
+        }
+      },
+      {
+        "name": "empty_customer_name_triggers_default",
+        "query": {
+          "customer_name": ""
+        },
+        "expected": {
+          "company_id": "600866980",
+          "match_type": "default",
+          "source_value": null,
+          "priority": null
+        }
+      },
+      {
+        "name": "whitespace_customer_name_triggers_default",
+        "query": {
+          "customer_name": "   "
+        },
+        "expected": {
+          "company_id": "600866980",
+          "match_type": "default",
+          "source_value": null,
+          "priority": null
+        }
+      }
+    ],
+    "chinese_character_edge_cases": [
+      {
+        "name": "exact_chinese_match",
+        "query": {
+          "customer_name": "中国平安保险股份有限公司"
+        },
+        "expected": {
+          "company_id": "614810477",
+          "match_type": "name",
+          "source_value": "中国平安保险股份有限公司"
+        }
+      },
+      {
+        "name": "chinese_account_name_match",
+        "query": {
+          "account_name": "平安保险年金计划账户",
+          "customer_name": "not empty"
+        },
+        "expected": {
+          "company_id": "614810477",
+          "match_type": "account_name",
+          "source_value": "平安保险年金计划账户"
+        }
+      },
+      {
+        "name": "chinese_no_match",
+        "query": {
+          "customer_name": "不存在的公司名称"
+        },
+        "expected": {
+          "company_id": null,
+          "match_type": null,
+          "source_value": null
+        }
+      }
+    ],
+    "null_empty_handling": [
+      {
+        "name": "all_nulls",
+        "query": {
+          "plan_code": null,
+          "account_number": null,
+          "customer_name": null,
+          "account_name": null
+        },
+        "expected": {
+          "company_id": "600866980",
+          "match_type": "default"
+        }
+      },
+      {
+        "name": "all_empty_strings",
+        "query": {
+          "plan_code": "",
+          "account_number": "",
+          "customer_name": "",
+          "account_name": ""
+        },
+        "expected": {
+          "company_id": "600866980",
+          "match_type": "default"
+        }
+      },
+      {
+        "name": "mixed_null_empty",
+        "query": {
+          "plan_code": null,
+          "account_number": "",
+          "customer_name": "   ",
+          "account_name": null
+        },
+        "expected": {
+          "company_id": "600866980",
+          "match_type": "default"
+        }
+      }
+    ],
+    "case_sensitivity": [
+      {
+        "name": "exact_case_match",
+        "query": {
+          "plan_code": "AN001"
+        },
+        "expected": {
+          "company_id": "614810477",
+          "match_type": "plan"
+        }
+      },
+      {
+        "name": "wrong_case_no_match",
+        "query": {
+          "plan_code": "an001"
+        },
+        "expected": {
+          "company_id": "600866980",
+          "match_type": "default"
+        }
+      }
+    ]
+  },
+  "validation_test_data": {
+    "conflicting_mappings": [
+      {
+        "alias_name": "CONFLICT001",
+        "canonical_id": "111111111",
+        "match_type": "plan",
+        "priority": 1
+      },
+      {
+        "alias_name": "CONFLICT001",
+        "canonical_id": "222222222",
+        "match_type": "plan",
+        "priority": 1
+      }
+    ],
+    "priority_mismatches": [
+      {
+        "alias_name": "PRIORITY_MISMATCH",
+        "canonical_id": "333333333",
+        "match_type": "plan",
+        "priority": 3
+      }
+    ]
+  },
+  "performance_test_data": {
+    "description": "Large dataset for performance testing (<100ms requirement)",
+    "plan_mappings_count": 1000,
+    "account_mappings_count": 5000,
+    "name_mappings_count": 10000,
+    "pattern_prefix": "PERF_TEST_",
+    "company_id_range": {
+      "start": "700000000",
+      "end": "799999999"
+    }
+  },
+  "metadata": {
+    "created_date": "2024-01-15",
+    "purpose": "Testing company ID mapping migration PRP S-001",
+    "total_test_mappings": 45,
+    "chinese_character_test_count": 14,
+    "edge_case_count": 8,
+    "validation_conflict_count": 3
+  }
+}

@@ -1,0 +1,95 @@
+# generated: 2025-11-09
+# project: WorkDataHub
+# project_key: WorkDataHub
+# tracking_system: file-system
+# story_location: {project-root}/docs/stories
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic exists in epic file but not contexted
+#   - contexted: Epic tech context created (required before drafting stories)
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - drafted: Story file created in stories folder
+#   - ready-for-dev: Draft approved and story context created
+#   - in-progress: Developer actively working on implementation
+#   - review: Under SM review (via code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - completed: Retrospective has been done
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epics should be 'contexted' before stories can be 'drafted'
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically drafts next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', SM reviews, then Dev moves to 'done'
+
+generated: 2025-11-09
+project: WorkDataHub
+project_key: WorkDataHub
+tracking_system: file-system
+story_location: "{project-root}/docs/stories"
+
+development_status:
+  epic-1: backlog
+  1-1-project-structure-and-development-environment-setup: backlog
+  1-2-basic-cicd-pipeline-setup: backlog
+  1-3-structured-logging-framework: backlog
+  1-4-configuration-management-framework: backlog
+  1-5-shared-pipeline-framework-core-simple: backlog
+  1-6-clean-architecture-boundaries-enforcement: backlog
+  1-7-database-schema-management-framework: backlog
+  1-8-postgresql-connection-and-transactional-loading-framework: backlog
+  1-9-dagster-orchestration-setup: backlog
+  1-10-pipeline-framework-advanced-features: backlog
+  1-11-enhanced-cicd-with-integration-tests: backlog
+  epic-1-retrospective: optional
+
+  epic-2: backlog
+  2-1-pydantic-models-for-row-level-validation-silver-layer: backlog
+  2-2-pandera-schemas-for-dataframe-validation-bronze-gold-layers: backlog
+  2-3-cleansing-registry-framework: backlog
+  2-4-chinese-date-parsing-utilities: backlog
+  2-5-validation-error-handling-and-reporting: backlog
+  epic-2-retrospective: optional
+
+  epic-3: backlog
+  3-0-data-source-configuration-schema-validation: backlog
+  3-1-version-aware-folder-scanner: backlog
+  3-2-pattern-based-file-matcher: backlog
+  3-3-multi-sheet-excel-reader: backlog
+  3-4-column-name-normalization: backlog
+  3-5-file-discovery-integration: backlog
+  epic-3-retrospective: optional
+
+  epic-4: backlog
+  4-1-annuity-domain-data-models-pydantic: backlog
+  4-2-annuity-bronze-layer-validation-schema: backlog
+  4-3-annuity-transformation-pipeline-bronze-silver: backlog
+  4-4-annuity-gold-layer-projection-and-schema: backlog
+  4-5-annuity-end-to-end-pipeline-integration: backlog
+  4-6-annuity-domain-configuration-and-documentation: backlog
+  epic-4-retrospective: optional
+
+  epic-5: backlog
+  5-1-enterpriseinfoprovider-protocol-and-stub-implementation: backlog
+  5-2-temporary-company-id-generation-hmac-based: backlog
+  5-3-internal-mapping-tables-and-database-schema: backlog
+  5-4-internal-mapping-resolver-multi-tier-lookup: backlog
+  5-5-enrichmentgateway-integration-and-fallback-logic: backlog
+  5-6-eqc-api-provider-sync-lookup-with-budget: backlog
+  5-7-async-enrichment-queue-deferred-resolution: backlog
+  5-8-enrichment-observability-and-export: backlog
+  epic-5-retrospective: optional
+
+  epic-6: backlog
+  6-1-golden-dataset-extraction-from-legacy-system: backlog
+  6-2-automated-reconciliation-engine: backlog
+  6-3-parity-test-integration-in-ci-pipeline: backlog
+  6-4-divergence-reporting-and-sql-diff-tool: backlog
+  epic-6-retrospective: optional

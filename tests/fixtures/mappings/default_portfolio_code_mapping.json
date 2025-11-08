@@ -1,0 +1,14 @@
+{
+  "data": {
+    "单一计划": "QTAN002",
+    "职业年金": "QTAN003",
+    "集合计划": "QTAN001"
+  },
+  "metadata": {
+    "description": "Default portfolio codes used when source is blank",
+    "export_timestamp": "2025-09-22 14:17:52.049649",
+    "extractor_version": "1.0",
+    "row_count": 3,
+    "source": "hardcoded_dictionary"
+  }
+}
