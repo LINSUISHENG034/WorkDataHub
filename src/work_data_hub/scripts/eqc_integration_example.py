@@ -63,11 +63,13 @@ class EqcIntegrationExample:
             if token:
                 self.token = token
                 self.session_info = {
-                    'authenticated_at': datetime.now(),
-                    'token_length': len(token),
-                    'auth_method': 'interactive_browser'
+                    "authenticated_at": datetime.now(),
+                    "token_length": len(token),
+                    "auth_method": "interactive_browser",
                 }
-                logger.info(f"Authentication successful! Token length: {len(token)} characters")
+                logger.info(
+                    f"Authentication successful! Token length: {len(token)} characters"
+                )
                 return True
             else:
                 logger.error("Authentication failed - no token received")
@@ -85,8 +87,8 @@ class EqcIntegrationExample:
             Dictionary with session details including authentication status
         """
         base_info = {
-            'authenticated': self.token is not None,
-            'token_present': bool(self.token),
+            "authenticated": self.token is not None,
+            "token_present": bool(self.token),
         }
 
         if self.session_info:
@@ -114,20 +116,22 @@ class EqcIntegrationExample:
             >>> print(f"Found company: {result['company_name']}")
         """
         if not self.token:
-            raise ValueError("Authentication required. Call authenticate_interactive() first.")
+            raise ValueError(
+                "Authentication required. Call authenticate_interactive() first."
+            )
 
         logger.info(f"Simulating EQC search for: {company_name}")
 
         # Simulate EQC API call structure
         simulated_result = {
-            'search_query': company_name,
-            'company_name': company_name,
-            'company_id': '601318',  # Simulated
-            'unified_code': '91110000100006172',  # Simulated
-            'search_timestamp': datetime.now().isoformat(),
-            'token_used': f"{self.token[:8]}...",  # Show first 8 chars only
-            'status': 'success',
-            'data_source': 'eqc_simulation'
+            "search_query": company_name,
+            "company_name": company_name,
+            "company_id": "601318",  # Simulated
+            "unified_code": "91110000100006172",  # Simulated
+            "search_timestamp": datetime.now().isoformat(),
+            "token_used": f"{self.token[:8]}...",  # Show first 8 chars only
+            "status": "success",
+            "data_source": "eqc_simulation",
         }
 
         # In real implementation, you would:
@@ -150,7 +154,9 @@ class EqcIntegrationExample:
             List of search results
         """
         if not self.token:
-            raise ValueError("Authentication required. Call authenticate_interactive() first.")
+            raise ValueError(
+                "Authentication required. Call authenticate_interactive() first."
+            )
 
         logger.info(f"Starting batch search for {len(company_names)} companies")
 
@@ -165,17 +171,16 @@ class EqcIntegrationExample:
 
             except Exception as e:
                 logger.error(f"Error searching for {company_name}: {e}")
-                results.append({
-                    'search_query': company_name,
-                    'status': 'error',
-                    'error': str(e)
-                })
+                results.append(
+                    {"search_query": company_name, "status": "error", "error": str(e)}
+                )
 
         logger.info(f"Batch search completed: {len(results)} results")
         return results
 
 
 # Example usage functions for demonstration
+
 
 async def example_single_search():
     """Example: Single company search with interactive authentication."""
@@ -230,7 +235,7 @@ async def example_batch_search():
     companies = [
         "中国平安保险股份有限公司",
         "招商银行股份有限公司",
-        "中国建设银行股份有限公司"
+        "中国建设银行股份有限公司",
     ]
 
     print(f"\nStep 2: Searching for {len(companies)} companies...")
@@ -239,8 +244,8 @@ async def example_batch_search():
     print("✅ Batch search completed!")
     print(f"   Total results: {len(results)}")
     for i, result in enumerate(results, 1):
-        status = result.get('status', 'unknown')
-        company = result.get('search_query', 'N/A')
+        status = result.get("status", "unknown")
+        company = result.get("search_query", "N/A")
         print(f"   {i}. {company}: {status}")
 
 

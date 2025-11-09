@@ -15,9 +15,9 @@ import pytest
 
 # tomllib is only available in Python 3.11+, use tomli for 3.10
 try:
-    import tomllib
+    import tomllib  # type: ignore[import-not-found]
 except ModuleNotFoundError:
-    import tomli as tomllib
+    import tomli as tomllib  # type: ignore[import-not-found,no-redef]
 
 # Project root is 3 levels up from this test file
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -27,7 +27,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 class TestAC1_UvProjectInitialization:
     """AC-1: Project initialized with uv package manager"""
 
-    def test_pyproject_toml_exists(self):
+    def test_pyproject_toml_exists(self) -> None:
         """Verify pyproject.toml exists with [project] metadata"""
         pyproject_path = PROJECT_ROOT / "pyproject.toml"
         assert pyproject_path.exists(), "pyproject.toml must exist"

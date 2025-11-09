@@ -1,9 +1,10 @@
 """
 Pure transformation service for annuity performance data.
 
-This module provides pure functions for transforming raw Excel data from "规模明细"
-sheets into validated annuity performance domain objects. All functions are side-effect
-free and fully testable. Includes column projection to prevent SQL column mismatch errors.
+This module provides pure functions for transforming raw Excel data from
+"规模明细" sheets into validated annuity performance domain objects. All
+functions are side-effect free and fully testable. Includes column projection
+to prevent SQL column mismatch errors.
 """
 
 import logging
@@ -75,7 +76,9 @@ def get_allowed_columns() -> List[str]:
     ]
 
 
-def project_columns(rows: List[Dict[str, Any]], allowed_cols: List[str]) -> List[Dict[str, Any]]:
+def project_columns(
+    rows: List[Dict[str, Any]], allowed_cols: List[str]
+) -> List[Dict[str, Any]]:
     """
     Filter dictionary keys to only allowed columns for safe SQL loading.
 
@@ -92,7 +95,9 @@ def project_columns(rows: List[Dict[str, Any]], allowed_cols: List[str]) -> List
     if not rows:
         return []
 
-    logger.debug(f"Projecting {len(rows)} rows to allowed columns: {len(allowed_cols)} columns")
+    logger.debug(
+        f"Projecting {len(rows)} rows to allowed columns: {len(allowed_cols)} columns"
+    )
 
     # Use dictionary comprehension for memory efficiency
     projected_rows = [{k: row.get(k) for k in allowed_cols if k in row} for row in rows]
@@ -105,7 +110,6 @@ def project_columns(rows: List[Dict[str, Any]], allowed_cols: List[str]) -> List
             logger.debug(f"Removed columns during projection: {sorted(removed_cols)}")
 
     return projected_rows
-
 
 
 def process(
@@ -153,9 +157,9 @@ def process_with_enrichment(
     Process raw Excel rows into validated annuity performance output models
     with optional enrichment.
 
-    This is the full-featured entry point for the annuity performance domain service.
-    It transforms raw dictionary data from "规模明细" Excel sheets into fully
-    validated AnnuityPerformanceOut models ready for data warehouse loading.
+    This is the full-featured entry point for the annuity performance domain
+    service. It transforms raw dictionary data from "规模明细" Excel sheets into
+    fully validated AnnuityPerformanceOut models ready for warehouse loading.
 
     When enrichment_service is provided, performs company ID resolution using
     internal mappings, EQC lookups, and async queue processing according to the
@@ -164,13 +168,17 @@ def process_with_enrichment(
     Args:
         rows: List of dictionaries representing Excel rows
         data_source: Identifier for the source file or system
-        enrichment_service: Optional CompanyEnrichmentService for company ID resolution
-        sync_lookup_budget: Budget for synchronous EQC lookups per processing session
+        enrichment_service: Optional CompanyEnrichmentService for company ID
+            resolution
+        sync_lookup_budget: Budget for synchronous EQC lookups per processing
+            session
         export_unknown_names: Whether to export unknown company names to CSV
-        use_pipeline: Whether to use shared pipeline framework (None=respect config setting)
+        use_pipeline: Whether to use shared pipeline framework
+            (None=respect config setting)
 
     Returns:
-        ProcessingResultWithEnrichment with processed records, statistics, and optional CSV export
+        ProcessingResultWithEnrichment with processed records, statistics, and
+        optional CSV export
 
     Raises:
         AnnuityPerformanceTransformationError: If transformation fails
@@ -182,7 +190,7 @@ def process_with_enrichment(
             records=[],
             data_source=data_source,
             unknown_names_csv=None,
-            processing_time_ms=0
+            processing_time_ms=0,
         )
 
     if not isinstance(rows, list):
@@ -200,18 +208,23 @@ def process_with_enrichment(
     if use_pipeline is None:
         try:
             settings = get_settings()
-            use_pipeline = getattr(settings, 'annuity_pipeline_enabled', False)
+            use_pipeline = getattr(settings, "annuity_pipeline_enabled", False)
         except Exception:
             # Fallback to legacy path if settings unavailable
             use_pipeline = False
-            logger.warning("Could not load settings, defaulting to legacy transformation path")
+            logger.warning(
+                "Could not load settings, defaulting to legacy transformation path"
+            )
 
     logger.info(f"Using {'pipeline' if use_pipeline else 'legacy'} transformation path")
 
     if use_pipeline:
         # New pipeline path - exact transformation parity with legacy
         try:
-            from .pipeline_steps import build_annuity_pipeline, load_mappings_from_json_fixture
+            from .pipeline_steps import (
+                build_annuity_pipeline,
+                load_mappings_from_json_fixture,
+            )
 
             # Load mappings for pipeline construction
             try:
@@ -222,7 +235,8 @@ def process_with_enrichment(
             except Exception as mapping_error:
                 # Fallback to empty mappings if fixture unavailable
                 logger.warning(
-                    f"Could not load mapping fixture: {mapping_error}, using empty mappings"
+                    "Could not load mapping fixture: "
+                    f"{mapping_error}, using empty mappings"
                 )
                 pipeline = build_annuity_pipeline({})
 
@@ -240,31 +254,43 @@ def process_with_enrichment(
                             )
 
                             if processed_record:
-                                # Apply enrichment integration (identical to legacy path)
+                                # Apply enrichment integration
+                                # (identical to legacy path)
                                 if enrichment_service:
                                     processed_record = _apply_enrichment_integration(
-                                        processed_record, raw_row, enrichment_service,
-                                        sync_lookup_budget, stats, unknown_names, row_index
+                                        processed_record,
+                                        raw_row,
+                                        enrichment_service,
+                                        sync_lookup_budget,
+                                        stats,
+                                        unknown_names,
+                                        row_index,
                                     )
 
                                 processed_records.append(processed_record)
                             else:
                                 logger.debug(
-                                    f"Row {row_index} filtered out during pipeline transformation"
+                                    "Row %s filtered out during pipeline "
+                                    "transformation",
+                                    row_index,
                                 )
                                 processing_errors.append(
-                                    f"Row {row_index}: filtered out due to missing required fields"
+                                    f"Row {row_index}: filtered out due to missing "
+                                    "required fields"
                                 )
 
                         except ValidationError as e:
-                            error_msg = f"Pipeline validation failed for row {row_index}: {e}"
+                            error_msg = (
+                                f"Pipeline validation failed for row {row_index}: {e}"
+                            )
                             logger.error(error_msg)
                             processing_errors.append(error_msg)
 
                     else:
                         # Log pipeline errors
                         error_msg = (
-                            f"Pipeline transformation failed for row {row_index}: {result.errors}"
+                            "Pipeline transformation failed for row "
+                            f"{row_index}: {result.errors}"
                         )
                         logger.error(error_msg)
                         processing_errors.append(error_msg)
@@ -276,7 +302,9 @@ def process_with_enrichment(
 
         except ImportError as e:
             # Fallback to legacy path if pipeline unavailable
-            logger.error(f"Pipeline import failed: {e}, falling back to legacy transformation")
+            logger.error(
+                f"Pipeline import failed: {e}, falling back to legacy transformation"
+            )
             use_pipeline = False
 
     if not use_pipeline:
@@ -287,7 +315,9 @@ def process_with_enrichment(
         for row_index, raw_row in enumerate(rows):
             try:
                 # Transform single row (existing logic)
-                processed_record = _transform_single_row(raw_row, data_source, row_index)
+                processed_record = _transform_single_row(
+                    raw_row, data_source, row_index
+                )
 
                 if processed_record:
                     # Optional enrichment integration
@@ -305,25 +335,35 @@ def process_with_enrichment(
 
                             # Update record with resolved company_id
                             if enrichment_result.company_id:
-                                processed_record.company_id = enrichment_result.company_id
+                                processed_record.company_id = (
+                                    enrichment_result.company_id
+                                )
 
                             # Record statistics
-                            stats.record(enrichment_result.status, enrichment_result.source)
+                            stats.record(
+                                enrichment_result.status, enrichment_result.source
+                            )
 
                             # Collect unknown names for CSV export
-                            if not enrichment_result.company_id and raw_row.get("客户名称"):
+                            if not enrichment_result.company_id and raw_row.get(
+                                "客户名称"
+                            ):
                                 customer_name = raw_row.get("客户名称")
                                 if customer_name is not None:
                                     unknown_names.append(str(customer_name))
 
                         except Exception as e:
                             # CRITICAL: Never fail main pipeline on enrichment errors
-                            logger.warning(f"Enrichment failed for row {row_index}: {e}")
+                            logger.warning(
+                                f"Enrichment failed for row {row_index}: {e}"
+                            )
                             stats.failed += 1
 
                     processed_records.append(processed_record)
                 else:
-                    logger.debug(f"Row {row_index} was filtered out during transformation")
+                    logger.debug(
+                        f"Row {row_index} was filtered out during transformation"
+                    )
                     processing_errors.append(
                         f"Row {row_index}: filtered out due to missing required fields"
                     )
@@ -356,7 +396,9 @@ def process_with_enrichment(
     if export_unknown_names and unknown_names:
         try:
             csv_path = write_unknowns_csv(unknown_names, data_source)
-            logger.info(f"Exported {len(unknown_names)} unknown company names to: {csv_path}")
+            logger.info(
+                f"Exported {len(unknown_names)} unknown company names to: {csv_path}"
+            )
         except Exception as e:
             # Don't fail processing for CSV export errors
             logger.warning(f"Failed to export unknown names CSV: {e}")
@@ -379,8 +421,8 @@ def process_with_enrichment(
                 "sync_budget_used": stats.sync_budget_used,
                 "processing_time_ms": processing_time_ms,
                 "unknown_names_count": len(unknown_names),
-                "csv_exported": bool(csv_path)
-            }
+                "csv_exported": bool(csv_path),
+            },
         )
 
     return ProcessingResultWithEnrichment(
@@ -452,7 +494,9 @@ def _transform_single_row(
         raise
 
 
-def _extract_report_date(input_model: AnnuityPerformanceIn, row_index: int) -> Optional[date]:
+def _extract_report_date(
+    input_model: AnnuityPerformanceIn, row_index: int
+) -> Optional[date]:
     """
     Extract report date from input model using unified date parsing.
 
@@ -472,10 +516,14 @@ def _extract_report_date(input_model: AnnuityPerformanceIn, row_index: int) -> O
         try:
             parsed_date = parse_chinese_date(input_model.月度)
             if parsed_date:
-                logger.debug(f"Row {row_index}: Parsed date from 月度 field: {parsed_date}")
+                logger.debug(
+                    f"Row {row_index}: Parsed date from 月度 field: {parsed_date}"
+                )
                 return parsed_date
         except Exception as e:
-            logger.debug(f"Row {row_index}: Cannot parse 月度 field {input_model.月度}: {e}")
+            logger.debug(
+                f"Row {row_index}: Cannot parse 月度 field {input_model.月度}: {e}"
+            )
 
     # Fall back to constructing from 年/月 fields
     year = None
@@ -491,13 +539,17 @@ def _extract_report_date(input_model: AnnuityPerformanceIn, row_index: int) -> O
             elif year < 100:  # Years 50-99 are 19xx
                 year += 1900
         except (ValueError, AttributeError):
-            logger.debug(f"Row {row_index}: Cannot parse year from '年' field: {input_model.年}")
+            logger.debug(
+                f"Row {row_index}: Cannot parse year from '年' field: {input_model.年}"
+            )
 
     if input_model.月:
         try:
             month = int(str(input_model.月).strip())
         except (ValueError, AttributeError):
-            logger.debug(f"Row {row_index}: Cannot parse month from '月' field: {input_model.月}")
+            logger.debug(
+                f"Row {row_index}: Cannot parse month from '月' field: {input_model.月}"
+            )
 
     # Try to parse from report_period string if direct fields are not available
     if (year is None or month is None) and input_model.report_period:
@@ -525,7 +577,11 @@ def _extract_report_date(input_model: AnnuityPerformanceIn, row_index: int) -> O
             return date(year, month, 1)
         except ValueError as e:
             logger.debug(
-                f"Row {row_index}: Cannot create date from year={year}, month={month}: {e}"
+                "Row %s: Cannot create date from year=%s, month=%s: %s",
+                row_index,
+                year,
+                month,
+                e,
             )
             return None
 
@@ -596,7 +652,8 @@ def _parse_report_period(report_period: str) -> Optional[Tuple[int, int]]:
 
 def _strip_f_prefix_if_pattern_matches(value: Optional[str]) -> Optional[str]:
     """
-    Strip F-prefix from portfolio code only if it matches strict pattern for portfolio codes.
+    Strip F-prefix from portfolio code only if it matches the strict
+    pattern for portfolio codes.
 
     This function implements surgical F-prefix removal as specified in PRP P-024.
     Only removes the leading 'F' from codes that look like prefixed portfolio codes,
@@ -631,7 +688,9 @@ def _strip_f_prefix_if_pattern_matches(value: Optional[str]) -> Optional[str]:
     return portfolio_code
 
 
-def _extract_plan_code(input_model: AnnuityPerformanceIn, row_index: int) -> Optional[str]:
+def _extract_plan_code(
+    input_model: AnnuityPerformanceIn, row_index: int
+) -> Optional[str]:
     """Extract plan code from input model without F-prefix modification."""
     # Try Chinese field name first
     if input_model.计划代码:
@@ -642,7 +701,9 @@ def _extract_plan_code(input_model: AnnuityPerformanceIn, row_index: int) -> Opt
     return None
 
 
-def _extract_company_code(input_model: AnnuityPerformanceIn, row_index: int) -> Optional[str]:
+def _extract_company_code(
+    input_model: AnnuityPerformanceIn, row_index: int
+) -> Optional[str]:
     """Extract company code from input model."""
     # Try explicit company_id field first
     if input_model.company_id:
@@ -659,7 +720,10 @@ def _extract_company_code(input_model: AnnuityPerformanceIn, row_index: int) -> 
         customer = str(input_model.客户名称).strip()
         # Remove common company suffixes and take first meaningful part
         simplified = (
-            customer.replace("有限公司", "").replace("股份有限公司", "").replace("集团", "").strip()
+            customer.replace("有限公司", "")
+            .replace("股份有限公司", "")
+            .replace("集团", "")
+            .strip()
         )
         if simplified:
             return simplified[:20]  # Truncate to reasonable length
@@ -668,7 +732,9 @@ def _extract_company_code(input_model: AnnuityPerformanceIn, row_index: int) -> 
     return None
 
 
-def _extract_financial_metrics(input_model: AnnuityPerformanceIn, row_index: int) -> Dict[str, Any]:
+def _extract_financial_metrics(
+    input_model: AnnuityPerformanceIn, row_index: int
+) -> Dict[str, Any]:
     """
     Extract all financial metrics from input model.
 
@@ -705,7 +771,9 @@ def _extract_financial_metrics(input_model: AnnuityPerformanceIn, row_index: int
     return metrics
 
 
-def _extract_metadata_fields(input_model: AnnuityPerformanceIn, row_index: int) -> Dict[str, Any]:
+def _extract_metadata_fields(
+    input_model: AnnuityPerformanceIn, row_index: int
+) -> Dict[str, Any]:
     """
     Extract all metadata and organizational fields from input model.
 
@@ -752,7 +820,9 @@ def _extract_metadata_fields(input_model: AnnuityPerformanceIn, row_index: int) 
     return fields
 
 
-def validate_input_batch(rows: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[str]]:
+def validate_input_batch(
+    rows: List[Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], List[str]]:
     """
     Validate a batch of input rows and return valid rows plus error messages.
 
@@ -821,7 +891,10 @@ def _pipeline_row_to_model(
         company_code = _extract_company_code(input_model, row_index)
 
         if not all([report_date, plan_code, company_code]):
-            logger.debug(f"Row {row_index}: Missing required fields after pipeline transformation")
+            logger.debug(
+                "Row %s: Missing required fields after pipeline transformation",
+                row_index,
+            )
             return None
 
         # Extract financial and metadata fields
@@ -845,7 +918,9 @@ def _pipeline_row_to_model(
         logger.debug(f"Row {row_index}: Pipeline output validation failed: {e}")
         return None
     except Exception as e:
-        logger.warning(f"Row {row_index}: Unexpected error in pipeline model conversion: {e}")
+        logger.warning(
+            f"Row {row_index}: Unexpected error in pipeline model conversion: {e}"
+        )
         return None
 
 
@@ -856,7 +931,7 @@ def _apply_enrichment_integration(
     sync_lookup_budget: int,
     stats: EnrichmentStats,
     unknown_names: List[str],
-    row_index: int
+    row_index: int,
 ) -> AnnuityPerformanceOut:
     """
     Apply enrichment service integration to a processed record.
@@ -878,7 +953,8 @@ def _apply_enrichment_integration(
     """
     try:
         # Call enrichment service with proper field mapping
-        # Extract fields from raw_row since processed_record may not have all original fields
+        # Extract fields from raw_row since processed_record may not have all
+        # original fields
         result = enrichment_service.resolve_company_id(
             plan_code=raw_row.get("计划代码"),
             customer_name=raw_row.get("客户名称"),

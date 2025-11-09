@@ -11,19 +11,16 @@ from typing import Optional
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
+from pydantic import ValidationError
+
+from .models import AuthTimeoutError, AuthTokenResult, BrowserError
 
 # Configuration constants - make these configurable for easy maintenance
-LOGIN_URL = "https://eqc.pingan.com/#/login?redirect=%2Fhome"
+LOGIN_URL = "https://eqc.pingan.com/"
 TARGET_API_PATH = "/kg-api-hfd/api/search/"
 DEFAULT_TIMEOUT_SECONDS = 300  # 5 minutes
 
 logger = logging.getLogger(__name__)
-
-
-class AuthTimeoutError(Exception):
-    """Custom exception for authentication timeouts."""
-
-    pass
 
 
 async def get_auth_token_interactively(
@@ -50,20 +47,27 @@ async def get_auth_token_interactively(
         ... else:
         ...     print("Authentication failed")
     """
-    logger.info("Starting interactive EQC authentication with enhanced stealth options...")
+    logger.info(
+        "Starting interactive EQC authentication with enhanced stealth options..."
+    )
     logger.info(f"Timeout set to {timeout_seconds} seconds")
 
     try:
         async with async_playwright() as playwright:
-            # Launch headed browser for user interaction
-            logger.debug("Launching Chromium browser in headed mode")
-            browser = await playwright.chromium.launch(headless=False)
-
+            browser = None
             try:
+                # Launch headed browser for user interaction
+                logger.debug("Launching Chromium browser in headed mode")
+                browser = await playwright.chromium.launch(headless=False)
+
                 # --- START: 浏览器伪装配置 ---
 
                 # 1. 设置一个真实的User-Agent
-                user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36"
+                user_agent = (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/116.0.0.0 Safari/537.36"
+                )
 
                 # 2. 设置常规的视口大小
                 viewport_size = {"width": 1920, "height": 1080}
@@ -107,13 +111,17 @@ async def get_auth_token_interactively(
 
                         # Check for specific API endpoint
                         if TARGET_API_PATH in request.url:
-                            logger.debug(f"Intercepted target API request: {request.url}")
+                            logger.debug(
+                                "Intercepted target API request: %s", request.url
+                            )
 
                             # Token is in 'token' header, not Authorization
                             token = request.headers.get("token")
                             if token and not token_future.done():
-                                logger.info("Successfully captured authentication token")
-                                logger.debug(f"Captured token prefix: {token[:8]}...")
+                                logger.info(
+                                    "Successfully captured authentication token"
+                                )
+                                logger.debug("Captured token prefix: %s", token[:8])
                                 token_future.set_result(token)
 
                         # Must continue all requests or page will hang
@@ -134,43 +142,54 @@ async def get_auth_token_interactively(
                 logger.info("Navigating to EQC login page...")
                 await page.goto(LOGIN_URL, wait_until="domcontentloaded")
                 logger.info(
-                    "Browser opened - please complete login manually and perform a search "
-                    "to capture token"
+                    "Browser opened - please complete login manually "
+                    "and perform a search to capture token"
                 )
 
                 try:
                     # Wait for token with timeout
-                    token = await asyncio.wait_for(token_future, timeout=timeout_seconds)
+                    token = await asyncio.wait_for(
+                        token_future, timeout=timeout_seconds
+                    )
                     logger.info("Authentication completed successfully")
                     return token
 
-                except asyncio.TimeoutError:
-                    logger.error(f"Authentication timed out after {timeout_seconds} seconds")
+                except asyncio.TimeoutError as exc:
+                    logger.error(
+                        "Authentication timed out after %s seconds", timeout_seconds
+                    )
                     raise AuthTimeoutError(
                         f"Authentication timed out after {timeout_seconds} seconds. "
                         "Please ensure you complete login and perform a search "
                         "within the time limit."
-                    )
+                    ) from exc
 
-            except PlaywrightTimeoutError as e:
-                logger.error(f"Playwright timeout error: {e}")
-                return None
+            except AuthTimeoutError:
+                raise
+            except PlaywrightTimeoutError as exc:
+                logger.error("Playwright timeout error: %s", exc)
+                raise BrowserError("Playwright timed out during EQC login") from exc
 
-            except Exception as e:
-                logger.error(f"Browser operation error: {e}")
-                return None
+            except Exception as exc:
+                logger.error("Browser operation error: %s", exc)
+                raise BrowserError("Browser operation failed") from exc
 
             finally:
                 # Always cleanup browser resources
-                logger.debug("Closing browser")
-                try:
-                    await browser.close()
-                except Exception as e:
-                    logger.warning(f"Error closing browser: {e}")
+                if browser:
+                    logger.debug("Closing browser")
+                    try:
+                        await browser.close()
+                    except Exception as exc:
+                        logger.warning("Error closing browser: %s", exc)
 
-    except Exception as e:
-        logger.error(f"Unexpected authentication error: {e}")
-        return None
+    except BrowserError:
+        raise
+    except AuthTimeoutError:
+        raise
+    except Exception as exc:
+        logger.error("Unexpected authentication error: %s", exc)
+        raise BrowserError("Unexpected authentication error") from exc
 
 
 def run_get_token(timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS) -> Optional[str]:
@@ -195,6 +214,37 @@ def run_get_token(timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS) -> Optional[st
     """
     try:
         return asyncio.run(get_auth_token_interactively(timeout_seconds))
-    except Exception as e:
-        logger.error(f"Synchronous authentication wrapper failed: {e}")
+    except Exception as exc:
+        logger.error("Synchronous authentication wrapper failed: %s", exc)
+        return None
+
+
+async def get_auth_token_with_validation(
+    timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
+) -> Optional[AuthTokenResult]:
+    """
+    Capture an authentication token and validate it via AuthTokenResult.
+
+    Returns None if no token is captured or validation fails.
+    """
+    token = await get_auth_token_interactively(timeout_seconds=timeout_seconds)
+    if not token:
+        return None
+    try:
+        return AuthTokenResult(token=token, source_url=LOGIN_URL)
+    except ValidationError as exc:
+        logger.error("Captured token failed validation: %s", exc)
+        return None
+
+
+def run_get_token_with_validation(
+    timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
+) -> Optional[AuthTokenResult]:
+    """Synchronous wrapper for get_auth_token_with_validation."""
+    try:
+        return asyncio.run(
+            get_auth_token_with_validation(timeout_seconds=timeout_seconds)
+        )
+    except Exception as exc:
+        logger.error("Synchronous validation wrapper failed to capture token: %s", exc)
         return None

@@ -16,9 +16,12 @@ from .models import AnnuityPlanCandidate, PortfolioCandidate
 logger = logging.getLogger(__name__)
 
 
-def derive_plan_candidates(processed_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def derive_plan_candidates(
+    processed_rows: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
     """
-    Derive unique annuity plan candidates from processed fact data with enhanced business logic.
+    Derive unique annuity plan candidates from processed fact data with
+    enhanced business logic.
 
     Enhanced derivation logic:
     - 客户名称: Most frequent value with tie-breaking by maximum 期末资产规模
@@ -57,30 +60,36 @@ def derive_plan_candidates(processed_rows: List[Dict[str, Any]]) -> List[Dict[st
             # Find the row with maximum 期末资产规模 for tie-break and 主拓派生
             max_row = _row_with_max_numeric(rows, "期末资产规模")
             # Pick first non-null 月度 for remark
-            month_value = next((r.get("月度") for r in rows if r.get("月度") is not None), None)
+            month_value = next(
+                (r.get("月度") for r in rows if r.get("月度") is not None), None
+            )
 
             candidate = {
                 # FIXED: Use only the actual database field, remove duplicate 计划代码
                 "年金计划号": plan_code,
-
                 # BUSINESS RULE: Most frequent 客户名称, tie-break by max 期末资产规模
                 "客户名称": _get_most_frequent_with_tiebreak(
                     rows, "客户名称", "期末资产规模"
                 ),
-
                 # BUSINESS RULE: From row with max 期末资产规模
                 # 主拓代码 <- 该行的 机构代码； 主拓机构 <- 该行的 机构名称
-                "主拓代码": (str(max_row.get("机构代码")).strip() if max_row and max_row.get("机构代码") else None),
-                "主拓机构": (str(max_row.get("机构名称")).strip() if max_row and max_row.get("机构名称") else None),
-
+                "主拓代码": (
+                    str(max_row.get("机构代码")).strip()
+                    if max_row and max_row.get("机构代码")
+                    else None
+                ),
+                "主拓机构": (
+                    str(max_row.get("机构名称")).strip()
+                    if max_row and max_row.get("机构名称")
+                    else None
+                ),
                 # BUSINESS RULE: Format as YYMM_新建 from 月度 (first non-null)
                 "备注": _format_remark_from_date(month_value),
-
-                # BUSINESS RULE: Filter and order business types (FIXED: use actual database field)
+                # BUSINESS RULE: Filter and order business types (FIXED: use
+                # actual database field)
                 "管理资格": _format_qualification_from_business_types(
                     {row.get("业务类型") for row in rows}
                 ),
-
                 # Standard fields from first available row
                 "计划全称": next(
                     (row.get("计划名称") for row in rows if row.get("计划名称")), None
@@ -89,13 +98,14 @@ def derive_plan_candidates(processed_rows: List[Dict[str, Any]]) -> List[Dict[st
                     (row.get("计划类型") for row in rows if row.get("计划类型")), None
                 ),
                 "company_id": next(
-                    (row.get("company_id") for row in rows if row.get("company_id")), None
+                    (row.get("company_id") for row in rows if row.get("company_id")),
+                    None,
                 ),
             }
             candidates.append(candidate)
 
         except Exception as e:
-            logger.warning(f"Error processing plan {plan_code} candidates: {e}")
+            logger.warning("Error processing plan %s candidates: %s", plan_code, e)
             continue
 
     logger.info(
@@ -177,7 +187,9 @@ def _get_value_from_max_row(
     return max_row.get(target_col)
 
 
-def _row_with_max_numeric(rows: List[Dict[str, Any]], max_col: str) -> Optional[Dict[str, Any]]:
+def _row_with_max_numeric(
+    rows: List[Dict[str, Any]], max_col: str
+) -> Optional[Dict[str, Any]]:
     """Return the row having maximum numeric value in max_col.
 
     Falls back to first row when conversion fails for all.
@@ -211,7 +223,7 @@ def _format_remark_from_date(date_input: Any) -> Optional[str]:
 
     try:
         # Handle datetime objects directly
-        if hasattr(date_input, 'year') and hasattr(date_input, 'month'):
+        if hasattr(date_input, "year") and hasattr(date_input, "month"):
             dt_obj = date_input
         # Handle string/int YYYYMM format (202411 -> 2024-11)
         elif str(date_input).isdigit() and len(str(date_input)) == 6:
@@ -226,8 +238,8 @@ def _format_remark_from_date(date_input: Any) -> Optional[str]:
             if not date_str:
                 return None
             # Simple parsing for common formats
-            if '-' in date_str:
-                parts = date_str.split('-')
+            if "-" in date_str:
+                parts = date_str.split("-")
                 if len(parts) >= 2:
                     year = int(parts[0])
                     month = int(parts[1])
@@ -245,9 +257,7 @@ def _format_remark_from_date(date_input: Any) -> Optional[str]:
         return None  # Graceful degradation
 
 
-def _format_qualification_from_business_types(
-    business_types_set: set
-) -> Optional[str]:
+def _format_qualification_from_business_types(business_types_set: set) -> Optional[str]:
     """
     Filter business types and join in specific order.
 
@@ -288,23 +298,26 @@ def _safe_numeric(value: Any) -> float:
         Numeric value, or negative infinity if conversion fails
     """
     if value is None:
-        return float('-inf')
+        return float("-inf")
 
     try:
         # Handle string representations of numbers
         if isinstance(value, str):
             value = value.strip()
             if not value:
-                return float('-inf')
+                return float("-inf")
 
         return float(value)
     except (ValueError, TypeError):
-        return float('-inf')  # Ensures failed conversions sort last
+        return float("-inf")  # Ensures failed conversions sort last
 
 
-def derive_portfolio_candidates(processed_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def derive_portfolio_candidates(
+    processed_rows: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
     """
-    Derive unique portfolio candidates from processed fact data with enhanced business logic.
+    Derive unique portfolio candidates from processed fact data with
+    enhanced business logic.
 
     Business rules for portfolio derivation:
     - 年金计划号: From 计划代码 field in fact data
@@ -343,21 +356,25 @@ def derive_portfolio_candidates(processed_rows: List[Dict[str, Any]]) -> List[Di
     for portfolio_code, rows in grouped_data.items():
         try:
             # Pick first non-null 月度 for remark generation
-            month_value = next((r.get("月度") for r in rows if r.get("月度") is not None), None)
+            month_value = next(
+                (r.get("月度") for r in rows if r.get("月度") is not None), None
+            )
 
             # Get plan code from first available row
-            plan_code = next((r.get("计划代码") for r in rows if r.get("计划代码")), None)
+            plan_code = next(
+                (r.get("计划代码") for r in rows if r.get("计划代码")), None
+            )
             if not plan_code:
-                logger.debug(f"Portfolio {portfolio_code}: skipping due to missing 计划代码")
+                logger.debug(
+                    f"Portfolio {portfolio_code}: skipping due to missing 计划代码"
+                )
                 continue
 
             candidate = {
                 # Primary key
                 "组合代码": portfolio_code,
-
                 # Foreign key to 年金计划 table
                 "年金计划号": str(plan_code).strip(),
-
                 # Portfolio attributes from first available non-null values
                 "组合名称": next(
                     (row.get("组合名称") for row in rows if row.get("组合名称")), None
@@ -365,17 +382,17 @@ def derive_portfolio_candidates(processed_rows: List[Dict[str, Any]]) -> List[Di
                 "组合类型": next(
                     (row.get("组合类型") for row in rows if row.get("组合类型")), None
                 ),
-
                 # BUSINESS RULE: Format as YYMM_新建 from 月度 (first non-null)
                 "备注": _format_remark_from_date(month_value),
-
                 # Not derived from fact data, remains NULL for backfill
                 "运作开始日": None,
             }
             candidates.append(candidate)
 
         except Exception as e:
-            logger.warning(f"Error processing portfolio {portfolio_code} candidates: {e}")
+            logger.warning(
+                f"Error processing portfolio {portfolio_code} candidates: {e}"
+            )
             continue
 
     logger.info(
@@ -386,7 +403,9 @@ def derive_portfolio_candidates(processed_rows: List[Dict[str, Any]]) -> List[Di
     return candidates
 
 
-def validate_plan_candidates(candidates: List[Dict[str, Any]]) -> List[AnnuityPlanCandidate]:
+def validate_plan_candidates(
+    candidates: List[Dict[str, Any]],
+) -> List[AnnuityPlanCandidate]:
     """
     Validate plan candidates using Pydantic models.
 
@@ -410,7 +429,9 @@ def validate_plan_candidates(candidates: List[Dict[str, Any]]) -> List[AnnuityPl
     return validated
 
 
-def validate_portfolio_candidates(candidates: List[Dict[str, Any]]) -> List[PortfolioCandidate]:
+def validate_portfolio_candidates(
+    candidates: List[Dict[str, Any]],
+) -> List[PortfolioCandidate]:
     """
     Validate portfolio candidates using Pydantic models.
 

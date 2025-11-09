@@ -1,9 +1,9 @@
 """
 Dagster ops for WorkDataHub ETL orchestration.
 
-This module provides thin wrappers around existing WorkDataHub components as Dagster ops,
-enabling structured orchestration with configuration validation, structured logging,
-and proper error handling.
+This module provides thin wrappers around existing WorkDataHub components as
+Dagster ops, enabling structured orchestration with configuration validation,
+structured logging, and proper error handling.
 """
 
 import logging
@@ -16,7 +16,10 @@ from pydantic import field_validator, model_validator
 
 from ..config.settings import get_settings
 from ..domain.annuity_performance.service import process_with_enrichment
-from ..domain.reference_backfill.service import derive_plan_candidates, derive_portfolio_candidates
+from ..domain.reference_backfill.service import (
+    derive_plan_candidates,
+    derive_portfolio_candidates,
+)
 from ..domain.sample_trustee_performance.service import process
 from ..io.connectors.file_connector import DataSourceConnector
 from ..io.loader.warehouse_loader import (
@@ -30,7 +33,8 @@ from ..io.readers.excel_reader import read_excel_rows
 logger = logging.getLogger(__name__)
 
 # psycopg2 lazy import holder to satisfy both patching styles in tests:
-# 1) patch("src.work_data_hub.orchestration.ops.psycopg2") expects a module attribute here
+# 1) patch("src.work_data_hub.orchestration.ops.psycopg2") expects a module
+#    attribute here
 # 2) patch builtins.__import__ expects a dynamic import path at runtime
 _PSYCOPG2_NOT_LOADED = object()
 psycopg2 = _PSYCOPG2_NOT_LOADED  # type: ignore
@@ -50,21 +54,24 @@ def _load_valid_domains() -> List[str]:
     """
     # Optional: Validate data_sources.yml for fail-fast behavior
     try:
-        from ..config.schema import DataSourcesValidationError, validate_data_sources_config
+        from ..config.schema import (
+            DataSourcesValidationError,
+            validate_data_sources_config,
+        )
 
         validate_data_sources_config()
     except DataSourcesValidationError as e:
         logger.error(f"data_sources.yml validation failed: {e}")
         raise
     except Exception as e:
-        logger.debug(f"Optional data_sources validation skipped: {e}")
+        logger.debug("Optional data_sources validation skipped: %s", e)
 
     try:
         settings = get_settings()
         config_path = Path(settings.data_sources_config)
 
         if not config_path.exists():
-            logger.warning(f"Data sources config not found: {config_path}")
+            logger.warning("Data sources config not found: %s", config_path)
             return ["trustee_performance"]  # Fallback to current default
 
         with open(config_path, "r", encoding="utf-8") as f:
@@ -77,11 +84,11 @@ def _load_valid_domains() -> List[str]:
             logger.warning("No domains found in configuration, using default")
             return ["trustee_performance"]
 
-        logger.debug(f"Loaded {len(valid_domains)} valid domains: {valid_domains}")
+        logger.debug("Loaded %s valid domains: %s", len(valid_domains), valid_domains)
         return valid_domains
 
     except Exception as e:
-        logger.error(f"Failed to load domains from configuration: {e}")
+        logger.error("Failed to load domains from configuration: %s", e)
         # Fallback to prevent complete failure
         return ["trustee_performance"]
 
@@ -102,7 +109,9 @@ class DiscoverFilesConfig(Config):
 
 
 @op
-def discover_files_op(context: OpExecutionContext, config: DiscoverFilesConfig) -> List[str]:
+def discover_files_op(
+    context: OpExecutionContext, config: DiscoverFilesConfig
+) -> List[str]:
     """
     Discover files for specified domain, return file paths as strings.
 
@@ -152,7 +161,9 @@ class ReadExcelConfig(Config):
         try:
             iv = int(v)
         except Exception:
-            raise ValueError("Sheet must be a non-negative integer or a non-empty string name")
+            raise ValueError(
+                "Sheet must be a non-negative integer or a non-empty string name"
+            )
         if iv < 0:
             raise ValueError("Sheet index must be non-negative")
         return iv
@@ -165,7 +176,9 @@ class ProcessingConfig(Config):
     enrichment_sync_budget: int = 0
     export_unknown_names: bool = True
     plan_only: bool = True
-    use_pipeline: Optional[bool] = None  # CLI override for pipeline framework (None=respect setting)
+    use_pipeline: Optional[bool] = (
+        None  # CLI override for pipeline framework (None=respect setting)
+    )
 
     @field_validator("enrichment_sync_budget")
     @classmethod
@@ -244,9 +257,11 @@ def process_sample_trustee_performance_op(
         ]
 
         context.log.info(
-            f"Domain processing completed - source: {file_path}, "
-            f"input_rows: {len(excel_rows)}, output_records: {len(result_dicts)}, "
-            f"domain: sample_trustee_performance"
+            "Domain processing completed - source: %s, input_rows: %s, "
+            "output_records: %s, domain: sample_trustee_performance",
+            file_path,
+            len(excel_rows),
+            len(result_dicts),
         )
 
         return result_dicts
@@ -261,10 +276,11 @@ def process_annuity_performance_op(
     context: OpExecutionContext,
     config: ProcessingConfig,
     excel_rows: List[Dict[str, Any]],
-    file_paths: List[str]
+    file_paths: List[str],
 ) -> List[Dict[str, Any]]:
     """
-    Process annuity performance data with optional enrichment and return validated records as dicts.
+    Process annuity performance data with optional enrichment and return
+    validated records as dicts.
 
     Handles Chinese "规模明细" Excel data with column projection to prevent
     SQL column mismatch errors. When enrichment is enabled, performs company ID
@@ -291,18 +307,25 @@ def process_annuity_performance_op(
         if not config.plan_only and config.enrichment_enabled:
             # Import enrichment components (lazy import to avoid circular dependencies)
             from work_data_hub.domain.company_enrichment.lookup_queue import LookupQueue
-            from work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
+            from work_data_hub.domain.company_enrichment.service import (
+                CompanyEnrichmentService,
+            )
             from work_data_hub.io.connectors.eqc_client import EQCClient
-            from work_data_hub.io.loader.company_enrichment_loader import CompanyEnrichmentLoader
+            from work_data_hub.io.loader.company_enrichment_loader import (
+                CompanyEnrichmentLoader,
+            )
 
             # Lazy import psycopg2 for database connection (following load_op pattern)
             global psycopg2  # type: ignore
             if psycopg2 is _PSYCOPG2_NOT_LOADED:  # type: ignore
                 try:
                     import psycopg2 as _psycopg2  # type: ignore
+
                     psycopg2 = _psycopg2  # type: ignore
                 except ImportError:
-                    raise DataWarehouseLoaderError("psycopg2 not available for enrichment database operations")
+                    raise DataWarehouseLoaderError(
+                        "psycopg2 not available for enrichment database operations"
+                    )
 
             # Create database connection only in execute mode
             settings = get_settings()
@@ -318,15 +341,15 @@ def process_annuity_performance_op(
                 loader=loader,
                 queue=queue,
                 eqc_client=eqc_client,
-                sync_lookup_budget=config.enrichment_sync_budget
+                sync_lookup_budget=config.enrichment_sync_budget,
             )
 
             context.log.info(
                 "Enrichment service setup completed",
                 extra={
                     "sync_budget": config.enrichment_sync_budget,
-                    "export_unknowns": config.export_unknown_names
-                }
+                    "export_unknowns": config.export_unknown_names,
+                },
             )
 
         # Call service with enrichment metadata support
@@ -358,15 +381,20 @@ def process_annuity_performance_op(
                     "failed": result.enrichment_stats.failed,
                     "budget_used": result.enrichment_stats.sync_budget_used,
                     "csv_exported": bool(result.unknown_names_csv),
-                }
+                },
             )
 
         # Enhanced logging with execution mode
         mode_text = "EXECUTED" if not config.plan_only else "PLAN-ONLY"
         context.log.info(
-            f"Domain processing completed ({mode_text}) - source: {file_path}, "
-            f"input_rows: {len(excel_rows)}, output_records: {len(result_dicts)}, "
-            f"domain: annuity_performance, enrichment_enabled: {config.enrichment_enabled}"
+            "Domain processing completed (%s) - source: %s, input_rows: %s, "
+            "output_records: %s, domain: annuity_performance, "
+            "enrichment_enabled: %s",
+            mode_text,
+            file_path,
+            len(excel_rows),
+            len(result_dicts),
+            config.enrichment_enabled,
         )
 
         return result_dicts
@@ -434,13 +462,17 @@ def read_and_process_sample_trustee_files_op(
 
             # JSON-serializable accumulation (use mode="json" for friendly types)
             processed_dicts = [
-                model.model_dump(mode="json", by_alias=True, exclude_none=True) for model in models
+                model.model_dump(mode="json", by_alias=True, exclude_none=True)
+                for model in models
             ]
             all_processed.extend(processed_dicts)
 
             # Structured logging like existing ops
             context.log.info(
-                f"Processed {file_path}: {len(rows)} rows -> {len(processed_dicts)} records"
+                "Processed %s: %s rows -> %s records",
+                file_path,
+                len(rows),
+                len(processed_dicts),
             )
 
         except Exception as e:
@@ -448,8 +480,9 @@ def read_and_process_sample_trustee_files_op(
             raise
 
     context.log.info(
-        f"Multi-file processing completed: {len(paths_to_process)} files, "
-        f"{len(all_processed)} total records"
+        "Multi-file processing completed: %s files, %s total records",
+        len(paths_to_process),
+        len(all_processed),
     )
     return all_processed
 
@@ -546,12 +579,16 @@ def load_op(
             global psycopg2  # type: ignore
             if psycopg2 is None:  # type: ignore
                 # Explicitly treated as unavailable (tests may patch to None)
-                raise DataWarehouseLoaderError("psycopg2 not available for database operations")
+                raise DataWarehouseLoaderError(
+                    "psycopg2 not available for database operations"
+                )
             if psycopg2 is _PSYCOPG2_NOT_LOADED:  # type: ignore
                 try:
                     import psycopg2 as _psycopg2  # type: ignore
                 except ImportError:
-                    raise DataWarehouseLoaderError("psycopg2 not available for database operations")
+                    raise DataWarehouseLoaderError(
+                        "psycopg2 not available for database operations"
+                    )
                 psycopg2 = _psycopg2  # type: ignore
 
             settings = get_settings()
@@ -575,14 +612,17 @@ def load_op(
                     "Database connection failed: invalid DSN resolved from settings"
                 )
 
-            context.log.info(f"Connecting to database for execution (table: {config.table})")
+            context.log.info(
+                "Connecting to database for execution (table: %s)", config.table
+            )
 
             # CRITICAL: Only catch psycopg2.connect failures
             try:
                 conn = psycopg2.connect(dsn)  # type: ignore  # Bare connection, no context manager
             except Exception as e:
                 raise DataWarehouseLoaderError(
-                    f"Database connection failed: {e}. Check WDH_DATABASE__* environment variables."
+                    f"Database connection failed: {e}. "
+                    "Check WDH_DATABASE__* environment variables."
                 ) from e
 
             # Call loader - it handles transactions with 'with conn:'
@@ -606,10 +646,14 @@ def load_op(
         # Enhanced logging with execution mode
         mode_text = "EXECUTED" if not config.plan_only else "PLAN-ONLY"
         context.log.info(
-            f"Load operation completed ({mode_text}) - "
-            f"table: {config.table}, mode: {config.mode}, "
-            f"deleted: {result.get('deleted', 0)}, inserted: {result.get('inserted', 0)}, "
-            f"batches: {result.get('batches', 0)}"
+            "Load operation completed (%s) - table: %s, mode: %s, "
+            "deleted: %s, inserted: %s, batches: %s",
+            mode_text,
+            config.table,
+            config.mode,
+            result.get("deleted", 0),
+            result.get("inserted", 0),
+            result.get("batches", 0),
         )
 
         return result
@@ -716,12 +760,16 @@ def backfill_refs_op(
         if not config.plan_only:
             global psycopg2  # type: ignore
             if psycopg2 is None:  # type: ignore
-                raise DataWarehouseLoaderError("psycopg2 not available for database operations")
+                raise DataWarehouseLoaderError(
+                    "psycopg2 not available for database operations"
+                )
             if psycopg2 is _PSYCOPG2_NOT_LOADED:  # type: ignore
                 try:
                     import psycopg2 as _psycopg2  # type: ignore
                 except ImportError:
-                    raise DataWarehouseLoaderError("psycopg2 not available for database operations")
+                    raise DataWarehouseLoaderError(
+                        "psycopg2 not available for database operations"
+                    )
                 psycopg2 = _psycopg2  # type: ignore
 
             settings = get_settings()
@@ -749,7 +797,8 @@ def backfill_refs_op(
                 conn = psycopg2.connect(dsn)  # type: ignore
             except Exception as e:
                 raise DataWarehouseLoaderError(
-                    f"Database connection failed: {e}. Check WDH_DATABASE__* environment variables."
+                    f"Database connection failed: {e}. "
+                    "Check WDH_DATABASE__* environment variables."
                 ) from e
 
         result: Dict[str, Any] = {"operations": [], "plan_only": config.plan_only}
@@ -767,10 +816,12 @@ def backfill_refs_op(
                 data_sources = yaml.safe_load(f)
 
             # Extract refs for current domain (annuity_performance)
-            domain = "annuity_performance"  # TODO: could be passed from discover_files_op context
-            refs_config = data_sources.get("domains", {}).get(domain, {}).get("refs", {})
+            domain = "annuity_performance"  # TODO: pass from discover_files_op
+            refs_config = (
+                data_sources.get("domains", {}).get(domain, {}).get("refs", {})
+            )
         except Exception as e:
-            context.log.warning(f"Could not load refs config: {e}, using defaults")
+            context.log.warning("Could not load refs config: %s, using defaults", e)
 
         # Get plans configuration with fallbacks
         plans_config = refs_config.get("plans", {})
@@ -784,7 +835,9 @@ def backfill_refs_op(
         # Get portfolios configuration with fallbacks
         portfolios_config = refs_config.get("portfolios", {})
         portfolios_schema = portfolios_config.get("schema")  # None if not specified
-        portfolios_table = portfolios_config.get("table", "组合计划")  # fallback to hardcoded
+        portfolios_table = portfolios_config.get(
+            "table", "组合计划"
+        )  # fallback to hardcoded
         portfolios_key = portfolios_config.get("key", ["组合代码"])  # fallback
         portfolios_updatable = portfolios_config.get(
             "updatable", ["组合名称", "组合类型", "运作开始日"]
@@ -817,7 +870,9 @@ def backfill_refs_op(
                         schema=plans_schema,  # NEW: pass schema
                     )
                 else:
-                    raise DataWarehouseLoaderError(f"Unsupported backfill mode: {config.mode}")
+                    raise DataWarehouseLoaderError(
+                        f"Unsupported backfill mode: {config.mode}"
+                    )
 
                 # Release savepoint on success
                 if conn:
@@ -825,7 +880,9 @@ def backfill_refs_op(
                         cursor.execute("RELEASE SAVEPOINT plans_backfill")
 
                 result["operations"].append({"table": plans_table, **plan_result})
-                context.log.info(f"Plans backfill completed successfully: {plans_table}")
+                context.log.info(
+                    f"Plans backfill completed successfully: {plans_table}"
+                )
 
             except Exception as plans_error:
                 context.log.warning(f"Plans backfill failed: {plans_error}")
@@ -839,15 +896,19 @@ def backfill_refs_op(
                         pass
 
                 # Add error result but continue with portfolios
-                result["operations"].append({
-                    "table": plans_table,
-                    "error": str(plans_error),
-                    "inserted": 0,
-                    "batches": 0
-                })
+                result["operations"].append(
+                    {
+                        "table": plans_table,
+                        "error": str(plans_error),
+                        "inserted": 0,
+                        "batches": 0,
+                    }
+                )
 
         # Execute backfill for portfolios
-        if ("portfolios" in config.targets or "all" in config.targets) and portfolio_candidates:
+        if (
+            "portfolios" in config.targets or "all" in config.targets
+        ) and portfolio_candidates:
             try:
                 # Begin a savepoint for portfolios operation
                 if conn:
@@ -873,15 +934,21 @@ def backfill_refs_op(
                         schema=portfolios_schema,  # NEW: pass schema
                     )
                 else:
-                    raise DataWarehouseLoaderError(f"Unsupported backfill mode: {config.mode}")
+                    raise DataWarehouseLoaderError(
+                        f"Unsupported backfill mode: {config.mode}"
+                    )
 
                 # Release savepoint on success
                 if conn:
                     with conn.cursor() as cursor:
                         cursor.execute("RELEASE SAVEPOINT portfolios_backfill")
 
-                result["operations"].append({"table": portfolios_table, **portfolio_result})
-                context.log.info(f"Portfolios backfill completed successfully: {portfolios_table}")
+                result["operations"].append(
+                    {"table": portfolios_table, **portfolio_result}
+                )
+                context.log.info(
+                    f"Portfolios backfill completed successfully: {portfolios_table}"
+                )
 
             except Exception as portfolios_error:
                 context.log.warning(f"Portfolios backfill failed: {portfolios_error}")
@@ -895,12 +962,14 @@ def backfill_refs_op(
                         pass
 
                 # Add error result
-                result["operations"].append({
-                    "table": portfolios_table,
-                    "error": str(portfolios_error),
-                    "inserted": 0,
-                    "batches": 0
-                })
+                result["operations"].append(
+                    {
+                        "table": portfolios_table,
+                        "error": str(portfolios_error),
+                        "inserted": 0,
+                        "batches": 0,
+                    }
+                )
 
         # Enhanced logging with execution mode
         mode_text = "EXECUTED" if not config.plan_only else "PLAN-ONLY"
@@ -946,10 +1015,12 @@ def gate_after_backfill(
     dependency on backfill_refs_op so that load_op cannot start before
     reference backfill has finished (important when FK constraints exist).
     """
-    ops = backfill_summary.get("operations", []) if isinstance(backfill_summary, dict) else []
-    context.log.info(
-        f"Backfill completed; gating fact load. operations={len(ops)}"
+    ops = (
+        backfill_summary.get("operations", [])
+        if isinstance(backfill_summary, dict)
+        else []
     )
+    context.log.info(f"Backfill completed; gating fact load. operations={len(ops)}")
     return processed_rows
 
 
@@ -996,19 +1067,27 @@ def process_company_lookup_queue_op(
             global psycopg2  # type: ignore
             if psycopg2 is None:  # type: ignore
                 # Explicitly treated as unavailable (tests may patch to None)
-                raise DataWarehouseLoaderError("psycopg2 not available for database operations")
+                raise DataWarehouseLoaderError(
+                    "psycopg2 not available for database operations"
+                )
             if psycopg2 is _PSYCOPG2_NOT_LOADED:  # type: ignore
                 try:
                     import psycopg2 as _psycopg2  # type: ignore
                 except ImportError:
-                    raise DataWarehouseLoaderError("psycopg2 not available for database operations")
+                    raise DataWarehouseLoaderError(
+                        "psycopg2 not available for database operations"
+                    )
                 psycopg2 = _psycopg2  # type: ignore
 
             # Import enrichment components (lazy import to avoid circular dependencies)
             from work_data_hub.domain.company_enrichment.lookup_queue import LookupQueue
-            from work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
+            from work_data_hub.domain.company_enrichment.service import (
+                CompanyEnrichmentService,
+            )
             from work_data_hub.io.connectors.eqc_client import EQCClient
-            from work_data_hub.io.loader.company_enrichment_loader import CompanyEnrichmentLoader
+            from work_data_hub.io.loader.company_enrichment_loader import (
+                CompanyEnrichmentLoader,
+            )
 
             settings = get_settings()
 
@@ -1026,8 +1105,8 @@ def process_company_lookup_queue_op(
                 )
 
             context.log.info(
-                f"Connecting to database for queue processing "
-                f"(batch_size: {config.batch_size})"
+                "Connecting to database for queue processing (batch_size: %s)",
+                config.batch_size,
             )
 
             # CRITICAL: Only catch psycopg2.connect failures
@@ -1035,7 +1114,8 @@ def process_company_lookup_queue_op(
                 conn = psycopg2.connect(dsn)  # type: ignore  # Bare connection, no context manager
             except Exception as e:
                 raise DataWarehouseLoaderError(
-                    f"Database connection failed: {e}. Check WDH_DATABASE__* environment variables."
+                    f"Database connection failed: {e}. "
+                    "Check WDH_DATABASE__* environment variables."
                 ) from e
 
             # Setup enrichment service components
@@ -1047,11 +1127,13 @@ def process_company_lookup_queue_op(
                 loader=loader,
                 queue=queue,
                 eqc_client=eqc_client,
-                sync_lookup_budget=0  # No sync budget for queue processing
+                sync_lookup_budget=0,  # No sync budget for queue processing
             )
 
             # Process the queue
-            processed_count = enrichment_service.process_lookup_queue(batch_size=config.batch_size)
+            processed_count = enrichment_service.process_lookup_queue(
+                batch_size=config.batch_size
+            )
 
             # Get final queue status
             queue_status = enrichment_service.get_queue_status()
@@ -1066,7 +1148,8 @@ def process_company_lookup_queue_op(
         else:
             # Plan-only: simulate queue processing
             context.log.info(
-                f"Queue processing plan - batch_size: {config.batch_size} (no database operations)"
+                "Queue processing plan - batch_size: %s (no database operations)",
+                config.batch_size,
             )
             result = {
                 "processed_count": 0,

@@ -15,7 +15,9 @@ from ..rules.numeric_rules import comprehensive_decimal_cleaning
 logger = logging.getLogger(__name__)
 
 
-def decimal_fields_cleaner(*field_names: str, precision_config: Optional[Dict[str, int]] = None):
+def decimal_fields_cleaner(
+    *field_names: str, precision_config: Optional[Dict[str, int]] = None
+):
     """
     专门用于数值字段清洗的简化装饰器
 
@@ -45,10 +47,14 @@ def decimal_fields_cleaner(*field_names: str, precision_config: Optional[Dict[st
         # 为每个字段动态添加验证器
         for field_name in field_names:
             # 创建字段验证器装饰器
-            field_val = field_validator(field_name, mode="before")(classmethod(validator_func))
+            field_val = field_validator(field_name, mode="before")(
+                classmethod(validator_func)
+            )
 
             # 添加到类的注释中，以便Pydantic能够发现它
-            validator_name = f"validate_{field_name.replace('/', '_').replace(' ', '_')}"
+            validator_name = (
+                f"validate_{field_name.replace('/', '_').replace(' ', '_')}"
+            )
             setattr(cls, validator_name, field_val)
 
         # 重建模型以应用新的验证器
@@ -62,7 +68,9 @@ def decimal_fields_cleaner(*field_names: str, precision_config: Optional[Dict[st
     return decorator
 
 
-def simple_field_validator(*field_names: str, rule_name: str = "comprehensive_decimal_cleaning"):
+def simple_field_validator(
+    *field_names: str, rule_name: str = "comprehensive_decimal_cleaning"
+):
     """
     简化的字段验证器装饰器
 
@@ -87,7 +95,9 @@ def simple_field_validator(*field_names: str, rule_name: str = "comprehensive_de
                 if rule:
                     return rule.func(v)
                 else:
-                    logger.warning(f"Rule '{rule_name}' not found, using original function")
+                    logger.warning(
+                        f"Rule '{rule_name}' not found, using original function"
+                    )
                     return func(v, info)
 
         return wrapper

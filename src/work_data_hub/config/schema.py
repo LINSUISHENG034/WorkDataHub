@@ -27,16 +27,24 @@ class DomainConfig(BaseModel):
     sheet: Union[int, str] = Field(0, description="Excel sheet to process")
     table: str = Field(..., description="Target database table")
     pk: List[str] = Field(..., min_length=1, description="Primary key columns")
-    required_columns: Optional[List[str]] = Field(None, description="Required data columns")
+    required_columns: Optional[List[str]] = Field(
+        None, description="Required data columns"
+    )
     validation: Optional[Dict[str, Any]] = Field(None, description="Validation rules")
 
 
 class DiscoveryConfig(BaseModel):
     """Schema for global discovery configuration."""
 
-    file_extensions: Optional[List[str]] = Field(None, description="File extensions to scan")
-    exclude_directories: Optional[List[str]] = Field(None, description="Directories to exclude")
-    ignore_patterns: Optional[List[str]] = Field(None, description="File patterns to ignore")
+    file_extensions: Optional[List[str]] = Field(
+        None, description="File extensions to scan"
+    )
+    exclude_directories: Optional[List[str]] = Field(
+        None, description="Directories to exclude"
+    )
+    ignore_patterns: Optional[List[str]] = Field(
+        None, description="File patterns to ignore"
+    )
     max_depth: Optional[int] = Field(10, description="Maximum directory scan depth")
     follow_symlinks: Optional[bool] = Field(False, description="Follow symbolic links")
 
@@ -44,8 +52,12 @@ class DiscoveryConfig(BaseModel):
 class DataSourcesConfig(BaseModel):
     """Schema for complete data_sources.yml structure."""
 
-    domains: Dict[str, DomainConfig] = Field(..., min_length=1, description="Domain configurations")
-    discovery: Optional[DiscoveryConfig] = Field(None, description="Global discovery settings")
+    domains: Dict[str, DomainConfig] = Field(
+        ..., min_length=1, description="Domain configurations"
+    )
+    discovery: Optional[DiscoveryConfig] = Field(
+        None, description="Global discovery settings"
+    )
 
 
 class DataSourcesValidationError(Exception):
@@ -86,7 +98,8 @@ def validate_data_sources_config(
         # PATTERN: Use Pydantic validation like settings.py
         config = DataSourcesConfig(**data)
         logger.info(
-            f"Successfully validated data_sources configuration with {len(config.domains)} domains"
+            "Successfully validated data_sources configuration with "
+            f"{len(config.domains)} domains"
         )
         return True
     except ValidationError as e:
@@ -117,6 +130,8 @@ def get_domain_config(
         data = yaml.safe_load(f)
 
     if domain_name not in data.get("domains", {}):
-        raise DataSourcesValidationError(f"Domain '{domain_name}' not found in configuration")
+        raise DataSourcesValidationError(
+            f"Domain '{domain_name}' not found in configuration"
+        )
 
     return DomainConfig(**data["domains"][domain_name])

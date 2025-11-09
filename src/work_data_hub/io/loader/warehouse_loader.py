@@ -127,7 +127,11 @@ def build_insert_sql(
         Tuple of (sql_string, flattened_parameters)
 
     Example:
-        >>> sql, params = build_insert_sql("users", ["id", "name"], [{"id": 1, "name": "John"}])
+        >>> sql, params = build_insert_sql(
+        ...     "users",
+        ...     ["id", "name"],
+        ...     [{"id": 1, "name": "John"}],
+        ... )
         >>> sql
         'INSERT INTO "users" ("id","name") VALUES (%s,%s)'
         >>> params
@@ -160,12 +164,13 @@ def build_insert_sql(
 
     return sql, params
 
+
 def build_insert_sql_with_conflict(
     table: str,
     cols: List[str],
     rows: List[Dict[str, Any]],
     conflict_cols: Optional[List[str]] = None,
-    conflict_action: str = "DO NOTHING"
+    conflict_action: str = "DO NOTHING",
 ) -> Tuple[Optional[str], List[Any]]:
     """
     Build parameterized INSERT SQL with conflict resolution for bulk operations.
@@ -175,15 +180,19 @@ def build_insert_sql_with_conflict(
         cols: Column names in desired order
         rows: List of dictionaries with row data
         conflict_cols: Columns to check for conflicts (for ON CONFLICT clause)
-        conflict_action: Action to take on conflict ("DO NOTHING" or "DO UPDATE SET ...")
+        conflict_action: Action to take on conflict ("DO NOTHING" or
+            "DO UPDATE SET ...")
 
     Returns:
         Tuple of (sql_string, flattened_parameters)
 
     Example:
         >>> sql, params = build_insert_sql_with_conflict(
-        ...     "users", ["id", "name"], [{"id": 1, "name": "John"}],
-        ...     conflict_cols=["id"], conflict_action="DO NOTHING"
+        ...     "users",
+        ...     ["id", "name"],
+        ...     [{"id": 1, "name": "John"}],
+        ...     conflict_cols=["id"],
+        ...     conflict_action="DO NOTHING",
         ... )
         >>> sql
         'INSERT INTO "users" ("id","name") VALUES (%s,%s) ON CONFLICT ("id") DO NOTHING'
@@ -239,7 +248,11 @@ def build_delete_sql(
         Tuple of (sql_string, flattened_parameters)
 
     Example:
-        >>> sql, params = build_delete_sql("users", ["id", "type"], [{"id": 1, "type": "A"}])
+        >>> sql, params = build_delete_sql(
+        ...     "users",
+        ...     ["id", "type"],
+        ...     [{"id": 1, "type": "A"}],
+        ... )
         >>> sql
         'DELETE FROM "users" WHERE ("id","type") IN ((%s,%s))'
         >>> params
@@ -426,7 +439,9 @@ def insert_missing(
             try:
                 from psycopg2.extras import execute_values
             except ImportError:
-                raise DataWarehouseLoaderError("psycopg2 not available for bulk operations")
+                raise DataWarehouseLoaderError(
+                    "psycopg2 not available for bulk operations"
+                )
 
             with conn.cursor() as cursor:
                 try:
@@ -442,11 +457,15 @@ def insert_missing(
                         rc = len(row_data)
                     inserted_total += max(0, rc)
                     logger.info(
-                        f"Insert missing (ON CONFLICT): attempted {len(chunk)} rows for "
-                        f"{table}, inserted ~{rc}"
+                        "Insert missing (ON CONFLICT): attempted %s rows for %s, "
+                        "inserted ~%s",
+                        len(chunk),
+                        table,
+                        rc,
                     )
                 except Exception as e:
-                    # Robust detection of missing unique/exclusion constraint for ON CONFLICT
+                    # Robust detection of missing unique/exclusion constraint
+                    # for ON CONFLICT
                     msg = str(e)
                     pgcode = getattr(e, "pgcode", None)
                     should_fallback = False
@@ -455,25 +474,27 @@ def insert_missing(
                     if pgcode == "42P10":
                         should_fallback = True
                     # Message-based heuristics (multi-language)
-                    if (
-                        "ON CONFLICT" in msg
-                        and (
-                            "constraint" in msg
-                            or "唯一" in msg  # Chinese: unique
-                            or "排除" in msg  # Chinese: exclusion
-                            or "约束" in msg  # Chinese: constraint
-                        )
+                    if "ON CONFLICT" in msg and (
+                        "constraint" in msg
+                        or "唯一" in msg  # Chinese: unique
+                        or "排除" in msg  # Chinese: exclusion
+                        or "约束" in msg  # Chinese: constraint
                     ):
                         should_fallback = True
 
                     if should_fallback:
-                        # Fallback: SELECT existing keys, then plain INSERT for missing only
+                        # Fallback: SELECT existing keys, then plain INSERT for
+                        # missing only
                         key_tuples = [tuple(r.get(k) for k in key_cols) for r in chunk]
                         existing_set = set()
                         if key_tuples:
                             sel_cols = ",".join(quote_ident(k) for k in key_cols)
-                            tuple_placeholder = "(" + ",".join(["%s"] * len(key_cols)) + ")"
-                            placeholders = ",".join([tuple_placeholder] * len(key_tuples))
+                            tuple_placeholder = (
+                                "(" + ",".join(["%s"] * len(key_cols)) + ")"
+                            )
+                            placeholders = ",".join(
+                                [tuple_placeholder] * len(key_tuples)
+                            )
                             sel_sql = (
                                 f"SELECT {sel_cols} FROM {quoted_table} "
                                 f"WHERE ({sel_cols}) IN ({placeholders})"
@@ -482,16 +503,22 @@ def insert_missing(
                             for t in key_tuples:
                                 params.extend(list(t))
                             cursor.execute(sel_sql, params)
-                            existing_set = set(tuple(row) for row in (cursor.fetchall() or []))
+                            existing_set = set(
+                                tuple(row) for row in (cursor.fetchall() or [])
+                            )
 
                         to_insert = [
-                            r for r in chunk
+                            r
+                            for r in chunk
                             if tuple(r.get(k) for k in key_cols) not in existing_set
                         ]
                         if to_insert:
-                            simple_sql = f"INSERT INTO {quoted_table} ({col_list}) VALUES %s"
+                            simple_sql = (
+                                f"INSERT INTO {quoted_table} ({col_list}) VALUES %s"
+                            )
                             simple_data = [
-                                [_adapt_param(r.get(c)) for c in all_cols] for r in to_insert
+                                [_adapt_param(r.get(c)) for c in all_cols]
+                                for r in to_insert
                             ]
                             execute_values(
                                 cursor,
@@ -507,13 +534,18 @@ def insert_missing(
                                 rc2 = len(simple_data)
                             inserted_total += max(0, rc2)
                             logger.info(
-                                f"Insert missing (fallback): inserted {rc2}/{len(to_insert)} "
-                                f"rows into {table}"
+                                "Insert missing (fallback): inserted %s/%s rows "
+                                "into %s",
+                                rc2,
+                                len(to_insert),
+                                table,
                             )
                         else:
                             logger.info(
-                                f"Insert missing (fallback): all {len(chunk)} keys "
-                                f"already exist in {table}"
+                                "Insert missing (fallback): all %s keys already "
+                                "exist in %s",
+                                len(chunk),
+                                table,
                             )
                     else:
                         # Unknown error: re-raise
@@ -595,16 +627,22 @@ def fill_null_only(
             # Plan-only mode: return SQL plans
             params_list = []
             for row in update_rows:
-                params = [_adapt_param(row[col])] + [_adapt_param(row[k]) for k in key_cols]
+                params = [_adapt_param(row[col])] + [
+                    _adapt_param(row[k]) for k in key_cols
+                ]
                 params_list.append(params)
             operations.append(("UPDATE_NULL_ONLY", sql, params_list))
         else:
             # Execute mode
             with conn.cursor() as cursor:
                 for row in update_rows:
-                    params = [_adapt_param(row[col])] + [_adapt_param(row[k]) for k in key_cols]
+                    params = [_adapt_param(row[col])] + [
+                        _adapt_param(row[k]) for k in key_cols
+                    ]
                     cursor.execute(sql, params)
-                    updated_total += cursor.rowcount if hasattr(cursor, "rowcount") else 0
+                    updated_total += (
+                        cursor.rowcount if hasattr(cursor, "rowcount") else 0
+                    )
 
             logger.info(
                 f"Fill null only: updated {len(update_rows)} rows "
@@ -662,7 +700,13 @@ def load(
 
     # Early return for empty data
     if not rows:
-        return {"mode": mode, "table": table, "deleted": 0, "inserted": 0, "batches": 0}
+        return {
+            "mode": mode,
+            "table": table,
+            "deleted": 0,
+            "inserted": 0,
+            "batches": 0,
+        }
 
     # Determine column order
     cols = _get_column_order(rows)
@@ -706,14 +750,17 @@ def load(
             quoted_pk_cols = ",".join(quote_ident(c) for c in pk)
             cols_tuple = f"({quoted_pk_cols})"
 
-            # Number of PK tuples per DELETE; reuse chunk_size to keep configuration simple
+            # Number of PK tuples per DELETE; reuse chunk_size to keep
+            # configuration simple
             delete_chunk = max(1, min(chunk_size, 1000))
             for j in range(0, len(unique_tuples), delete_chunk):
                 chunk_pk = unique_tuples[j : j + delete_chunk]
                 # Build placeholders for this chunk
                 tuple_placeholder = "(" + ",".join(["%s"] * len(pk)) + ")"
                 placeholders = ",".join([tuple_placeholder] * len(chunk_pk))
-                sql = f"DELETE FROM {quoted_table} WHERE {cols_tuple} IN ({placeholders})"
+                sql = (
+                    f"DELETE FROM {quoted_table} WHERE {cols_tuple} IN ({placeholders})"
+                )
                 params: list[Any] = []
                 for t in chunk_pk:
                     params.extend(t)
@@ -747,7 +794,8 @@ def load(
         result["sql_plans"] = operations
         return result
 
-    # Execute with database connection (manual transaction management for broad compatibility)
+    # Execute with database connection (manual transaction management for
+    # broad compatibility)
     try:
         executed_deleted_total = 0
         with conn.cursor() as cursor:
@@ -766,7 +814,9 @@ def load(
                     try:
                         from psycopg2.extras import execute_values  # type: ignore
                     except ImportError:
-                        raise DataWarehouseLoaderError("psycopg2 not available for bulk operations")
+                        raise DataWarehouseLoaderError(
+                            "psycopg2 not available for bulk operations"
+                        )
 
                     # Convert flattened params back to rows and adapt JSONB parameters
                     cols_per_row = len(cols)

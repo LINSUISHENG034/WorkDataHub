@@ -104,7 +104,7 @@ class Pipeline:
 
         self.logger.debug(
             "Starting pipeline execution",
-            extra={"pipeline": self.config.name, "steps": len(self.steps)}
+            extra={"pipeline": self.config.name, "steps": len(self.steps)},
         )
 
         for step in self.steps:
@@ -129,8 +129,8 @@ class Pipeline:
                         "step": step.name,
                         "duration_ms": step_duration,
                         "warnings": len(result.warnings),
-                        "errors": len(result.errors)
-                    }
+                        "errors": len(result.errors),
+                    },
                 )
 
                 # Handle stop_on_error configuration
@@ -148,8 +148,8 @@ class Pipeline:
                     extra={
                         "step": step.name,
                         "duration_ms": step_duration,
-                        "error": str(e)
-                    }
+                        "error": str(e),
+                    },
                 )
 
                 # Handle error according to configuration
@@ -161,7 +161,9 @@ class Pipeline:
 
         # Calculate total execution time
         duration_ms = int((time.perf_counter() - start_time) * 1000)
-        metrics = PipelineMetrics(executed_steps=executed_steps, duration_ms=duration_ms)
+        metrics = PipelineMetrics(
+            executed_steps=executed_steps, duration_ms=duration_ms
+        )
 
         self.logger.info(
             "Pipeline execution completed",
@@ -170,13 +172,10 @@ class Pipeline:
                 "duration_ms": duration_ms,
                 "executed_steps": len(executed_steps),
                 "total_warnings": len(all_warnings),
-                "total_errors": len(all_errors)
-            }
+                "total_errors": len(all_errors),
+            },
         )
 
         return PipelineResult(
-            row=current_row,
-            warnings=all_warnings,
-            errors=all_errors,
-            metrics=metrics
+            row=current_row, warnings=all_warnings, errors=all_errors, metrics=metrics
         )

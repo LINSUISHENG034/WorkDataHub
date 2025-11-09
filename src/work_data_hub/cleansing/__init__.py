@@ -36,7 +36,10 @@ Usage:
 """
 
 # 导出主要的公共 API
-from .integrations.pydantic_adapter import decimal_fields_cleaner, simple_field_validator
+from .integrations.pydantic_adapter import (
+    decimal_fields_cleaner,
+    simple_field_validator,
+)
 from .registry import CleansingRegistry, CleansingRule, RuleCategory, registry, rule
 from .rules.numeric_rules import (
     annuity_decimal_cleaner,

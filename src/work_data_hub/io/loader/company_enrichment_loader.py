@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 class CompanyEnrichmentLoaderError(Exception):
     """Raised when company enrichment loader encounters an error."""
+
     pass
 
 
@@ -50,7 +51,7 @@ class CompanyEnrichmentLoader:
 
         logger.debug(
             "CompanyEnrichmentLoader initialized",
-            extra={"plan_only": plan_only, "has_connection": bool(connection)}
+            extra={"plan_only": plan_only, "has_connection": bool(connection)},
         )
 
     def cache_company_mapping(
@@ -59,7 +60,7 @@ class CompanyEnrichmentLoader:
         canonical_id: str,
         *,
         source: str = "EQC",
-        match_type: str = "name"
+        match_type: str = "name",
     ) -> None:
         """
         Cache a company mapping result from EQC lookup.
@@ -114,8 +115,8 @@ class CompanyEnrichmentLoader:
                     "canonical_id": clean_canonical_id,
                     "source": source,
                     "match_type": match_type,
-                    "priority": priority
-                }
+                    "priority": priority,
+                },
             )
             return
 
@@ -140,8 +141,8 @@ class CompanyEnrichmentLoader:
                         "alias_name": clean_alias,
                         "canonical_id": clean_canonical_id,
                         "source": source,
-                        "match_type": match_type
-                    }
+                        "match_type": match_type,
+                    },
                 )
 
                 cursor.execute(
@@ -152,8 +153,8 @@ class CompanyEnrichmentLoader:
                         source,
                         match_type,
                         priority,
-                        datetime.now(timezone.utc)
-                    )
+                        datetime.now(timezone.utc),
+                    ),
                 )
 
                 logger.info(
@@ -162,8 +163,8 @@ class CompanyEnrichmentLoader:
                         "alias_name": clean_alias,
                         "canonical_id": clean_canonical_id,
                         "source": source,
-                        "match_type": match_type
-                    }
+                        "match_type": match_type,
+                    },
                 )
 
         except psycopg2.Error as e:
@@ -172,8 +173,8 @@ class CompanyEnrichmentLoader:
                 extra={
                     "alias_name": clean_alias,
                     "canonical_id": clean_canonical_id,
-                    "error": str(e)
-                }
+                    "error": str(e),
+                },
             )
             raise CompanyEnrichmentLoaderError(f"Failed to cache company mapping: {e}")
 
@@ -182,7 +183,7 @@ class CompanyEnrichmentLoader:
         mappings: List[Dict[str, str]],
         *,
         source: str = "EQC",
-        match_type: str = "name"
+        match_type: str = "name",
     ) -> Dict[str, int]:
         """
         Cache multiple company mappings in a single transaction.
@@ -205,7 +206,11 @@ class CompanyEnrichmentLoader:
         if self.plan_only:
             logger.info(
                 "PLAN ONLY: Would cache batch of company mappings",
-                extra={"batch_size": len(mappings), "source": source, "match_type": match_type}
+                extra={
+                    "batch_size": len(mappings),
+                    "source": source,
+                    "match_type": match_type,
+                },
             )
             return {"cached": len(mappings)}
 
@@ -234,7 +239,9 @@ class CompanyEnrichmentLoader:
                 logger.warning(f"Skipping empty mapping: {mapping}")
                 continue
 
-            batch_data.append((alias_name, canonical_id, source, match_type, priority, now))
+            batch_data.append(
+                (alias_name, canonical_id, source, match_type, priority, now)
+            )
 
         if not batch_data:
             logger.warning("No valid mappings to cache after filtering")
@@ -257,16 +264,19 @@ class CompanyEnrichmentLoader:
                 with self.connection.cursor() as cursor:
                     logger.debug(
                         "Caching batch of company mappings",
-                        extra={"batch_size": len(batch_data), "source": source}
+                        extra={"batch_size": len(batch_data), "source": source},
                     )
 
                     # Use execute_values for efficient batch insert
                     from psycopg2.extras import execute_values
-                    execute_values(cursor, sql, batch_data, template=None, page_size=1000)
+
+                    execute_values(
+                        cursor, sql, batch_data, template=None, page_size=1000
+                    )
 
                     logger.info(
                         "Company mappings batch cached successfully",
-                        extra={"cached_count": len(batch_data), "source": source}
+                        extra={"cached_count": len(batch_data), "source": source},
                     )
 
                     return {"cached": len(batch_data)}
@@ -274,16 +284,18 @@ class CompanyEnrichmentLoader:
         except psycopg2.Error as e:
             logger.error(
                 "Database error during batch company mapping cache operation",
-                extra={"batch_size": len(batch_data), "error": str(e)}
+                extra={"batch_size": len(batch_data), "error": str(e)},
             )
-            raise CompanyEnrichmentLoaderError(f"Failed to cache company mappings batch: {e}")
+            raise CompanyEnrichmentLoaderError(
+                f"Failed to cache company mappings batch: {e}"
+            )
 
     def load_mappings(
         self,
         *,
         source: Optional[str] = None,
         match_type: Optional[str] = None,
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
     ) -> List[CompanyMappingRecord]:
         """
         Load company mappings from the database.
@@ -307,7 +319,7 @@ class CompanyEnrichmentLoader:
                     canonical_id="614810477",
                     source="internal",
                     match_type="name",
-                    priority=4
+                    priority=4,
                 )
             ]
             logger.info(
@@ -316,8 +328,8 @@ class CompanyEnrichmentLoader:
                     "source": source,
                     "match_type": match_type,
                     "limit": limit,
-                    "mock_count": len(mock_mappings)
-                }
+                    "mock_count": len(mock_mappings),
+                },
             )
             return mock_mappings
 
@@ -354,7 +366,7 @@ class CompanyEnrichmentLoader:
             with self.connection.cursor(cursor_factory=RealDictCursor) as cursor:
                 logger.debug(
                     "Loading company mappings",
-                    extra={"source": source, "match_type": match_type, "limit": limit}
+                    extra={"source": source, "match_type": match_type, "limit": limit},
                 )
 
                 cursor.execute(sql, params)
@@ -364,7 +376,7 @@ class CompanyEnrichmentLoader:
 
                 logger.debug(
                     "Company mappings loaded successfully",
-                    extra={"loaded_count": len(mappings)}
+                    extra={"loaded_count": len(mappings)},
                 )
 
                 return mappings
@@ -372,11 +384,13 @@ class CompanyEnrichmentLoader:
         except psycopg2.Error as e:
             logger.error(
                 "Database error during company mappings loading",
-                extra={"source": source, "match_type": match_type, "error": str(e)}
+                extra={"source": source, "match_type": match_type, "error": str(e)},
             )
             raise CompanyEnrichmentLoaderError(f"Failed to load company mappings: {e}")
 
-    def get_cached_mapping(self, alias_name: str, match_type: str = "name") -> Optional[str]:
+    def get_cached_mapping(
+        self, alias_name: str, match_type: str = "name"
+    ) -> Optional[str]:
         """
         Get a cached company mapping for a specific alias.
 
@@ -398,7 +412,7 @@ class CompanyEnrichmentLoader:
         if self.plan_only:
             logger.info(
                 "PLAN ONLY: Would get cached mapping",
-                extra={"alias_name": clean_alias, "match_type": match_type}
+                extra={"alias_name": clean_alias, "match_type": match_type},
             )
             return "614810477"  # Mock result
 
@@ -422,25 +436,31 @@ class CompanyEnrichmentLoader:
                         extra={
                             "alias_name": clean_alias,
                             "match_type": match_type,
-                            "canonical_id": canonical_id
-                        }
+                            "canonical_id": canonical_id,
+                        },
                     )
                     return canonical_id
                 else:
                     logger.debug(
                         "No cached mapping found",
-                        extra={"alias_name": clean_alias, "match_type": match_type}
+                        extra={"alias_name": clean_alias, "match_type": match_type},
                     )
                     return None
 
         except psycopg2.Error as e:
             logger.error(
                 "Database error during cached mapping lookup",
-                extra={"alias_name": clean_alias, "match_type": match_type, "error": str(e)}
+                extra={
+                    "alias_name": clean_alias,
+                    "match_type": match_type,
+                    "error": str(e),
+                },
             )
             raise CompanyEnrichmentLoaderError(f"Failed to get cached mapping: {e}")
 
-    def clear_cache(self, *, source: str = "EQC", dry_run: bool = True) -> Dict[str, int]:
+    def clear_cache(
+        self, *, source: str = "EQC", dry_run: bool = True
+    ) -> Dict[str, int]:
         """
         Clear cached mappings by source.
 
@@ -456,7 +476,9 @@ class CompanyEnrichmentLoader:
         """
         if self.plan_only or dry_run:
             # Count what would be deleted
-            count_sql = "SELECT COUNT(*) FROM enterprise.company_mapping WHERE source = %s"
+            count_sql = (
+                "SELECT COUNT(*) FROM enterprise.company_mapping WHERE source = %s"
+            )
 
             try:
                 with self.connection.cursor() as cursor:
@@ -465,7 +487,7 @@ class CompanyEnrichmentLoader:
 
                     logger.info(
                         "PLAN ONLY/DRY RUN: Would clear cached mappings",
-                        extra={"source": source, "would_delete_count": count}
+                        extra={"source": source, "would_delete_count": count},
                     )
 
                     return {"deleted": count}
@@ -473,9 +495,11 @@ class CompanyEnrichmentLoader:
             except psycopg2.Error as e:
                 logger.error(
                     "Database error during cache clear count",
-                    extra={"source": source, "error": str(e)}
+                    extra={"source": source, "error": str(e)},
                 )
-                raise CompanyEnrichmentLoaderError(f"Failed to count cached mappings: {e}")
+                raise CompanyEnrichmentLoaderError(
+                    f"Failed to count cached mappings: {e}"
+                )
 
         # Execute actual deletion
         delete_sql = "DELETE FROM enterprise.company_mapping WHERE source = %s"
@@ -483,17 +507,14 @@ class CompanyEnrichmentLoader:
         try:
             with self.connection:  # Transaction
                 with self.connection.cursor() as cursor:
-                    logger.warning(
-                        "Clearing cached mappings",
-                        extra={"source": source}
-                    )
+                    logger.warning("Clearing cached mappings", extra={"source": source})
 
                     cursor.execute(delete_sql, (source,))
                     deleted_count = cursor.rowcount
 
                     logger.warning(
                         "Cached mappings cleared",
-                        extra={"source": source, "deleted_count": deleted_count}
+                        extra={"source": source, "deleted_count": deleted_count},
                     )
 
                     return {"deleted": deleted_count}
@@ -501,6 +522,6 @@ class CompanyEnrichmentLoader:
         except psycopg2.Error as e:
             logger.error(
                 "Database error during cache clear operation",
-                extra={"source": source, "error": str(e)}
+                extra={"source": source, "error": str(e)},
             )
             raise CompanyEnrichmentLoaderError(f"Failed to clear cached mappings: {e}")

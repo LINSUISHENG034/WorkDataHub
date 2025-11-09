@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 class LookupQueueError(Exception):
     """Base exception for lookup queue operations."""
+
     pass
 
 
@@ -89,10 +90,12 @@ class LookupQueue:
 
         logger.debug(
             "LookupQueue initialized",
-            extra={"plan_only": plan_only, "has_connection": bool(connection)}
+            extra={"plan_only": plan_only, "has_connection": bool(connection)},
         )
 
-    def enqueue(self, name: str, normalized_name: Optional[str] = None) -> LookupRequest:
+    def enqueue(
+        self, name: str, normalized_name: Optional[str] = None
+    ) -> LookupRequest:
         """
         Enqueue a new lookup request for async processing.
 
@@ -121,19 +124,30 @@ class LookupQueue:
                 normalized_name=norm_name,
                 status="pending",
                 attempts=0,
-                last_error=None
+                last_error=None,
             )
             logger.info(
                 "PLAN ONLY: Would enqueue lookup request",
-                extra={"company_name": cleaned_name, "normalized_name": norm_name}
+                extra={"company_name": cleaned_name, "normalized_name": norm_name},
             )
             return mock_request
 
         sql = """
-            INSERT INTO enterprise.lookup_requests (name, normalized_name, status, attempts)
+            INSERT INTO enterprise.lookup_requests (
+                name,
+                normalized_name,
+                status,
+                attempts
+            )
             VALUES (%s, %s, 'pending', 0)
-            RETURNING id, name, normalized_name, status, attempts, last_error,
-                      created_at, updated_at
+            RETURNING id,
+                      name,
+                      normalized_name,
+                      status,
+                      attempts,
+                      last_error,
+                      created_at,
+                      updated_at
         """
 
         try:
@@ -141,14 +155,16 @@ class LookupQueue:
             with self.connection.cursor() as cursor:
                 logger.debug(
                     "Enqueueing lookup request",
-                    extra={"company_name": cleaned_name, "normalized_name": norm_name}
+                    extra={"company_name": cleaned_name, "normalized_name": norm_name},
                 )
 
                 cursor.execute(sql, (cleaned_name, norm_name))
                 row = cursor.fetchone()
 
                 if not row:
-                    raise LookupQueueError("Failed to enqueue lookup request - no row returned")
+                    raise LookupQueueError(
+                        "Failed to enqueue lookup request - no row returned"
+                    )
 
                 # Support both tuple- and dict-like rows from cursor
                 if isinstance(row, dict):
@@ -178,8 +194,8 @@ class LookupQueue:
                     extra={
                         "request_id": request.id,
                         "company_name": request.name,
-                        "normalized_name": request.normalized_name
-                    }
+                        "normalized_name": request.normalized_name,
+                    },
                 )
 
                 return request
@@ -187,7 +203,7 @@ class LookupQueue:
         except Exception as e:
             logger.error(
                 "Database error during enqueue operation",
-                extra={"company_name": cleaned_name, "error": str(e)}
+                extra={"company_name": cleaned_name, "error": str(e)},
             )
             raise LookupQueueError(f"Failed to enqueue lookup request: {e}")
 
@@ -220,17 +236,18 @@ class LookupQueue:
                     normalized_name=f"test company {i + 1}",
                     status="processing",
                     attempts=0,
-                    last_error=None
+                    last_error=None,
                 )
                 for i in range(min(batch_size, 3))  # Return up to 3 mock requests
             ]
             logger.info(
                 "PLAN ONLY: Would dequeue requests",
-                extra={"batch_size": batch_size, "mock_count": len(mock_requests)}
+                extra={"batch_size": batch_size, "mock_count": len(mock_requests)},
             )
             return mock_requests
 
-        # Atomic dequeue with status update using CTE pattern to avoid FOR UPDATE in subquery
+        # Atomic dequeue with status update using CTE pattern to avoid
+        # FOR UPDATE in subquery
         sql = """
             WITH pending AS (
                 SELECT id FROM enterprise.lookup_requests
@@ -243,8 +260,14 @@ class LookupQueue:
             SET status = 'processing', updated_at = now()
             FROM pending
             WHERE enterprise.lookup_requests.id = pending.id
-            RETURNING enterprise.lookup_requests.id, name, normalized_name, status,
-                      attempts, last_error, created_at, updated_at
+            RETURNING enterprise.lookup_requests.id,
+                      name,
+                      normalized_name,
+                      status,
+                      attempts,
+                      last_error,
+                      created_at,
+                      updated_at
         """
 
         try:
@@ -252,7 +275,7 @@ class LookupQueue:
             with self.connection.cursor() as cursor:
                 logger.debug(
                     "Dequeueing requests for processing",
-                    extra={"batch_size": batch_size}
+                    extra={"batch_size": batch_size},
                 )
 
                 cursor.execute(sql, (batch_size,))
@@ -285,8 +308,8 @@ class LookupQueue:
                     "Requests dequeued successfully",
                     extra={
                         "dequeued_count": len(requests),
-                        "requested_batch_size": batch_size
-                    }
+                        "requested_batch_size": batch_size,
+                    },
                 )
 
                 return requests
@@ -294,7 +317,7 @@ class LookupQueue:
         except Exception as e:
             logger.error(
                 "Database error during dequeue operation",
-                extra={"batch_size": batch_size, "error": str(e)}
+                extra={"batch_size": batch_size, "error": str(e)},
             )
             raise LookupQueueError(f"Failed to dequeue requests: {e}")
 
@@ -315,7 +338,7 @@ class LookupQueue:
         if self.plan_only:
             logger.info(
                 "PLAN ONLY: Would mark request as done",
-                extra={"request_id": request_id}
+                extra={"request_id": request_id},
             )
             return
 
@@ -332,21 +355,18 @@ class LookupQueue:
                 if cursor.rowcount == 0:
                     logger.warning(
                         "No request updated - may not exist or not in processing state",
-                        extra={"request_id": request_id}
+                        extra={"request_id": request_id},
                     )
                     raise LookupQueueError(
                         f"Request {request_id} not found or not in processing state"
                     )
 
-                logger.info(
-                    "Request marked as done",
-                    extra={"request_id": request_id}
-                )
+                logger.info("Request marked as done", extra={"request_id": request_id})
 
         except Exception as e:
             logger.error(
                 "Database error during mark_done operation",
-                extra={"request_id": request_id, "error": str(e)}
+                extra={"request_id": request_id, "error": str(e)},
             )
             raise LookupQueueError(f"Failed to mark request as done: {e}")
 
@@ -375,7 +395,7 @@ class LookupQueue:
         if self.plan_only:
             logger.info(
                 "PLAN ONLY: Would mark request as failed",
-                extra={"request_id": request_id, "attempts": attempts}
+                extra={"request_id": request_id, "attempts": attempts},
             )
             return
 
@@ -392,7 +412,7 @@ class LookupQueue:
                 if cursor.rowcount == 0:
                     logger.warning(
                         "No request updated - may not exist or not in processing state",
-                        extra={"request_id": request_id}
+                        extra={"request_id": request_id},
                     )
                     raise LookupQueueError(
                         f"Request {request_id} not found or not in processing state"
@@ -403,14 +423,14 @@ class LookupQueue:
                     extra={
                         "request_id": request_id,
                         "attempts": attempts,
-                        "error": error_message
-                    }
+                        "error": error_message,
+                    },
                 )
 
         except Exception as e:
             logger.error(
                 "Database error during mark_failed operation",
-                extra={"request_id": request_id, "error": str(e)}
+                extra={"request_id": request_id, "error": str(e)},
             )
             raise LookupQueueError(f"Failed to mark request as failed: {e}")
 
@@ -432,7 +452,7 @@ class LookupQueue:
             mock_temp_id = "TEMP_000001"
             logger.info(
                 "PLAN ONLY: Would generate temp ID",
-                extra={"mock_temp_id": mock_temp_id}
+                extra={"mock_temp_id": mock_temp_id},
             )
             return mock_temp_id
 
@@ -444,6 +464,7 @@ class LookupQueue:
 
         try:
             with self.connection.cursor() as cursor:
+
                 def _extract_sequence_value(result):
                     """Normalize cursor row into an integer sequence value."""
                     if result is None:
@@ -470,13 +491,18 @@ class LookupQueue:
                 if sequence_value is None:
                     logger.debug(
                         "Temp ID sequence empty - seeding initial row",
-                        extra={"bootstrap": True}
+                        extra={"bootstrap": True},
                     )
                     cursor.execute(
                         """
-                        INSERT INTO enterprise.temp_id_sequence (last_number, updated_at)
+                        INSERT INTO enterprise.temp_id_sequence (
+                            last_number,
+                            updated_at
+                        )
                         SELECT 0, now()
-                        WHERE NOT EXISTS (SELECT 1 FROM enterprise.temp_id_sequence)
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM enterprise.temp_id_sequence
+                        )
                         """
                     )
                     cursor.execute(sql)
@@ -492,14 +518,13 @@ class LookupQueue:
 
                 logger.debug(
                     "Generated temporary ID",
-                    extra={"temp_id": temp_id, "sequence_value": sequence_value}
+                    extra={"temp_id": temp_id, "sequence_value": sequence_value},
                 )
                 return temp_id
 
         except Exception as e:
             logger.error(
-                "Database error during temp ID generation",
-                extra={"error": str(e)}
+                "Database error during temp ID generation", extra={"error": str(e)}
             )
             raise LookupQueueError(f"Failed to generate temp ID: {e}")
 
@@ -517,8 +542,7 @@ class LookupQueue:
             # Return mock stats for plan-only mode
             mock_stats = {"pending": 5, "processing": 2, "done": 100, "failed": 3}
             logger.info(
-                "PLAN ONLY: Would get queue stats",
-                extra={"mock_stats": mock_stats}
+                "PLAN ONLY: Would get queue stats", extra={"mock_stats": mock_stats}
             )
             return mock_stats
 
@@ -547,8 +571,5 @@ class LookupQueue:
                 return stats
 
         except Exception as e:
-            logger.error(
-                "Database error during stats query",
-                extra={"error": str(e)}
-            )
+            logger.error("Database error during stats query", extra={"error": str(e)})
             raise LookupQueueError(f"Failed to get queue stats: {e}")

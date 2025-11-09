@@ -1,0 +1,307 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>2</storyId>
+    <title>Basic CI/CD Pipeline Setup</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-09</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-2-basic-cicd-pipeline-setup.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>automated quality checks configured from the start</iWant>
+    <soThat>type errors and linting issues are caught immediately as I build the infrastructure</soThat>
+    <tasks>
+      <task id="1" ac="1">
+        <title>Determine CI/CD platform and create workflow file</title>
+        <subtasks>
+          <subtask id="1.1">Determine if GitHub Actions or GitLab CI based on repository hosting</subtask>
+          <subtask id="1.2">Create `.github/workflows/ci.yml` (GitHub) or `.gitlab-ci.yml` (GitLab)</subtask>
+          <subtask id="1.3">Configure triggers: push to main, pull requests to any branch</subtask>
+          <subtask id="1.4">Set up Python 3.10+ environment in CI</subtask>
+        </subtasks>
+      </task>
+      <task id="2" ac="2">
+        <title>Configure mypy strict mode type checking</title>
+        <subtasks>
+          <subtask id="2.1">Add `[tool.mypy]` section to `pyproject.toml` with strict mode enabled</subtask>
+          <subtask id="2.2">Configure mypy to check `src/` directory</subtask>
+          <subtask id="2.3">Add CI job step: `uv run mypy src/ --strict`</subtask>
+          <subtask id="2.4">Verify existing code (Story 1.1) passes mypy strict mode</subtask>
+          <subtask id="2.5">Configure CI to block merge on mypy errors</subtask>
+        </subtasks>
+      </task>
+      <task id="3" ac="3">
+        <title>Configure ruff linting</title>
+        <subtasks>
+          <subtask id="3.1">Add `[tool.ruff]` section to `pyproject.toml` with linting rules</subtask>
+          <subtask id="3.2">Configure line length (88 chars), target Python 3.10+</subtask>
+          <subtask id="3.3">Add CI job step: `uv run ruff check src/`</subtask>
+          <subtask id="3.4">Verify existing code passes ruff linting</subtask>
+          <subtask id="3.5">Configure CI to block merge on ruff violations</subtask>
+        </subtasks>
+      </task>
+      <task id="4" ac="4">
+        <title>Configure ruff code formatting</title>
+        <subtasks>
+          <subtask id="4.1">Configure ruff format settings in `pyproject.toml`</subtask>
+          <subtask id="4.2">Add CI job step: `uv run ruff format --check src/`</subtask>
+          <subtask id="4.3">Run `uv run ruff format src/` locally to format existing code</subtask>
+          <subtask id="4.4">Document formatting command in README.md</subtask>
+          <subtask id="4.5">Configure CI to block merge if code not formatted</subtask>
+        </subtasks>
+      </task>
+      <task id="5" ac="5">
+        <title>Add secret scanning with gitleaks</title>
+        <subtasks>
+          <subtask id="5.1">Add gitleaks step to CI workflow (GitHub Actions: gitleaks/gitleaks-action@v2)</subtask>
+          <subtask id="5.2">Configure gitleaks to scan all commits in PR</subtask>
+          <subtask id="5.3">Test with intentional secret pattern (then remove) to verify detection works</subtask>
+          <subtask id="5.4">Configure CI to block merge if secrets detected</subtask>
+        </subtasks>
+      </task>
+      <task id="6" ac="6">
+        <title>Optimize CI performance and add caching</title>
+        <subtasks>
+          <subtask id="6.1">Add dependency caching for uv packages</subtask>
+          <subtask id="6.2">Add mypy cache persistence between runs</subtask>
+          <subtask id="6.3">Run type checking and linting in parallel (matrix strategy)</subtask>
+          <subtask id="6.4">Measure total CI execution time (target: &lt;2 minutes)</subtask>
+          <subtask id="6.5">Add timing annotations to workflow for monitoring</subtask>
+        </subtasks>
+      </task>
+      <task id="7" ac="1">
+        <title>Add pytest execution to CI</title>
+        <subtasks>
+          <subtask id="7.1">Add CI job step: `uv run pytest -v`</subtask>
+          <subtask id="7.2">Configure pytest to discover tests in `tests/` directory</subtask>
+          <subtask id="7.3">Verify CI passes with existing tests from Story 1.1</subtask>
+          <subtask id="7.4">Configure CI to block merge on test failures</subtask>
+        </subtasks>
+      </task>
+      <task id="8" ac="1,4">
+        <title>Document CI/CD setup and usage</title>
+        <subtasks>
+          <subtask id="8.1">Update README.md with CI/CD status badge</subtask>
+          <subtask id="8.2">Document local quality check commands (mypy, ruff, pytest)</subtask>
+          <subtask id="8.3">Document how to interpret CI failure messages</subtask>
+          <subtask id="8.4">Add section on pre-commit hooks (optional but recommended)</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">
+      <title>CI pipeline configuration file exists</title>
+      <details>
+        <item>`.github/workflows/ci.yml` OR `.gitlab-ci.yml` (depending on platform)</item>
+        <item>Triggers on: push to main, pull requests</item>
+        <item>Uses Python 3.10+</item>
+      </details>
+    </criterion>
+    <criterion id="2">
+      <title>Type checking enforced</title>
+      <details>
+        <item>CI runs `uv run mypy src/ --strict` and blocks merge on errors</item>
+        <item>`mypy.ini` or `pyproject.toml` configures strict mode</item>
+        <item>All existing code (Stories 1.1-1.2) passes type checking</item>
+      </details>
+    </criterion>
+    <criterion id="3">
+      <title>Linting enforced</title>
+      <details>
+        <item>CI runs `uv run ruff check src/` and blocks merge on violations</item>
+        <item>`ruff.toml` or `pyproject.toml` configures rules</item>
+        <item>All existing code passes linting</item>
+      </details>
+    </criterion>
+    <criterion id="4">
+      <title>Code formatting checked</title>
+      <details>
+        <item>CI runs `uv run ruff format --check src/` and blocks merge if not formatted</item>
+        <item>Local formatting command documented: `uv run ruff format src/`</item>
+      </details>
+    </criterion>
+    <criterion id="5">
+      <title>Secret scanning enabled</title>
+      <details>
+        <item>CI runs gitleaks or equivalent tool to detect secrets</item>
+        <item>Blocks merge if secrets detected in commits</item>
+      </details>
+    </criterion>
+    <criterion id="6">
+      <title>CI execution time acceptable</title>
+      <details>
+        <item>Total CI pipeline (type check + lint + format + secret scan) completes in &lt;2 minutes</item>
+      </details>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic Technical Specification: Foundation &amp; Core Infrastructure</title>
+        <section>Story 1.2: Basic CI/CD Pipeline</section>
+        <snippet>Story 1.2 establishes automated quality gates: mypy strict mode type checking, ruff linting/formatting, gitleaks secret scanning, and pytest execution. All checks block merge on failure. Total execution time target: &lt;2 minutes. Detailed acceptance criteria AC-1.2.1 through AC-1.2.6 define configuration requirements.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>WorkDataHub - Epic Breakdown</title>
+        <section>Story 1.2: Basic CI/CD Pipeline Setup</section>
+        <snippet>User story defines need for automated quality checks from the start. CI runs on pull requests and main branch with dependency caching. Enables quality gates for all subsequent stories (1.3-1.10). Time budget per check helps identify slowdowns early.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Scale Adaptive Architecture</title>
+        <section>Technology Stack</section>
+        <snippet>mypy ≥1.17.1 with strict mode for 100% type coverage NFR. ruff ≥0.12.12 replaces black + flake8 + isort, 10-100x faster. Python 3.10+ corporate standard for type system maturity. uv package manager for 10-100x faster dependency management.</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>WorkDataHub - Product Requirements Document</title>
+        <section>§1189-1248: Maintainability NFRs</section>
+        <snippet>100% Type Safety enforced via mypy strict mode. Team-Ready Maintainability requires automated quality checks. Clear architecture boundaries enforced via linting. NFR-3.4 defines code review and CI/CD requirements with quality gates blocking merge.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>pyproject.toml</path>
+        <kind>config</kind>
+        <symbol>[project] and [tool.*] sections</symbol>
+        <lines>1-76</lines>
+        <reason>Contains existing ruff and pytest configuration. Story 1.2 will add [tool.mypy] section with strict mode settings. Already has ruff ≥0.12.12 and mypy ≥1.17.1 in dev dependencies.</reason>
+      </artifact>
+      <artifact>
+        <path>README.md</path>
+        <kind>documentation</kind>
+        <symbol>Project overview and development guide</symbol>
+        <lines>1-244</lines>
+        <reason>Documents project structure, technology stack, and development commands. Story 1.2 will add CI/CD status badge and quality check documentation per AC-1 and AC-4.</reason>
+      </artifact>
+      <artifact>
+        <path>.gitignore</path>
+        <kind>config</kind>
+        <symbol>Git ignore patterns</symbol>
+        <lines>all</lines>
+        <reason>Already excludes .env, __pycache__/, .pytest_cache/, .mypy_cache/ per Story 1.1. Ensures no secrets committed to git per AC-5 security requirements.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/unit/test_project_structure.py</path>
+        <kind>test</kind>
+        <symbol>15 unit tests from Story 1.1</symbol>
+        <lines>all</lines>
+        <reason>Existing tests that CI will execute per AC-1 and Task 7. Expected to pass (15 tests) validating project structure from Story 1.1.</reason>
+      </artifact>
+      <artifact>
+        <path>uv.lock</path>
+        <kind>lockfile</kind>
+        <symbol>Dependency lock file</symbol>
+        <lines>all</lines>
+        <reason>Used as cache key for CI dependency caching per Task 6. Ensures reproducible builds across CI runs.</reason>
+      </artifact>
+      <artifact>
+        <path>.python-version</path>
+        <kind>config</kind>
+        <symbol>Python version specification</symbol>
+        <lines>all</lines>
+        <reason>Specifies Python 3.10 requirement. CI environment setup must use this version per AC-1.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <python version="3.10+">
+        <package name="mypy" version="&gt;=1.17.1" category="dev" />
+        <package name="ruff" version="&gt;=0.12.12" category="dev" />
+        <package name="pytest" version="latest" category="dev" />
+        <package name="pytest-cov" version="latest" category="dev" />
+        <package name="pytest-postgresql" version="latest" category="dev" />
+        <package name="pandas-stubs" version="&gt;=2.3.2" category="dev" />
+        <package name="types-psycopg2" version="&gt;=2.9.21" category="dev" />
+        <package name="types-pyyaml" version="&gt;=6.0.12" category="dev" />
+        <package name="tomli" version="&gt;=2.0.0; python_version &lt; '3.11'" category="dev" />
+        <note>All CI commands must use `uv run` prefix (e.g., `uv run mypy src/`)</note>
+      </python>
+      <ci>
+        <tool name="gitleaks" version="latest" purpose="secret-scanning" />
+        <tool name="GitHub Actions" version="latest" purpose="ci-platform" note="OR GitLab CI depending on repository hosting" />
+      </ci>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint id="1" category="tooling">
+      <description>All CI commands MUST use `uv run` prefix</description>
+      <rationale>Story 1.1 established uv as package manager. Commands: `uv run mypy src/`, `uv run ruff check src/`, `uv run pytest -v`</rationale>
+      <source>stories/1-1-project-structure-and-development-environment-setup.md#Learnings</source>
+    </constraint>
+    <constraint id="2" category="type-safety">
+      <description>mypy strict mode enforced (100% type coverage)</description>
+      <rationale>PRD §1189-1248 NFR-3.1: Maintainability requires 100% type safety. mypy strict mode blocks merge on any type errors.</rationale>
+      <source>docs/PRD.md#nfr-3-maintainability-requirements</source>
+    </constraint>
+    <constraint id="3" category="security">
+      <description>No secrets in git repository</description>
+      <rationale>gitleaks must detect: API keys, tokens, passwords, DATABASE_URL patterns. Blocks merge if secrets detected. .env already gitignored per Story 1.1.</rationale>
+      <source>docs/tech-spec-epic-1.md#security</source>
+    </constraint>
+    <constraint id="4" category="performance">
+      <description>CI execution time &lt;2 minutes</description>
+      <rationale>Fast feedback loop for developers. Story 1.11 will expand to &lt;5 minutes with integration tests. Use caching and parallel execution per Task 6.</rationale>
+      <source>docs/tech-spec-epic-1.md#story-12-basic-cicd-pipeline AC-1.2.6</source>
+    </constraint>
+    <constraint id="5" category="architecture">
+      <description>Clean Architecture boundaries enforced via linting</description>
+      <rationale>domain/ layer must NOT import from io/ or orchestration/ layers. Ruff linting enforces import rules per Decision #7.</rationale>
+      <source>docs/architecture.md#decision-7-comprehensive-naming-conventions</source>
+    </constraint>
+    <constraint id="6" category="code-style">
+      <description>Consistent formatting via ruff format</description>
+      <rationale>Line length 88 chars (already configured in pyproject.toml). Quote style: double quotes. CI blocks merge if code not formatted.</rationale>
+      <source>pyproject.toml [tool.ruff] and [tool.ruff.format]</source>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <note>No interfaces to implement for this infrastructure story. Story 1.2 configures CI/CD pipeline to validate code in future stories.</note>
+  </interfaces>
+
+  <tests>
+    <standards>
+      pytest framework with custom markers (unit, integration, postgres, monthly_data, legacy_data). Story 1.2 CI runs unit tests only. Story 1.11 will add integration tests. Test execution: `uv run pytest -v` discovers all tests in tests/ directory. Expected: 15 unit tests from Story 1.1 (test_project_structure.py) pass successfully. Test markers defined in pyproject.toml [tool.pytest.ini_options].
+    </standards>
+    <locations>
+      <location>tests/unit/</location>
+      <location>tests/integration/ (Story 1.11)</location>
+      <location>tests/fixtures/</location>
+    </locations>
+    <ideas>
+      <idea ac="1">
+        <description>Verify CI workflow file structure</description>
+        <approach>Test that .github/workflows/ci.yml or .gitlab-ci.yml exists, parses correctly (valid YAML), contains required job steps (mypy, ruff check, ruff format, gitleaks, pytest), triggers on push to main and pull_request events.</approach>
+      </idea>
+      <idea ac="2">
+        <description>Verify mypy configuration</description>
+        <approach>Test that pyproject.toml has [tool.mypy] section with strict mode enabled. Run `uv run mypy src/ --strict` and verify exit code 0 (no type errors in existing code).</approach>
+      </idea>
+      <idea ac="3,4">
+        <description>Verify ruff configuration and formatting</description>
+        <approach>Test that pyproject.toml has [tool.ruff] and [tool.ruff.lint] sections. Run `uv run ruff check src/` and verify exit code 0. Run `uv run ruff format --check src/` and verify all files properly formatted.</approach>
+      </idea>
+      <idea ac="5">
+        <description>Verify gitleaks secret scanning</description>
+        <approach>Test intentional secret pattern (e.g., fake API key in comment), run gitleaks, verify detection. Remove secret pattern. Verify clean scan on actual codebase.</approach>
+      </idea>
+      <idea ac="6">
+        <description>Measure CI execution time</description>
+        <approach>Run complete CI pipeline locally or in test environment. Measure total time from start to finish. Verify &lt;2 minutes target met. Profile individual job steps if time exceeded.</approach>
+      </idea>
+      <idea ac="7">
+        <description>Verify pytest execution in CI</description>
+        <approach>CI job runs `uv run pytest -v`. Verify 15 tests from Story 1.1 discovered and executed. Verify all tests pass. Verify CI blocks merge on test failure (simulate failure scenario).</approach>
+      </idea>
+    </ideas>
+  </tests>
+</story-context>

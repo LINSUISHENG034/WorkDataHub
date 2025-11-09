@@ -48,7 +48,9 @@ class AnnuityPerformanceIn(BaseModel):
     # Core identification fields (Chinese column names from DDL)
     年: Optional[str] = Field(None, description="Year field from Excel (年)")
     月: Optional[str] = Field(None, description="Month field from Excel (月)")
-    月度: Optional[Union[date, str, int]] = Field(None, description="Report date (月度)")
+    月度: Optional[Union[date, str, int]] = Field(
+        None, description="Report date (月度)"
+    )
     计划代码: Optional[str] = Field(None, description="Plan code (计划代码)")
     公司代码: Optional[str] = Field(None, description="Company code - for mapping")
 
@@ -70,7 +72,9 @@ class AnnuityPerformanceIn(BaseModel):
     期末资产规模: Optional[Union[Decimal, float, int, str]] = Field(
         None, description="Final asset scale (期末资产规模)"
     )
-    供款: Optional[Union[Decimal, float, int, str]] = Field(None, description="Contribution (供款)")
+    供款: Optional[Union[Decimal, float, int, str]] = Field(
+        None, description="Contribution (供款)"
+    )
     流失_含待遇支付: Optional[Union[Decimal, float, int, str]] = Field(
         None,
         description="Loss including benefit payment (流失_含待遇支付)",
@@ -78,7 +82,9 @@ class AnnuityPerformanceIn(BaseModel):
         alias="流失(含待遇支付)",
         serialization_alias="流失(含待遇支付)",
     )
-    流失: Optional[Union[Decimal, float, int, str]] = Field(None, description="Loss (流失)")
+    流失: Optional[Union[Decimal, float, int, str]] = Field(
+        None, description="Loss (流失)"
+    )
     待遇支付: Optional[Union[Decimal, float, int, str]] = Field(
         None, description="Benefit payment (待遇支付)"
     )
@@ -95,13 +101,19 @@ class AnnuityPerformanceIn(BaseModel):
         None,
         description="Institution name (机构名称)",
         # Support both '机构' and '机构名称' column names from Excel
-        alias="机构"
+        alias="机构",
     )
-    产品线代码: Optional[str] = Field(None, description="Product line code (产品线代码)")
+    产品线代码: Optional[str] = Field(
+        None, description="Product line code (产品线代码)"
+    )
 
     # Pension account fields
-    年金账户号: Optional[str] = Field(None, description="Pension account number (年金账户号)")
-    年金账户名: Optional[str] = Field(None, description="Pension account name (年金账户名)")
+    年金账户号: Optional[str] = Field(
+        None, description="Pension account number (年金账户号)"
+    )
+    年金账户名: Optional[str] = Field(
+        None, description="Pension account name (年金账户名)"
+    )
 
     # English fields for compatibility
     company_id: Optional[str] = Field(None, description="Company identifier")
@@ -121,7 +133,9 @@ class AnnuityPerformanceIn(BaseModel):
         v_str = str(v).strip()
 
         # Remove common non-numeric characters
-        v_str = v_str.replace("年", "").replace("月", "").replace("/", "").replace("-", "")
+        v_str = (
+            v_str.replace("年", "").replace("月", "").replace("/", "").replace("-", "")
+        )
 
         # Return cleaned string (will be validated later in transformation)
         return v_str if v_str else None
@@ -189,9 +203,14 @@ class AnnuityPerformanceOut(BaseModel):
     )
 
     # Core required fields matching composite PK from data_sources.yml
-    计划代码: str = Field(..., min_length=1, max_length=255, description="Plan code identifier")
+    计划代码: str = Field(
+        ..., min_length=1, max_length=255, description="Plan code identifier"
+    )
     company_id: str = Field(
-        ..., min_length=1, max_length=50, description="Company identifier - matches DB column"
+        ...,
+        min_length=1,
+        max_length=50,
+        description="Company identifier - matches DB column",
     )
 
     # All fields from DDL schema - exact column name mapping
@@ -209,7 +228,9 @@ class AnnuityPerformanceOut(BaseModel):
     期初资产规模: Optional[Decimal] = Field(
         None, decimal_places=4, description="Initial asset scale"
     )
-    期末资产规模: Optional[Decimal] = Field(None, decimal_places=4, description="Final asset scale")
+    期末资产规模: Optional[Decimal] = Field(
+        None, decimal_places=4, description="Final asset scale"
+    )
     供款: Optional[Decimal] = Field(None, decimal_places=4, description="Contribution")
     # 使用数据库标准化列名进行输出序列化，输入兼容别名（括号形式）
     流失_含待遇支付: Optional[Decimal] = Field(
@@ -221,20 +242,38 @@ class AnnuityPerformanceOut(BaseModel):
         serialization_alias="流失_含待遇支付",  # 输出遵循 DDL 列名
     )
     流失: Optional[Decimal] = Field(None, decimal_places=4, description="Loss")
-    待遇支付: Optional[Decimal] = Field(None, decimal_places=4, description="Benefit payment")
-    投资收益: Optional[Decimal] = Field(None, decimal_places=4, description="Investment return")
+    待遇支付: Optional[Decimal] = Field(
+        None, decimal_places=4, description="Benefit payment"
+    )
+    投资收益: Optional[Decimal] = Field(
+        None, decimal_places=4, description="Investment return"
+    )
     当期收益率: Optional[Decimal] = Field(
-        None, decimal_places=6, ge=-1.0, le=10.0, description="Current period return rate"
+        None,
+        decimal_places=6,
+        ge=-1.0,
+        le=10.0,
+        description="Current period return rate",
     )
 
     # Organizational fields
-    机构代码: Optional[str] = Field(None, max_length=255, description="Institution code")
-    机构名称: Optional[str] = Field(None, max_length=255, description="Institution name")
-    产品线代码: Optional[str] = Field(None, max_length=255, description="Product line code")
+    机构代码: Optional[str] = Field(
+        None, max_length=255, description="Institution code"
+    )
+    机构名称: Optional[str] = Field(
+        None, max_length=255, description="Institution name"
+    )
+    产品线代码: Optional[str] = Field(
+        None, max_length=255, description="Product line code"
+    )
 
     # Pension account fields
-    年金账户号: Optional[str] = Field(None, max_length=50, description="Pension account number")
-    年金账户名: Optional[str] = Field(None, max_length=255, description="Pension account name")
+    年金账户号: Optional[str] = Field(
+        None, max_length=50, description="Pension account number"
+    )
+    年金账户名: Optional[str] = Field(
+        None, max_length=255, description="Pension account name"
+    )
 
     @field_validator("计划代码", "company_id", mode="after")
     @classmethod
@@ -266,7 +305,9 @@ class AnnuityPerformanceOut(BaseModel):
     @classmethod
     def clean_decimal_fields(cls, v, info: Any):
         """Clean decimal fields using the unified cleansing framework."""
-        from work_data_hub.cleansing.rules.numeric_rules import comprehensive_decimal_cleaning
+        from work_data_hub.cleansing.rules.numeric_rules import (
+            comprehensive_decimal_cleaning,
+        )
 
         # Field-specific precision configuration
         precision_config = {
@@ -306,6 +347,7 @@ class AnnuityPerformanceOut(BaseModel):
 # ===== Company Enrichment Integration Models =====
 # These models support optional company enrichment functionality
 
+
 class EnrichmentStats(BaseModel):
     """Statistics collection for company enrichment operations."""
 
@@ -315,13 +357,13 @@ class EnrichmentStats(BaseModel):
     )
 
     total_records: int = 0
-    success_internal: int = 0      # Resolved via internal mappings
-    success_external: int = 0      # Resolved via EQC lookup + cached
-    pending_lookup: int = 0        # Queued for async processing
-    temp_assigned: int = 0         # Assigned temporary ID
-    failed: int = 0               # Resolution failed completely
-    sync_budget_used: int = 0     # EQC lookups consumed from budget
-    processing_time_ms: int = 0   # Total enrichment processing time
+    success_internal: int = 0  # Resolved via internal mappings
+    success_external: int = 0  # Resolved via EQC lookup + cached
+    pending_lookup: int = 0  # Queued for async processing
+    temp_assigned: int = 0  # Assigned temporary ID
+    failed: int = 0  # Resolution failed completely
+    sync_budget_used: int = 0  # EQC lookups consumed from budget
+    processing_time_ms: int = 0  # Total enrichment processing time
 
     def record(self, status: "ResolutionStatus", source: Optional[str] = None):
         """Record a resolution result for statistics tracking."""
@@ -354,6 +396,8 @@ class ProcessingResultWithEnrichment(BaseModel):
         ..., description="Processed annuity performance records"
     )
     enrichment_stats: EnrichmentStats = Field(default_factory=EnrichmentStats)
-    unknown_names_csv: Optional[str] = Field(None, description="Path to exported unknown names CSV")
+    unknown_names_csv: Optional[str] = Field(
+        None, description="Path to exported unknown names CSV"
+    )
     data_source: str = Field("unknown", description="Source file or identifier")
     processing_time_ms: int = Field(0, description="Total processing time")

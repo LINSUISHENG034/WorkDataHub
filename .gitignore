@@ -25,6 +25,8 @@ bmad/
 .github/
 docs/sprint*.md
 
+# env
+.uv-cache/
 
 # Python
 __pycache__/

@@ -177,7 +177,9 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
     """
     # Single source of truth calculation - execute takes precedence over plan-only
     effective_plan_only = (
-        not args.execute if hasattr(args, "execute") else getattr(args, "plan_only", True)
+        not args.execute
+        if hasattr(args, "execute")
+        else getattr(args, "plan_only", True)
     )
 
     # Load table/pk from data_sources.yml if needed
@@ -261,7 +263,9 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
                 "enrichment_sync_budget": getattr(args, "enrichment_sync_budget", 0),
                 "export_unknown_names": getattr(args, "export_unknown_names", True),
                 "plan_only": effective_plan_only,  # Use effective flag
-                "use_pipeline": getattr(args, "use_pipeline", None),  # CLI override for pipeline framework
+                "use_pipeline": getattr(
+                    args, "use_pipeline", None
+                ),  # CLI override for pipeline framework
             }
         }
 
@@ -325,8 +329,14 @@ def _execute_company_mapping_job(args: argparse.Namespace):
         print(f"  Total mappings: {plan['total_mappings']:,}")
         print("  Breakdown by type:")
 
-        for match_type, count in plan['mapping_breakdown'].items():
-            priority = {"plan": 1, "account": 2, "hardcode": 3, "name": 4, "account_name": 5}.get(match_type, "?")
+        for match_type, count in plan["mapping_breakdown"].items():
+            priority = {
+                "plan": 1,
+                "account": 2,
+                "hardcode": 3,
+                "name": 4,
+                "account_name": 5,
+            }.get(match_type, "?")
             print(f"    {match_type} (priority {priority}): {count:,} mappings")
 
         if effective_plan_only:
@@ -342,23 +352,33 @@ def _execute_company_mapping_job(args: argparse.Namespace):
 
         try:
             with psycopg2.connect(conn_string) as conn:
-                print(f"🔌 Connected to PostgreSQL: {settings.database_host}:{settings.database_port}/{settings.database_db}")
+                print(
+                    "🔌 Connected to PostgreSQL: "
+                    f"{settings.database_host}:{settings.database_port}/"
+                    f"{settings.database_db}"
+                )
 
                 # Verify target table exists
                 cursor = conn.cursor()
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT EXISTS (
                         SELECT FROM information_schema.tables
                         WHERE table_schema = %s AND table_name = %s
                     );
-                """, ("enterprise", "company_mapping"))
+                """,
+                    ("enterprise", "company_mapping"),
+                )
 
                 table_exists = cursor.fetchone()[0]
                 cursor.close()
 
                 if not table_exists:
                     print("❌ Target table enterprise.company_mapping does not exist")
-                    print("Please run the DDL script first: scripts/create_table/ddl/company_mapping.sql")
+                    print(
+                        "Please run the DDL script first: "
+                        "scripts/create_table/ddl/company_mapping.sql"
+                    )
                     return
 
                 # Execute the load
@@ -368,7 +388,7 @@ def _execute_company_mapping_job(args: argparse.Namespace):
                     schema="enterprise",
                     table="company_mapping",
                     mode="delete_insert",
-                    chunk_size=1000
+                    chunk_size=1000,
                 )
 
                 print("✅ MIGRATION COMPLETED SUCCESSFULLY:")
@@ -474,7 +494,9 @@ def main():
     )
 
     # Core arguments
-    parser.add_argument("--domain", default="sample_trustee_performance", help="Domain to process")
+    parser.add_argument(
+        "--domain", default="sample_trustee_performance", help="Domain to process"
+    )
     parser.add_argument(
         "--mode",
         choices=["delete_insert", "append"],
@@ -493,7 +515,10 @@ def main():
         "--use-pipeline",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="Use shared pipeline framework for annuity performance processing (overrides WDH_ANNUITY_PIPELINE_ENABLED setting)",
+        help=(
+            "Use shared pipeline framework for annuity performance processing "
+            "(overrides WDH_ANNUITY_PIPELINE_ENABLED setting)"
+        ),
     )
     # Sheet can be an index or a name (string)
     parser.add_argument(
@@ -522,8 +547,8 @@ def main():
         "--pk",
         type=str,
         help=(
-            "Override composite key for delete_insert mode. "
-            "Comma or semicolon separated (e.g., '月度,计划代码,company_id')."
+            "Override composite key for delete_insert mode. Comma or semicolon "
+            "separated (e.g., '月度,计划代码,company_id')."
         ),
     )
 
@@ -590,7 +615,9 @@ def main():
 
     # Calculate effective execution mode for consistent display and logic
     effective_plan_only = (
-        not args.execute if hasattr(args, "execute") else getattr(args, "plan_only", True)
+        not args.execute
+        if hasattr(args, "execute")
+        else getattr(args, "plan_only", True)
     )
 
     # Build run configuration from CLI arguments
@@ -603,8 +630,10 @@ def main():
     print(f"   Plan-only: {effective_plan_only}")
     print(f"   Sheet: {args.sheet}")
     print(f"   Max files: {args.max_files}")
-    print(f"   Skip facts: {getattr(args, 'skip_facts', False)}")  # NEW: skip facts status
-    if hasattr(args, 'backfill_refs') and args.backfill_refs:
+    print(
+        f"   Skip facts: {getattr(args, 'skip_facts', False)}"
+    )  # NEW: skip facts status
+    if hasattr(args, "backfill_refs") and args.backfill_refs:
         print(f"   Backfill refs: {args.backfill_refs}")
         print(f"   Backfill mode: {args.backfill_mode}")
     print("=" * 50)
@@ -616,7 +645,9 @@ def main():
         # Currently only single file supported for annuity performance
         selected_job = annuity_performance_job
         if max_files > 1:
-            print(f"Warning: max_files > 1 not yet supported for {args.domain}, using 1")
+            print(
+                f"Warning: max_files > 1 not yet supported for {args.domain}, using 1"
+            )
     elif args.domain == "sample_trustee_performance":
         selected_job = (
             sample_trustee_performance_multi_file_job
@@ -699,7 +730,10 @@ def main():
                 # Print error details when not raising
                 for event in result.all_node_events:
                     if event.is_failure:
-                        print(f"   Error in {event.node_name}: {event.event_specific_data}")
+                        print(
+                            f"   Error in {event.node_name}: "
+                            f"{event.event_specific_data}"
+                        )
 
     except Exception as e:
         print(f"💥 Job execution failed: {e}")

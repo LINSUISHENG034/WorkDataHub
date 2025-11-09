@@ -39,7 +39,9 @@ def _build_sensor_run_config() -> Dict[str, Any]:
         with open(settings.data_sources_config, "r", encoding="utf-8") as f:
             data_sources = yaml.safe_load(f)
 
-        domain_config = data_sources.get("domains", {}).get("sample_trustee_performance", {})
+        domain_config = data_sources.get("domains", {}).get(
+            "sample_trustee_performance", {}
+        )
         table = domain_config.get("table", "sample_trustee_performance")
         pk = domain_config.get("pk", ["report_date", "plan_code", "company_code"])
 
@@ -52,7 +54,9 @@ def _build_sensor_run_config() -> Dict[str, Any]:
     return {
         "ops": {
             "discover_files_op": {"config": {"domain": "sample_trustee_performance"}},
-            "read_and_process_sample_trustee_files_op": {"config": {"sheet": 0, "max_files": 5}},
+            "read_and_process_sample_trustee_files_op": {
+                "config": {"sheet": 0, "max_files": 5}
+            },
             "load_op": {
                 "config": {
                     "table": table,
@@ -91,7 +95,9 @@ def trustee_new_files_sensor(context: SensorEvaluationContext):
         files = connector.discover("sample_trustee_performance")
 
         if not files:
-            return SkipReason("No sample_trustee_performance files found in configured directories")
+            return SkipReason(
+                "No sample_trustee_performance files found in configured directories"
+            )
 
         # Cursor management: track last processed modification time
         last_mtime = float(context.cursor) if context.cursor else 0.0
@@ -105,7 +111,8 @@ def trustee_new_files_sensor(context: SensorEvaluationContext):
 
         if not new_files:
             return SkipReason(
-                f"No new files detected (last_mtime: {last_mtime}, total_files: {len(files)})"
+                "No new files detected (last_mtime: "
+                f"{last_mtime}, total_files: {len(files)})"
             )
 
         # Calculate new cursor value from maximum modification time
@@ -119,8 +126,11 @@ def trustee_new_files_sensor(context: SensorEvaluationContext):
         run_key = f"new_files_{max_mtime}"
 
         context.log.info(
-            f"Detected {len(new_files)} new sample trustee performance files "
-            f"(max_mtime: {max_mtime}, run_key: {run_key})"
+            "Detected %s new sample trustee performance files "
+            "(max_mtime: %s, run_key: %s)",
+            len(new_files),
+            max_mtime,
+            run_key,
         )
 
         return RunRequest(run_key=run_key, run_config=run_config)
@@ -173,12 +183,16 @@ def trustee_data_quality_sensor(context: SensorEvaluationContext):
                 if Path(file.path).exists():
                     accessible_files.append(file)
                 else:
-                    context.log.warning(f"DATA QUALITY ALERT: File not accessible: {file.path}")
+                    context.log.warning(
+                        f"DATA QUALITY ALERT: File not accessible: {file.path}"
+                    )
             except Exception as e:
                 context.log.warning(f"DATA QUALITY ALERT: File access error: {e}")
 
         if not accessible_files:
-            return SkipReason("DATA QUALITY ALERT: No accessible files for health check")
+            return SkipReason(
+                "DATA QUALITY ALERT: No accessible files for health check"
+            )
 
         # Check 3: Plan-only data processing probe
         # This simulates the data processing pipeline without actual execution

@@ -83,8 +83,10 @@ def _import_step_class_or_factory(import_path: str) -> Any:
     Dynamically import a step class or factory method from its import path.
 
     Supports both direct class imports and factory method calls:
-    - "work_data_hub.domain.pipelines.adapters.CleansingRuleStep" -> imports class
-    - "work_data_hub.domain.pipelines.adapters.CleansingRuleStep.from_registry" -> imports factory
+    - "work_data_hub.domain.pipelines.adapters.CleansingRuleStep"
+      -> imports class
+    - "work_data_hub.domain.pipelines.adapters.CleansingRuleStep.from_registry"
+      -> imports factory
 
     Args:
         import_path: Full import path to the step class or factory method
@@ -131,7 +133,9 @@ def _import_step_class_or_factory(import_path: str) -> Any:
                 module = importlib.import_module(module_path)
                 if hasattr(module, class_name):
                     step_class = getattr(module, class_name)
-                    if isinstance(step_class, type) and hasattr(step_class, method_name):
+                    if isinstance(step_class, type) and hasattr(
+                        step_class, method_name
+                    ):
                         factory_method = getattr(step_class, method_name)
                         if callable(factory_method):
                             # Validate that the class inherits from TransformStep
@@ -143,7 +147,9 @@ def _import_step_class_or_factory(import_path: str) -> Any:
                 pass
 
         # If we get here, nothing worked
-        raise PipelineAssemblyError(f"Could not import class or factory from '{import_path}'")
+        raise PipelineAssemblyError(
+            f"Could not import class or factory from '{import_path}'"
+        )
 
     except ImportError as e:
         raise PipelineAssemblyError(f"Failed to import '{import_path}': {e}")
@@ -162,29 +168,34 @@ def _validate_transform_step_class(step_class: type, import_path: str) -> None:
         raise PipelineAssemblyError(f"'{import_path}' is not a class")
 
     # Duck-typing validation: check for required methods and properties
-    if not hasattr(step_class, 'name'):
+    if not hasattr(step_class, "name"):
         raise PipelineAssemblyError(
-            f"Class '{import_path}' must have a 'name' property (TransformStep interface)"
+            f"Class '{import_path}' must have a 'name' property "
+            "(TransformStep interface)"
         )
 
-    if not hasattr(step_class, 'apply'):
+    if not hasattr(step_class, "apply"):
         raise PipelineAssemblyError(
-            f"Class '{import_path}' must have an 'apply' method (TransformStep interface)"
+            f"Class '{import_path}' must have an 'apply' method "
+            "(TransformStep interface)"
         )
 
-    # Additional validation: try direct issubclass check, but don't fail if it doesn't work
-    # due to import path mismatches (duck typing above is sufficient)
+    # Additional validation: try direct issubclass check, but don't fail if it
+    # doesn't work due to import path mismatches (duck typing is sufficient)
     try:
         if issubclass(step_class, TransformStep):
             logger.debug(f"Direct issubclass check passed for {import_path}")
         else:
             logger.debug(
-                f"Direct issubclass check failed for {import_path}, but duck typing passed"
+                "Direct issubclass check failed for %s, but duck typing passed",
+                import_path,
             )
     except TypeError:
-        # This can happen with import path mismatches - duck typing above should catch issues
+        # This can happen with import path mismatches - duck typing above should
+        # catch issues
         logger.debug(
-            f"Direct issubclass check not possible for {import_path}, relying on duck typing"
+            "Direct issubclass check not possible for %s, relying on duck typing",
+            import_path,
         )
 
 
@@ -215,7 +226,7 @@ def _create_step_instance(step_config: StepConfig) -> TransformStep:
             step_instance = target(**step_config.options)
 
         # Validate the result implements TransformStep interface
-        if not hasattr(step_instance, 'name') or not hasattr(step_instance, 'apply'):
+        if not hasattr(step_instance, "name") or not hasattr(step_instance, "apply"):
             raise PipelineAssemblyError(
                 f"Step created from '{step_config.import_path}' does not implement "
                 f"TransformStep interface"
@@ -227,8 +238,8 @@ def _create_step_instance(step_config: StepConfig) -> TransformStep:
                 "step_name": step_config.name,
                 "import_path": step_config.import_path,
                 "options": step_config.options,
-                "actual_name": getattr(step_instance, 'name', 'unknown')
-            }
+                "actual_name": getattr(step_instance, "name", "unknown"),
+            },
         )
 
         return step_instance
@@ -236,7 +247,7 @@ def _create_step_instance(step_config: StepConfig) -> TransformStep:
     except Exception as e:
         raise PipelineAssemblyError(
             f"Failed to create step '{step_config.name}': {e}",
-            step_name=step_config.name
+            step_name=step_config.name,
         )
 
 
@@ -257,8 +268,9 @@ def _validate_step_dependencies(steps: List[StepConfig]) -> None:
         for required_step in step.requires:
             if required_step not in step_names:
                 raise PipelineAssemblyError(
-                    f"Step '{step.name}' requires '{required_step}', but it's not defined",
-                    step_name=step.name
+                    f"Step '{step.name}' requires '{required_step}', "
+                    "but it's not defined",
+                    step_name=step.name,
                 )
 
             # Check that required step comes before this step
@@ -268,14 +280,15 @@ def _validate_step_dependencies(steps: List[StepConfig]) -> None:
             if required_index >= current_index:
                 raise PipelineAssemblyError(
                     f"Step '{step.name}' requires '{required_step}', "
-                    f"but '{required_step}' is defined after '{step.name}' in the pipeline",
-                    step_name=step.name
+                    f"but '{required_step}' is defined after '{step.name}' "
+                    "in the pipeline",
+                    step_name=step.name,
                 )
 
 
 def build_pipeline(
     config: Union[Dict[str, Any], PipelineConfig],
-    steps: Optional[List[TransformStep]] = None
+    steps: Optional[List[TransformStep]] = None,
 ) -> Pipeline:
     """
     Build a pipeline from configuration with optional pre-built steps.
@@ -321,8 +334,8 @@ def build_pipeline(
         extra={
             "pipeline": pipeline_config.name,
             "step_count": len(pipeline_config.steps),
-            "stop_on_error": pipeline_config.stop_on_error
-        }
+            "stop_on_error": pipeline_config.stop_on_error,
+        },
     )
 
     # Use provided steps or build from configuration
@@ -351,8 +364,8 @@ def build_pipeline(
         f"Pipeline '{pipeline_config.name}' built successfully",
         extra={
             "pipeline": pipeline_config.name,
-            "steps": [step.name for step in pipeline_steps]
-        }
+            "steps": [step.name for step in pipeline_steps],
+        },
     )
 
     return pipeline

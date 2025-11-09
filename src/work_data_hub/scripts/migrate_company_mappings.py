@@ -28,9 +28,11 @@ import psycopg2
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.work_data_hub.config.settings import get_settings
-from src.work_data_hub.domain.company_enrichment.service import validate_mapping_consistency
-from src.work_data_hub.io.loader.company_mapping_loader import (
+from src.work_data_hub.config.settings import get_settings  # noqa: E402
+from src.work_data_hub.domain.company_enrichment.service import (  # noqa: E402
+    validate_mapping_consistency,
+)
+from src.work_data_hub.io.loader.company_mapping_loader import (  # noqa: E402
     CompanyMappingLoaderError,
     extract_legacy_mappings,
     generate_load_plan,
@@ -40,11 +42,11 @@ from src.work_data_hub.io.loader.company_mapping_loader import (
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler('company_mapping_migration.log')
-    ]
+        logging.FileHandler("company_mapping_migration.log"),
+    ],
 )
 logger = logging.getLogger(__name__)
 
@@ -57,28 +59,28 @@ def main():
     parser.add_argument(
         "--plan-only",
         action="store_true",
-        help="Generate migration plan without executing (safe preview mode)"
+        help="Generate migration plan without executing (safe preview mode)",
     )
     parser.add_argument(
         "--execute",
         action="store_true",
-        help="Execute the migration (will modify database)"
+        help="Execute the migration (will modify database)",
     )
     parser.add_argument(
         "--schema",
         default="enterprise",
-        help="Target PostgreSQL schema (default: enterprise)"
+        help="Target PostgreSQL schema (default: enterprise)",
     )
     parser.add_argument(
         "--table",
         default="company_mapping",
-        help="Target table name (default: company_mapping)"
+        help="Target table name (default: company_mapping)",
     )
     parser.add_argument(
         "--chunk-size",
         type=int,
         default=1000,
-        help="Batch size for INSERT operations (default: 1000)"
+        help="Batch size for INSERT operations (default: 1000)",
     )
 
     args = parser.parse_args()
@@ -133,9 +135,17 @@ def main():
         logger.info(f"  Total mappings: {plan['total_mappings']:,}")
         logger.info("  Breakdown by type:")
 
-        for match_type, count in plan['mapping_breakdown'].items():
-            priority = {"plan": 1, "account": 2, "hardcode": 3, "name": 4, "account_name": 5}.get(match_type, "?")
-            logger.info(f"    {match_type} (priority {priority}): {count:,} mappings")
+        for match_type, count in plan["mapping_breakdown"].items():
+            priority = {
+                "plan": 1,
+                "account": 2,
+                "hardcode": 3,
+                "name": 4,
+                "account_name": 5,
+            }.get(match_type, "?")
+            logger.info(
+                "    %s (priority %s): %s mappings", match_type, priority, count
+            )
 
         if args.plan_only:
             logger.info("\n" + "=" * 60)
@@ -153,23 +163,36 @@ def main():
 
         try:
             with psycopg2.connect(conn_string) as conn:
-                logger.info(f"Connected to PostgreSQL: {settings.database_host}:{settings.database_port}/{settings.database_db}")
+                logger.info(
+                    "Connected to PostgreSQL: %s:%s/%s",
+                    settings.database_host,
+                    settings.database_port,
+                    settings.database_db,
+                )
 
                 # Verify target table exists
                 cursor = conn.cursor()
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT EXISTS (
                         SELECT FROM information_schema.tables
                         WHERE table_schema = %s AND table_name = %s
                     );
-                """, (args.schema, args.table))
+                """,
+                    (args.schema, args.table),
+                )
 
                 table_exists = cursor.fetchone()[0]
                 cursor.close()
 
                 if not table_exists:
-                    logger.error(f"Target table {args.schema}.{args.table} does not exist")
-                    logger.error("Please run the DDL script first: scripts/create_table/ddl/company_mapping.sql")
+                    logger.error(
+                        f"Target table {args.schema}.{args.table} does not exist"
+                    )
+                    logger.error(
+                        "Please run the DDL script first: "
+                        "scripts/create_table/ddl/company_mapping.sql"
+                    )
                     sys.exit(1)
 
                 # Execute the load
@@ -179,7 +202,7 @@ def main():
                     schema=args.schema,
                     table=args.table,
                     mode="delete_insert",
-                    chunk_size=args.chunk_size
+                    chunk_size=args.chunk_size,
                 )
 
                 logger.info("MIGRATION COMPLETED SUCCESSFULLY:")
@@ -214,15 +237,24 @@ def validate_environment() -> bool:
         settings = get_settings()
 
         # Check PostgreSQL configuration
-        conn_string = settings.get_database_connection_string()
-        logger.debug(f"PostgreSQL config: {settings.database_host}:{settings.database_port}")
+        settings.get_database_connection_string()
+        logger.debug(
+            f"PostgreSQL config: {settings.database_host}:{settings.database_port}"
+        )
 
         # Check legacy MySQL access
         try:
-            from legacy.annuity_hub.database_operations.mysql_ops import MySqlDBManager
+            from legacy.annuity_hub.database_operations.mysql_ops import (
+                MySqlDBManager,
+            )
+
+            _ = MySqlDBManager
+
             logger.debug("Legacy MySqlDBManager is available")
         except ImportError:
-            logger.error("Cannot import MySqlDBManager - legacy database access unavailable")
+            logger.error(
+                "Cannot import MySqlDBManager - legacy database access unavailable"
+            )
             return False
 
         return True

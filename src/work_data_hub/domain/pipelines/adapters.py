@@ -31,14 +31,15 @@ class CleansingRuleStep(TransformStep):
         rule: CleansingRule,
         target_fields: Optional[List[str]] = None,
         step_name: Optional[str] = None,
-        **options
+        **options,
     ):
         """
         Initialize the cleansing rule step.
 
         Args:
             rule: CleansingRule instance from the registry
-            target_fields: List of field names to apply the rule to (None = apply to all fields)
+            target_fields: List of field names to apply the rule to
+                (None = apply to all fields)
             step_name: Custom step name (defaults to rule name)
             **options: Additional options passed to the cleansing rule function
         """
@@ -53,8 +54,8 @@ class CleansingRuleStep(TransformStep):
                 "rule_name": rule.name,
                 "rule_category": rule.category.value,
                 "target_fields": target_fields,
-                "options": options
-            }
+                "options": options,
+            },
         )
 
     @property
@@ -68,7 +69,7 @@ class CleansingRuleStep(TransformStep):
         rule_name: str,
         target_fields: Optional[List[str]] = None,
         step_name: Optional[str] = None,
-        **options
+        **options,
     ) -> "CleansingRuleStep":
         """
         Create a CleansingRuleStep from a rule in the registry.
@@ -101,10 +102,7 @@ class CleansingRuleStep(TransformStep):
             )
 
         return cls(
-            rule=rule,
-            target_fields=target_fields,
-            step_name=step_name,
-            **options
+            rule=rule, target_fields=target_fields, step_name=step_name, **options
         )
 
     def apply(self, row: Row, context: Dict) -> StepResult:
@@ -130,11 +128,13 @@ class CleansingRuleStep(TransformStep):
             "rule_category": self.rule.category.value,
             "processed_fields": [],
             "skipped_fields": [],
-            "error_fields": []
+            "error_fields": [],
         }
 
         # Determine which fields to process
-        fields_to_process = self.target_fields if self.target_fields else list(row.keys())
+        fields_to_process = (
+            self.target_fields if self.target_fields else list(row.keys())
+        )
 
         logger.debug(
             f"Applying cleansing rule: {self.rule.name}",
@@ -142,8 +142,8 @@ class CleansingRuleStep(TransformStep):
                 "step_name": self.step_name,
                 "rule_name": self.rule.name,
                 "fields_to_process": len(fields_to_process),
-                "total_fields": len(row.keys())
-            }
+                "total_fields": len(row.keys()),
+            },
         )
 
         for field_name in fields_to_process:
@@ -174,12 +174,14 @@ class CleansingRuleStep(TransformStep):
                             "field": field_name,
                             "rule": self.rule.name,
                             "original_type": type(original_value).__name__,
-                            "cleaned_type": type(cleaned_value).__name__
-                        }
+                            "cleaned_type": type(cleaned_value).__name__,
+                        },
                     )
 
             except Exception as e:
-                error_msg = f"Rule '{self.rule.name}' failed on field '{field_name}': {e}"
+                error_msg = (
+                    f"Rule '{self.rule.name}' failed on field '{field_name}': {e}"
+                )
                 errors.append(error_msg)
                 metadata["error_fields"].append(field_name)
 
@@ -190,8 +192,8 @@ class CleansingRuleStep(TransformStep):
                         "rule_name": self.rule.name,
                         "field": field_name,
                         "original_value": original_value,
-                        "error": str(e)
-                    }
+                        "error": str(e),
+                    },
                 )
 
                 # Keep original value when cleansing fails
@@ -199,10 +201,7 @@ class CleansingRuleStep(TransformStep):
 
         # Create step result
         result = StepResult(
-            row=processed_row,
-            warnings=warnings,
-            errors=errors,
-            metadata=metadata
+            row=processed_row, warnings=warnings, errors=errors, metadata=metadata
         )
 
         logger.debug(
@@ -211,8 +210,8 @@ class CleansingRuleStep(TransformStep):
                 "step_name": self.step_name,
                 "processed_fields": len(metadata["processed_fields"]),
                 "warnings": len(warnings),
-                "errors": len(errors)
-            }
+                "errors": len(errors),
+            },
         )
 
         return result
@@ -238,7 +237,7 @@ class FieldMapperStep(TransformStep):
 
         logger.debug(
             f"Created FieldMapperStep: {step_name}",
-            extra={"mapping_count": len(field_mapping), "mapping": field_mapping}
+            extra={"mapping_count": len(field_mapping), "mapping": field_mapping},
         )
 
     @property
@@ -263,7 +262,7 @@ class FieldMapperStep(TransformStep):
         metadata: Dict[str, Any] = {
             "mapped_fields": [],
             "missing_fields": [],
-            "preserved_fields": []
+            "preserved_fields": [],
         }
 
         # Apply field mapping
@@ -272,7 +271,9 @@ class FieldMapperStep(TransformStep):
                 processed_row[new_name] = row[old_name]
                 metadata["mapped_fields"].append(f"{old_name} -> {new_name}")
             else:
-                warnings.append(f"Field '{old_name}' not found for mapping to '{new_name}'")
+                warnings.append(
+                    f"Field '{old_name}' not found for mapping to '{new_name}'"
+                )
                 metadata["missing_fields"].append(old_name)
 
         # Preserve fields not in mapping
@@ -282,8 +283,5 @@ class FieldMapperStep(TransformStep):
                 metadata["preserved_fields"].append(field_name)
 
         return StepResult(
-            row=processed_row,
-            warnings=warnings,
-            errors=[],
-            metadata=metadata
+            row=processed_row, warnings=warnings, errors=[], metadata=metadata
         )

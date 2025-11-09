@@ -32,7 +32,7 @@ class PipelineStepError(PipelineError):
         self,
         message: str,
         step_name: Optional[str] = None,
-        row_index: Optional[int] = None
+        row_index: Optional[int] = None,
     ):
         self.step_name = step_name
         self.row_index = row_index
@@ -70,7 +70,7 @@ class PipelineAssemblyError(PipelineError):
         self,
         message: str,
         config_path: Optional[str] = None,
-        step_name: Optional[str] = None
+        step_name: Optional[str] = None,
     ):
         self.config_path = config_path
         self.step_name = step_name

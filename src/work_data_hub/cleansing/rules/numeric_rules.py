@@ -94,12 +94,16 @@ def handle_percentage_conversion(value: Any, field_name: str = "") -> Union[floa
             raise ValueError(f"Invalid percentage format: {value}")
 
     # 数值百分比处理（针对收益率字段）
-    if isinstance(value, (int, float)) and ("收益率" in field_name or "rate" in field_name.lower()):
+    if isinstance(value, (int, float)) and (
+        "收益率" in field_name or "rate" in field_name.lower()
+    ):
         if abs(value) > 1:  # 判断是否为百分比格式，支持负百分比
             return value / 100.0
 
     # 字符串数值的百分比处理（针对收益率字段）
-    if isinstance(value, str) and ("收益率" in field_name or "rate" in field_name.lower()):
+    if isinstance(value, str) and (
+        "收益率" in field_name or "rate" in field_name.lower()
+    ):
         try:
             # 尝试将字符串转换为数值进行百分比判断
             numeric_value = float(value)
@@ -113,7 +117,9 @@ def handle_percentage_conversion(value: Any, field_name: str = "") -> Union[floa
 
 
 @rule(
-    name="standardize_null_values", category=RuleCategory.VALIDATION, description="标准化空值表示"
+    name="standardize_null_values",
+    category=RuleCategory.VALIDATION,
+    description="标准化空值表示",
 )
 def standardize_null_values(value: Any) -> Optional[Any]:
     """
@@ -247,7 +253,9 @@ def comprehensive_decimal_cleaning(
         )
 
     except (ValueError, TypeError) as e:
-        raise ValueError(f"Invalid numeric value for field '{field_name}': {value} - {e}")
+        raise ValueError(
+            f"Invalid numeric value for field '{field_name}': {value} - {e}"
+        )
 
 
 # 便捷函数 - 为特定领域提供预配置的清洗函数

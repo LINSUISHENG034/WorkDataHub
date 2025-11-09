@@ -1,5 +1,7 @@
 # WorkDataHub
 
+[![CI](https://github.com/LINSUISHENG034/WorkDataHub/actions/workflows/ci.yml/badge.svg)](https://github.com/LINSUISHENG034/WorkDataHub/actions/workflows/ci.yml)
+
 A modernized data processing platform built with Clean Architecture principles, featuring type-safe Python 3.10+, advanced validation frameworks, and Dagster orchestration.
 
 ## Project Overview
@@ -153,17 +155,17 @@ source .venv/bin/activate  # Linux/Mac
 ### Running Tests
 
 ```bash
-# Run all tests
-pytest
+# Run all tests with verbosity
+uv run pytest -v
 
 # Run only unit tests (fast)
-pytest -m unit
+uv run pytest -m unit
 
 # Run integration tests
-pytest -m integration
+uv run pytest -m integration
 
 # Run with coverage
-pytest --cov=src/work_data_hub --cov-report=html
+uv run pytest --cov=src/work_data_hub --cov-report=html
 ```
 
 **Test Markers:**
@@ -177,17 +179,69 @@ pytest --cov=src/work_data_hub --cov-report=html
 
 ```bash
 # Run type checking
-mypy src/
+uv run mypy src/ --strict
 
 # Run linting
-ruff check .
+uv run ruff check src/
 
-# Auto-fix linting issues
-ruff check --fix .
+# Auto-fix linting issues (only when needed)
+uv run ruff check src/ --fix
 
 # Format code
-ruff format .
+uv run ruff format src/
+
+# Format check (CI equivalent)
+uv run ruff format --check src/
 ```
+
+## CI/CD Workflow
+
+The GitHub Actions pipeline in `.github/workflows/ci.yml` enforces all Story 1.2 acceptance criteria:
+
+1. **Quality Gate (`ruff-lint`, `ruff-format`, `mypy`)** – matrix job that runs the three quality gates in parallel on Python 3.10 using `uv run`. Dependency caching (`~/.cache/uv`) and restored `.mypy_cache` keep execution under the two-minute budget, and every step emits a `::notice::... completed in Ns` annotation for quick timing reviews.
+2. **Pytest Suite** – executes `uv run pytest -v` so the smoke/unit tests created in Story 1.1 block merges on failure.
+3. **Secret Scan** – runs `gitleaks/gitleaks-action@v2` with `--log-opts="--all"` so every commit in a pull request is scanned before merge.
+
+### Interpreting CI failures
+
+- `Quality Gate (ruff-lint)`: Fix lint errors with `uv run ruff check src/ --fix` (CI will show the failing files).
+- `Quality Gate (ruff-format)`: Run `uv run ruff format src/` locally; push the formatted files and re-run CI.
+- `Quality Gate (mypy)`: Execute `uv run mypy src/ --strict` to see the same strict-mode diagnostics CI enforces.
+- `Pytest Suite`: Re-run `uv run pytest -v`; the job prints a runtime notice so you can spot slow suites quickly.
+- `Secret Scan`: Review the gitleaks findings in the job log, rotate exposed credentials, and force-push a fixed commit.
+
+### Local secret scanning
+
+To mirror the CI gitleaks job locally, run:
+
+```bash
+docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:latest detect --redact --source /repo --log-opts="--all"
+```
+
+If Docker is unavailable, download the latest gitleaks release and execute `gitleaks detect --redact --source .`.
+
+### Optional pre-commit hooks
+
+While not required, adding a pre-commit workflow keeps local changes aligned with CI. After installing [`pre-commit`](https://pre-commit.com/):
+
+1. Create `.pre-commit-config.yaml` with hooks for Ruff (lint + format) and mypy, for example:
+
+   ```yaml
+   repos:
+     - repo: https://github.com/astral-sh/ruff-pre-commit
+       rev: v0.7.0
+       hooks:
+         - id: ruff
+         - id: ruff-format
+     - repo: https://github.com/pre-commit/mirrors-mypy
+       rev: v1.11.2
+       hooks:
+         - id: mypy
+           args: [--strict, src/]
+   ```
+
+2. Install hooks with `pre-commit install`.
+3. Run `pre-commit run --all-files` before opening a PR to catch the same issues the CI pipeline enforces.
 
 ### Coding Standards
 

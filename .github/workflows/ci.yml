@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.10"
+
+jobs:
+  quality:
+    name: Quality Gate (${{ matrix.check }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - ruff-lint
+          - ruff-format
+          - mypy
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v1
+
+      - name: Prepare uv cache directory
+        run: mkdir -p ~/.cache/uv
+
+      - name: Cache uv packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
+          restore-keys: ${{ runner.os }}-uv-
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Restore mypy cache
+        if: matrix.check == 'mypy'
+        uses: actions/cache@v4
+        with:
+          path: .mypy_cache
+          key: ${{ runner.os }}-mypy-${{ hashFiles('pyproject.toml') }}
+          restore-keys: ${{ runner.os }}-mypy-
+
+      - name: Run ${{ matrix.check }}
+        shell: bash
+        run: |
+          start=$(date +%s)
+          case "${{ matrix.check }}" in
+            ruff-lint)
+              uv run ruff check src/
+              ;;
+            ruff-format)
+              uv run ruff format --check src/
+              ;;
+            mypy)
+              uv run mypy src/ --strict
+              ;;
+            *)
+              echo "Unknown check '${{ matrix.check }}'"
+              exit 1
+              ;;
+          esac
+          end=$(date +%s)
+          echo "::notice::${{ matrix.check }} completed in $((end-start))s"
+
+  tests:
+    name: Pytest Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v1
+
+      - name: Prepare uv cache directory
+        run: mkdir -p ~/.cache/uv
+
+      - name: Cache uv packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
+          restore-keys: ${{ runner.os }}-uv-
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run pytest
+        shell: bash
+        run: |
+          start=$(date +%s)
+          uv run pytest -v
+          end=$(date +%s)
+          echo "::notice::pytest completed in $((end-start))s"
+
+  secrets:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: --verbose --redact --source . --log-opts="--all"

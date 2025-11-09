@@ -39,31 +39,26 @@ class CompanyMappingRecord(BaseModel):
         ...,
         min_length=1,
         max_length=255,
-        description="Source identifier (plan code, account, name, etc.)"
+        description="Source identifier (plan code, account, name, etc.)",
     )
     canonical_id: str = Field(
-        ...,
-        min_length=1,
-        max_length=50,
-        description="Target company_id to resolve to"
+        ..., min_length=1, max_length=50, description="Target company_id to resolve to"
     )
     source: Literal["internal"] = Field(
-        default="internal",
-        description="Data source identifier"
+        default="internal", description="Data source identifier"
     )
     match_type: Literal["plan", "account", "hardcode", "name", "account_name"] = Field(
-        ...,
-        description="Mapping type determining priority order"
+        ..., description="Mapping type determining priority order"
     )
     priority: int = Field(
         ...,
         ge=1,
         le=5,
-        description="Search priority (1=highest, matches legacy layer numbering)"
+        description="Search priority (1=highest, matches legacy layer numbering)",
     )
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
-        description="Record update timestamp"
+        description="Record update timestamp",
     )
 
     @field_validator("alias_name", "canonical_id", mode="before")
@@ -90,18 +85,21 @@ class CompanyMappingRecord(BaseModel):
             "account": 2,
             "hardcode": 3,
             "name": 4,
-            "account_name": 5
+            "account_name": 5,
         }
 
         # Check if priority field exists in values
-        if hasattr(info, 'data') and info.data and 'priority' in info.data:
-            priority = info.data['priority']
+        if hasattr(info, "data") and info.data and "priority" in info.data:
+            priority = info.data["priority"]
             expected_priority = expected_priority_map.get(v)
 
             if expected_priority and priority != expected_priority:
                 logger.warning(
-                    f"Priority mismatch: match_type={v} expects priority={expected_priority}, "
-                    f"got priority={priority}"
+                    "Priority mismatch: match_type=%s expects priority=%s, "
+                    "got priority=%s",
+                    v,
+                    expected_priority,
+                    priority,
                 )
 
         return v
@@ -116,23 +114,21 @@ class CompanyMappingQuery(BaseModel):
     )
 
     plan_code: Optional[str] = Field(
-        None,
-        description="Plan code for priority 1 lookup (计划代码)"
+        None, description="Plan code for priority 1 lookup (计划代码)"
     )
     account_number: Optional[str] = Field(
-        None,
-        description="Account number for priority 2 lookup (集团企业客户号)"
+        None, description="Account number for priority 2 lookup (集团企业客户号)"
     )
     customer_name: Optional[str] = Field(
-        None,
-        description="Customer name for priority 4 lookup (客户名称)"
+        None, description="Customer name for priority 4 lookup (客户名称)"
     )
     account_name: Optional[str] = Field(
-        None,
-        description="Account name for priority 5 lookup (年金账户名)"
+        None, description="Account name for priority 5 lookup (年金账户名)"
     )
 
-    @field_validator("plan_code", "account_number", "customer_name", "account_name", mode="before")
+    @field_validator(
+        "plan_code", "account_number", "customer_name", "account_name", mode="before"
+    )
     @classmethod
     def normalize_query_fields(cls, v):
         """Normalize query field values for consistent lookup."""
@@ -155,22 +151,16 @@ class CompanyResolutionResult(BaseModel):
     )
 
     company_id: Optional[str] = Field(
-        None,
-        description="Resolved company_id or None if no match found"
+        None, description="Resolved company_id or None if no match found"
     )
     match_type: Optional[str] = Field(
-        None,
-        description="Which mapping type provided the result (plan, account, etc.)"
+        None, description="Which mapping type provided the result (plan, account, etc.)"
     )
     source_value: Optional[str] = Field(
-        None,
-        description="The alias_name that matched in the lookup"
+        None, description="The alias_name that matched in the lookup"
     )
     priority: Optional[int] = Field(
-        None,
-        ge=1,
-        le=5,
-        description="Priority level of the successful match"
+        None, ge=1, le=5, description="Priority level of the successful match"
     )
 
     @field_validator("company_id", mode="after")
@@ -188,7 +178,8 @@ class CompanyResolutionResult(BaseModel):
 
 
 # ===== EQC API Models =====
-# These models define the data contracts for EQC (Enterprise Query Center) API integration
+# These models define the data contracts for EQC (Enterprise Query Center)
+# API integration
 
 
 class CompanySearchResult(BaseModel):
@@ -205,27 +196,17 @@ class CompanySearchResult(BaseModel):
         extra="forbid",
     )
 
-    company_id: str = Field(
-        ...,
-        min_length=1,
-        description="EQC company ID as string"
-    )
+    company_id: str = Field(..., min_length=1, description="EQC company ID as string")
     official_name: str = Field(
-        ...,
-        min_length=1,
-        max_length=500,
-        description="Official company name from EQC"
+        ..., min_length=1, max_length=500, description="Official company name from EQC"
     )
     unite_code: Optional[str] = Field(
         None,
         max_length=100,
-        description="Unified social credit code (统一社会信用代码)"
+        description="Unified social credit code (统一社会信用代码)",
     )
     match_score: float = Field(
-        default=0.0,
-        ge=0.0,
-        le=1.0,
-        description="Search relevance score (0.0-1.0)"
+        default=0.0, ge=0.0, le=1.0, description="Search relevance score (0.0-1.0)"
     )
 
     @field_validator("company_id", mode="before")
@@ -262,30 +243,20 @@ class CompanyDetail(BaseModel):
         extra="forbid",
     )
 
-    company_id: str = Field(
-        ...,
-        min_length=1,
-        description="EQC company ID as string"
-    )
+    company_id: str = Field(..., min_length=1, description="EQC company ID as string")
     official_name: str = Field(
-        ...,
-        min_length=1,
-        max_length=500,
-        description="Official company name from EQC"
+        ..., min_length=1, max_length=500, description="Official company name from EQC"
     )
     unite_code: Optional[str] = Field(
         None,
         max_length=100,
-        description="Unified social credit code (统一社会信用代码)"
+        description="Unified social credit code (统一社会信用代码)",
     )
     aliases: List[str] = Field(
-        default_factory=list,
-        description="Alternative company names and aliases"
+        default_factory=list, description="Alternative company names and aliases"
     )
     business_status: Optional[str] = Field(
-        None,
-        max_length=100,
-        description="Current business operating status"
+        None, max_length=100, description="Current business operating status"
     )
 
     @field_validator("company_id", mode="before")
@@ -329,13 +300,14 @@ class CompanyDetail(BaseModel):
 # These models define the data contracts for the CompanyEnrichmentService
 # with caching, queue processing, and unified resolution capabilities
 
+
 class ResolutionStatus(str, Enum):
     """Status enumeration for company ID resolution operations."""
 
-    SUCCESS_INTERNAL = "success_internal"      # Found in internal mappings
-    SUCCESS_EXTERNAL = "success_external"      # Found via EQC lookup + cached
-    PENDING_LOOKUP = "pending_lookup"          # Queued for async lookup
-    TEMP_ASSIGNED = "temp_assigned"            # Assigned temporary ID
+    SUCCESS_INTERNAL = "success_internal"  # Found in internal mappings
+    SUCCESS_EXTERNAL = "success_external"  # Found via EQC lookup + cached
+    PENDING_LOOKUP = "pending_lookup"  # Queued for async lookup
+    TEMP_ASSIGNED = "temp_assigned"  # Assigned temporary ID
 
 
 class CompanyIdResult(BaseModel):
@@ -352,20 +324,16 @@ class CompanyIdResult(BaseModel):
     )
 
     company_id: Optional[str] = Field(
-        None,
-        description="Resolved company_id or temp ID"
+        None, description="Resolved company_id or temp ID"
     )
     status: ResolutionStatus = Field(
-        ...,
-        description="Resolution status indicating the resolution path taken"
+        ..., description="Resolution status indicating the resolution path taken"
     )
     source: Optional[str] = Field(
-        None,
-        description="Source of resolution (internal/EQC/temp/queued)"
+        None, description="Source of resolution (internal/EQC/temp/queued)"
     )
     temp_id: Optional[str] = Field(
-        None,
-        description="Generated temporary ID if applicable"
+        None, description="Generated temporary ID if applicable"
     )
 
     @field_validator("temp_id", mode="after")
@@ -402,34 +370,28 @@ class LookupRequest(BaseModel):
         ...,
         min_length=1,
         max_length=255,
-        description="Original company name to lookup via EQC API"
+        description="Original company name to lookup via EQC API",
     )
     normalized_name: str = Field(
         ...,
         min_length=1,
         max_length=255,
-        description="Normalized version of name for duplicate detection"
+        description="Normalized version of name for duplicate detection",
     )
-    status: str = Field(
-        default="pending",
-        description="Queue processing status"
-    )
+    status: str = Field(default="pending", description="Queue processing status")
     attempts: int = Field(
-        default=0,
-        ge=0,
-        description="Number of processing attempts for retry logic"
+        default=0, ge=0, description="Number of processing attempts for retry logic"
     )
     last_error: Optional[str] = Field(
-        None,
-        description="Last error message from failed processing attempt"
+        None, description="Last error message from failed processing attempt"
     )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
-        description="Request creation timestamp"
+        description="Request creation timestamp",
     )
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
-        description="Last status update timestamp"
+        description="Last status update timestamp",
     )
 
     @field_validator("status", mode="after")

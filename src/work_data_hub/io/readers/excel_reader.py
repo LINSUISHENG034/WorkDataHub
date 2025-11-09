@@ -130,13 +130,17 @@ class ExcelReader:
             )
             if any(s in msg for s in sheet_err_signals):
                 raise ExcelReadError(f"Sheet '{sheet}' not found in {file_path}")
-            raise ExcelReadError(f"Invalid Excel file or parameters for {file_path}: {e}")
+            raise ExcelReadError(
+                f"Invalid Excel file or parameters for {file_path}: {e}"
+            )
         except Exception as e:
             # Catch-all for other Excel reading issues, including openpyxl-related
             error_msg = str(e)
             if "openpyxl" in error_msg:
                 raise ExcelReadError(f"Failed to parse Excel file {file_path}: {e}")
-            raise ExcelReadError(f"Unexpected error reading Excel file {file_path}: {e}")
+            raise ExcelReadError(
+                f"Unexpected error reading Excel file {file_path}: {e}"
+            )
 
     def get_sheet_names(self, file_path: str) -> List[Union[str, int]]:
         """
@@ -192,7 +196,8 @@ class ExcelReader:
         Returns:
             List of dictionaries representing the DataFrame rows
         """
-        # Clean column names (remove leading/trailing whitespace and handle unnamed columns)
+        # Clean column names (remove leading/trailing whitespace and handle
+        # unnamed columns)
         cleaned_columns = []
         for col in df.columns:
             col_str = str(col).strip() if col is not None else ""
@@ -214,10 +219,11 @@ class ExcelReader:
         changed_mappings = {k: v for k, v in column_mapping.items() if k != v}
         if changed_mappings:
             logger.info(
-                f"Applied column name standardization: {len(changed_mappings)} columns normalized"
+                "Applied column name standardization: %s columns normalized",
+                len(changed_mappings),
             )
             for original, normalized in changed_mappings.items():
-                logger.debug(f"  '{original}' -> '{normalized}'")
+                logger.debug("  '%s' -> '%s'", original, normalized)
 
         # Ensure year/month columns remain as strings
         year_month_columns = ["年", "月", "year", "month"]

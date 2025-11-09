@@ -92,7 +92,7 @@ class CleansingRegistry:
 
         stats = {
             "total_rules": len(self._rules),
-            "rules_by_category": rules_by_category
+            "rules_by_category": rules_by_category,
         }
         return stats
 
@@ -125,7 +125,9 @@ def rule(name: str, category: RuleCategory, description: str):
 
     def decorator(func: Callable) -> Callable:
         # 创建清洗规则对象
-        rule_obj = CleansingRule(name=name, category=category, func=func, description=description)
+        rule_obj = CleansingRule(
+            name=name, category=category, func=func, description=description
+        )
 
         # 注册到全局注册表
         registry.register(rule_obj)

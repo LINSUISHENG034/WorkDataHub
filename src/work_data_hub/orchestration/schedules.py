@@ -38,7 +38,9 @@ def _build_schedule_run_config() -> Dict[str, Any]:
         with open(settings.data_sources_config, "r", encoding="utf-8") as f:
             data_sources = yaml.safe_load(f)
 
-        domain_config = data_sources.get("domains", {}).get("sample_trustee_performance", {})
+        domain_config = data_sources.get("domains", {}).get(
+            "sample_trustee_performance", {}
+        )
         table = domain_config.get("table", "sample_trustee_performance")
         pk = domain_config.get("pk", ["report_date", "plan_code", "company_code"])
 
@@ -52,7 +54,9 @@ def _build_schedule_run_config() -> Dict[str, Any]:
     return {
         "ops": {
             "discover_files_op": {"config": {"domain": "sample_trustee_performance"}},
-            "read_and_process_sample_trustee_files_op": {"config": {"sheet": 0, "max_files": 5}},
+            "read_and_process_sample_trustee_files_op": {
+                "config": {"sheet": 0, "max_files": 5}
+            },
             "load_op": {
                 "config": {
                     "table": table,

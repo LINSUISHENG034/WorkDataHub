@@ -36,7 +36,8 @@ dev = [
 ]
 
 [tool.ruff]
-line-length = 100
+line-length = 88
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
@@ -73,3 +74,29 @@ dev = [
 mypy_path = ["src"]
 explicit_package_bases = true
 namespace_packages = true
+
+# Strict mode settings (Story 1.2 - AC-2)
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+no_implicit_reexport = true
+strict_equality = true
+
+# Handle third-party libraries without type stubs
+[[tool.mypy.overrides]]
+module = [
+    "playwright_stealth",
+    "cv2",
+    "gmssl.*",
+]
+ignore_missing_imports = true

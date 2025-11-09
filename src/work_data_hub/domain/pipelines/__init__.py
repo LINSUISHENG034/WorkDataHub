@@ -1,9 +1,9 @@
 """
 Pipeline transformation framework for WorkDataHub.
 
-This module provides a reusable foundation for building data cleansing pipelines
-that can be configured from YAML/JSON and executed consistently across different
-domain services.
+This module provides a reusable foundation for building data cleansing
+pipelines that can be configured from YAML/JSON and executed consistently
+across different domain services.
 
 The framework enables domain services to:
 - Build transformation pipelines from configuration
@@ -21,7 +21,8 @@ Example Usage:
     ...         {
     ...             "name": "decimal_clean",
     ...             "import_path": (
-    ...                 "work_data_hub.domain.pipelines.adapters.CleansingRuleStep.from_registry"
+    ...                 "work_data_hub.domain.pipelines.adapters."
+    ...                 "CleansingRuleStep.from_registry"
     ...             ),
     ...             "options": {
     ...                 "rule_name": "decimal_quantization",
@@ -82,26 +83,21 @@ from .types import PipelineMetrics, PipelineResult, Row, StepResult
 __all__ = [
     # Main entry point
     "build_pipeline",
-
     # Core framework classes
     "Pipeline",
     "TransformStep",
     "PipelineBuilder",
-
     # Configuration models
     "PipelineConfig",
     "StepConfig",
-
     # Adapter implementations
     "CleansingRuleStep",
     "FieldMapperStep",
-
     # Type definitions
     "Row",
     "StepResult",
     "PipelineResult",
     "PipelineMetrics",
-
     # Exception hierarchy
     "PipelineError",
     "PipelineStepError",

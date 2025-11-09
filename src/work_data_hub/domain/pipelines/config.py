@@ -28,8 +28,12 @@ class StepConfig(BaseModel):
 
     name: str = Field(..., description="Unique step name")
     import_path: str = Field(..., description="Full import path to step class")
-    options: Dict[str, Any] = Field(default_factory=dict, description="Step initialization options")
-    requires: List[str] = Field(default_factory=list, description="Dependencies on other steps")
+    options: Dict[str, Any] = Field(
+        default_factory=dict, description="Step initialization options"
+    )
+    requires: List[str] = Field(
+        default_factory=list, description="Dependencies on other steps"
+    )
 
     @field_validator("name")
     @classmethod
@@ -75,8 +79,12 @@ class PipelineConfig(BaseModel):
     """
 
     name: str = Field(..., description="Pipeline name")
-    steps: List[StepConfig] = Field(..., description="Pipeline steps in execution order")
-    stop_on_error: bool = Field(default=True, description="Stop execution on first error")
+    steps: List[StepConfig] = Field(
+        ..., description="Pipeline steps in execution order"
+    )
+    stop_on_error: bool = Field(
+        default=True, description="Stop execution on first error"
+    )
 
     @field_validator("name")
     @classmethod

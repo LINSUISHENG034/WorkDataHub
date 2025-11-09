@@ -18,9 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def write_unknowns_csv(
-    unknown_names: List[str],
-    data_source: str,
-    output_dir: Optional[str] = None
+    unknown_names: List[str], data_source: str, output_dir: Optional[str] = None
 ) -> str:
     """
     Export unknown company names to CSV file for manual review.
@@ -73,40 +71,39 @@ def write_unknowns_csv(
         extra={
             "unknown_count": len(unique_names),
             "data_source": data_source,
-            "output_path": str(csv_path)
-        }
+            "output_path": str(csv_path),
+        },
     )
 
     try:
         # Write CSV with UTF-8 encoding for Chinese character support
-        with open(csv_path, 'w', encoding='utf-8', newline='') as csvfile:
+        with open(csv_path, "w", encoding="utf-8", newline="") as csvfile:
             writer = csv.writer(csvfile)
 
             # Write header row
-            writer.writerow([
-                "company_name",
-                "data_source",
-                "export_timestamp",
-                "notes"
-            ])
+            writer.writerow(
+                ["company_name", "data_source", "export_timestamp", "notes"]
+            )
 
             # Write data rows
             export_timestamp = datetime.now().isoformat()
             for name in unique_names:
-                writer.writerow([
-                    name,
-                    data_source,
-                    export_timestamp,
-                    "Requires manual company ID mapping"
-                ])
+                writer.writerow(
+                    [
+                        name,
+                        data_source,
+                        export_timestamp,
+                        "Requires manual company ID mapping",
+                    ]
+                )
 
         logger.info(
             "Successfully exported unknown company names",
             extra={
                 "exported_count": len(unique_names),
                 "file_path": str(csv_path),
-                "file_size_bytes": csv_path.stat().st_size
-            }
+                "file_size_bytes": csv_path.stat().st_size,
+            },
         )
 
         return str(csv_path)
@@ -145,12 +142,12 @@ def read_unknowns_csv(csv_path: str) -> List[str]:
 
     try:
         company_names = []
-        with open(csv_file, 'r', encoding='utf-8') as csvfile:
+        with open(csv_file, "r", encoding="utf-8") as csvfile:
             reader = csv.DictReader(csvfile)
 
             for row in reader:
-                if 'company_name' in row and row['company_name']:
-                    company_names.append(row['company_name'].strip())
+                if "company_name" in row and row["company_name"]:
+                    company_names.append(row["company_name"].strip())
 
         logger.debug(f"Loaded {len(company_names)} company names from CSV")
         return company_names
@@ -177,13 +174,13 @@ def _sanitize_filename(filename: str, max_length: int = 50) -> str:
     name = Path(filename).stem
 
     # Replace special characters with underscores
-    sanitized = re.sub(r'[^\w\u4e00-\u9fff\-]', '_', name)
+    sanitized = re.sub(r"[^\w\u4e00-\u9fff\-]", "_", name)
 
     # Collapse multiple underscores
-    sanitized = re.sub(r'_+', '_', sanitized)
+    sanitized = re.sub(r"_+", "_", sanitized)
 
     # Remove leading/trailing underscores
-    sanitized = sanitized.strip('_')
+    sanitized = sanitized.strip("_")
 
     # Truncate to max length
     if len(sanitized) > max_length:

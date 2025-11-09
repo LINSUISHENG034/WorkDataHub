@@ -106,7 +106,9 @@ class ColumnNormalizer:
 
             if normalized:
                 if normalized in normalized_set:
-                    conflicts.append(f"重复的标准化列名: '{normalized}' 来自 '{original}'")
+                    conflicts.append(
+                        f"重复的标准化列名: '{normalized}' 来自 '{original}'"
+                    )
                 else:
                     normalized_set.add(normalized)
                     mapping[original] = normalized
@@ -120,7 +122,9 @@ class ColumnNormalizer:
         return mapping
 
     def apply_normalization(
-        self, data_rows: List[Dict[str, Any]], column_mapping: Optional[Dict[str, str]] = None
+        self,
+        data_rows: List[Dict[str, Any]],
+        column_mapping: Optional[Dict[str, str]] = None,
     ) -> List[Dict[str, Any]]:
         """
         对数据行应用列名标准化

@@ -91,11 +91,15 @@ class DataSourceConnector:
             pattern = self.compiled_patterns[domain_name]
 
             logger.debug(
-                f"Scanning for domain '{domain_name}' with pattern: {domain_config['pattern']}"
+                "Scanning for domain '%s' with pattern: %s",
+                domain_name,
+                domain_config["pattern"],
             )
 
             # Discover files for this domain
-            domain_files = self._scan_directory_for_domain(domain_name, pattern, domain_config)
+            domain_files = self._scan_directory_for_domain(
+                domain_name, pattern, domain_config
+            )
             discovered_files.extend(domain_files)
 
             logger.info(f"Found {len(domain_files)} files for domain '{domain_name}'")
@@ -103,7 +107,9 @@ class DataSourceConnector:
         # Apply selection strategies to discovered files
         selected_files = self._apply_selection_strategies(discovered_files)
 
-        logger.info(f"Selected {len(selected_files)} files after applying selection strategies")
+        logger.info(
+            f"Selected {len(selected_files)} files after applying selection strategies"
+        )
 
         return selected_files
 
@@ -120,7 +126,9 @@ class DataSourceConnector:
         config_path = Path(self.config_path)
 
         if not config_path.exists():
-            raise DataSourceConnectorError(f"Configuration file not found: {self.config_path}")
+            raise DataSourceConnectorError(
+                f"Configuration file not found: {self.config_path}"
+            )
 
         try:
             with open(config_path, "r", encoding="utf-8") as f:
@@ -163,8 +171,12 @@ class DataSourceConnector:
 
             try:
                 # Compile with Unicode support for Chinese characters
-                compiled[domain_name] = re.compile(pattern_str, re.UNICODE | re.IGNORECASE)
-                logger.debug(f"Compiled pattern for domain '{domain_name}': {pattern_str}")
+                compiled[domain_name] = re.compile(
+                    pattern_str, re.UNICODE | re.IGNORECASE
+                )
+                logger.debug(
+                    f"Compiled pattern for domain '{domain_name}': {pattern_str}"
+                )
             except re.error as e:
                 raise DataSourceConnectorError(
                     f"Invalid regex pattern for domain '{domain_name}': {e}"
@@ -204,7 +216,9 @@ class DataSourceConnector:
                     continue
 
                 # Filter out excluded directories
-                excluded_dirs = self.config.get("discovery", {}).get("exclude_directories", [])
+                excluded_dirs = self.config.get("discovery", {}).get(
+                    "exclude_directories", []
+                )
                 dirs[:] = [d for d in dirs if d not in excluded_dirs]
 
                 # Process files in current directory
@@ -223,7 +237,11 @@ class DataSourceConnector:
                     if match:
                         # Extract year/month from named groups if present
                         groups = match.groupdict()
-                        year = int(groups["year"]) if "year" in groups and groups["year"] else None
+                        year = (
+                            int(groups["year"])
+                            if "year" in groups and groups["year"]
+                            else None
+                        )
 
                         # Post-process month extraction for robustness
                         month_str = groups.get("month")
@@ -233,11 +251,14 @@ class DataSourceConnector:
                             if match_end < len(filename):
                                 next_char = filename[match_end]
                                 if month_str == "1" and next_char in "012":
-                                    month_str = month_str + next_char  # Form "10", "11", "12"
+                                    month_str = (
+                                        month_str + next_char
+                                    )  # Form "10", "11", "12"
 
                         month = int(month_str) if month_str else None
 
-                        # Apply two-digit year normalization (24 → 2024, but 2024 → 2024)
+                        # Apply two-digit year normalization
+                        # (24 → 2024, but 2024 → 2024)
                         if year and year < 100:
                             year = 2000 + year
 
@@ -252,23 +273,34 @@ class DataSourceConnector:
                                 version_str = parent_path.name[1:]  # Remove 'V' prefix
                                 version = int(version_str)
                                 logger.debug(
-                                    f"Extracted version {version} from directory {parent_path.name}"
+                                    "Extracted version %s from directory %s",
+                                    version,
+                                    parent_path.name,
                                 )
                             except ValueError:
-                                version = None  # Fallback for malformed versions like 'VX'
+                                version = (
+                                    None  # Fallback for malformed versions like 'VX'
+                                )
                                 logger.debug(
-                                    f"Malformed version in {parent_path.name}, using mtime fallback"
+                                    "Malformed version in %s, using mtime fallback",
+                                    parent_path.name,
                                 )
 
                         # Extract additional file metadata
                         try:
                             file_metadata = extract_file_metadata(file_path)
                             file_metadata.update(groups)  # Add regex groups to metadata
-                            file_metadata["version"] = version  # Add version to metadata
+                            file_metadata["version"] = (
+                                version  # Add version to metadata
+                            )
                         except OSError as e:
-                            logger.warning(f"Cannot extract metadata for {file_path}: {e}")
+                            logger.warning(
+                                "Cannot extract metadata for %s: %s", file_path, e
+                            )
                             file_metadata = groups
-                            file_metadata["version"] = version  # Add version to metadata
+                            file_metadata["version"] = (
+                                version  # Add version to metadata
+                            )
 
                         discovered_file = DiscoveredFile(
                             domain=domain_name,
@@ -279,7 +311,12 @@ class DataSourceConnector:
                         )
 
                         discovered.append(discovered_file)
-                        logger.debug(f"Discovered file: {file_path} (year={year}, month={month})")
+                        logger.debug(
+                            "Discovered file: %s (year=%s, month=%s)",
+                            file_path,
+                            year,
+                            month,
+                        )
 
         except OSError as e:
             logger.error(f"Error scanning directory {base_dir}: {e}")
@@ -287,7 +324,9 @@ class DataSourceConnector:
 
         return discovered
 
-    def _apply_selection_strategies(self, files: List[DiscoveredFile]) -> List[DiscoveredFile]:
+    def _apply_selection_strategies(
+        self, files: List[DiscoveredFile]
+    ) -> List[DiscoveredFile]:
         """
         Apply selection strategies to discovered files by domain.
 
@@ -317,18 +356,27 @@ class DataSourceConnector:
             elif strategy == "latest_by_year_month_and_version":
                 selected = self._select_latest_by_year_month_and_version(domain_files)
             else:
-                logger.warning(f"Unknown selection strategy '{strategy}' for domain '{domain}'")
+                logger.warning(
+                    "Unknown selection strategy '%s' for domain '%s'",
+                    strategy,
+                    domain,
+                )
                 selected = domain_files  # Return all files if strategy unknown
 
             if selected:
                 selected_files.extend(selected)
                 logger.info(
-                    f"Domain '{domain}': Selected {len(selected)} files using '{strategy}' strategy"
+                    "Domain '%s': Selected %s files using '%s' strategy",
+                    domain,
+                    len(selected),
+                    strategy,
                 )
 
         return selected_files
 
-    def _select_latest_by_year_month(self, files: List[DiscoveredFile]) -> List[DiscoveredFile]:
+    def _select_latest_by_year_month(
+        self, files: List[DiscoveredFile]
+    ) -> List[DiscoveredFile]:
         """
         Select latest file by year/month, with mtime fallback.
 
@@ -355,7 +403,9 @@ class DataSourceConnector:
         else:
             return []
 
-    def _select_latest_by_mtime(self, files: List[DiscoveredFile]) -> List[DiscoveredFile]:
+    def _select_latest_by_mtime(
+        self, files: List[DiscoveredFile]
+    ) -> List[DiscoveredFile]:
         """
         Select file with the most recent modification time.
 
@@ -403,7 +453,9 @@ class DataSourceConnector:
         sorted_files = sorted(files, key=lambda f: (f.year or 0, f.month or 0))
 
         selected = []
-        for (year, month), group_files in groupby(sorted_files, key=lambda f: (f.year, f.month)):
+        for (year, month), group_files in groupby(
+            sorted_files, key=lambda f: (f.year, f.month)
+        ):
             group_list = list(group_files)
 
             # Within group, select by (version, mtime) descending
@@ -421,7 +473,9 @@ class DataSourceConnector:
                     f"for year={year}, month={month}: {best_file.path}"
                 )
             except (OSError, FileNotFoundError) as e:
-                logger.error(f"Error accessing file modification times in version selection: {e}")
+                logger.error(
+                    f"Error accessing file modification times in version selection: {e}"
+                )
                 # Fallback to first file if stat() fails
                 if group_list:
                     selected.append(group_list[0])

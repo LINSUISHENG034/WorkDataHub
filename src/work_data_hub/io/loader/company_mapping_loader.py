@@ -39,6 +39,7 @@ logger = logging.getLogger(__name__)
 
 class CompanyMappingLoaderError(Exception):
     """Raised when company mapping loader encounters an error."""
+
     pass
 
 
@@ -46,8 +47,9 @@ def extract_legacy_mappings() -> List[CompanyMappingRecord]:
     """
     Extract company mappings from all 5 legacy sources with retry logic.
 
-    Replicates the exact mapping structure from legacy/annuity_hub/data_handler/mappings.py
-    with proper error handling and retry logic for unstable MySQL connections.
+    Replicates the exact mapping structure from
+    legacy/annuity_hub/data_handler/mappings.py with proper error handling
+    and retry logic for unstable MySQL connections.
 
     Returns:
         List of CompanyMappingRecord instances ready for database loading
@@ -63,7 +65,11 @@ def extract_legacy_mappings() -> List[CompanyMappingRecord]:
     logger.info("Starting legacy mapping extraction from 5 sources")
     mappings: List[CompanyMappingRecord] = []
     extraction_stats = {
-        "plan": 0, "account": 0, "hardcode": 0, "name": 0, "account_name": 0
+        "plan": 0,
+        "account": 0,
+        "hardcode": 0,
+        "name": 0,
+        "account_name": 0,
     }
 
     # COMPANY_ID1_MAPPING: Plan codes (priority=1)
@@ -73,14 +79,16 @@ def extract_legacy_mappings() -> List[CompanyMappingRecord]:
         )
         for alias, company_id in plan_mappings.items():
             if alias and company_id:
-                mappings.append(CompanyMappingRecord(
-                    alias_name=str(alias).strip(),
-                    canonical_id=str(company_id).strip(),
-                    match_type="plan",
-                    priority=1,
-                    source="internal",
-                    updated_at=datetime.now(timezone.utc)
-                ))
+                mappings.append(
+                    CompanyMappingRecord(
+                        alias_name=str(alias).strip(),
+                        canonical_id=str(company_id).strip(),
+                        match_type="plan",
+                        priority=1,
+                        source="internal",
+                        updated_at=datetime.now(timezone.utc),
+                    )
+                )
                 extraction_stats["plan"] += 1
     except Exception as e:
         logger.error(f"Failed to extract COMPANY_ID1_MAPPING: {e}")
@@ -93,14 +101,16 @@ def extract_legacy_mappings() -> List[CompanyMappingRecord]:
         )
         for alias, company_id in account_mappings.items():
             if alias and company_id:
-                mappings.append(CompanyMappingRecord(
-                    alias_name=str(alias).strip(),
-                    canonical_id=str(company_id).strip(),
-                    match_type="account",
-                    priority=2,
-                    source="internal",
-                    updated_at=datetime.now(timezone.utc)
-                ))
+                mappings.append(
+                    CompanyMappingRecord(
+                        alias_name=str(alias).strip(),
+                        canonical_id=str(company_id).strip(),
+                        match_type="account",
+                        priority=2,
+                        source="internal",
+                        updated_at=datetime.now(timezone.utc),
+                    )
+                )
                 extraction_stats["account"] += 1
     except Exception as e:
         logger.error(f"Failed to extract COMPANY_ID2_MAPPING: {e}")
@@ -109,26 +119,28 @@ def extract_legacy_mappings() -> List[CompanyMappingRecord]:
     # COMPANY_ID3_MAPPING: Hardcoded mappings (priority=3)
     # This is the hardcoded dictionary from mappings.py lines 148-158
     hardcoded_mappings = {
-        'FP0001': '614810477',
-        'FP0002': '614810477',
-        'FP0003': '610081428',
-        'P0809': '608349737',
-        'SC002': '604809109',
-        'SC007': '602790403',
-        'XNP466': '603968573',
-        'XNP467': '603968573',
-        'XNP596': '601038164',
+        "FP0001": "614810477",
+        "FP0002": "614810477",
+        "FP0003": "610081428",
+        "P0809": "608349737",
+        "SC002": "604809109",
+        "SC007": "602790403",
+        "XNP466": "603968573",
+        "XNP467": "603968573",
+        "XNP596": "601038164",
     }
 
     for alias, company_id in hardcoded_mappings.items():
-        mappings.append(CompanyMappingRecord(
-            alias_name=alias,
-            canonical_id=company_id,
-            match_type="hardcode",
-            priority=3,
-            source="internal",
-            updated_at=datetime.now(timezone.utc)
-        ))
+        mappings.append(
+            CompanyMappingRecord(
+                alias_name=alias,
+                canonical_id=company_id,
+                match_type="hardcode",
+                priority=3,
+                source="internal",
+                updated_at=datetime.now(timezone.utc),
+            )
+        )
         extraction_stats["hardcode"] += 1
 
     # COMPANY_ID4_MAPPING: Customer names (priority=4)
@@ -138,14 +150,16 @@ def extract_legacy_mappings() -> List[CompanyMappingRecord]:
         )
         for alias, company_id in name_mappings.items():
             if alias and company_id:
-                mappings.append(CompanyMappingRecord(
-                    alias_name=str(alias).strip(),
-                    canonical_id=str(company_id).strip(),
-                    match_type="name",
-                    priority=4,
-                    source="internal",
-                    updated_at=datetime.now(timezone.utc)
-                ))
+                mappings.append(
+                    CompanyMappingRecord(
+                        alias_name=str(alias).strip(),
+                        canonical_id=str(company_id).strip(),
+                        match_type="name",
+                        priority=4,
+                        source="internal",
+                        updated_at=datetime.now(timezone.utc),
+                    )
+                )
                 extraction_stats["name"] += 1
     except Exception as e:
         logger.error(f"Failed to extract COMPANY_ID4_MAPPING: {e}")
@@ -158,14 +172,16 @@ def extract_legacy_mappings() -> List[CompanyMappingRecord]:
         )
         for alias, company_id in account_name_mappings.items():
             if alias and company_id:
-                mappings.append(CompanyMappingRecord(
-                    alias_name=str(alias).strip(),
-                    canonical_id=str(company_id).strip(),
-                    match_type="account_name",
-                    priority=5,
-                    source="internal",
-                    updated_at=datetime.now(timezone.utc)
-                ))
+                mappings.append(
+                    CompanyMappingRecord(
+                        alias_name=str(alias).strip(),
+                        canonical_id=str(company_id).strip(),
+                        match_type="account_name",
+                        priority=5,
+                        source="internal",
+                        updated_at=datetime.now(timezone.utc),
+                    )
+                )
                 extraction_stats["account_name"] += 1
     except Exception as e:
         logger.error(f"Failed to extract COMPANY_ID5_MAPPING: {e}")
@@ -179,15 +195,18 @@ def extract_legacy_mappings() -> List[CompanyMappingRecord]:
             "account_mappings": extraction_stats["account"],
             "hardcode_mappings": extraction_stats["hardcode"],
             "name_mappings": extraction_stats["name"],
-            "account_name_mappings": extraction_stats["account_name"]
-        }
+            "account_name_mappings": extraction_stats["account_name"],
+        },
     )
 
     return mappings
 
 
 def _extract_with_retry(
-    extraction_func, description: str, max_attempts: int = 3, backoff_factor: float = 2.0
+    extraction_func,
+    description: str,
+    max_attempts: int = 3,
+    backoff_factor: float = 2.0,
 ) -> Dict[str, str]:
     """
     Execute extraction function with exponential backoff retry logic.
@@ -210,14 +229,16 @@ def _extract_with_retry(
         try:
             logger.debug(f"Extracting {description} (attempt {attempt}/{max_attempts})")
             result = extraction_func()
-            logger.debug(f"Successfully extracted {description}, got {len(result)} mappings")
+            logger.debug(
+                f"Successfully extracted {description}, got {len(result)} mappings"
+            )
             return result
 
         except Exception as e:
             last_exception = e
             logger.warning(
                 f"Extraction attempt {attempt} failed for {description}: {e}",
-                extra={"attempt": attempt, "max_attempts": max_attempts}
+                extra={"attempt": attempt, "max_attempts": max_attempts},
             )
 
             if attempt < max_attempts:
@@ -233,7 +254,7 @@ def _extract_with_retry(
 
 def _extract_company_id1_mapping() -> Dict[str, str]:
     """Extract COMPANY_ID1_MAPPING from MySQL (plan codes)."""
-    with MySqlDBManager(database='mapping') as mysqldb:
+    with MySqlDBManager(database="mapping") as mysqldb:
         cursor = mysqldb.cursor
         try:
             cursor.execute("""
@@ -250,7 +271,7 @@ def _extract_company_id1_mapping() -> Dict[str, str]:
 
 def _extract_company_id2_mapping() -> Dict[str, str]:
     """Extract COMPANY_ID2_MAPPING from MySQL (account numbers)."""
-    with MySqlDBManager(database='enterprise') as mysqldb:
+    with MySqlDBManager(database="enterprise") as mysqldb:
         cursor = mysqldb.cursor
         try:
             cursor.execute("""
@@ -267,7 +288,7 @@ def _extract_company_id2_mapping() -> Dict[str, str]:
 
 def _extract_company_id4_mapping() -> Dict[str, str]:
     """Extract COMPANY_ID4_MAPPING from MySQL (customer names)."""
-    with MySqlDBManager(database='enterprise') as mysqldb:
+    with MySqlDBManager(database="enterprise") as mysqldb:
         cursor = mysqldb.cursor
         try:
             cursor.execute("""
@@ -283,7 +304,7 @@ def _extract_company_id4_mapping() -> Dict[str, str]:
 
 def _extract_company_id5_mapping() -> Dict[str, str]:
     """Extract COMPANY_ID5_MAPPING from MySQL (account names)."""
-    with MySqlDBManager(database='business') as mysqldb:
+    with MySqlDBManager(database="business") as mysqldb:
         cursor = mysqldb.cursor
         try:
             cursor.execute("""
@@ -304,7 +325,7 @@ def load_company_mappings(
     schema: str = "enterprise",
     table: str = "company_mapping",
     mode: str = "delete_insert",
-    chunk_size: int = 1000
+    chunk_size: int = 1000,
 ) -> Dict[str, Any]:
     """
     Load company mappings to PostgreSQL with transactional safety.
@@ -334,8 +355,8 @@ def load_company_mappings(
             "schema": schema,
             "table": table,
             "mode": mode,
-            "chunk_size": chunk_size
-        }
+            "chunk_size": chunk_size,
+        },
     )
 
     # Convert Pydantic models to dictionaries
@@ -376,18 +397,22 @@ def load_company_mappings(
             batch_count = 0
 
             for i in range(0, len(mapping_dicts), chunk_size):
-                chunk = mapping_dicts[i:i + chunk_size]
+                chunk = mapping_dicts[i : i + chunk_size]
 
                 if mode == "append":
                     # Use conflict-aware SQL for append mode
                     insert_sql, insert_params = build_insert_sql_with_conflict(
-                        qualified_table, cols, chunk,
+                        qualified_table,
+                        cols,
+                        chunk,
                         conflict_cols=pk_cols,
-                        conflict_action="DO NOTHING"
+                        conflict_action="DO NOTHING",
                     )
                 else:
                     # Use regular SQL for delete_insert mode
-                    insert_sql, insert_params = build_insert_sql(qualified_table, cols, chunk)
+                    insert_sql, insert_params = build_insert_sql(
+                        qualified_table, cols, chunk
+                    )
 
                 if insert_sql:
                     cursor = conn.cursor()
@@ -406,10 +431,7 @@ def load_company_mappings(
             stats["inserted"] = total_inserted
             stats["batches"] = batch_count
 
-        logger.info(
-            "Company mapping load completed successfully",
-            extra=stats
-        )
+        logger.info("Company mapping load completed successfully", extra=stats)
 
     except Exception as e:
         logger.error(f"Company mapping load failed: {e}")
@@ -421,7 +443,7 @@ def load_company_mappings(
 def generate_load_plan(
     mappings: List[CompanyMappingRecord],
     schema: str = "enterprise",
-    table: str = "company_mapping"
+    table: str = "company_mapping",
 ) -> Dict[str, Any]:
     """
     Generate execution plan for company mapping load without executing.
@@ -440,7 +462,7 @@ def generate_load_plan(
             "table": f"{schema}.{table}",
             "total_mappings": 0,
             "mapping_breakdown": {},
-            "sql_plans": []
+            "sql_plans": [],
         }
 
     # Analyze mapping breakdown by type
@@ -471,12 +493,12 @@ def generate_load_plan(
             {
                 "operation": "DELETE (upsert mode)",
                 "sql_template": sample_delete_sql,
-                "estimated_affected": len(mapping_dicts)
+                "estimated_affected": len(mapping_dicts),
             },
             {
                 "operation": "INSERT",
                 "sql_template": sample_insert_sql,
-                "estimated_affected": len(mapping_dicts)
-            }
-        ]
+                "estimated_affected": len(mapping_dicts),
+            },
+        ],
     }

@@ -156,7 +156,9 @@ def _transform_single_row(
         raise
 
 
-def _extract_report_date(input_model: TrusteePerformanceIn, row_index: int) -> Optional[date]:
+def _extract_report_date(
+    input_model: TrusteePerformanceIn, row_index: int
+) -> Optional[date]:
     """
     Extract report date from input model using unified date parsing.
 
@@ -175,13 +177,17 @@ def _extract_report_date(input_model: TrusteePerformanceIn, row_index: int) -> O
         try:
             year = int(str(input_model.年).strip())
         except (ValueError, AttributeError):
-            logger.debug(f"Row {row_index}: Cannot parse year from '年' field: {input_model.年}")
+            logger.debug(
+                f"Row {row_index}: Cannot parse year from '年' field: {input_model.年}"
+            )
 
     if input_model.月:
         try:
             month = int(str(input_model.月).strip())
         except (ValueError, AttributeError):
-            logger.debug(f"Row {row_index}: Cannot parse month from '月' field: {input_model.月}")
+            logger.debug(
+                f"Row {row_index}: Cannot parse month from '月' field: {input_model.月}"
+            )
 
     # Fallback to English field names
     if year is None and input_model.year is not None:
@@ -216,7 +222,11 @@ def _extract_report_date(input_model: TrusteePerformanceIn, row_index: int) -> O
             return date(year, month, 1)
         except ValueError as e:
             logger.debug(
-                f"Row {row_index}: Cannot create date from year={year}, month={month}: {e}"
+                "Row %s: Cannot create date from year=%s, month=%s: %s",
+                row_index,
+                year,
+                month,
+                e,
             )
             return None
 
@@ -271,7 +281,9 @@ def _parse_report_period(report_period: str) -> Optional[Tuple[int, int]]:
     return None
 
 
-def _extract_plan_code(input_model: TrusteePerformanceIn, row_index: int) -> Optional[str]:
+def _extract_plan_code(
+    input_model: TrusteePerformanceIn, row_index: int
+) -> Optional[str]:
     """Extract plan code from input model."""
     # Try Chinese field name first
     if input_model.计划代码:
@@ -285,7 +297,9 @@ def _extract_plan_code(input_model: TrusteePerformanceIn, row_index: int) -> Opt
     return None
 
 
-def _extract_company_code(input_model: TrusteePerformanceIn, row_index: int) -> Optional[str]:
+def _extract_company_code(
+    input_model: TrusteePerformanceIn, row_index: int
+) -> Optional[str]:
     """Extract company code from input model."""
     # Try Chinese field name first
     if input_model.公司代码:
@@ -329,7 +343,9 @@ def _extract_performance_metrics(
     return metrics
 
 
-def validate_input_batch(rows: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[str]]:
+def validate_input_batch(
+    rows: List[Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], List[str]]:
     """
     Validate a batch of input rows and return valid rows plus error messages.
 

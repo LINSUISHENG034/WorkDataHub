@@ -119,10 +119,14 @@ class PATokenClient:
         sm2_config = self._fetch_sm2_config()
         timestamp = str(int(time.time() * 1000))
         password_payload = f"{self.password}{sm2_config.pwd_split}{timestamp}"
-        encrypted_password = self._encrypt(sm2_config.key_x, sm2_config.key_y, password_payload)
+        encrypted_password = self._encrypt(
+            sm2_config.key_x, sm2_config.key_y, password_payload
+        )
         session_id = self._authenticate(encrypted_password, timestamp)
         token = self._authenticate_pin(sm2_config, session_id)
-        otp_payload = self._request_otp(session_id, token, AUTO_REFRESH_URL, with_auth=True)
+        otp_payload = self._request_otp(
+            session_id, token, AUTO_REFRESH_URL, with_auth=True
+        )
         expires_in = int(otp_payload.get("countDown") or 0)
         return OTPResult(
             otp=otp_payload["otp"],
@@ -136,7 +140,9 @@ class PATokenClient:
         """Refresh the OTP using the cached token."""
 
         url = MANUAL_REFRESH_URL if manual else AUTO_REFRESH_URL
-        otp_payload = self._request_otp(result.session_id, result.token, url, with_auth=not manual)
+        otp_payload = self._request_otp(
+            result.session_id, result.token, url, with_auth=not manual
+        )
         expires_in = int(otp_payload.get("countDown") or 0)
         return OTPResult(
             otp=otp_payload["otp"],
@@ -201,7 +207,9 @@ class PATokenClient:
         }
         if with_auth:
             headers["X-Authorization"] = session_id
-        payload = self._request_json("POST", url, data={"token": token}, headers=headers)
+        payload = self._request_json(
+            "POST", url, data={"token": token}, headers=headers
+        )
         outer = payload.get("data") or {}
         if isinstance(outer, dict) and "data" in outer:
             outer = outer["data"]
@@ -220,7 +228,9 @@ class PATokenClient:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         try:
-            response = self.session.request(method, url, headers=headers, timeout=timeout, **kwargs)
+            response = self.session.request(
+                method, url, headers=headers, timeout=timeout, **kwargs
+            )
             response.raise_for_status()
         except requests.RequestException as exc:
             hint = ""
@@ -228,8 +238,8 @@ class PATokenClient:
                 root = exc.__cause__
                 if root and "NameResolutionError" in repr(root):
                     hint = (
-                        " — DNS lookup failed. Confirm VPN/intranet connectivity and that "
-                        "otp.paic.com.cn is reachable."
+                        " — DNS lookup failed. Confirm VPN/intranet connectivity "
+                        "and that otp.paic.com.cn is reachable."
                     )
             raise APIRequestError(f"Request to {url} failed: {exc}{hint}") from exc
         try:
@@ -281,7 +291,9 @@ def build_client_from_env() -> PATokenClient:
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
     try:
         client = build_client_from_env()
         result = client.fetch_once()

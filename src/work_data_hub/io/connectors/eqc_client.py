@@ -17,7 +17,10 @@ from urllib.parse import quote
 import requests
 
 from work_data_hub.config.settings import get_settings
-from work_data_hub.domain.company_enrichment.models import CompanyDetail, CompanySearchResult
+from work_data_hub.domain.company_enrichment.models import (
+    CompanyDetail,
+    CompanySearchResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,10 +78,12 @@ class EQCClient:
         Initialize EQC client with configuration.
 
         Args:
-            token: EQC API token. If None, reads from WDH_EQC_TOKEN environment variable
+            token: EQC API token. If None, reads from WDH_EQC_TOKEN
+                environment variable
             timeout: Request timeout in seconds. If None, uses settings default
             retry_max: Maximum retry attempts. If None, uses settings default
-            rate_limit: Requests per minute limit. If None, uses settings default
+            rate_limit: Requests per minute limit. If None, uses settings
+                default
             base_url: EQC API base URL. If None, uses settings default
 
         Raises:
@@ -91,26 +96,34 @@ class EQCClient:
         self.token = token or os.getenv("WDH_EQC_TOKEN")
         if not self.token:
             raise EQCAuthenticationError(
-                "EQC token required via constructor parameter or WDH_EQC_TOKEN environment variable"
+                "EQC token required via constructor parameter or "
+                "WDH_EQC_TOKEN environment variable"
             )
 
         # Configuration with settings fallbacks
         self.timeout = timeout if timeout is not None else self.settings.eqc_timeout
-        self.retry_max = retry_max if retry_max is not None else self.settings.eqc_retry_max
-        self.rate_limit = rate_limit if rate_limit is not None else self.settings.eqc_rate_limit
+        self.retry_max = (
+            retry_max if retry_max is not None else self.settings.eqc_retry_max
+        )
+        self.rate_limit = (
+            rate_limit if rate_limit is not None else self.settings.eqc_rate_limit
+        )
         self.base_url = base_url if base_url is not None else self.settings.eqc_base_url
 
         # Initialize requests session with proper headers
         self.session = requests.Session()
-        self.session.headers.update({
-            "token": self.token,
-            "Referer": "https://eqc.pingan.com/",
-            "User-Agent": "Mozilla/5.0 (WorkDataHub EQC Client)",
-            "Accept": "application/json",
-            "Content-Type": "application/json; charset=utf-8",
-        })
+        self.session.headers.update(
+            {
+                "token": self.token,
+                "Referer": "https://eqc.pingan.com/",
+                "User-Agent": "Mozilla/5.0 (WorkDataHub EQC Client)",
+                "Accept": "application/json",
+                "Content-Type": "application/json; charset=utf-8",
+            }
+        )
 
-        # Rate limiting: track request timestamps using deque for efficient sliding window
+        # Rate limiting: track request timestamps using deque for efficient
+        # sliding window
         self.request_times: Deque[float] = deque(maxlen=self.rate_limit)
 
         logger.info(
@@ -157,7 +170,10 @@ class EQCClient:
             sleep_time = 60 - (now - self.request_times[0]) + 0.1  # Small buffer
             logger.debug(
                 "Rate limit reached, sleeping",
-                extra={"sleep_seconds": round(sleep_time, 1), "rate_limit": self.rate_limit},
+                extra={
+                    "sleep_seconds": round(sleep_time, 1),
+                    "rate_limit": self.rate_limit,
+                },
             )
             time.sleep(sleep_time)
 
@@ -200,27 +216,38 @@ class EQCClient:
                 )
 
                 # Make the actual request
-                response = self.session.request(method, url, timeout=self.timeout, **kwargs)
+                response = self.session.request(
+                    method, url, timeout=self.timeout, **kwargs
+                )
 
                 # Handle different status codes
                 if response.status_code == 200:
                     logger.debug(
                         "EQC API request successful",
-                        extra={"url": sanitized_url, "status_code": response.status_code},
+                        extra={
+                            "url": sanitized_url,
+                            "status_code": response.status_code,
+                        },
                     )
                     return response
 
                 elif response.status_code == 401:
                     logger.error(
                         "EQC authentication failed",
-                        extra={"url": sanitized_url, "status_code": response.status_code},
+                        extra={
+                            "url": sanitized_url,
+                            "status_code": response.status_code,
+                        },
                     )
                     raise EQCAuthenticationError("Invalid or expired EQC token")
 
                 elif response.status_code == 404:
                     logger.warning(
                         "EQC resource not found",
-                        extra={"url": sanitized_url, "status_code": response.status_code},
+                        extra={
+                            "url": sanitized_url,
+                            "status_code": response.status_code,
+                        },
                     )
                     raise EQCNotFoundError("Resource not found")
 
@@ -262,9 +289,14 @@ class EQCClient:
                     # Unexpected status code
                     logger.error(
                         "Unexpected EQC API response",
-                        extra={"url": sanitized_url, "status_code": response.status_code},
+                        extra={
+                            "url": sanitized_url,
+                            "status_code": response.status_code,
+                        },
                     )
-                    raise EQCClientError(f"Unexpected status code: {response.status_code}")
+                    raise EQCClientError(
+                        f"Unexpected status code: {response.status_code}"
+                    )
 
             except requests.RequestException as e:
                 logger.warning(
@@ -281,7 +313,9 @@ class EQCClient:
                     logger.debug(f"Retrying after {delay:.1f}s due to request error")
                     time.sleep(delay)
                     continue
-                raise EQCClientError(f"Request failed after {self.retry_max + 1} attempts: {e}")
+                raise EQCClientError(
+                    f"Request failed after {self.retry_max + 1} attempts: {e}"
+                )
 
         # Should not reach here, but for completeness
         raise EQCClientError("Request failed for unknown reason")
@@ -348,7 +382,8 @@ class EQCClient:
             for item in results_list:
                 try:
                     # Map EQC field names to our model fields
-                    # Based on legacy code analysis: companyId, companyFullName, unite_code
+                    # Based on legacy analysis: companyId, companyFullName,
+                    # unite_code
                     company = CompanySearchResult(
                         company_id=str(item.get("companyId", "")),
                         official_name=item.get("companyFullName", ""),
@@ -387,7 +422,9 @@ class EQCClient:
                 "Unexpected EQC search response structure",
                 extra={"query": cleaned_name, "missing_key": str(e)},
             )
-            raise EQCClientError(f"Unexpected response structure from EQC search API: {e}")
+            raise EQCClientError(
+                f"Unexpected response structure from EQC search API: {e}"
+            )
 
     def get_company_detail(self, company_id: str) -> CompanyDetail:
         """
@@ -444,7 +481,10 @@ class EQCClient:
             if not business_info:
                 logger.warning(
                     "Empty business info in EQC response",
-                    extra={"company_id": cleaned_id, "response_keys": list(data.keys())},
+                    extra={
+                        "company_id": cleaned_id,
+                        "response_keys": list(data.keys()),
+                    },
                 )
                 raise EQCNotFoundError(
                     f"No business information found for company ID: {cleaned_id}"
@@ -500,7 +540,9 @@ class EQCClient:
                 "Unexpected EQC detail response structure",
                 extra={"company_id": cleaned_id, "missing_key": str(e)},
             )
-            raise EQCClientError(f"Unexpected response structure from EQC detail API: {e}")
+            raise EQCClientError(
+                f"Unexpected response structure from EQC detail API: {e}"
+            )
 
     def _extract_aliases(self, business_info: dict) -> List[str]:
         """

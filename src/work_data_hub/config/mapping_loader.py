@@ -30,13 +30,16 @@ def get_mappings_dir() -> Path:
         Path to the mappings directory
 
     Raises:
-        MappingLoaderError: If WDH_MAPPINGS_DIR environment variable points to invalid path
+        MappingLoaderError: If WDH_MAPPINGS_DIR environment variable points to an
+            invalid path
     """
     env_dir = os.environ.get("WDH_MAPPINGS_DIR")
     if env_dir:
         p = Path(env_dir)
         if not p.exists() or not p.is_dir():
-            raise MappingLoaderError(f"WDH_MAPPINGS_DIR not found or not a directory: {env_dir}")
+            raise MappingLoaderError(
+                f"WDH_MAPPINGS_DIR not found or not a directory: {env_dir}"
+            )
         return p
     return Path(__file__).parent / "mappings"
 
@@ -78,7 +81,9 @@ def load_yaml_mapping(path: str) -> Dict[str, str]:
         if not isinstance(key, str):
             raise MappingLoaderError(f"Mapping key must be string, got {type(key)}")
         if not isinstance(value, (str, int)):
-            raise MappingLoaderError(f"Mapping value must be string or int, got {type(value)}")
+            raise MappingLoaderError(
+                f"Mapping value must be string or int, got {type(value)}"
+            )
         validated_mapping[key] = str(value)
 
     logger.debug(f"Loaded {len(validated_mapping)} mappings from {path}")

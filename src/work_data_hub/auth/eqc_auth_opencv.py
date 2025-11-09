@@ -13,7 +13,8 @@ Environment variables:
 - EQC_OTP: optional one-time code if present (captcha/token still allowed manual)
 - EQC_AUTO_SLIDER: 'true' to enable OpenCV slider attempts (default true)
 - EQC_REUSE_SESSION: 'true' to load/save storage_state (default true)
-- EQC_STORAGE_STATE: path to persist storage state (default .cache/eqc_storage_state.json)
+- EQC_STORAGE_STATE: path to persist storage state
+  (default .cache/eqc_storage_state.json)
 
 Usage example:
     from src.work_data_hub.auth.eqc_auth_opencv import run_get_token
@@ -92,7 +93,11 @@ async def _load_or_new_context(playwright):
     """Create a browser context, trying to reuse storage_state if enabled."""
     browser = await playwright.chromium.launch(headless=False)
     try:
-        if EQC_REUSE_SESSION and not EQC_CLEAR_SESSION and Path(EQC_STORAGE_STATE).exists():
+        if (
+            EQC_REUSE_SESSION
+            and not EQC_CLEAR_SESSION
+            and Path(EQC_STORAGE_STATE).exists()
+        ):
             context = await browser.new_context(storage_state=EQC_STORAGE_STATE)
             page = await context.new_page()
             await page.goto(LOGIN_URL, wait_until="domcontentloaded")
@@ -135,16 +140,19 @@ async def _fill_login_form(page) -> bool:
     # Selectors from docs/company_id/EQC/login_page_elements.md
     # 使用占位符定位更稳，CSS 作为回退
     sel_user = (
-        "#app > div > div.login-input-wrap > div.login-content > div.password-login > "
-        "div:nth-child(2) > form > div:nth-child(1) > div > div > input"
+        "#app > div > div.login-input-wrap > div.login-content > "
+        "div.password-login > div:nth-child(2) > form > "
+        "div:nth-child(1) > div > div > input"
     )
     sel_pwd_relaxed = (
-        "#app > div > div.login-input-wrap > div.login-content > div.password-login > "
-        "div:nth-child(2) > form > div.el-form-item.form-input.pwd-input > div > div > input"
+        "#app > div > div.login-input-wrap > div.login-content > "
+        "div.password-login > div:nth-child(2) > form > "
+        "div.el-form-item.form-input.pwd-input > div > div > input"
     )
     sel_otp = (
-        "#app > div > div.login-input-wrap > div.login-content > div.password-login > "
-        "div:nth-child(2) > form > div:nth-child(3) > div > div > input"
+        "#app > div > div.login-input-wrap > div.login-content > "
+        "div.password-login > div:nth-child(2) > form > "
+        "div:nth-child(3) > div > div > input"
     )
     sel_btn = "#loginBtn"
 
@@ -217,7 +225,9 @@ async def _fill_login_form(page) -> bool:
             await btn.click()
             return True
         else:
-            logger.info("Missing EQC_USERNAME/EQC_PASSWORD in env; please login manually.")
+            logger.info(
+                "Missing EQC_USERNAME/EQC_PASSWORD in env; please login manually."
+            )
             return False
     except Exception as e:
         logger.warning(f"Auto-fill login form failed: {e}")
@@ -255,10 +265,18 @@ async def _capture_slider_images(page) -> Optional[SliderImages]:
     """
     # Prefer precise paths from docs; fallback to generic class names
     bg = page.locator(
-        "body > div.geetest_panel.geetest_wind.geetest_customtype > div.geetest_panel_box.geetest_panel_type4.geetest_panelshowslide > div.geetest_panel_next > div > div.geetest_wrap > div.geetest_widget > div > a > div.geetest_canvas_img.geetest_absolute > div > canvas.geetest_canvas_bg.geetest_absolute, .geetest_canvas_bg"
+        "body > div.geetest_panel.geetest_wind.geetest_customtype > "
+        "div.geetest_panel_box.geetest_panel_type4.geetest_panelshowslide > "
+        "div.geetest_panel_next > div > div.geetest_wrap > div.geetest_widget > "
+        "div > a > div.geetest_canvas_img.geetest_absolute > div > "
+        "canvas.geetest_canvas_bg.geetest_absolute, .geetest_canvas_bg"
     ).first
     fullbg = page.locator(
-        "body > div.geetest_panel.geetest_wind.geetest_customtype > div.geetest_panel_box.geetest_panel_type4.geetest_panelshowslide > div.geetest_panel_next > div > div.geetest_wrap > div.geetest_widget > div > a > div.geetest_canvas_img.geetest_absolute > canvas, .geetest_canvas_fullbg"
+        "body > div.geetest_panel.geetest_wind.geetest_customtype > "
+        "div.geetest_panel_box.geetest_panel_type4.geetest_panelshowslide > "
+        "div.geetest_panel_next > div > div.geetest_wrap > div.geetest_widget > "
+        "div > a > div.geetest_canvas_img.geetest_absolute > canvas, "
+        ".geetest_canvas_fullbg"
     ).first
     widget = page.locator("div.geetest_canvas_img, div.geetest_widget").first
 
@@ -282,13 +300,17 @@ async def _capture_slider_images(page) -> Optional[SliderImages]:
             # Decode to get width
             arr = np.frombuffer(bg_bytes, dtype=np.uint8)
             img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-            return SliderImages(bg_bytes=bg_bytes, full_bytes=full_bytes, bg_width=int(img.shape[1]))
+            return SliderImages(
+                bg_bytes=bg_bytes, full_bytes=full_bytes, bg_width=int(img.shape[1])
+            )
         elif await bg.count() > 0:
             # bg 存在但 full 不可见：先返回仅 bg，由上游选择边缘投影算法
             bg_bytes = await bg.screenshot(type="png")
             arr = np.frombuffer(bg_bytes, dtype=np.uint8)
             img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-            return SliderImages(bg_bytes=bg_bytes, full_bytes=bg_bytes, bg_width=int(img.shape[1]))
+            return SliderImages(
+                bg_bytes=bg_bytes, full_bytes=bg_bytes, bg_width=int(img.shape[1])
+            )
         elif await widget.count() > 0:
             # 最弱回退：对容器截图做边缘投影
             w = await widget.screenshot(type="png")
@@ -419,14 +441,20 @@ async def get_auth_token_interactively(
 
         # Intercept all requests; pick first 'token' header
         # parse capture substrings (comma-separated)
-        capture_subs = [s.strip() for s in EQC_CAPTURE_URL_SUBSTR.split(",") if s.strip()]
+        capture_subs = [
+            s.strip() for s in EQC_CAPTURE_URL_SUBSTR.split(",") if s.strip()
+        ]
 
         async def intercept(route):
             try:
                 req = route.request
                 token = req.headers.get("token")
                 # Only capture when URL matches whitelist and token looks valid
-                url_ok = any(sub in req.url for sub in capture_subs) if capture_subs else True
+                url_ok = (
+                    any(sub in req.url for sub in capture_subs)
+                    if capture_subs
+                    else True
+                )
                 token_ok = (
                     token is not None
                     and token not in ("", "null", "undefined")

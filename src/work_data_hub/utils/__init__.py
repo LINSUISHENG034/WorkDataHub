@@ -13,7 +13,12 @@ __all__ = [
 ]
 
 if TYPE_CHECKING:  # pragma: no cover - imported only for typing
-    from .patoken_client import OTPResult, PATokenClient, build_client_from_env, load_env_file
+    from .patoken_client import (
+        OTPResult,
+        PATokenClient,
+        build_client_from_env,
+        load_env_file,
+    )
 
 
 def __getattr__(name: str) -> Any:

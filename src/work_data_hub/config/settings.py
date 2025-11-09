@@ -113,13 +113,12 @@ class Settings(BaseSettings):
 
     # Development settings
     dev_sample_size: Optional[int] = Field(
-        default=None, description="Limit processing to N rows for development (None = no limit)"
+        default=None,
+        description="Limit processing to N rows for development (None = no limit)",
     )
 
     # EQC Configuration - Enterprise Query Center API settings
-    eqc_enabled: bool = Field(
-        default=True, description="Enable EQC API integration"
-    )
+    eqc_enabled: bool = Field(default=True, description="Enable EQC API integration")
 
     eqc_timeout: int = Field(
         default=30, description="EQC API request timeout in seconds"
@@ -159,12 +158,14 @@ class Settings(BaseSettings):
     )
 
     enrichment_export_unknowns: bool = Field(
-        default=True, description="Export unknown company names to CSV for manual review"
+        default=True,
+        description="Export unknown company names to CSV for manual review",
     )
 
     # Pipeline Framework Configuration - shared transformation pipeline settings
     annuity_pipeline_enabled: bool = Field(
-        default=True, description="Use shared pipeline framework for annuity performance processing"
+        default=True,
+        description="Use shared pipeline framework for annuity performance processing",
     )
 
     # Database configuration - nested settings with WDH_DATABASE__ prefix
@@ -173,7 +174,9 @@ class Settings(BaseSettings):
     database_user: str = Field(default="user", description="Database user")
     database_password: str = Field(default="password", description="Database password")
     database_db: str = Field(default="database", description="Database name")
-    database_uri: Optional[str] = Field(default=None, description="Complete database URI")
+    database_uri: Optional[str] = Field(
+        default=None, description="Complete database URI"
+    )
 
     def get_database_connection_string(self) -> str:
         """Get PostgreSQL connection string.

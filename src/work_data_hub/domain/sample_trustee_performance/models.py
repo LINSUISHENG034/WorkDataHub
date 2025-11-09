@@ -63,7 +63,9 @@ class TrusteePerformanceIn(BaseModel):
     净值: Optional[Union[Decimal, float, int, str]] = Field(
         None, description="Net asset value (净值)"
     )
-    规模: Optional[Union[Decimal, float, int, str]] = Field(None, description="Scale/size (规模)")
+    规模: Optional[Union[Decimal, float, int, str]] = Field(
+        None, description="Scale/size (规模)"
+    )
 
     # Metadata fields
     report_period: Optional[str] = Field(None, description="Report period string")
@@ -80,7 +82,9 @@ class TrusteePerformanceIn(BaseModel):
         v_str = str(v).strip()
 
         # Remove common non-numeric characters
-        v_str = v_str.replace("年", "").replace("月", "").replace("/", "").replace("-", "")
+        v_str = (
+            v_str.replace("年", "").replace("月", "").replace("/", "").replace("-", "")
+        )
 
         # Return cleaned string (will be validated later in transformation)
         return v_str if v_str else None
@@ -110,7 +114,9 @@ class TrusteePerformanceOut(BaseModel):
 
     # Required core fields
     report_date: date = Field(..., description="Report date (YYYY-MM-DD)")
-    plan_code: str = Field(..., min_length=1, max_length=50, description="Plan identifier code")
+    plan_code: str = Field(
+        ..., min_length=1, max_length=50, description="Plan identifier code"
+    )
     company_code: str = Field(
         ..., min_length=1, max_length=20, description="Company identifier code"
     )
@@ -135,7 +141,8 @@ class TrusteePerformanceOut(BaseModel):
     # Metadata and tracking fields
     data_source: str = Field(..., description="Source system or file")
     processed_at: datetime = Field(
-        default_factory=lambda: datetime.now(), description="Timestamp when record was processed"
+        default_factory=lambda: datetime.now(),
+        description="Timestamp when record was processed",
     )
 
     # Data quality indicators
@@ -144,7 +151,8 @@ class TrusteePerformanceOut(BaseModel):
     )
 
     validation_warnings: List[str] = Field(
-        default_factory=list, description="List of validation warnings (non-fatal issues)"
+        default_factory=list,
+        description="List of validation warnings (non-fatal issues)",
     )
 
     @field_validator("plan_code", "company_code", mode="after")
@@ -167,7 +175,9 @@ class TrusteePerformanceOut(BaseModel):
     @classmethod
     def clean_decimal_fields(cls, v, info: Any):
         """Clean decimal fields using the unified cleansing framework."""
-        from work_data_hub.cleansing.rules.numeric_rules import comprehensive_decimal_cleaning
+        from work_data_hub.cleansing.rules.numeric_rules import (
+            comprehensive_decimal_cleaning,
+        )
 
         # Field-specific precision configuration
         precision_config = {
@@ -192,7 +202,9 @@ class TrusteePerformanceOut(BaseModel):
 
             # Check date is not too old (more than 10 years)
             if (current_date - self.report_date).days > 3650:
-                self.validation_warnings.append(f"Report date is very old: {self.report_date}")
+                self.validation_warnings.append(
+                    f"Report date is very old: {self.report_date}"
+                )
 
         return self
 
