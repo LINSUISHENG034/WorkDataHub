@@ -8,8 +8,10 @@ dependencies = [
     "dagster",
     "dagster-webserver",
     "pandas",
-    "pydantic",
+    "pydantic>=2.11.7",
+    "structlog",
     "psycopg2-binary",
+    "alembic",
     "openpyxl",
     "PyYAML",
     "pydantic-settings>=2.10.1",
@@ -27,8 +29,10 @@ where = ["src"]
 [project.optional-dependencies]
 dev = [
     "pytest",
-    "ruff",
-    "mypy",
+    "pytest-cov",
+    "pytest-postgresql",
+    "ruff>=0.12.12",
+    "mypy>=1.17.1",
 ]
 
 [tool.ruff]
@@ -42,6 +46,8 @@ quote-style = "double"
 
 [tool.pytest.ini_options]
 markers = [
+    "unit: marks tests as fast unit tests with no external dependencies",
+    "integration: marks tests as integration tests with database or filesystem",
     "postgres: marks tests as requiring a PostgreSQL database (deselect with '-m \"not postgres\"')",
     "monthly_data: marks tests requiring reference/monthly data (opt-in)",
     "legacy_data: marks tests as requiring legacy sample data (opt-in)",
@@ -55,6 +61,7 @@ dev = [
     "pytest-asyncio>=1.2.0",
     "pytest-cov>=6.2.1",
     "ruff>=0.12.12",
+    "tomli>=2.0.0; python_version < '3.11'",
     "types-psycopg2>=2.9.21.20250809",
     "types-python-dateutil>=2.9.0.20250822",
     "types-pyyaml>=6.0.12.20250822",
