@@ -20,13 +20,24 @@ archive/
 .devcontainer/
 sample_data/
 bmad/
+.bmad/
+.bmad-ephemeral/
 .claude/
 .gemini/
 .github/
 docs/sprint*.md
 
-# env
+# Python Virtual Environments (Backend)
+# uv-managed environment
+backend/.venv/
+.venv/
 .uv-cache/
+.venv-linux/
+env/
+venv/
+test-results/
+fixtures/
+reference/
 
 # Python
 __pycache__/

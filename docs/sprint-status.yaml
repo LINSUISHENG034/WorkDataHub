@@ -39,7 +39,7 @@ development_status:
   epic-1: contexted
   1-1-project-structure-and-development-environment-setup: done
   1-2-basic-cicd-pipeline-setup: done
-  1-3-structured-logging-framework: backlog
+  1-3-structured-logging-framework: done
   1-4-configuration-management-framework: backlog
   1-5-shared-pipeline-framework-core-simple: backlog
   1-6-clean-architecture-boundaries-enforcement: backlog

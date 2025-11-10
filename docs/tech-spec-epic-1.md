@@ -1747,3 +1747,8 @@ _This specification provides the complete technical blueprint for Epic 1: Founda
 1. Obtain stakeholder approval on this tech spec
 2. Update sprint-status.yaml to mark epic-1 as "ready for implementation"
 3. Begin Story 1.1 implementation following AC-1.1.X criteria
+
+## Post-Review Follow-ups
+
+- **2025-11-10 – Story 1.3:** Dev Notes still need a concrete `.bind(domain="annuity", execution_id="exec_123")` example plus the resulting JSON payload so downstream teams can reuse the context binding guidance.
+- **2025-11-10 – Story 1.3:** Document the `LOG_LEVEL`, `LOG_TO_FILE`, and `LOG_FILE_DIR` settings (matching `work_data_hub.utils.logging`) in `.env.example` / developer docs so operational teams can enable file logging without reverse-engineering the module.
