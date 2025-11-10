@@ -210,7 +210,8 @@ class TestAC3_CoreDependencies:
 class TestAC4_EnvironmentConfiguration:
     """AC-4: Environment configuration template provided"""
 
-    REQUIRED_ENV_VARS = ["WDH_DATABASE", "WDH_LOG_LEVEL"]
+    # Story 1.4 introduced standardized configuration variables
+    REQUIRED_ENV_VARS = ["DATABASE_URL", "LOG_LEVEL", "ENVIRONMENT"]
 
     REQUIRED_GITIGNORE_PATTERNS = [
         ".env",

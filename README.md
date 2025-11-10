@@ -194,6 +194,88 @@ uv run ruff format src/
 uv run ruff format --check src/
 ```
 
+## Configuration
+
+WorkDataHub uses centralized configuration management powered by Pydantic Settings (Story 1.4). Configuration is loaded from environment variables with validation at startup to catch configuration errors early.
+
+### Required Environment Variables
+
+**DATABASE_URL** (required)
+- Database connection string
+- Format: `postgresql://username:password@host:port/database`
+- Example: `postgresql://wdh_user:changeme@localhost:5432/wdh`
+- **Production requirement**: Must be a PostgreSQL connection string (validated at startup)
+
+**ENVIRONMENT** (default: `dev`)
+- Deployment environment
+- Valid values: `dev`, `staging`, `prod`
+- Production environments enforce strict validation rules (e.g., PostgreSQL-only databases)
+
+### Optional Environment Variables
+
+**LOG_LEVEL** (default: `INFO`)
+- Logging level for structured logging framework (Story 1.3)
+- Valid values: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
+- Used by the structlog-based logging system
+
+**DAGSTER_HOME** (default: `~/.dagster`)
+- Dagster home directory for orchestration metadata and run storage
+
+**MAX_WORKERS** (default: `4`)
+- Maximum number of concurrent worker threads for data processing operations
+
+**DB_POOL_SIZE** (default: `10`)
+- Database connection pool size for PostgreSQL connections
+
+**DB_BATCH_SIZE** (default: `1000`)
+- Batch size for bulk database operations
+
+### Configuration Setup
+
+1. **Copy the environment template:**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Set required variables in `.env`:**
+   ```bash
+   # Minimum required configuration
+   DATABASE_URL=postgresql://user:password@localhost:5432/workdatahub
+   ENVIRONMENT=dev
+   ```
+
+3. **Optional: Customize logging and performance:**
+   ```bash
+   LOG_LEVEL=DEBUG
+   MAX_WORKERS=8
+   DB_POOL_SIZE=20
+   ```
+
+### Using Configuration in Code
+
+```python
+# Import the pre-instantiated singleton
+from work_data_hub.config import settings
+
+# Access configuration values
+database_url = settings.DATABASE_URL
+log_level = settings.LOG_LEVEL
+environment = settings.ENVIRONMENT
+
+# Configuration is loaded once and cached for performance
+# Multiple imports return the same instance
+```
+
+### Configuration Validation
+
+The configuration system validates settings at application startup:
+- Missing required fields (e.g., `DATABASE_URL`) raise `ValidationError` with clear error messages
+- Production environments (`ENVIRONMENT=prod`) enforce PostgreSQL URLs
+- Invalid environment values are rejected (must be `dev`, `staging`, or `prod`)
+- Type validation ensures integers for `MAX_WORKERS`, `DB_POOL_SIZE`, etc.
+
+**See `.env.example` for complete configuration options including legacy WDH_-prefixed settings.**
+
 ## CI/CD Workflow
 
 The GitHub Actions pipeline in `.github/workflows/ci.yml` enforces all Story 1.2 acceptance criteria:

@@ -7,7 +7,7 @@ This module provides centralized logging configuration with:
 - Context binding support
 - Dual output (stdout + optional file logging)
 
-Environment variables:
+Configuration is loaded from work_data_hub.config.settings:
 - LOG_LEVEL: Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL). Default: INFO
 - LOG_TO_FILE: Enable file logging (1, true, yes). Default: disabled
 - LOG_FILE_DIR: Directory for log files. Default: logs/
@@ -28,6 +28,8 @@ from typing import Any, Dict, MutableMapping
 
 import structlog
 from structlog.types import EventDict, Processor
+
+from work_data_hub.config import get_settings
 
 # Sensitive key patterns for sanitization
 SENSITIVE_PATTERNS = [
@@ -92,8 +94,23 @@ def sanitization_processor(
 
 
 def _get_log_level() -> int:
-    """Get log level from environment variable."""
-    level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+    """Get log level from settings.
+
+    Uses centralized configuration management (Story 1.4) to retrieve
+    the LOG_LEVEL setting instead of direct environment variable access.
+
+    Returns:
+        Logging level constant (e.g., logging.INFO, logging.DEBUG)
+    """
+    try:
+        # Try to get settings, which requires DATABASE_URL
+        settings_instance = get_settings()
+        level_name = settings_instance.LOG_LEVEL.upper()
+    except Exception:
+        # Fallback to environment variable if settings can't be loaded
+        # This allows logging to work even when DATABASE_URL isn't configured
+        level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+
     return getattr(logging, level_name, logging.INFO)
 
 

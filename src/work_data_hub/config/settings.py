@@ -9,9 +9,9 @@ environments while maintaining secure credential management.
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Determine project root for resolving .env by default
@@ -85,7 +85,52 @@ class Settings(BaseSettings):
 
     Environment variables are automatically loaded with the WDH_ prefix.
     For example, WDH_DATA_BASE_DIR will override the data_base_dir setting.
+
+    Story 1.4 Configuration Management fields (no prefix):
+    - DATABASE_URL (required): Database connection string
+    - ENVIRONMENT: Deployment environment (dev, staging, prod)
+    - LOG_LEVEL: Logging level (uppercase)
+    - DAGSTER_HOME: Dagster home directory
+    - MAX_WORKERS: Maximum worker threads (uppercase)
+    - DB_POOL_SIZE: Database connection pool size
+    - DB_BATCH_SIZE: Batch size for database operations
     """
+
+    # Story 1.4 required fields (no prefix, uppercase names)
+    DATABASE_URL: str = Field(
+        validation_alias="DATABASE_URL",
+        description="Database connection string (required for Story 1.4)",
+    )
+    ENVIRONMENT: Literal["dev", "staging", "prod"] = Field(
+        default="dev",
+        validation_alias="ENVIRONMENT",
+        description="Deployment environment",
+    )
+    LOG_LEVEL: str = Field(
+        default="INFO",
+        validation_alias="LOG_LEVEL",
+        description="Logging level (uppercase)",
+    )
+    DAGSTER_HOME: str = Field(
+        default="~/.dagster",
+        validation_alias="DAGSTER_HOME",
+        description="Dagster home directory",
+    )
+    MAX_WORKERS: int = Field(
+        default=4,
+        validation_alias="MAX_WORKERS",
+        description="Maximum worker threads (uppercase field name)",
+    )
+    DB_POOL_SIZE: int = Field(
+        default=10,
+        validation_alias="DB_POOL_SIZE",
+        description="Database connection pool size",
+    )
+    DB_BATCH_SIZE: int = Field(
+        default=1000,
+        validation_alias="DB_BATCH_SIZE",
+        description="Batch size for database operations",
+    )
 
     # Core application settings
     app_name: str = Field(default="WorkDataHub", description="Application name")
@@ -212,6 +257,32 @@ class Settings(BaseSettings):
             uri=self.database_uri,
         )
 
+    @model_validator(mode="after")
+    def validate_production_database_url(self) -> "Settings":
+        """Validate that production environment uses PostgreSQL.
+
+        In production environments, only PostgreSQL connections are allowed
+        to prevent accidental use of SQLite or other databases that may not
+        be suitable for production workloads.
+
+        Returns:
+            The validated Settings instance
+
+        Raises:
+            ValueError: If ENVIRONMENT is 'prod' and DATABASE_URL is not PostgreSQL
+        """
+        if self.ENVIRONMENT == "prod" and not self.DATABASE_URL.startswith(
+            "postgresql://"
+        ):
+            db_url_preview = self.DATABASE_URL[:20]
+            raise ValueError(
+                "Production environment requires PostgreSQL database. "
+                f"DATABASE_URL must start with 'postgresql://', "
+                f"got: {db_url_preview}..."
+            )
+
+        return self
+
     model_config = SettingsConfigDict(
         env_prefix="WDH_",
         env_file=str(SETTINGS_ENV_FILE),
@@ -233,7 +304,7 @@ def get_settings() -> Settings:
     Returns:
         Settings instance with loaded configuration
     """
-    return Settings()
+    return Settings()  # type: ignore[call-arg]
 
 
 def validate_data_directory(settings: Settings) -> bool:
