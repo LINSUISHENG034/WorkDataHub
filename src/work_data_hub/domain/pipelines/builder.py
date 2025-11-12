@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Union
 from .config import PipelineConfig, StepConfig
 from .core import Pipeline, TransformStep
 from .exceptions import PipelineAssemblyError
+from .types import DataFrameStep, RowTransformStep
 
 logger = logging.getLogger(__name__)
 
@@ -174,10 +175,10 @@ def _validate_transform_step_class(step_class: type, import_path: str) -> None:
             "(TransformStep interface)"
         )
 
-    if not hasattr(step_class, "apply"):
+    if not (hasattr(step_class, "apply") or hasattr(step_class, "execute")):
         raise PipelineAssemblyError(
-            f"Class '{import_path}' must have an 'apply' method "
-            "(TransformStep interface)"
+            f"Class '{import_path}' must implement either 'apply' "
+            "or 'execute' to satisfy the TransformStep protocols"
         )
 
     # Additional validation: try direct issubclass check, but don't fail if it
@@ -226,7 +227,7 @@ def _create_step_instance(step_config: StepConfig) -> TransformStep:
             step_instance = target(**step_config.options)
 
         # Validate the result implements TransformStep interface
-        if not hasattr(step_instance, "name") or not hasattr(step_instance, "apply"):
+        if not isinstance(step_instance, (RowTransformStep, DataFrameStep)):
             raise PipelineAssemblyError(
                 f"Step created from '{step_config.import_path}' does not implement "
                 f"TransformStep interface"

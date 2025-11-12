@@ -46,7 +46,7 @@ development_status:
   1-2-basic-cicd-pipeline-setup: done
   1-3-structured-logging-framework: done
   1-4-configuration-management-framework: done
-  1-5-shared-pipeline-framework-core-simple: backlog
+  1-5-shared-pipeline-framework-core-simple: done
   1-6-clean-architecture-boundaries-enforcement: backlog
   1-7-database-schema-management-framework: backlog
   1-8-postgresql-connection-and-transactional-loading-framework: backlog
@@ -103,3 +103,4 @@ development_status:
   6-3-parity-test-integration-in-ci-pipeline: backlog
   6-4-divergence-reporting-and-sql-diff-tool: backlog
   epic-6-retrospective: optional
+

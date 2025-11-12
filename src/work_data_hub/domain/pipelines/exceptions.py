@@ -26,6 +26,7 @@ class PipelineStepError(PipelineError):
         message: Error description
         step_name: Name of the step that failed
         row_index: Index of the row being processed when error occurred (optional)
+        step_index: Sequential index of the failing step (optional)
     """
 
     def __init__(
@@ -33,14 +34,18 @@ class PipelineStepError(PipelineError):
         message: str,
         step_name: Optional[str] = None,
         row_index: Optional[int] = None,
+        step_index: Optional[int] = None,
     ):
         self.step_name = step_name
         self.row_index = row_index
+        self.step_index = step_index
 
         # Build contextual error message
         context_parts = []
         if step_name:
             context_parts.append(f"step='{step_name}'")
+        if step_index is not None:
+            context_parts.append(f"step_index={step_index}")
         if row_index is not None:
             context_parts.append(f"row_index={row_index}")
 

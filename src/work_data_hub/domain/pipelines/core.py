@@ -1,181 +1,317 @@
 """
-Core pipeline execution framework.
+Core pipeline execution framework with dual DataFrame and row-level support.
 
-This module defines the abstract base classes and execution engine for
-the data transformation pipeline system, providing step orchestration,
-error handling, and metrics collection.
+Story 1.5 upgrades the executor to provide:
+- Structured execution context (`PipelineContext`)
+- Sequential `run()` processing for DataFrame and row steps
+- Fail-fast error wrapping with step index/name
+- Structlog instrumentation (`pipeline.*` events)
+- Comprehensive `PipelineResult` metrics and immutability guarantees
 """
 
-import logging
-import time
-from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from __future__ import annotations
+
+import uuid
+from datetime import datetime, timezone
+from typing import Any, List, MutableMapping, Optional, Sequence, Tuple, Union
+
+import pandas as pd
+
+from work_data_hub.utils.logging import get_logger
 
 from .config import PipelineConfig
 from .exceptions import PipelineStepError
-from .types import PipelineMetrics, PipelineResult, Row, StepResult
+from .types import (
+    DataFrameStep,
+    PipelineContext,
+    PipelineMetrics,
+    PipelineResult,
+    Row,
+    RowTransformStep,
+    StepMetrics,
+    StepResult,
+    TransformStep,
+)
 
-logger = logging.getLogger(__name__)
+ContextInput = Optional[Union[PipelineContext, MutableMapping[str, Any]]]
 
-
-class TransformStep(ABC):
-    """
-    Abstract base class for pipeline transformation steps.
-
-    All pipeline steps must inherit from this class and implement the apply method
-    to perform data transformations on individual rows.
-    """
-
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Return the unique name of this transformation step."""
-        pass
-
-    @abstractmethod
-    def apply(self, row: Row, context: Dict) -> StepResult:
-        """
-        Apply this transformation step to a data row.
-
-        Args:
-            row: Input data row to transform
-            context: Execution context and shared state
-
-        Returns:
-            StepResult containing transformed row and metadata
-
-        Raises:
-            Exception: May raise any exception for step-specific errors
-        """
-        pass
+logger = get_logger(__name__)
 
 
 class Pipeline:
     """
     Data transformation pipeline executor.
 
-    Orchestrates the execution of transformation steps in sequence,
-    collecting metrics and handling errors according to configuration.
+    Supports both DataFrame-based steps (`DataFrameStep`) and row-level steps
+    (`RowTransformStep`) while emitting structured logs and metrics.
     """
 
     def __init__(self, steps: List[TransformStep], config: PipelineConfig):
-        """
-        Initialize pipeline with steps and configuration.
-
-        Args:
-            steps: List of transformation steps to execute in order
-            config: Pipeline configuration including error handling behavior
-        """
         self.steps = steps
         self.config = config
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger.bind(pipeline=config.name)
 
-        # Validate steps match configuration
         if len(steps) != len(config.steps):
-            logger.warning(
-                f"Step count mismatch: pipeline has {len(steps)} steps, "
-                f"config defines {len(config.steps)} steps"
+            self.logger.warning(
+                "pipeline.step_mismatch",
+                configured=len(config.steps),
+                provided=len(steps),
             )
 
-    def execute(self, row: Row, context: Optional[Dict] = None) -> PipelineResult:
+    def add_step(self, step: TransformStep) -> None:
+        """Append a transformation step at runtime (builder-style API)."""
+        self.steps.append(step)
+
+    def run(
+        self,
+        initial_data: pd.DataFrame,
+        context: Optional[PipelineContext] = None,
+    ) -> PipelineResult:
         """
-        Execute the complete pipeline on a single data row.
+        Execute the pipeline over a DataFrame and return the aggregated result.
 
         Args:
-            row: Input data row to transform
-            context: Optional execution context for sharing state between steps
-
-        Returns:
-            PipelineResult with transformed row, errors, warnings, and metrics
+            initial_data: Input DataFrame (copied internally to stay immutable)
+            context: Optional PipelineContext (auto-generated when omitted)
 
         Raises:
-            PipelineStepError: If stop_on_error=True and a step fails
+            PipelineStepError: When a step fails and stop_on_error is True
         """
-        if context is None:
-            context = {}
+        pipeline_context = context or self._build_context()
+        current_df = initial_data.copy(deep=True)
 
-        start_time = time.perf_counter()
-        executed_steps = []
-        all_warnings = []
-        all_errors = []
+        step_metrics: List[StepMetrics] = []
+        warnings: List[str] = []
+        errors: List[str] = []
 
-        # CRITICAL: Work with copy to avoid side effects
-        current_row = {**row}
-
-        self.logger.debug(
-            "Starting pipeline execution",
-            extra={"pipeline": self.config.name, "steps": len(self.steps)},
+        start_time = datetime.now(timezone.utc)
+        self.logger.info(
+            "pipeline.started",
+            execution_id=pipeline_context.execution_id,
+            rows=len(current_df),
         )
 
-        for step in self.steps:
-            step_start_time = time.perf_counter()
+        for index, step in enumerate(self.steps):
+            step_df, step_warnings, step_errors, metrics = self._run_step(
+                index, step, current_df, pipeline_context
+            )
+            current_df = step_df
+            warnings.extend(step_warnings)
+            errors.extend(step_errors)
+            step_metrics.append(metrics)
 
-            try:
-                self.logger.debug(f"Executing step: {step.name}")
-
-                # Apply transformation step
-                result = step.apply(current_row, context)
-
-                # CRITICAL: Always copy to prevent side effects
-                current_row = {**result.row}
-                all_warnings.extend(result.warnings)
-                all_errors.extend(result.errors)
-                executed_steps.append(step.name)
-
-                step_duration = int((time.perf_counter() - step_start_time) * 1000)
-                self.logger.debug(
-                    f"Step completed: {step.name}",
-                    extra={
-                        "step": step.name,
-                        "duration_ms": step_duration,
-                        "warnings": len(result.warnings),
-                        "errors": len(result.errors),
-                    },
+            if step_errors and self.config.stop_on_error:
+                # Fail-fast after recording the error in metrics/logs
+                raise PipelineStepError(
+                    step_errors[0],
+                    step_name=step.name,
+                    step_index=index,
                 )
 
-                # Handle stop_on_error configuration
-                if result.errors and self.config.stop_on_error:
-                    error_msg = f"Step '{step.name}' failed: {result.errors[0]}"
-                    self.logger.error(error_msg)
-                    raise PipelineStepError(error_msg, step_name=step.name)
+        total_duration_ms = int(
+        (
+                datetime.now(timezone.utc) - start_time
+            ).total_seconds()
+            * 1000
+        )
 
-            except Exception as e:
-                step_duration = int((time.perf_counter() - step_start_time) * 1000)
-                error_msg = f"Step '{step.name}' execution failed: {e}"
-
-                self.logger.error(
-                    error_msg,
-                    extra={
-                        "step": step.name,
-                        "duration_ms": step_duration,
-                        "error": str(e),
-                    },
-                )
-
-                # Handle error according to configuration
-                if self.config.stop_on_error:
-                    raise PipelineStepError(error_msg, step_name=step.name)
-                else:
-                    # In non-stop mode, record error and continue
-                    all_errors.append(error_msg)
-
-        # Calculate total execution time
-        duration_ms = int((time.perf_counter() - start_time) * 1000)
         metrics = PipelineMetrics(
-            executed_steps=executed_steps, duration_ms=duration_ms
+            executed_steps=[metric.name for metric in step_metrics],
+            duration_ms=total_duration_ms,
+            step_details=step_metrics,
         )
+
+        success = len(errors) == 0
+        result_df = current_df.copy(deep=True)
+        first_row: Optional[Row] = None
+        if not result_df.empty and len(result_df.index) == 1:
+            first_row = result_df.iloc[0].to_dict()
 
         self.logger.info(
-            "Pipeline execution completed",
-            extra={
-                "pipeline": self.config.name,
-                "duration_ms": duration_ms,
-                "executed_steps": len(executed_steps),
-                "total_warnings": len(all_warnings),
-                "total_errors": len(all_errors),
-            },
+            "pipeline.completed",
+            execution_id=pipeline_context.execution_id,
+            success=success,
+            duration_ms=total_duration_ms,
+            warnings=len(warnings),
+            errors=len(errors),
         )
 
         return PipelineResult(
-            row=current_row, warnings=all_warnings, errors=all_errors, metrics=metrics
+            success=success,
+            output_data=result_df,
+            warnings=warnings,
+            errors=errors,
+            metrics=metrics,
+            context=pipeline_context,
+            row=first_row,
         )
+
+    def execute(
+        self,
+        row: Row,
+        context: ContextInput = None,
+    ) -> PipelineResult:
+        """
+        Backwards-compatible single-row execution helper.
+
+        Converts the row into a single-row DataFrame, runs the pipeline,
+        and returns the resulting PipelineResult with `.row` populated.
+        """
+        dataframe = pd.DataFrame([row])
+        pipeline_context = self._ensure_context(context)
+        result = self.run(dataframe, pipeline_context)
+
+        if result.row is None and not result.output_data.empty:
+            result.row = result.output_data.iloc[0].to_dict()
+
+        return result
+
+    # --------------------------------------------------------------------- #
+    # Internal helpers
+    # --------------------------------------------------------------------- #
+
+    def _ensure_context(self, context: ContextInput) -> PipelineContext:
+        if isinstance(context, PipelineContext):
+            return context
+        return self._build_context(context)
+
+    def _build_context(
+        self, seed: Optional[MutableMapping[str, Any]] = None
+    ) -> PipelineContext:
+        seed = seed or {}
+        execution_id = seed.get("execution_id") or str(uuid.uuid4())
+        timestamp = seed.get("timestamp")
+        if not isinstance(timestamp, datetime):
+            timestamp = datetime.now(timezone.utc)
+
+        metadata = dict(seed.get("metadata", {}))
+        for k, v in seed.items():
+            if k not in {"execution_id", "timestamp", "metadata"}:
+                metadata.setdefault(k, v)
+
+        return PipelineContext(
+            pipeline_name=self.config.name,
+            execution_id=execution_id,
+            timestamp=timestamp,
+            config=self.config.model_dump(),
+            metadata=metadata,
+        )
+
+    def _run_step(
+        self,
+        step_index: int,
+        step: TransformStep,
+        current_df: pd.DataFrame,
+        context: PipelineContext,
+    ) -> Tuple[pd.DataFrame, List[str], List[str], StepMetrics]:
+        self.logger.info(
+            "pipeline.step.started",
+            step=step.name,
+            step_index=step_index,
+            rows=len(current_df),
+        )
+
+        step_start = datetime.now(timezone.utc)
+        warnings: List[str] = []
+        errors: List[str] = []
+
+        try:
+            if isinstance(step, DataFrameStep):
+                result_df = step.execute(current_df.copy(deep=True), context)
+                if not isinstance(result_df, pd.DataFrame):
+                    raise PipelineStepError(
+                        "DataFrameStep.execute must return a pandas DataFrame",
+                        step_name=step.name,
+                        step_index=step_index,
+                    )
+
+                updated_df = result_df.copy(deep=True)
+                rows_processed = len(updated_df)
+
+            elif isinstance(step, RowTransformStep):
+                updated_df, warnings, errors = self._execute_row_step(
+                    step, current_df, context, step_index
+                )
+                rows_processed = len(current_df)
+
+            else:
+                raise PipelineStepError(
+                    "Step must implement DataFrameStep or RowTransformStep protocols",
+                    step_name=getattr(step, "name", "unknown"),
+                    step_index=step_index,
+                )
+
+        except PipelineStepError:
+            raise
+        except Exception as exc:  # pragma: no cover - defensive logging
+            raise PipelineStepError(
+                f"Step execution failed: {exc}",
+                step_name=getattr(step, "name", "unknown"),
+                step_index=step_index,
+            ) from exc
+
+        duration_ms = int(
+            (datetime.now(timezone.utc) - step_start).total_seconds() * 1000
+        )
+
+        self.logger.info(
+            "pipeline.step.completed",
+            step=step.name,
+            step_index=step_index,
+            duration_ms=duration_ms,
+            warnings=len(warnings),
+            errors=len(errors),
+        )
+
+        metrics = StepMetrics(
+            name=step.name,
+            duration_ms=duration_ms,
+            rows_processed=rows_processed,
+        )
+        return updated_df, warnings, errors, metrics
+
+    def _execute_row_step(
+        self,
+        step: RowTransformStep,
+        dataframe: pd.DataFrame,
+        context: PipelineContext,
+        step_index: int,
+    ) -> Tuple[pd.DataFrame, List[str], List[str]]:
+        transformed_rows: List[Row] = []
+        warnings: List[str] = []
+        errors: List[str] = []
+
+        for row_position, (_, row_series) in enumerate(dataframe.iterrows()):
+            row_dict: Row = row_series.to_dict()
+            try:
+                result: StepResult = step.apply(row_dict, context)
+            except Exception as exc:
+                raise PipelineStepError(
+                    f"Row-level transform failed: {exc}",
+                    step_name=step.name,
+                    step_index=step_index,
+                    row_index=row_position,
+                ) from exc
+
+            transformed_rows.append(result.row)
+            warnings.extend(result.warnings)
+            errors.extend(result.errors)
+
+            if result.errors and self.config.stop_on_error:
+                error_message = (
+                    result.errors[0]
+                    if isinstance(result.errors, Sequence) and result.errors
+                    else "Row-level step reported errors"
+                )
+                raise PipelineStepError(
+                    error_message,
+                    step_name=step.name,
+                    step_index=step_index,
+                    row_index=row_position,
+                )
+
+        updated_df = pd.DataFrame(transformed_rows)
+        return updated_df, warnings, errors
+
+
+__all__ = ["Pipeline", "TransformStep"]
