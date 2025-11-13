@@ -389,7 +389,7 @@ outer layers, so a clean lint run is proof that Story 1.6 dependency rules hol
 
 ## Project Status
 
-This project is under active development. See `docs/sprint-status.yaml` for current progress across all epics and stories.
+This project is under active development. See `docs/sprint-artifacts/sprint-status.yaml` for current progress across all epics and stories.
 
 ## License
 

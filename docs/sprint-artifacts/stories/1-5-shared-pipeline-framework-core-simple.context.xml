@@ -1,0 +1,258 @@
+<story-context id="{bmad_folder}/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.5</storyId>
+    <title>Shared Pipeline Framework Core (Simple)</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-11T00:09:07Z</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>.bmad-ephemeral/stories/1-5-shared-pipeline-framework-core-simple.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>As a data engineer</asA>
+    <iWant>I want a simple, synchronous pipeline execution framework</iWant>
+    <soThat>So that I can chain transformation steps without unnecessary orchestration complexity and prove the pattern before adding advanced features</soThat>
+    <tasks>Task 1 — Define pipeline contracts and types (AC 1,3)
+  Subtask 1.1: Create or extend src/work_data_hub/domain/pipelines/types.py with PipelineContext, PipelineResult, StepResult, and TransformStep/DataFrameStep/RowTransformStep protocols.
+  Subtask 1.2: Fully type annotate the dataclasses, include metrics/error collections, and align with mypy strict expectations from PRD FR-3.1.
+Task 2 — Implement sequential pipeline executor (AC 2,4,7)
+  Subtask 2.1: Implement Pipeline in src/work_data_hub/domain/pipelines/core.py with add_step() builder semantics and run() that copies DataFrames between steps.
+  Subtask 2.2: Add fail-fast exception handling to wrap errors with step index and class/name while preserving the original stack and returning PipelineResult summaries.
+Task 3 — Support row-level transforms plus metrics/logging (AC 3,5)
+  Subtask 3.1: Detect row-level steps, iterate rows safely, capture warnings/errors per Decision #3, and keep updates immutable.
+  Subtask 3.2: Emit structlog events (pipeline.started/step.started/step.completed/pipeline.completed) and aggregate per-step metrics tied to PipelineResult.
+Task 4 — Provide reference pipeline and docs (AC 6)
+  Subtask 4.1: Build illustrative add-column, filter, and aggregate steps plus documentation that demonstrates chaining semantics for downstream consumers.
+Task 5 — Create comprehensive unit tests (AC 8)
+  Subtask 5.1: Add pytest module tests/unit/domain/pipelines/test_core.py covering DataFrame-only, row-only, and mixed pipelines.
+  Subtask 5.2: Reuse Story 1.4 monkeypatch + get_settings.cache_clear() patterns to isolate config-dependent behavior.
+  Subtask 5.3: Write test_pipeline_contracts_ac1 validating dataclass fields and protocol behaviors (AC 1).
+  Subtask 5.4: Write test_pipeline_executor_ac2 asserting sequential add_step/run semantics and immutable hand-offs (AC 2).
+  Subtask 5.5: Write test_row_step_support_ac3 covering row-level iteration plus warning capture (AC 3).
+  Subtask 5.6: Write test_fail_fast_errors_ac4 verifying error wrapping includes step index/name (AC 4).
+  Subtask 5.7: Write test_pipeline_metrics_logging_ac5 validating structlog hooks and metrics aggregation (AC 5).
+  Subtask 5.8: Write test_reference_pipeline_ac6 demonstrating the sample pipeline chain (AC 6).
+  Subtask 5.9: Write test_pipeline_result_payload_ac7 checking success/error payload contents (AC 7).
+  Subtask 5.10: Write test_pipeline_task_matrix_ac8 ensuring every acceptance criterion is covered (AC 8).</tasks>
+  </story>
+
+  <acceptanceCriteria>1. **Pipeline Contracts Defined** – `TransformStep` protocol plus `PipelineContext`, `PipelineResult`, and `StepResult` dataclasses exist with required fields (`pipeline_name`, `execution_id`, `timestamp`, `config`, metrics, errors) so every step receives consistent metadata.  
+   [Source: docs/epics.md#story-15-shared-pipeline-framework-core-simple]  
+   [Source: docs/tech-spec-epic-1.md#story-15-basic-pipeline-framework]
+2. **Sequential Pipeline Executor** – `Pipeline` class in `domain/pipelines/core.py` exposes `add_step()` (builder) and `run(initial_data)` methods that execute each step synchronously, copying inputs to preserve immutability, and returning updated DataFrames between steps.  
+   [Source: docs/epics.md#story-15-shared-pipeline-framework-core-simple]
+3. **Dual Step Support** – Executor recognizes both DataFrame-oriented steps (`execute(df, context) -&gt; DataFrame`) and row-level steps that iterate through rows, apply transformations, and collect warnings/errors per Decision #3.  
+   [Source: docs/tech-spec-epic-1.md#story-15-basic-pipeline-framework]  
+   [Source: docs/architecture.md#decision-3-hybrid-pipeline-step-protocol]
+4. **Fail-Fast Error Handling** – When any step raises an exception, pipeline halts immediately and surfaces a descriptive error message containing step index, step class/name, and original exception details (no retries/optional branches yet).  
+   [Source: docs/epics.md#story-15-shared-pipeline-framework-core-simple]
+5. **Metrics &amp; Logging** – Execution captures start/end timestamps, step durations/counts, and emits structlog events (`pipeline.started`, `pipeline.step.started/completed`, `pipeline.completed`) wired to the Story 1.3 logger + Story 1.4 settings.  
+   [Source: docs/tech-spec-epic-1.md#story-15-basic-pipeline-framework]  
+   [Source: docs/PRD.md#fr-3-1-pipeline-framework-execution]
+6. **Sample Pipeline Demonstration** – Reference implementation (e.g., add column → filter rows → aggregate) proves chaining semantics and immutability; documentation highlights the pattern for downstream stories.  
+   [Source: docs/epics.md#story-15-shared-pipeline-framework-core-simple]
+7. **PipelineResult Returned** – Successful runs produce `PipelineResult(success=True, output_data=df, metrics={...}, errors=[])`; failures return `success=False` with populated `errors`.  
+   [Source: docs/epics.md#story-15-shared-pipeline-framework-core-simple]
+8. **Unit Tests Cover Scenarios** – Pytest suite validates DataFrame-only, row-only, and mixed pipelines; asserts ordering, metrics, and logging hooks; uses monkeypatch + cache clearing patterns from Story 1.4.  
+   [Source: docs/tech-spec-epic-1.md#story-15-basic-pipeline-framework]  
+   [Source: stories/1-4-configuration-management-framework.md#Testing-Standards-Summary]</acceptanceCriteria>
+
+  <artifacts>
+    <docs>  <doc>
+    <path>docs/epics.md</path>
+    <title>WorkDataHub - Epic Breakdown</title>
+    <section>Story 1.5: Shared Pipeline Framework Core (Simple)</section>
+    <snippet>Defines the TransformStep protocol signature, PipelineContext fields, sequential Pipeline.add_step()/run() behavior, fail-fast error handling, and metric logging requirements for the simple pipeline executor.</snippet>
+  </doc>
+  <doc>
+    <path>docs/tech-spec-epic-1.md</path>
+    <title>Tech Spec – Epic 1</title>
+    <section>Story 1.5: Basic Pipeline Framework</section>
+    <snippet>Acceptance checks AC-1.5.1 through AC-1.5.8 confirm DataFrameStep/RowTransformStep protocols, PipelineResult/StepResult dataclasses, builder-style Pipeline class, structlog events (`pipeline.started`, `pipeline.step.*`, `pipeline.completed`), and unit tests for mixed step execution.</snippet>
+  </doc>
+  <doc>
+    <path>docs/PRD.md</path>
+    <title>Product Requirements Document</title>
+    <section>FR-3.1: Pipeline Framework Execution</section>
+    <snippet>Requires pipelines to execute ordered TransformStep lists, keep rows immutable (`current_row = {**row}`), support stop_on_error fail-fast handling, and capture per-step duration plus total execution metrics.</snippet>
+  </doc>
+  <doc>
+    <path>docs/architecture.md</path>
+    <title>Architecture Decision Log</title>
+    <section>Decision #3: Hybrid Pipeline Step Protocol</section>
+    <snippet>Explains why both DataFrameStep.execute(df, context) and RowTransformStep.apply(row, context) protocols exist, including sample class definitions and how Pipeline.run routes bulk vs. row-level steps.</snippet>
+  </doc>
+  <doc>
+    <path>.bmad-ephemeral/stories/1-4-configuration-management-framework.md</path>
+    <title>Story 1.4 Record</title>
+    <section>Testing Standards Summary</section>
+    <snippet>Establishes CI guardrails: unit tests via `uv run pytest -m unit`, mypy --strict, Ruff lint/format, and monkeypatch + get_settings.cache_clear() patterns for isolating configuration state in new suites.</snippet>
+  </doc></docs>
+    <code>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/core.py</path>
+        <kind>domain module</kind>
+        <symbol>TransformStep.apply</symbol>
+        <lines>21-50</lines>
+        <reason>Current row-level step contract; needs DataFrameStep/PipelineContext support to satisfy AC-1 and AC-3.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/core.py</path>
+        <kind>domain module</kind>
+        <symbol>Pipeline.execute</symbol>
+        <lines>80-181</lines>
+        <reason>Sequential executor clones rows, enforces stop_on_error, and logs metrics—baseline to extend with DataFrame-aware run() behavior and richer PipelineResult (AC-2/4/5/7).</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/builder.py</path>
+        <kind>builder</kind>
+        <symbol>PipelineBuilder.add_step / with_config / build</symbol>
+        <lines>19-79</lines>
+        <reason>Fluent API already implements add_step() and build() semantics referenced in AC-2; must stay aligned with new step interfaces.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/config.py</path>
+        <kind>config model</kind>
+        <symbol>PipelineConfig</symbol>
+        <lines>68-118</lines>
+        <reason>Defines pipeline metadata, ordered StepConfig list, and stop_on_error default True—drives fail-fast behavior in AC-4 and allows explicit overrides.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/adapters.py</path>
+        <kind>transform adapter</kind>
+        <symbol>CleansingRuleStep.apply</symbol>
+        <lines>108-198</lines>
+        <reason>Existing TransformStep implementation returning StepResult with warnings/errors; can be reused for the sample pipeline demonstrating dual step support (AC-3/6).</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/pipeline_steps.py</path>
+        <kind>pipeline factory</kind>
+        <symbol>build_annuity_pipeline</symbol>
+        <lines>661-758</lines>
+        <reason>Factory assembles nine sequential steps plus PipelineConfig, serving as today’s reference pipeline demo required by AC-6.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/types.py</path>
+        <kind>domain types</kind>
+        <symbol>StepResult / PipelineResult</symbol>
+        <lines>1-70</lines>
+        <reason>Defines the dataclasses referenced in AC-1/5/7; current implementation still lacks PipelineContext field coverage for immutability + metrics.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/utils/logging.py</path>
+        <kind>utility module</kind>
+        <symbol>get_logger / _configure_structlog</symbol>
+        <lines>1-160</lines>
+        <reason>Story 1.3 logger used by pipeline.started/step.completed events; needed for testing the structlog hooks in AC-5 and enforcing Decision #8.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/e2e/test_pipeline_vs_legacy.py</path>
+        <kind>integration test</kind>
+        <symbol>process_with_pipeline</symbol>
+        <lines>138-201</lines>
+        <reason>Feeds real Excel data through pipeline.execute() and compares against golden baseline, validating PipelineResult structure and determinism (AC-6/7/8).</reason>
+      </artifact>
+      <artifact>
+        <path>tests/unit</path>
+        <kind>test suite</kind>
+        <symbol>pytest -m unit</symbol>
+        <lines>n/a</lines>
+        <reason>CI gate for Story 1.5: ensures new unit tests covering DataFrame vs row steps, fail-fast errors, and metrics/logging run under `uv run pytest -m unit`.</reason>
+      </artifact>
+</code>
+    <dependencies>
+      <python>
+        <package name="pandas" version="pyproject.toml:[project].dependencies">
+          <reason>Provides vectorized DataFrame operations and copy-on-write semantics required for DataFrameStep execution and sample pipeline chaining.</reason>
+        </package>
+        <package name="numpy" version="pyproject.toml:[project].dependencies">
+          <reason>Backs pandas operations and ensures per-step metrics can handle large arrays efficiently during transformations.</reason>
+        </package>
+        <package name="pydantic" version="&gt;=2.11.7 (pyproject.toml)">
+          <reason>Used by PipelineConfig/StepConfig models plus centralized Settings; underpins strict validation for Story 1.5 contracts.</reason>
+        </package>
+        <package name="pydantic-settings" version="&gt;=2.10.1 (pyproject.toml)">
+          <reason>Feeds Story 1.4 configuration singleton (annuity_pipeline_enabled toggle, LOG_LEVEL) that pipelines rely on.</reason>
+        </package>
+        <package name="structlog" version="pyproject.toml:[project].dependencies">
+          <reason>Story 1.3 logging framework used by Pipeline.execute to emit pipeline.started/step.completed events.</reason>
+        </package>
+        <package name="psycopg2-binary" version="pyproject.toml:[project].dependencies">
+          <reason>Persistence layer for pipelines; ensures fail-fast execution can bubble up errors that ultimately roll back transactions (Stories 1.7/1.8 context).</reason>
+        </package>
+        <package name="alembic" version="pyproject.toml:[project].dependencies">
+          <reason>Database schema migration tool that Story 1.5 outputs must respect when writing PipelineResult data downstream.</reason>
+        </package>
+        <package name="dagster" version="pyproject.toml:[project].dependencies">
+          <reason>Future orchestration layer (Story 1.9) that will call the story context pipeline APIs; keep compatibility in mind.</reason>
+        </package>
+      </python>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Dual DataFrame/row protocols from Decision #3 must be honored so heavy transforms use DataFrameStep while validation-heavy logic uses RowTransformStep (docs/architecture.md#decision-3-hybrid-pipeline-step-protocol).
+    - Each step must copy incoming rows before mutation to preserve immutability and satisfy FR-3.1 (src/work_data_hub/domain/pipelines/core.py:102-121).
+    - Pipeline logging has to feed structlog with sanitization via utils.logging.get_logger to meet Decision #8 / Story 1.3 (src/work_data_hub/utils/logging.py:1-130).
+    - stop_on_error defaults to True and implements fail-fast semantics unless a PipelineConfig explicitly overrides it (src/work_data_hub/domain/pipelines/config.py:81-118, docs/epics.md#story-15-shared-pipeline-framework-core-simple).
+    - CI expectations from Story 1.4 require `uv run pytest -m unit`, mypy --strict, Ruff lint/format, and monkeypatch + get_settings.cache_clear() isolation (.bmad-ephemeral/stories/1-4-configuration-management-framework.md#Testing-Standards-Summary).
+    - Domain modules must reuse centralized settings toggles (e.g., annuity_pipeline_enabled) rather than reading env vars directly to keep Clean Architecture boundaries intact (src/work_data_hub/config/settings.py:210-230, docs/epics.md#story-1-6-clean-architecture-boundaries-enforcement).
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>TransformStep</name>
+      <kind>abstract base class</kind>
+      <signature>class TransformStep(ABC):
+    @property
+    def name(self) -> str: ...
+
+    @abstractmethod
+    def apply(self, row: Row, context: Dict) -> StepResult: ...</signature>
+      <path>src/work_data_hub/domain/pipelines/core.py:21</path>
+    </interface>
+    <interface>
+      <name>Pipeline.execute</name>
+      <kind>executor method</kind>
+      <signature>def execute(self, row: Row, context: Optional[Dict] = None) -> PipelineResult</signature>
+      <path>src/work_data_hub/domain/pipelines/core.py:80</path>
+    </interface>
+    <interface>
+      <name>PipelineBuilder</name>
+      <kind>builder API</kind>
+      <signature>class PipelineBuilder:
+    def add_step(self, step: TransformStep) -> PipelineBuilder
+    def with_config(self, config: PipelineConfig) -> PipelineBuilder
+    def build(self) -> Pipeline</signature>
+      <path>src/work_data_hub/domain/pipelines/builder.py:19</path>
+    </interface>
+    <interface>
+      <name>PipelineConfig</name>
+      <kind>Pydantic model</kind>
+      <signature>class PipelineConfig(BaseModel):
+    name: str
+    steps: list[StepConfig]
+    stop_on_error: bool = True</signature>
+      <path>src/work_data_hub/domain/pipelines/config.py:68</path>
+    </interface>
+    <interface>
+      <name>CleansingRuleStep.from_registry</name>
+      <kind>factory method</kind>
+      <signature>@classmethod
+def from_registry(cls, rule_name: str, target_fields: Optional[list[str]] = None, step_name: Optional[str] = None, **options) -> "CleansingRuleStep"</signature>
+      <path>src/work_data_hub/domain/pipelines/adapters.py:66</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Execute `uv run pytest -m unit` (Story 1.2) with every new suite marked `@pytest.mark.unit`; isolate config/logging side effects using `monkeypatch` + `get_settings.cache_clear()` per Story 1.4; enforce strict static checks via `uv run mypy --strict src/` and `uv run ruff check &amp;&amp; uv run ruff format --check` before promotion; DataFrame + row-step pipelines both need metric/logging assertions aligned with structlog Decision #8.</standards>
+    <locations>- tests/unit/domain/pipelines/test_core.py (new unit coverage for contracts, executor, error handling)
+- tests/e2e/test_pipeline_vs_legacy.py (baseline parity + integration of PipelineResult)
+- tests/unit/utils/test_logging.py (reuse for verifying structlog hooks referenced by AC-5)</locations>
+    <ideas>1. AC-1 contract suite: instantiate TransformStep/DataFrameStep mocks and assert PipelineResult + StepResult metadata surfaces pipeline_name/execution_id timestamps.
+2. AC-2/4 execution: simulate failing third step to ensure stop_on_error raises PipelineStepError with step index/name while preceding steps logged.
+3. AC-3 dual-mode: run pipeline with one DataFrameStep followed by RowTransformStep capturing warnings/errors, verifying copy-on-write behavior.
+4. AC-5 logging metrics: patch structlog logger, execute pipeline, and assert emitted events (`pipeline.started`, `pipeline.step.completed`) include duration + step counts.
+5. AC-6 reference pipeline: build simple add/filter/aggregate steps, assert immutability and final DataFrame matches expectations; compare to e2e parity harness for regression safety.
+6. AC-7/8: parameterize success vs failure to ensure PipelineResult.success flags and aggregated errors/warnings align with each acceptance criterion mapping.</ideas>
+  </tests>
+</story-context>

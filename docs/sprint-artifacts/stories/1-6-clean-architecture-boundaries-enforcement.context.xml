@@ -1,0 +1,291 @@
+<story-context id="{bmad_folder}/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.6</storyId>
+    <title>Clean Architecture Boundaries Enforcement</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-13</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>.bmad-ephemeral/stories/1-6-clean-architecture-boundaries-enforcement.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a data engineer</asA>
+    <iWant>strict separation between domain, I/O, and orchestration layers</iWant>
+    <soThat>business logic stays testable, maintainable, and ready for downstream epics</soThat>
+    <tasks>
+- Task 1: Scaffold Clean Architecture placeholders (AC: 1,5)
+  - Subtask 1.1: Update `domain/__init__.py` with boundary docstring and references to Story 1.5 assets
+  - Subtask 1.2: Add placeholder modules for `io/readers/excel_reader.py`, `io/loader/warehouse_loader.py`, `io/connectors/file_connector.py` describing responsibilities + inward-only imports
+  - Subtask 1.3: Create orchestration stubs (`jobs.py`, `ops.py`, `schedules.py`, `sensors.py`) referencing Dagster integration points and DI expectations
+
+- Task 2: Document architecture boundaries (AC: 2)
+  - Subtask 2.1: Add architecture diagram/section to README or new doc covering domain/io/orchestration responsibilities plus medallion mapping
+  - Subtask 2.2: Cross-link Story 1.5 pipeline components and highlight how future stories should reference them
+
+- Task 3: Enforce dependency guardrails (AC: 3)
+  - Subtask 3.1: Configure lint/mypy (e.g., ruff rule or script) to fail if `domain/` imports `io/` or `orchestration/`
+  - Subtask 3.2: Document how to run the guard (CI + local command) in README/CONTRIBUTING
+
+- Task 4: Publish DI example (AC: 4,5)
+  - Subtask 4.1: Add the `transform_annuity_data` example (or similar) showing orchestration injecting an I/O service into domain logic
+  - Subtask 4.2: Reference Story 1.5 pipeline modules as the consumer of injected services to reinforce reuse
+
+- Task 5: Validate + communicate (AC: 2,3,5)
+  - Subtask 5.1: Run `uv run ruff check` (or custom script) to prove the guard works and include output snippet in Dev Notes
+  - Subtask 5.2: Update this story's References section with citations for all new files/docs
+</tasks>
+  </story>
+
+  <acceptanceCriteria>
+1. **Architecture Boundaries Documented** – README or `docs/architecture-boundaries.md` explains domain/io/orchestration responsibilities, medallion alignment, and dependency flow (domain ← io ← orchestration) with a supporting diagram/table.
+
+2. **Placeholder Modules Created** – `domain/__init__.py`, `io/readers/excel_reader.py`, `io/loader/warehouse_loader.py`, `io/connectors/file_connector.py`, and `orchestration/{jobs,ops,schedules,sensors}.py` exist with docstrings describing responsibilities and referencing Story 1.5 assets.
+
+3. **Dependency Guardrails Enforced** – Automated lint/mypy check fails if `domain/` imports `io/` or `orchestration/`, with instructions for running the guard locally/CI (e.g., `uv run ruff check`).
+
+4. **Dependency Injection Example Published** – Story documents a concrete snippet (transform function + injected services) demonstrating how orchestration passes I/O dependencies into domain logic.
+
+5. **Cross-Story References Captured** – Story explicitly cites Story 1.5 pipeline/structlog assets so future work reuses them rather than recreating infrastructure.
+</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>WorkDataHub - Product Requirements Document</title>
+        <section>Code Organization: Clean Architecture (§396-447)</section>
+        <snippet>Adopts Clean Architecture with strict separation of concerns using Bronze→Silver→Gold layered data approach. Implements Dependency Injection pattern to ensure domain logic (pure business operations) remains completely isolated from infrastructure (database, file I/O, external APIs), with only inbound dependencies allowed.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>WorkDataHub - Epic Breakdown</title>
+        <section>Story 1.6: Clean Architecture Boundaries Enforcement (lines 275-323)</section>
+        <snippet>Enforces strict separation between domain logic (pure Python + pandas/pydantic only), I/O operations (data access), and orchestration (Dagster integration). Domain layer isolated without any imports from io/ or orchestration/ modules. Enforcement includes mypy type checking and pylintrc linting rules with documented dependency rules in README.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic Technical Specification: Foundation &amp; Core Infrastructure</title>
+        <section>Story 1.6: Clean Architecture Boundary Enforcement (AC-1.6.1–AC-1.6.4)</section>
+        <snippet>Module organization documented: domain/ for pure business logic, io/ for data access, orchestration/ for Dagster integration. Dependency rules enforced via linting: domain/ imports ONLY stdlib+pandas+pydantic (no io/ or orchestration/), io/ may import domain/, orchestration/ wires everything together. Pragmatic exceptions allowed with code review approval.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Scale Adaptive Architecture</title>
+        <section>Architecture Patterns &amp; Decisions</section>
+        <snippet>Defines locked-in patterns including Medallion (Bronze→Silver→Gold), Strangler Fig migration, Configuration-Driven Discovery, and Provider Protocol abstraction enforcing Clean Architecture principles. Novel patterns like Hybrid Pipeline Step Protocol (Decision #3) support both DataFrame and Row-level steps while maintaining clean boundaries.</snippet>
+      </doc>
+      <doc>
+        <path>README.md</path>
+        <title>WorkDataHub README</title>
+        <section>Directory Structure &amp; Layer Responsibilities</section>
+        <snippet>Documents Clean Architecture layering with domain/ as pure business logic (no external dependencies), io/ as data access layer (may import domain/), and orchestration/ as Dagster wiring layer (imports both). Defines clear directory structure for src/work_data_hub/ with matching test hierarchy.</snippet>
+      </doc>
+      <doc>
+        <path>.bmad-ephemeral/stories/1-5-shared-pipeline-framework-core-simple.md</path>
+        <title>Story 1.5: Shared Pipeline Framework Core (Simple)</title>
+        <section>Completed Implementation</section>
+        <snippet>Delivered TransformStep protocol, PipelineContext, PipelineResult dataclasses, sequential Pipeline executor, structlog logging hooks, and pytest patterns. All artifacts in domain/pipelines/ (types.py, core.py) must be referenced by Story 1.6 to demonstrate cross-story reuse. Uses config.get_settings() and utils/logging for integration.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/types.py</path>
+        <kind>protocol definitions</kind>
+        <symbol>TransformStep, DataFrameStep, RowTransformStep, PipelineContext, PipelineResult, StepResult</symbol>
+        <lines>entire file</lines>
+        <reason>Story 1.5 pipeline contracts that must be referenced in Story 1.6 documentation as reusable infrastructure</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/core.py</path>
+        <kind>pipeline executor</kind>
+        <symbol>Pipeline</symbol>
+        <lines>entire file</lines>
+        <reason>Story 1.5 sequential pipeline executor with add_step() and run() methods - example of domain layer purity</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/__init__.py</path>
+        <kind>package init</kind>
+        <symbol>n/a (currently empty)</symbol>
+        <lines>1</lines>
+        <reason>Target for Story 1.6: needs docstring documenting Clean Architecture boundaries and dependency rules</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/io/readers/excel_reader.py</path>
+        <kind>data reader</kind>
+        <symbol>ExcelReader, read_excel_rows</symbol>
+        <lines>entire file</lines>
+        <reason>Existing I/O layer implementation - Story 1.6 should verify it follows boundary rules (no domain imports prohibited)</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/io/loader/warehouse_loader.py</path>
+        <kind>database loader</kind>
+        <symbol>load, insert_missing, fill_null_only</symbol>
+        <lines>entire file</lines>
+        <reason>Existing I/O layer database operations - demonstrates proper I/O layer responsibilities</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/io/connectors/file_connector.py</path>
+        <kind>file connector</kind>
+        <symbol>DataSourceConnector</symbol>
+        <lines>entire file</lines>
+        <reason>Existing I/O layer file discovery - Story 1.6 should reference as example of I/O boundary</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/orchestration/jobs.py</path>
+        <kind>Dagster jobs</kind>
+        <symbol>sample_trustee_performance_job, annuity_performance_job, process_company_lookup_queue_job</symbol>
+        <lines>entire file</lines>
+        <reason>Existing orchestration layer - Story 1.6 should add docstrings explaining DI pattern and how jobs wire domain+io</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/orchestration/ops.py</path>
+        <kind>Dagster ops</kind>
+        <symbol>discover_files_op, read_excel_op, load_op, process_company_lookup_queue_op</symbol>
+        <lines>entire file</lines>
+        <reason>Existing orchestration ops showing dependency injection - good examples for Story 1.6 DI documentation</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/config/settings.py</path>
+        <kind>configuration</kind>
+        <symbol>Settings, get_settings</symbol>
+        <lines>entire file</lines>
+        <reason>Story 1.4 configuration singleton - must be used by all new modules per Dev Notes</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/utils/logging.py</path>
+        <kind>logging utilities</kind>
+        <symbol>get_logger, bind_context</symbol>
+        <lines>entire file</lines>
+        <reason>Story 1.3 structlog integration - must be used by all new modules per Dev Notes</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <python>
+        <runtime>
+          <package>pandas - DataFrame manipulation and data transformation</package>
+          <package>pydantic>=2.11.7 - Runtime type validation and settings management (domain layer)</package>
+          <package>structlog - Structured logging framework from Story 1.3</package>
+          <package>pydantic-settings>=2.10.1 - Configuration management from Story 1.4</package>
+          <package>dagster - Orchestration framework (orchestration layer only)</package>
+          <package>psycopg2-binary - PostgreSQL database driver (I/O layer only)</package>
+          <package>openpyxl - Excel file reading (I/O layer only)</package>
+          <package>alembic - Database schema migrations (I/O layer only)</package>
+        </runtime>
+        <dev>
+          <package>pytest - Testing framework with markers (unit, integration, postgres)</package>
+          <package>pytest-cov>=6.2.1 - Code coverage reporting</package>
+          <package>ruff>=0.12.12 - Fast linting and formatting (used for boundary enforcement)</package>
+          <package>mypy>=1.17.1 - Static type checking in strict mode (100% coverage required)</package>
+          <package>pandas-stubs>=2.3.2 - Type stubs for pandas</package>
+          <package>types-psycopg2, types-pyyaml - Type stubs for third-party libraries</package>
+        </dev>
+      </python>
+      <framework>
+        <item>Python 3.10+ - Modern type system with union types and pattern matching</item>
+        <item>uv package manager - 10-100x faster than pip for dependency resolution</item>
+        <item>Clean Architecture - Strict layer separation enforced by Story 1.6 guardrails</item>
+        <item>Medallion Architecture - Bronze→Silver→Gold data layering mapped to Clean Architecture boundaries</item>
+      </framework>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Domain layer (src/work_data_hub/domain/) must remain dependency-free beyond stdlib, pandas, and pydantic - NO imports from io/ or orchestration/ allowed</constraint>
+    <constraint>I/O layer (src/work_data_hub/io/) may import from domain/ layer for model types and business logic interfaces</constraint>
+    <constraint>Orchestration layer (src/work_data_hub/orchestration/) wires together domain and I/O components through dependency injection</constraint>
+    <constraint>All new modules must use config.get_settings() from Story 1.4 rather than direct environment variable access</constraint>
+    <constraint>All new modules must use utils.logging.get_logger() from Story 1.3 for structured logging</constraint>
+    <constraint>Story 1.5 pipeline contracts (TransformStep, Pipeline, PipelineContext) must be referenced rather than recreated</constraint>
+    <constraint>Dependency guardrails must be enforced via ruff/mypy linting - automated CI check required</constraint>
+    <constraint>Placeholder modules should document responsibilities without implementing business logic yet (preparation for future stories)</constraint>
+    <constraint>Documentation must map medallion layers (Bronze/Silver/Gold) to architecture boundaries for Epic 2-6 clarity</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>TransformStep Protocol</name>
+      <kind>runtime-checkable protocol</kind>
+      <signature>execute(data: DataFrame, context: PipelineContext) -> DataFrame | StepResult</signature>
+      <path>src/work_data_hub/domain/pipelines/types.py</path>
+    </interface>
+    <interface>
+      <name>DataFrameStep Protocol</name>
+      <kind>runtime-checkable protocol</kind>
+      <signature>execute(df: DataFrame, context: PipelineContext) -> DataFrame</signature>
+      <path>src/work_data_hub/domain/pipelines/types.py</path>
+    </interface>
+    <interface>
+      <name>RowTransformStep Protocol</name>
+      <kind>runtime-checkable protocol</kind>
+      <signature>execute(row: Row, context: PipelineContext) -> Row</signature>
+      <path>src/work_data_hub/domain/pipelines/types.py</path>
+    </interface>
+    <interface>
+      <name>Pipeline.add_step()</name>
+      <kind>builder method</kind>
+      <signature>add_step(step: TransformStep, name: str | None = None) -> Pipeline</signature>
+      <path>src/work_data_hub/domain/pipelines/core.py</path>
+    </interface>
+    <interface>
+      <name>Pipeline.run()</name>
+      <kind>execution method</kind>
+      <signature>run(initial_data: DataFrame, context: ContextInput | None = None) -> PipelineResult</signature>
+      <path>src/work_data_hub/domain/pipelines/core.py</path>
+    </interface>
+    <interface>
+      <name>get_settings()</name>
+      <kind>configuration singleton</kind>
+      <signature>get_settings() -> Settings</signature>
+      <path>src/work_data_hub/config/settings.py</path>
+    </interface>
+    <interface>
+      <name>get_logger()</name>
+      <kind>logging factory</kind>
+      <signature>get_logger(name: str | None = None) -> BoundLogger</signature>
+      <path>src/work_data_hub/utils/logging.py</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+Testing framework: pytest with markers (@pytest.mark.unit, @pytest.mark.integration, @pytest.mark.postgres). Unit tests focus on fast validation (&lt;1s total) with no external dependencies. Integration tests may use database/filesystem. Story 1.4 established monkeypatch + get_settings.cache_clear() pattern for config isolation. Story 1.5 established pipeline testing patterns (DataFrame-only, row-only, mixed scenarios). All test classes follow TestAC{N}_{Feature} naming convention mapping to acceptance criteria. Strict mypy type checking applies to tests. Coverage measured via pytest-cov. Tests mirror src/ directory structure (tests/unit/domain/, tests/integration/io/, tests/orchestration/).
+</standards>
+    <locations>
+- tests/unit/domain/ - Fast unit tests for domain layer (pure business logic, no external deps)
+- tests/integration/io/ - Integration tests for I/O layer (database, file operations)
+- tests/orchestration/ - Orchestration layer tests (Dagster jobs, ops)
+- tests/unit/test_project_structure.py - Project structure validation tests
+- tests/config/ - Configuration and settings tests (Story 1.4 patterns)
+- tests/domain/pipelines/ - Pipeline framework tests (Story 1.5 patterns)
+</locations>
+    <ideas>
+<test-idea ac="1">
+  <name>test_domain_init_documents_boundaries</name>
+  <description>Verify domain/__init__.py contains docstring documenting Clean Architecture boundaries, dependency flow rules, and references to Story 1.5 assets</description>
+</test-idea>
+<test-idea ac="2">
+  <name>test_placeholder_modules_exist_with_docstrings</name>
+  <description>Assert io/readers/excel_reader.py, io/loader/warehouse_loader.py, io/connectors/file_connector.py already exist. Verify orchestration/jobs.py, ops.py, schedules.py, sensors.py exist with docstrings explaining DI and Dagster integration</description>
+</test-idea>
+<test-idea ac="3">
+  <name>test_dependency_guardrails_domain_layer</name>
+  <description>Run ruff or custom import checker to verify domain/ never imports from io/ or orchestration/. Test should fail if boundary violation detected. Validate mypy strict mode passes.</description>
+</test-idea>
+<test-idea ac="3">
+  <name>test_ci_boundary_check_documented</name>
+  <description>Verify README or .github/workflows/ci.yml contains instructions for running boundary check locally (uv run ruff check) and in CI pipeline</description>
+</test-idea>
+<test-idea ac="4">
+  <name>test_di_example_in_documentation</name>
+  <description>Verify README or architecture doc includes dependency injection example showing orchestration layer injecting I/O services into domain logic (e.g., transform_annuity_data pattern)</description>
+</test-idea>
+<test-idea ac="5">
+  <name>test_story_15_references_captured</name>
+  <description>Verify Story 1.6 documentation explicitly references domain/pipelines/types.py, core.py, config/settings.py, utils/logging.py from Stories 1.3-1.5 to demonstrate cross-story reuse</description>
+</test-idea>
+<test-idea ac="1,2">
+  <name>test_architecture_diagram_exists</name>
+  <description>Verify README or docs/architecture-boundaries.md contains architecture diagram/table showing domain/io/orchestration responsibilities and medallion layer mapping</description>
+</test-idea>
+</ideas>
+  </tests>
+</story-context>
