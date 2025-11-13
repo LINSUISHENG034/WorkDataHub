@@ -1,9 +1,9 @@
-"""
-Dagster jobs and CLI interface for WorkDataHub ETL orchestration.
+"""Dagster jobs wiring I/O services into domain pipelines (Story 1.6).
 
-This module provides the main trustee_performance_job that composes the four ops
-into an end-to-end workflow, plus a CLI interface for local execution with
-comprehensive argument support and structured output.
+Jobs compose the Story 1.5 pipeline steps plus I/O adapters via dependency
+injection so that `work_data_hub.domain` never imports orchestration code.
+This module also exposes a CLI for executing the orchestrated graph while
+respecting the Clean Architecture flow: domain ← io ← orchestration.
 """
 
 import argparse
@@ -14,12 +14,13 @@ from typing import Any, Dict, List
 import yaml
 from dagster import DagsterInstance, job
 
-from ..config.settings import get_settings
-from ..io.loader.company_mapping_loader import (
+from src.work_data_hub.config.settings import get_settings
+from src.work_data_hub.io.loader.company_mapping_loader import (
     extract_legacy_mappings,
     generate_load_plan,
     load_company_mappings,
 )
+
 from .ops import (
     backfill_refs_op,
     derive_plan_refs_op,
@@ -72,6 +73,11 @@ def sample_trustee_performance_multi_file_job():
     # Use combined op for multi-file processing
     processed_data = read_and_process_sample_trustee_files_op(discovered_paths)
     load_op(processed_data)  # No return needed
+
+
+# Backward compatibility aliases for legacy tests/integrations
+trustee_performance_job = sample_trustee_performance_job
+trustee_performance_multi_file_job = sample_trustee_performance_multi_file_job
 
 
 @job
@@ -282,8 +288,12 @@ def _execute_company_mapping_job(args: argparse.Namespace):
     """
     import psycopg2
 
-    from ..domain.company_enrichment.service import validate_mapping_consistency
-    from ..io.loader.company_mapping_loader import CompanyMappingLoaderError
+    from src.work_data_hub.domain.company_enrichment.service import (
+        validate_mapping_consistency,
+    )
+    from src.work_data_hub.io.loader.company_mapping_loader import (
+        CompanyMappingLoaderError,
+    )
 
     effective_plan_only = not args.execute if hasattr(args, "execute") else True
 
@@ -641,23 +651,27 @@ def main():
     # Select appropriate job based on domain and max_files parameter
     max_files = getattr(args, "max_files", 1)
 
-    if args.domain == "annuity_performance":
+    domain_key = args.domain
+    if domain_key == "trustee_performance":
+        domain_key = "sample_trustee_performance"
+
+    if domain_key == "annuity_performance":
         # Currently only single file supported for annuity performance
         selected_job = annuity_performance_job
         if max_files > 1:
             print(
                 f"Warning: max_files > 1 not yet supported for {args.domain}, using 1"
             )
-    elif args.domain == "sample_trustee_performance":
+    elif domain_key == "sample_trustee_performance":
         selected_job = (
             sample_trustee_performance_multi_file_job
             if max_files > 1
             else sample_trustee_performance_job
         )
-    elif args.domain == "company_mapping":
+    elif domain_key == "company_mapping":
         # Special handling for company mapping migration
         return _execute_company_mapping_job(args)
-    elif args.domain == "company_lookup_queue":
+    elif domain_key == "company_lookup_queue":
         # Special handling for company lookup queue processing
         return _execute_queue_processing_job(args)
     else:

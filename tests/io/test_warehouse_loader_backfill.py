@@ -136,6 +136,7 @@ class TestInsertMissing:
         # Mock connection and cursor
         mock_conn = Mock()
         mock_cursor = MagicMock()  # Use MagicMock for context manager support
+        mock_cursor.rowcount = len(sample_plan_candidates)
         
         # Properly set up context manager
         cursor_context_manager = MagicMock()

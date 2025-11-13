@@ -17,8 +17,8 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from ..auth.eqc_auth_handler import get_auth_token_interactively
-from ..config.settings import get_settings
+from src.work_data_hub.auth.eqc_auth_handler import get_auth_token_interactively
+from src.work_data_hub.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 

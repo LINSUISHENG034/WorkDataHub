@@ -211,8 +211,10 @@ class TestFloatPrecisionEdgeCases:
         ]
 
         for float_val in float_values:
-            # Test the conversion pattern: float -> str -> Decimal
-            str_val = str(float_val)
+            # Test the conversion pattern: float -> controlled str -> Decimal
+            str_val = format(float_val, ".17f").rstrip("0").rstrip(".")
+            if not str_val:
+                str_val = "0"
             decimal_val = Decimal(str_val)
 
             # Verify string conversion fixes float precision

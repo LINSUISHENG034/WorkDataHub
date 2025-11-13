@@ -13,10 +13,13 @@ from unittest.mock import Mock, patch
 
 import pandas as pd
 import pytest
-
-pytestmark = pytest.mark.sample_domain
 import yaml
 from dagster import build_op_context
+
+pytestmark = [
+    pytest.mark.sample_domain,
+    pytest.mark.e2e_suite,
+]
 
 from src.work_data_hub.domain.sample_trustee_performance.service import process
 from src.work_data_hub.io.loader.warehouse_loader import DataWarehouseLoaderError, load

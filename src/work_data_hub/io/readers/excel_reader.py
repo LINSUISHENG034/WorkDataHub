@@ -1,9 +1,10 @@
-"""
-Excel file reading infrastructure for WorkDataHub.
+"""Excel reader for the Clean Architecture I/O layer (Story 1.6).
 
-This module provides robust, error-resilient Excel file reading capabilities
-using pandas as the underlying engine. It handles common Excel reading issues
-like missing sheets, corrupted files, and encoding problems.
+This module provides robust, error-resilient Excel utilities that remain
+isolated inside `work_data_hub.io.readers`. Orchestration code injects the
+reader into domain pipelines from Story 1.5 rather than letting domain logic
+pull in filesystem dependencies directly. The implementation purposefully keeps
+all imports pointed inward (domain ← io ← orchestration).
 """
 
 import logging

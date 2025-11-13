@@ -173,6 +173,11 @@ class TrusteePerformanceOut(BaseModel):
 
     @field_validator("return_rate", "net_asset_value", "fund_scale", mode="before")
     @classmethod
+    def _decimal_cleaner_proxy(cls, v, info: Any):
+        """Proxy validator to allow runtime patching in tests."""
+        return cls.clean_decimal_fields(v, info)
+
+    @classmethod
     def clean_decimal_fields(cls, v, info: Any):
         """Clean decimal fields using the unified cleansing framework."""
         from work_data_hub.cleansing.rules.numeric_rules import (

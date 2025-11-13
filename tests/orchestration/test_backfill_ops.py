@@ -192,6 +192,10 @@ class TestBackfillOps:
                 "计划类型": "DC",
                 "客户名称": "Client A",
                 "company_id": "COMP1",
+                "资格": None,
+                "主拓机构": None,
+                "备注": None,
+                "主拓代码": None,
             }
         ]
         portfolio_candidates = []

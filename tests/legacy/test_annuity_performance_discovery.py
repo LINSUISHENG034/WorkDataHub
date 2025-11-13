@@ -11,6 +11,8 @@ from unittest.mock import patch
 
 import pytest
 
+pytestmark = pytest.mark.legacy_suite
+
 from src.work_data_hub.io.connectors.file_connector import DataSourceConnector
 
 

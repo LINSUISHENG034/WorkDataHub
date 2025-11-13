@@ -81,7 +81,6 @@ def enrichment_service(mock_loader, mock_queue, mock_eqc_client):
         loader=mock_loader,
         queue=mock_queue,
         eqc_client=mock_eqc_client,
-        sync_lookup_budget=5
     )
 
 

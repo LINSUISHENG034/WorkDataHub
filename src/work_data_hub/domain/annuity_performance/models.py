@@ -232,14 +232,14 @@ class AnnuityPerformanceOut(BaseModel):
         None, decimal_places=4, description="Final asset scale"
     )
     供款: Optional[Decimal] = Field(None, decimal_places=4, description="Contribution")
-    # 使用数据库标准化列名进行输出序列化，输入兼容别名（括号形式）
+    # Preserve original alias throughout serialization so downstream SQL can reuse it
     流失_含待遇支付: Optional[Decimal] = Field(
         None,
         decimal_places=4,
         description="Loss including benefit payment",
         alias="流失(含待遇支付)",
         validation_alias="流失(含待遇支付)",
-        serialization_alias="流失_含待遇支付",  # 输出遵循 DDL 列名
+        serialization_alias="流失(含待遇支付)",
     )
     流失: Optional[Decimal] = Field(None, decimal_places=4, description="Loss")
     待遇支付: Optional[Decimal] = Field(

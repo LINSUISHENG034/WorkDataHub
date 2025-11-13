@@ -10,7 +10,10 @@ from typing import Dict, Optional
 
 from pydantic import ValidationInfo, field_validator
 
-from ..rules.numeric_rules import comprehensive_decimal_cleaning
+from src.work_data_hub.cleansing.registry import registry
+from src.work_data_hub.cleansing.rules.numeric_rules import (
+    comprehensive_decimal_cleaning,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -88,9 +91,6 @@ def simple_field_validator(
             if rule_name == "comprehensive_decimal_cleaning":
                 return comprehensive_decimal_cleaning(v, field_name=info.field_name)
             else:
-                # 如果需要其他规则，可以从注册表获取
-                from ..registry import registry
-
                 rule = registry.get_rule(rule_name)
                 if rule:
                     return rule.func(v)

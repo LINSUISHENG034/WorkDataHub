@@ -11,10 +11,13 @@ for exact parity validation.
 """
 
 import logging
+from pathlib import Path
+from typing import Any, Dict, List
+
 import pandas as pd
 import pytest
-from pathlib import Path
-from typing import Dict, Any, List
+
+pytestmark = pytest.mark.e2e_suite
 
 from work_data_hub.domain.annuity_performance.pipeline_steps import (
     build_annuity_pipeline,

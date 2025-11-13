@@ -8,9 +8,12 @@ plan generation and row counting.
 """
 
 import os
-from unittest.mock import Mock, patch
 
 import pytest
+
+pytestmark = pytest.mark.e2e_suite
+
+from unittest.mock import Mock, patch
 from dagster import build_op_context
 
 from src.work_data_hub.orchestration.jobs import (

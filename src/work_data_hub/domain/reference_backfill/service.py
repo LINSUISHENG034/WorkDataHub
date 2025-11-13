@@ -64,6 +64,12 @@ def derive_plan_candidates(
                 (r.get("月度") for r in rows if r.get("月度") is not None), None
             )
 
+            def _to_str(value: Any) -> Optional[str]:
+                if value is None:
+                    return None
+                value_str = str(value).strip()
+                return value_str or None
+
             candidate = {
                 # FIXED: Use only the actual database field, remove duplicate 计划代码
                 "年金计划号": plan_code,
@@ -72,22 +78,24 @@ def derive_plan_candidates(
                     rows, "客户名称", "期末资产规模"
                 ),
                 # BUSINESS RULE: From row with max 期末资产规模
-                # 主拓代码 <- 该行的 机构代码； 主拓机构 <- 该行的 机构名称
+                # 优先取该行的 主拓代码 / 主拓机构，若缺失则回退到 机构代码 / 机构名称
                 "主拓代码": (
-                    str(max_row.get("机构代码")).strip()
-                    if max_row and max_row.get("机构代码")
+                    _to_str(max_row.get("主拓代码"))
+                    if max_row
                     else None
-                ),
+                )
+                or (_to_str(max_row.get("机构代码")) if max_row else None),
                 "主拓机构": (
-                    str(max_row.get("机构名称")).strip()
-                    if max_row and max_row.get("机构名称")
+                    _to_str(max_row.get("主拓机构"))
+                    if max_row
                     else None
-                ),
+                )
+                or (_to_str(max_row.get("机构名称")) if max_row else None),
                 # BUSINESS RULE: Format as YYMM_新建 from 月度 (first non-null)
                 "备注": _format_remark_from_date(month_value),
                 # BUSINESS RULE: Filter and order business types (FIXED: use
                 # actual database field)
-                "管理资格": _format_qualification_from_business_types(
+                "资格": _format_qualification_from_business_types(
                     {row.get("业务类型") for row in rows}
                 ),
                 # Standard fields from first available row
@@ -279,7 +287,7 @@ def _format_qualification_from_business_types(business_types_set: set) -> Option
         return None
 
     # BUSINESS RULE: Specific order must be preserved
-    ALLOWED_ORDER = ["企年受托", "企年投资", "职年受托", "职年投资"]
+    ALLOWED_ORDER = ["企年受托", "企年投资", "职年受托", "年", "职年投资"]
 
     # PATTERN: Iterate through order list, not input set
     filtered = [bt for bt in ALLOWED_ORDER if bt in cleaned_set]

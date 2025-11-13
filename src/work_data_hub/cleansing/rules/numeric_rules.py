@@ -9,7 +9,7 @@ import unicodedata
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Dict, Optional, Union
 
-from ..registry import RuleCategory, rule
+from src.work_data_hub.cleansing.registry import RuleCategory, rule
 
 # 字段精度配置 - 可以通过配置文件外部化
 DEFAULT_PRECISION_CONFIG = {
@@ -179,8 +179,16 @@ def decimal_quantization(
         if isinstance(value, Decimal):
             decimal_value = value
         else:
-            # 通过字符串转换避免浮点精度问题
-            decimal_value = Decimal(str(value))
+            # 通过受控的字符串转换避免浮点精度问题
+            if isinstance(value, float):
+                value_str = format(value, ".17f")
+                if "." in value_str:
+                    value_str = value_str.rstrip("0").rstrip(".")
+                if not value_str:
+                    value_str = "0"
+            else:
+                value_str = str(value)
+            decimal_value = Decimal(value_str)
 
         # 执行量化
         quantizer = Decimal(1).scaleb(-target_precision)

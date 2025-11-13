@@ -24,7 +24,10 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.legacy_data
+pytestmark = [
+    pytest.mark.legacy_data,
+    pytest.mark.legacy_suite,
+]
 
 
 def _has_sample_root() -> bool:

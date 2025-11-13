@@ -5,7 +5,7 @@ This module tests the DataWarehouseLoader SQL builders and orchestration
 with both unit tests (no database required) and integration tests.
 """
 
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -520,7 +520,7 @@ class TestJSONBParameterAdaptation:
         ]
 
         # Mock database connection
-        mock_conn = Mock()
+        mock_conn = MagicMock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
         mock_conn.cursor.return_value.__exit__.return_value = None
@@ -528,9 +528,7 @@ class TestJSONBParameterAdaptation:
         mock_conn.__exit__.return_value = None
 
         # Mock execute_values to capture the adapted parameters
-        with patch(
-            "src.work_data_hub.io.loader.warehouse_loader.execute_values"
-        ) as mock_execute_values:
+        with patch("psycopg2.extras.execute_values") as mock_execute_values:
             result = load(table="test_table", rows=rows, mode="append", conn=mock_conn)
 
             # Verify execute_values was called
@@ -547,15 +545,19 @@ class TestJSONBParameterAdaptation:
             # Verify that dict/list parameters were adapted with psycopg2.extras.Json
             from psycopg2.extras import Json
 
-            # First row checks
-            row1_params = adapted_rows[0]
-            assert row1_params[0] == 1  # id - not adapted
-            assert isinstance(row1_params[1], Json)  # validation_warnings - adapted
-            assert isinstance(row1_params[2], Json)  # metadata - adapted
+            start = sql.index("(") + 1
+            end = sql.index(")")
+            columns = [col.strip().strip('"') for col in sql[start:end].split(",")]
 
-            # Verify wrapped data is preserved
-            assert row1_params[1].adapted == ["warning1", {"type": "error", "msg": "Invalid data"}]
-            assert row1_params[2].adapted == {"source": "file1.xlsx", "processed": True}
+            assert "validation_warnings" in columns
+            assert "metadata" in columns
+
+            for idx, row_values in enumerate(adapted_rows):
+                row_map = dict(zip(columns, row_values))
+                assert isinstance(row_map["validation_warnings"], Json)
+                assert isinstance(row_map["metadata"], Json)
+                assert row_map["validation_warnings"].adapted == rows[idx]["validation_warnings"]
+                assert row_map["metadata"].adapted == rows[idx]["metadata"]
 
     def test_execute_values_parameter_structure_with_jsonb(self):
         """Test that execute_values receives properly structured JSONB parameters."""
@@ -575,16 +577,14 @@ class TestJSONBParameterAdaptation:
         ]
 
         # Mock the database components
-        mock_conn = Mock()
+        mock_conn = MagicMock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
         mock_conn.cursor.return_value.__exit__.return_value = None
         mock_conn.__enter__.return_value = mock_conn
         mock_conn.__exit__.return_value = None
 
-        with patch(
-            "src.work_data_hub.io.loader.warehouse_loader.execute_values"
-        ) as mock_execute_values:
+        with patch("psycopg2.extras.execute_values") as mock_execute_values:
             load(table="trustee_performance", rows=rows, mode="append", conn=mock_conn)
 
             # Verify execute_values call structure
@@ -604,20 +604,17 @@ class TestJSONBParameterAdaptation:
 
             # Verify row_data structure for execute_values
             assert len(row_data) == 1
-            row_params = row_data[0]
-
-            # Should have 6 parameters (in column order)
-            assert len(row_params) == 6
 
             # Verify JSONB parameters are Json-wrapped
             from psycopg2.extras import Json
 
-            validation_warnings_param = next(
-                p for p in row_params if isinstance(p, Json) and isinstance(p.adapted, list)
-            )
-            metadata_param = next(
-                p for p in row_params if isinstance(p, Json) and isinstance(p.adapted, dict)
-            )
+            start = sql.index("(") + 1
+            end = sql.index(")")
+            columns = [col.strip().strip('"') for col in sql[start:end].split(",")]
+
+            row_params = dict(zip(columns, row_data[0]))
+            validation_warnings_param = row_params["validation_warnings"]
+            metadata_param = row_params["metadata"]
 
             assert validation_warnings_param.adapted == ["Rate exceeds threshold"]
             assert metadata_param.adapted["file_source"] == "2024_11_trustee_performance.xlsx"

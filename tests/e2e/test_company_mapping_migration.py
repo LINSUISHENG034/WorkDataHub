@@ -6,11 +6,14 @@ to PostgreSQL loading, including performance requirements and data consistency.
 """
 
 import json
-import pytest
 import time
 from pathlib import Path
 from typing import Dict, List
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+pytestmark = pytest.mark.e2e_suite
 
 from src.work_data_hub.domain.company_enrichment.models import (
     CompanyMappingRecord,

@@ -174,6 +174,13 @@ uv run pytest --cov=src/work_data_hub --cov-report=html
 - `@pytest.mark.postgres`: Requires PostgreSQL database
 - `@pytest.mark.monthly_data`: Opt-in tests requiring reference data
 - `@pytest.mark.legacy_data`: Opt-in tests for legacy compatibility
+- `@pytest.mark.legacy_suite`: Opt-in legacy regression suites (`RUN_LEGACY_TESTS=1` or `--run-legacy-tests`)
+- `@pytest.mark.e2e_suite`: Opt-in Dagster/warehouse E2E suites (`RUN_E2E_TESTS=1` or `--run-e2e-tests`)
+- `@pytest.mark.e2e`: Legacy parity marker retained for backwards compatibility
+- `@pytest.mark.performance`: Marks high-cost stress/performance scenarios
+- `@pytest.mark.sample_domain`: Sample trustee pipeline scenarios
+
+Legacy/E2E suites are skipped by default. Enable them with the matching CLI flags (`pytest --run-legacy-tests`, `pytest --run-e2e-tests`) or by exporting `RUN_LEGACY_TESTS=1` / `RUN_E2E_TESTS=1`.
 
 ### Code Quality
 
@@ -182,17 +189,19 @@ uv run pytest --cov=src/work_data_hub --cov-report=html
 uv run mypy src/ --strict
 
 # Run linting
-uv run ruff check src/
+uv run ruff check src/work_data_hub docs
 
 # Auto-fix linting issues (only when needed)
-uv run ruff check src/ --fix
+uv run ruff check src/work_data_hub docs --fix
 
 # Format code
-uv run ruff format src/
+uv run ruff format src/work_data_hub docs
 
 # Format check (CI equivalent)
-uv run ruff format --check src/
+uv run ruff format --check src/work_data_hub docs
 ```
+
+> ℹ️ The `legacy/` tree and the broad `tests/` tree carry outstanding lint debt from the historical codebase. The default Ruff command excludes those paths so guardrails stay green. Opt-in linting for them is still available with `uv run ruff check legacy tests/legacy` when you are ready to tackle the backlog.
 
 ## Configuration
 
@@ -348,6 +357,18 @@ The project enforces strict architectural boundaries:
 2. **I/O layer** may depend on domain layer
 3. **Orchestration layer** wires together domain + I/O
 4. Dependencies flow inward: `orchestration/` → `io/` → `domain/`
+
+For a detailed matrix of responsibilities, medallion mapping, and the
+Story 1.6 `transform_annuity_data` dependency-injection example, see
+`docs/architecture-boundaries.md`. That document also cites the Story 1.5
+pipeline contracts (`domain/pipelines/{core,types}.py`), Story 1.4 settings
+singleton, and Story 1.3 structlog helpers so future stories reference the same
+infrastructure instead of recreating it.
+
+🚧 **Boundary guardrail:** `uv run ruff check` now fails with `TID251` if any
+`work_data_hub/domain` module imports `work_data_hub.io` or
+`work_data_hub.orchestration`. The lint configuration automatically exempts the
+outer layers, so a clean lint run is proof that Story 1.6 dependency rules hold.
 
 ### Non-Functional Requirements
 

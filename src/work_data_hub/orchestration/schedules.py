@@ -1,9 +1,8 @@
-"""
-Dagster schedules for WorkDataHub orchestration.
+"""Dagster schedules that remain in the orchestration boundary (Story 1.6).
 
-This module defines production schedules for automated data processing jobs.
-Schedules follow the same configuration patterns as the existing build_run_config
-function to ensure consistency across CLI and scheduled execution modes.
+Schedules only configure how and when jobs run; they never introduce domain or
+I/O logic directly. Instead they call the same dependency-injected jobs that
+wire Story 1.5 pipelines to I/O adapters, preserving the inward dependency flow.
 """
 
 from typing import Any, Dict
@@ -11,7 +10,8 @@ from typing import Any, Dict
 import yaml
 from dagster import schedule
 
-from ..config.settings import get_settings
+from src.work_data_hub.config.settings import get_settings
+
 from .jobs import sample_trustee_performance_multi_file_job
 
 

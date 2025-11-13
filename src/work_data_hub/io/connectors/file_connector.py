@@ -1,10 +1,10 @@
-"""
-File discovery connector for WorkDataHub.
+"""File discovery connector anchored in the I/O layer (Story 1.6).
 
-This module provides configuration-driven file discovery with Unicode-aware
-regex patterns, version selection strategies, and robust error handling.
-It supports complex filename patterns including Chinese characters and
-handles versioned directory structures automatically.
+Configuration-driven scanning, version resolution, and filesystem access live
+here so that Story 1.5 domain pipelines only depend on pure inputs. Dagster
+ops inject this connector into domain transformations instead of importing
+`work_data_hub.io` from domain modules, keeping the dependency direction
+domain ← io ← orchestration intact.
 """
 
 import logging
@@ -15,8 +15,8 @@ from typing import Any, Dict, List, Optional, Pattern
 
 import yaml
 
-from ...config import settings as settings_module
-from ...utils.types import (
+import src.work_data_hub.config.settings as settings_module
+from src.work_data_hub.utils.types import (
     DiscoveredFile,
     extract_file_metadata,
     is_temporary_file,
@@ -49,17 +49,37 @@ class DataSourceConnector:
             config_path: Path to YAML configuration file. If None, uses default
                         from settings.
         """
-        # Fetch settings from module to support test monkeypatching
-        self.settings = settings_module.get_settings()
+        # Lazily load settings to make it easy to inject patched versions in tests
+        self.settings: Optional[Any] = None
 
         # Use provided config path or default from settings
-        self.config_path = config_path or self.settings.data_sources_config
+        if config_path:
+            self.config_path = config_path
+        else:
+            self.config_path = self._get_settings().data_sources_config
 
         # Load and validate configuration
         self.config = self._load_config()
 
+        # Prepare canonical/alias mappings for domain names
+        self._canonical_domains = {
+            name: self._canonicalize_domain(name, cfg)
+            for name, cfg in self.config["domains"].items()
+        }
+        self._domain_aliases = {
+            canonical: name for name, canonical in self._canonical_domains.items()
+        }
+
         # Pre-compile regex patterns with Unicode support
         self.compiled_patterns = self._compile_patterns()
+
+    def _get_settings(self) -> Any:
+        """
+        Lazily resolve settings so tests can patch get_settings easily.
+        """
+        if self.settings is None:
+            self.settings = settings_module.get_settings()
+        return self.settings
 
     def discover(self, domain: Optional[str] = None) -> List[DiscoveredFile]:
         """
@@ -76,11 +96,18 @@ class DataSourceConnector:
             DataSourceConnectorError: If discovery fails
         """
         # Determine domains to scan
-        domains_to_scan = [domain] if domain else list(self.config["domains"].keys())
+        domains_to_scan: List[str]
+        if domain:
+            config_domain = self._domain_aliases.get(domain, domain)
+            domains_to_scan = [config_domain]
+        else:
+            domains_to_scan = list(self.config["domains"].keys())
 
-        # Validate requested domain exists
-        if domain and domain not in self.config["domains"]:
-            raise DataSourceConnectorError(f"Unknown domain: {domain}")
+        # Validate requested domain exists (after alias resolution)
+        if domain:
+            config_domain = self._domain_aliases.get(domain, domain)
+            if config_domain not in self.config["domains"]:
+                raise DataSourceConnectorError(f"Unknown domain: {domain}")
 
         logger.info(f"Starting file discovery for domains: {domains_to_scan}")
 
@@ -184,6 +211,25 @@ class DataSourceConnector:
 
         return compiled
 
+    @staticmethod
+    def _canonicalize_domain(
+        domain_name: str, domain_config: Dict[str, Any]
+    ) -> str:
+        """
+        Determine the canonical domain name for reporting and API usage.
+        """
+        if "canonical_domain" in domain_config:
+            return domain_config["canonical_domain"]
+        if domain_name.startswith("sample_"):
+            return domain_name.replace("sample_", "", 1)
+        return domain_name
+
+    def _resolve_config_domain(self, canonical_domain: str) -> str:
+        """
+        Map a canonical domain name back to its configuration key.
+        """
+        return self._domain_aliases.get(canonical_domain, canonical_domain)
+
     def _scan_directory_for_domain(
         self, domain_name: str, pattern: Pattern[str], domain_config: Dict[str, Any]
     ) -> List[DiscoveredFile]:
@@ -198,7 +244,7 @@ class DataSourceConnector:
         Returns:
             List of DiscoveredFile objects for this domain
         """
-        base_dir = Path(self.settings.data_base_dir)
+        base_dir = Path(self._get_settings().data_base_dir)
 
         if not base_dir.exists():
             logger.warning(f"Data base directory does not exist: {base_dir}")
@@ -303,7 +349,9 @@ class DataSourceConnector:
                             )
 
                         discovered_file = DiscoveredFile(
-                            domain=domain_name,
+                            domain=self._canonical_domains.get(
+                                domain_name, domain_name
+                            ),
                             path=file_path,
                             year=year,
                             month=month,
@@ -346,7 +394,8 @@ class DataSourceConnector:
         selected_files = []
 
         for domain, domain_files in by_domain.items():
-            domain_config = self.config["domains"][domain]
+            config_domain = self._resolve_config_domain(domain)
+            domain_config = self.config["domains"][config_domain]
             strategy = domain_config["select"]
 
             if strategy == "latest_by_year_month":

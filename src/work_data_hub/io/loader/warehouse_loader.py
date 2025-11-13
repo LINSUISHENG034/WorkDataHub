@@ -1,10 +1,10 @@
-"""
-PostgreSQL data warehouse loader with transactional safety.
+"""Warehouse loader that stays inside the Clean Architecture I/O ring (Story 1.6).
 
-This module provides bulk loading capabilities for PostgreSQL with SQL injection
-protection, performance optimization, and comprehensive error handling.
-It supports both delete-then-insert (upsert) and append modes with chunking
-for large datasets.
+All database connectivity, transactional logic, and bulk loading behaviors live
+here so that domain pipelines from Story 1.5 remain pure. Orchestration layers
+inject concrete loader functions/services into pipeline steps instead of domain
+modules importing database stacks directly. Keep dependency direction:
+domain ← io ← orchestration.
 """
 
 import logging

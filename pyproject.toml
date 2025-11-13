@@ -41,6 +41,20 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
+extend-select = ["TID"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/work_data_hub/io/**/*.py" = ["TID251"]
+"src/work_data_hub/orchestration/**/*.py" = ["TID251"]
+"scripts/**/*.py" = ["TID251"]
+"tests/**/*.py" = ["ALL"]
+"legacy/**/*.py" = ["ALL"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api."work_data_hub.io"]
+msg = "Domain layer cannot import from work_data_hub.io (Story 1.6 Clean Architecture)."
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api."work_data_hub.orchestration"]
+msg = "Domain layer cannot import from work_data_hub.orchestration (Story 1.6 Clean Architecture)."
 
 [tool.ruff.format]
 quote-style = "double"
@@ -52,6 +66,10 @@ markers = [
     "postgres: marks tests as requiring a PostgreSQL database (deselect with '-m \"not postgres\"')",
     "monthly_data: marks tests requiring reference/monthly data (opt-in)",
     "legacy_data: marks tests as requiring legacy sample data (opt-in)",
+    "e2e: legacy marker for parity/end-to-end scenarios (see e2e_suite)",
+    "performance: marks slow or resource-intensive scenarios",
+    "legacy_suite: opt-in regression tests that exercise the legacy annuity stack (RUN_LEGACY_TESTS=1 or --run-legacy-tests)",
+    "e2e_suite: opt-in Dagster/warehouse E2E flows that require heavy fixtures (RUN_E2E_TESTS=1 or --run-e2e-tests)",
     "sample_domain: marks tests for the non-production sample domain (sample_trustee_performance)"
 ]
 

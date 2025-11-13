@@ -1,12 +1,8 @@
-"""
-Dagster sensors for WorkDataHub orchestration.
+"""Dagster sensors that trigger dependency-injected jobs (Story 1.6).
 
-This module defines production sensors for event-driven data processing:
-- File discovery sensor: Triggers jobs when new trustee performance files appear
-- Data quality sensor: Performs lightweight health checks and alerting
-
-Sensors use cursor management to maintain state between evaluations and follow
-the same configuration patterns as existing jobs for consistency.
+Sensors react to filesystem and data-quality events, then call orchestration
+jobs that already inject Story 1.5 domain pipelines with I/O adapters. Keeping
+logic here ensures domain modules stay unaware of eventing or infrastructure.
 """
 
 from typing import Any, Dict
@@ -14,9 +10,10 @@ from typing import Any, Dict
 import yaml
 from dagster import RunRequest, SensorEvaluationContext, SkipReason, sensor
 
-from ..config.settings import get_settings
-from ..io.connectors.file_connector import DataSourceConnector
-from ..io.loader.warehouse_loader import build_insert_sql
+from src.work_data_hub.config.settings import get_settings
+from src.work_data_hub.io.connectors.file_connector import DataSourceConnector
+from src.work_data_hub.io.loader.warehouse_loader import build_insert_sql
+
 from .jobs import sample_trustee_performance_multi_file_job
 
 

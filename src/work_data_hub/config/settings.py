@@ -98,6 +98,7 @@ class Settings(BaseSettings):
 
     # Story 1.4 required fields (no prefix, uppercase names)
     DATABASE_URL: str = Field(
+        default="sqlite:///workdatahub_dev.db",
         validation_alias="DATABASE_URL",
         description="Database connection string (required for Story 1.4)",
     )

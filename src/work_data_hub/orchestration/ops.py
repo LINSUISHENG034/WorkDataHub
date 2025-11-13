@@ -1,9 +1,9 @@
-"""
-Dagster ops for WorkDataHub ETL orchestration.
+"""Dagster ops that inject I/O adapters into domain services (Story 1.6).
 
-This module provides thin wrappers around existing WorkDataHub components as
-Dagster ops, enabling structured orchestration with configuration validation,
-structured logging, and proper error handling.
+Each op composes Story 1.5 domain pipelines with I/O implementations (readers,
+loaders, connectors) without reversing the dependency direction. Ops stay in
+the orchestration ring and merely provide dependency injection, logging, and
+configuration validation.
 """
 
 import logging
@@ -14,21 +14,23 @@ import yaml
 from dagster import Config, OpExecutionContext, op
 from pydantic import field_validator, model_validator
 
-from ..config.settings import get_settings
-from ..domain.annuity_performance.service import process_with_enrichment
-from ..domain.reference_backfill.service import (
+from src.work_data_hub.config.settings import get_settings
+from src.work_data_hub.domain.annuity_performance.service import (
+    process_with_enrichment,
+)
+from src.work_data_hub.domain.reference_backfill.service import (
     derive_plan_candidates,
     derive_portfolio_candidates,
 )
-from ..domain.sample_trustee_performance.service import process
-from ..io.connectors.file_connector import DataSourceConnector
-from ..io.loader.warehouse_loader import (
+from src.work_data_hub.domain.sample_trustee_performance.service import process
+from src.work_data_hub.io.connectors.file_connector import DataSourceConnector
+from src.work_data_hub.io.loader.warehouse_loader import (
     DataWarehouseLoaderError,
     fill_null_only,
     insert_missing,
     load,
 )
-from ..io.readers.excel_reader import read_excel_rows
+from src.work_data_hub.io.readers.excel_reader import read_excel_rows
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +56,7 @@ def _load_valid_domains() -> List[str]:
     """
     # Optional: Validate data_sources.yml for fail-fast behavior
     try:
-        from ..config.schema import (
+        from src.work_data_hub.config.schema import (
             DataSourcesValidationError,
             validate_data_sources_config,
         )
