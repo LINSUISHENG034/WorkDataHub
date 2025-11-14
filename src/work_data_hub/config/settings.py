@@ -97,8 +97,8 @@ class Settings(BaseSettings):
     """
 
     # Story 1.4 required fields (no prefix, uppercase names)
-    DATABASE_URL: str = Field(
-        default="sqlite:///workdatahub_dev.db",
+    DATABASE_URL: Optional[str] = Field(
+        default=None,
         validation_alias="DATABASE_URL",
         description="Database connection string (required for Story 1.4)",
     )
@@ -230,11 +230,14 @@ class Settings(BaseSettings):
         Unifies environment variable usage by preferring a single canonical URI
         while maintaining backward compatibility with prior naming.
         Priority order:
-        1) WDH_DATABASE__URI (canonical)
-        2) WDH_DATABASE_URI (alternate)
-        3) self.database_uri (settings field)
-        4) Construct from individual components
+        1) DATABASE_URL field (if provided directly)
+        2) WDH_DATABASE__URI (canonical)
+        3) WDH_DATABASE_URI (alternate)
+        4) self.database_uri (settings field)
+        5) Construct from individual components
         """
+        if self.DATABASE_URL:
+            return self.DATABASE_URL
         # Canonical and alternate environment variable overrides
         env_uri = os.getenv("WDH_DATABASE__URI") or os.getenv("WDH_DATABASE_URI")
         if env_uri:
@@ -272,9 +275,16 @@ class Settings(BaseSettings):
         Raises:
             ValueError: If ENVIRONMENT is 'prod' and DATABASE_URL is not PostgreSQL
         """
-        if self.ENVIRONMENT == "prod" and not self.DATABASE_URL.startswith(
-            "postgresql://"
-        ):
+        if not self.DATABASE_URL:
+            if ENV_FILE_OVERRIDE:
+                # Custom env files can omit DATABASE_URL; fall back to derived URI.
+                self.DATABASE_URL = self.database.get_connection_string()
+            else:
+                raise ValueError(
+                    "DATABASE_URL is required. Set it in the environment or .env file."
+                )
+
+        if self.ENVIRONMENT == "prod" and not self.DATABASE_URL.startswith("postgresql://"):
             db_url_preview = self.DATABASE_URL[:20]
             raise ValueError(
                 "Production environment requires PostgreSQL database. "

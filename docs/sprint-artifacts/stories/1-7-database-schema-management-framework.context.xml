@@ -1,0 +1,279 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.7</storyId>
+    <title>Database Schema Management Framework</title>
+    <status>done</status>
+    <generatedAt>2025-11-13</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/1-7-database-schema-management-framework.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>a systematic way to create and evolve database schemas</iWant>
+    <soThat>pipeline tests don't fail due to missing tables and production schema changes are tracked</soThat>
+    <tasks>
+      - Task 1: Install and configure Alembic (AC: 1,5)
+        - Subtask 1.1: Install Alembic via uv and add to project dependencies (pyproject.toml)
+        - Subtask 1.2: Initialize Alembic with `alembic init io/schema/migrations` and configure alembic.ini to reference project database URL from settings
+        - Subtask 1.3: Update env.py to use project settings (`from work_data_hub.config import settings`) and configure logging
+      - Task 2: Create initial migration for core tables (AC: 2,5)
+        - Subtask 2.1: Generate initial migration: `alembic revision --autogenerate -m "create_core_tables"`
+        - Subtask 2.2: Define `pipeline_executions` table schema: execution_id (PK, UUID), pipeline_name, status, started_at, completed_at, input_file, row_counts (JSONB), error_details (TEXT)
+        - Subtask 2.3: Define `data_quality_metrics` table schema: metric_id (PK, UUID), pipeline_name, metric_type, metric_value, recorded_at, metadata (JSONB)
+        - Subtask 2.4: Test migration apply (`alembic upgrade head`) and rollback (`alembic downgrade -1`) on local development database
+      - Task 3: Document migration workflow (AC: 3)
+        - Subtask 3.1: Add migration guide section to README or `docs/database-migrations.md` covering common commands and workflow
+        - Subtask 3.2: Document migration file naming convention (YYYYMMDD_HHMM_description.py) and why it prevents conflicts
+        - Subtask 3.3: Provide concrete examples: create migration, apply, rollback, check current version
+      - Task 4: Integrate migrations with test database (AC: 4)
+        - Subtask 4.1: Create pytest fixture `test_db_with_migrations` that provisions temp database and runs `alembic upgrade head`
+        - Subtask 4.2: Update existing integration tests to use this fixture instead of manual table creation
+        - Subtask 4.3: Document test database setup in testing guide, including how to run integration tests locally
+      - Task 5: Create db_setup helper script (AC: 3,4)
+        - Subtask 5.1: Create `scripts/db_setup.sh` (or .py) for fresh database initialization (create DB + run migrations)
+        - Subtask 5.2: Add seed data capability for test fixtures (`io/schema/fixtures/test_data.sql`)
+        - Subtask 5.3: Document script usage in README and reference in CI/CD workflow documentation
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. **Schema Migration Tool Configured** – Alembic installed and configured with workspace file (`alembic.ini`), initial migration script template, and documented upgrade/downgrade commands (`alembic upgrade head`, `alembic downgrade -1`)
+    2. **Core Tables Created** – Initial migration creates `pipeline_executions` (audit log) and `data_quality_metrics` tables using PostgreSQL conventions (lowercase_snake_case)
+    3. **Migration Workflow Documented** – README or migration guide explains how to create new migrations, apply them, and rollback, with concrete examples for common scenarios
+    4. **Test Database Integration** – Test database setup automatically runs migrations before integration tests (pytest fixture or CI script); documented in testing guide
+    5. **Schema Versioning Tracked** – `alembic_version` table correctly tracks applied migrations; validated with test migration creation and rollback cycle
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <!-- PRD Section: Database Loading & Management -->
+      <artifact>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>FR-4: Database Loading & Management</section>
+        <snippet>Transactional guarantees required. All-or-nothing writes with rollback on error. Connection pooling (min=2, max=10). Audit trail: pipeline execution logs with timestamps, input files, record counts, and error details.</snippet>
+      </artifact>
+
+      <!-- PRD Section: Monitoring & Observability -->
+      <artifact>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>FR-8: Monitoring & Observability (FR-8.1: Structured Logging)</section>
+        <snippet>Pipeline executions logged with timestamps, input files, row counts, error details. Audit trail enables queries like "show me all runs in last 6 months". Retention: keep logs for 2 years.</snippet>
+      </artifact>
+
+      <!-- Tech Spec: Story 1.7 Details -->
+      <artifact>
+        <path>docs/sprint-artifacts/tech-spec-epic-1.md</path>
+        <title>Epic 1 Technical Specification</title>
+        <section>Story 1.7: Database Schema Management with Alembic</section>
+        <snippet>Use Alembic for migration management. Store migrations in io/schema/migrations/. Core audit tables: pipeline_executions (execution tracking), data_quality_metrics (quality tracking). PostgreSQL conventions: lowercase_snake_case. Migration file naming: YYYYMMDD_HHMM_description.py prevents multi-developer conflicts. Separate migration user (admin) vs. application user (INSERT/SELECT only).</snippet>
+      </artifact>
+
+      <!-- Tech Spec: Database Schema Definition -->
+      <artifact>
+        <path>docs/sprint-artifacts/tech-spec-epic-1.md</path>
+        <title>Epic 1 Technical Specification</title>
+        <section>Data Models: Database Schema</section>
+        <snippet>pipeline_executions table: execution_id (VARCHAR PK), pipeline_name, started_at, completed_at, status (running/success/failed), input_file_path, rows_input/output/failed (INT), duration_ms, error_message. data_quality_metrics table: metric_id (SERIAL PK), execution_id (FK), domain, metric_name, metric_value (NUMERIC), recorded_at.</snippet>
+      </artifact>
+
+      <!-- Architecture: Technology Stack -->
+      <artifact>
+        <path>docs/architecture.md</path>
+        <title>Architecture Document</title>
+        <section>Technology Stack - Database</section>
+        <snippet>PostgreSQL (corporate standard) for transactional guarantees and JSON support. Alembic for schema migrations (industry standard with SQLAlchemy). Migration workflow: alembic upgrade head (apply), alembic downgrade -1 (rollback).</snippet>
+      </artifact>
+
+      <!-- Architecture Boundaries: Clean Architecture -->
+      <artifact>
+        <path>docs/architecture-boundaries.md</path>
+        <title>Clean Architecture Boundaries</title>
+        <section>Layer Responsibilities</section>
+        <snippet>Migrations belong in io/schema/migrations/ as I/O layer infrastructure, not domain logic. io/ layer can import domain/ for types but never vice versa. Alembic migrations are I/O concern.</snippet>
+      </artifact>
+    </docs>
+
+    <code>
+      <!-- Configuration Settings Framework -->
+      <artifact>
+        <path>src/work_data_hub/config/settings.py</path>
+        <kind>module</kind>
+        <symbol>Settings, get_settings</symbol>
+        <lines>all</lines>
+        <reason>Alembic env.py needs to import settings.DATABASE_URL for connection string. Story 1.4 established settings singleton that migrations must use.</reason>
+      </artifact>
+
+      <!-- Structured Logging Utilities -->
+      <artifact>
+        <path>src/work_data_hub/utils/logging.py</path>
+        <kind>module</kind>
+        <symbol>get_logger</symbol>
+        <lines>all</lines>
+        <reason>Alembic env.py should use Story 1.3 structured logging for migration execution logs. Consistent logging across all modules.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <!-- Python Core Dependencies -->
+      <python version="3.10+">
+        Standard library for database migrations
+      </python>
+
+      <!-- Database and Migration -->
+      <alembic version="latest">
+        Database schema migration tool - industry standard with SQLAlchemy
+      </alembic>
+      <psycopg2-binary version="latest">
+        PostgreSQL driver for database connections
+      </psycopg2-binary>
+      <sqlalchemy version="latest">
+        Required by Alembic for database operations (implicit dependency)
+      </sqlalchemy>
+
+      <!-- Testing -->
+      <pytest-postgresql version="latest">
+        Provides temporary PostgreSQL databases for integration tests (Story 1.11)
+      </pytest-postgresql>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <!-- Clean Architecture Boundary -->
+    - Migrations belong in io/schema/migrations/ (I/O layer, not domain)
+    - Alembic env.py MUST import from work_data_hub.config.settings for DATABASE_URL (single source of truth)
+    - Never duplicate database URL parsing with os.getenv() - use settings singleton
+
+    <!-- PostgreSQL Conventions -->
+    - Table names: lowercase_snake_case (e.g., pipeline_executions, not PipelineExecutions)
+    - Column names: lowercase_snake_case (e.g., started_at, not startedAt or StartedAt)
+    - No CamelCase in database schema
+
+    <!-- Migration File Naming -->
+    - Format: YYYYMMDD_HHMM_description.py (e.g., 20251113_1430_create_core_tables.py)
+    - Timestamp prevents multi-developer conflicts
+    - Descriptive name explains purpose
+
+    <!-- Security & Permissions -->
+    - Migration user: Database admin with DDL permissions (CREATE, ALTER, DROP)
+    - Application user: INSERT/SELECT only (no DDL) - least privilege principle
+    - Document this separation in migration guide
+
+    <!-- Integration with Previous Stories -->
+    - Story 1.3 logging: Use structured logging in Alembic env.py
+    - Story 1.4 config: Import settings, don't duplicate env var parsing
+    - Story 1.6 boundaries: Respect io/ vs domain/ separation
+
+    <!-- Future Story Dependencies -->
+    - Story 1.8 (Database Loader) will use tables created by these migrations
+    - Story 1.11 (Enhanced CI/CD) will run migrations in test database via pytest fixture
+    - Epic 4 (Annuity) will add domain-specific tables following this pattern
+  </constraints>
+
+  <interfaces>
+    <!-- Alembic Configuration -->
+    <interface>
+      <name>alembic.ini</name>
+      <kind>Configuration file</kind>
+      <signature>
+        [alembic]
+        script_location = io/schema/migrations
+        sqlalchemy.url = # Set dynamically from env.py using settings.DATABASE_URL
+      </signature>
+      <path>alembic.ini (project root)</path>
+    </interface>
+
+    <!-- Alembic Environment Script -->
+    <interface>
+      <name>env.py</name>
+      <kind>Alembic environment configuration</kind>
+      <signature>
+        from work_data_hub.config import settings
+        from work_data_hub.utils.logging import get_logger
+
+        # Configure Alembic to use project settings
+        config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+
+        # Run migrations with logging
+        run_migrations_offline() / run_migrations_online()
+      </signature>
+      <path>io/schema/migrations/env.py</path>
+    </interface>
+
+    <!-- Migration CLI Commands -->
+    <interface>
+      <name>Alembic CLI</name>
+      <kind>Command line interface</kind>
+      <signature>
+        alembic upgrade head      # Apply all pending migrations
+        alembic downgrade -1      # Rollback last migration
+        alembic revision --autogenerate -m "description"  # Create new migration
+        alembic current           # Show current migration version
+        alembic history           # Show migration history
+      </signature>
+      <path>Command line (uv run alembic ...)</path>
+    </interface>
+
+    <!-- Pytest Fixture for Test Database -->
+    <interface>
+      <name>test_db_with_migrations</name>
+      <kind>Pytest fixture</kind>
+      <signature>
+        @pytest.fixture
+        def test_db_with_migrations(postgresql):
+            """Provision temp database and run Alembic migrations."""
+            # Create database
+            # Run: alembic upgrade head
+            # Yield connection string
+            # Cleanup: alembic downgrade base
+      </signature>
+      <path>tests/conftest.py (Story 1.11)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing approach for database migrations follows pytest conventions with temporary PostgreSQL databases. Unit tests verify migration script validity (can apply/rollback without errors). Integration tests validate table creation and schema correctness. Story 1.11 will expand this with comprehensive test database provisioning using pytest-postgresql. Follow Epic 1 test coverage targets: io/ layer >70% coverage.
+    </standards>
+
+    <locations>
+      tests/unit/io/schema/          # Unit tests for migration scripts
+      tests/integration/             # Integration tests with test database (Story 1.11)
+      tests/conftest.py              # Shared fixtures including test_db_with_migrations
+      io/schema/fixtures/            # Test data SQL scripts for seeding
+    </locations>
+
+    <ideas>
+      <!-- AC 1: Alembic Configuration -->
+      - Test: Verify alembic.ini exists and has correct script_location
+      - Test: Verify env.py imports settings.DATABASE_URL (not os.getenv)
+      - Test: Verify alembic commands execute without errors (upgrade, downgrade)
+
+      <!-- AC 2: Core Tables Created -->
+      - Test: Apply migration, verify pipeline_executions table exists with correct schema
+      - Test: Verify pipeline_executions columns: execution_id (PK), pipeline_name, status, timestamps
+      - Test: Apply migration, verify data_quality_metrics table exists with correct schema
+      - Test: Verify data_quality_metrics columns: metric_id (PK), execution_id (FK), metric fields
+      - Test: Insert sample data, verify constraints work (PK, FK, NOT NULL)
+
+      <!-- AC 3: Migration Workflow Documented -->
+      - Test: Verify README or docs/database-migrations.md exists with migration guide
+      - Test: Documentation includes: upgrade command, downgrade command, revision creation
+      - Test: Examples provided for common scenarios
+
+      <!-- AC 4: Test Database Integration -->
+      - Test: pytest fixture test_db_with_migrations provisions database and runs migrations
+      - Test: Integration tests can insert/query data from migrated tables
+      - Test: Fixture cleanup correctly rolls back migrations
+
+      <!-- AC 5: Schema Versioning Tracked -->
+      - Test: alembic_version table exists after first migration
+      - Test: Version string matches expected migration revision ID
+      - Test: After downgrade, alembic_version updates correctly
+      - Test: Create test migration, apply, verify version, rollback, verify version reverted
+    </ideas>
+  </tests>
+</story-context>

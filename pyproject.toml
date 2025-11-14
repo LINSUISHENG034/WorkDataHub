@@ -12,6 +12,7 @@ dependencies = [
     "structlog",
     "psycopg2-binary",
     "alembic",
+    "sqlalchemy>=2.0",
     "openpyxl",
     "PyYAML",
     "pydantic-settings>=2.10.1",

@@ -387,6 +387,19 @@ outer layers, so a clean lint run is proof that Story 1.6 dependency rules hol
 - Modern Python tooling
 - Comprehensive documentation
 
+## Database Migrations
+
+- Alembic scripts live under `io/schema/migrations/` and are configured via the
+  root `alembic.ini`, which loads the canonical connection string from
+  `work_data_hub.config`.
+- Use `python scripts/db_setup.py --seed` to run `alembic upgrade head` and
+  optionally load `io/schema/fixtures/test_data.sql` for local smoke tests.
+- Integration tests can depend on the `test_db_with_migrations` fixture defined
+  in `tests/conftest.py`; it provisions a temporary SQLite database and applies
+  the latest migrations automatically.
+- Refer to `docs/database-migrations.md` for the complete workflow, naming
+  conventions, and troubleshooting steps introduced in Story 1.7.
+
 ## Project Status
 
 This project is under active development. See `docs/sprint-artifacts/sprint-status.yaml` for current progress across all epics and stories.

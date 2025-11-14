@@ -48,7 +48,7 @@ development_status:
   1-4-configuration-management-framework: done
   1-5-shared-pipeline-framework-core-simple: done
   1-6-clean-architecture-boundaries-enforcement: done
-  1-7-database-schema-management-framework: backlog
+  1-7-database-schema-management-framework: done
   1-8-postgresql-connection-and-transactional-loading-framework: backlog
   1-9-dagster-orchestration-setup: backlog
   1-10-pipeline-framework-advanced-features: backlog
@@ -103,4 +103,3 @@ development_status:
   6-3-parity-test-integration-in-ci-pipeline: backlog
   6-4-divergence-reporting-and-sql-diff-tool: backlog
   epic-6-retrospective: optional
-

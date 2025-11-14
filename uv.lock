@@ -2449,6 +2449,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pyyaml" },
+    { name = "sqlalchemy" },
     { name = "structlog" },
 ]
 
@@ -2497,6 +2498,7 @@ requires-dist = [
     { name = "pytest-postgresql", marker = "extra == 'dev'" },
     { name = "pyyaml" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.12.12" },
+    { name = "sqlalchemy", specifier = ">=2.0" },
     { name = "structlog" },
 ]
 provides-extras = ["dev"]
