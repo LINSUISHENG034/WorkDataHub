@@ -7,10 +7,30 @@ modules importing database stacks directly. Keep dependency direction:
 domain ← io ← orchestration.
 """
 
+from __future__ import annotations
+
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+import time
+import uuid
+from dataclasses import dataclass, field
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+import pandas as pd
+
+try:  # pragma: no cover - availability checked at runtime
+    from psycopg2 import OperationalError
+    from psycopg2.pool import ThreadedConnectionPool
+    from psycopg2.extras import execute_values
+except ImportError:  # pragma: no cover - handled gracefully
+    OperationalError = None  # type: ignore[assignment]
+    ThreadedConnectionPool = None  # type: ignore[assignment]
+    execute_values = None  # type: ignore[assignment]
+
+from work_data_hub.config import get_settings
+from work_data_hub.utils.logging import get_logger
 
 logger = logging.getLogger(__name__)
+structured_logger = get_logger(__name__)
 
 
 class DataWarehouseLoaderError(Exception):
@@ -19,6 +39,316 @@ class DataWarehouseLoaderError(Exception):
     pass
 
 
+@dataclass(slots=True)
+class LoadResult:
+    """Structured response for WarehouseLoader operations (Story 1.8)."""
+
+    success: bool
+    rows_inserted: int
+    rows_updated: int
+    duration_ms: float
+    execution_id: str
+    errors: List[str] = field(default_factory=list)
+
+
+class WarehouseLoader:
+    """Transactional PostgreSQL loader with pooling and column projection."""
+
+    _DEFAULT_RETRY_ATTEMPTS = 3
+    _DEFAULT_BACKOFF_MS = 1000
+
+    def __init__(
+        self,
+        connection_url: Optional[str] = None,
+        pool_size: Optional[int] = None,
+        batch_size: Optional[int] = None,
+        connect_timeout: int = 5,
+    ) -> None:
+        if ThreadedConnectionPool is None or OperationalError is None or execute_values is None:
+            raise DataWarehouseLoaderError(
+                "psycopg2 is required to use WarehouseLoader but is not installed"
+            )
+
+        try:
+            settings = get_settings()
+        except Exception:
+            settings = None
+
+        if connection_url is None:
+            if settings is None:
+                raise DataWarehouseLoaderError(
+                    "connection_url is required when application settings cannot load"
+                )
+            connection_url = settings.get_database_connection_string()
+
+        if pool_size is None:
+            pool_size = settings.DB_POOL_SIZE if settings else 10
+        if batch_size is None:
+            batch_size = settings.DB_BATCH_SIZE if settings else 1000
+
+        self.connection_url = connection_url
+        self.pool_size = pool_size
+        self.batch_size = batch_size
+        if self.pool_size < 1:
+            raise DataWarehouseLoaderError("pool_size must be at least 1")
+        if self.batch_size < 1:
+            raise DataWarehouseLoaderError("batch_size must be at least 1")
+
+        min_connections = 2 if self.pool_size >= 2 else 1
+        try:
+            self._pool = ThreadedConnectionPool(
+                minconn=min_connections,
+                maxconn=self.pool_size,
+                dsn=self.connection_url,
+                connect_timeout=connect_timeout,
+                application_name="WorkDataHubWarehouseLoader",
+            )
+        except Exception as exc:  # pragma: no cover - passthrough for connection issues
+            raise DataWarehouseLoaderError(
+                f"Unable to initialize connection pool: {exc}"
+            ) from exc
+
+        self._logger = structured_logger.bind(loader="WarehouseLoader")
+        self._allowed_columns_cache: Dict[Tuple[str, str], List[str]] = {}
+        self._max_retries = self._DEFAULT_RETRY_ATTEMPTS
+        self._backoff_ms = self._DEFAULT_BACKOFF_MS
+        self._health_check()
+
+    def close(self) -> None:
+        """Close the underlying connection pool."""
+        self._pool.closeall()
+
+    def _health_check(self) -> None:
+        """Validate pool connectivity with a lightweight query."""
+        conn = self._pool.getconn()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT 1")
+        except Exception as exc:
+            self._pool.putconn(conn, close=True)
+            raise DataWarehouseLoaderError(f"Health check failed: {exc}") from exc
+        else:
+            self._pool.putconn(conn)
+
+    def _get_connection_with_retry(self):
+        """Acquire a connection from the pool with retry on transient errors."""
+        last_error: Optional[Exception] = None
+        delay = self._backoff_ms / 1000
+        for attempt in range(1, self._max_retries + 1):
+            try:
+                return self._pool.getconn()
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+                is_transient = OperationalError is not None and isinstance(
+                    exc, OperationalError
+                )
+                if not is_transient or attempt == self._max_retries:
+                    break
+                self._logger.warning(
+                    "database.connection.retry",
+                    attempt=attempt,
+                    max_attempts=self._max_retries,
+                    error=str(exc),
+                )
+                time.sleep(delay)
+                delay *= 2
+        raise DataWarehouseLoaderError("Unable to acquire database connection") from last_error
+
+    def get_allowed_columns(self, table: str, schema: str = "public") -> List[str]:
+        """Fetch and cache the allowed columns for a table."""
+        cache_key = (schema, table)
+        if cache_key in self._allowed_columns_cache:
+            return self._allowed_columns_cache[cache_key]
+
+        conn = self._get_connection_with_retry()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_schema = %s AND table_name = %s
+                    ORDER BY ordinal_position
+                    """,
+                    (schema, table),
+                )
+                rows = cursor.fetchall()
+        except Exception as exc:
+            raise DataWarehouseLoaderError(
+                f"Unable to inspect columns for {schema}.{table}: {exc}"
+            ) from exc
+        finally:
+            self._pool.putconn(conn)
+
+        if not rows:
+            raise DataWarehouseLoaderError(
+                f"No columns found for table {schema}.{table}"
+            )
+
+        allowed = [row[0] for row in rows]
+        self._allowed_columns_cache[cache_key] = allowed
+        return allowed
+
+    def project_columns(
+        self, df: pd.DataFrame, table: str, schema: str = "public"
+    ) -> pd.DataFrame:
+        """Project DataFrame columns to the allowed schema-defined set."""
+        if not isinstance(df, pd.DataFrame):
+            raise DataWarehouseLoaderError("load_dataframe() requires a pandas DataFrame")
+
+        allowed = self.get_allowed_columns(table, schema)
+        preserved = [col for col in allowed if col in df.columns]
+        removed = [col for col in df.columns if col not in allowed]
+
+        if not preserved:
+            raise DataWarehouseLoaderError(
+                f"No valid columns remain after projection for {schema}.{table}"
+            )
+
+        if len(removed) > 5:
+            self._logger.warning(
+                "column_projection.many_removed",
+                removed_count=len(removed),
+                removed=removed,
+                table=table,
+                schema=schema,
+            )
+        elif removed:
+            self._logger.info(
+                "column_projection.removed",
+                removed_count=len(removed),
+                removed=removed,
+                table=table,
+                schema=schema,
+            )
+
+        return df.loc[:, preserved].copy()
+
+    def _chunk_dataframe(self, df: pd.DataFrame) -> Iterable[pd.DataFrame]:
+        """Yield DataFrame chunks respecting configured batch size."""
+        total_rows = len(df.index)
+        for start in range(0, total_rows, self.batch_size):
+            yield df.iloc[start : start + self.batch_size]
+
+    def _build_insert_query(
+        self,
+        columns: List[str],
+        table: str,
+        schema: str,
+        upsert_keys: Optional[List[str]],
+    ) -> str:
+        qualified_table = quote_qualified(schema, table)
+        quoted_cols = ",".join(quote_ident(col) for col in columns)
+        query = f"INSERT INTO {qualified_table} ({quoted_cols}) VALUES %s"
+
+        if upsert_keys:
+            quoted_conflict = ",".join(quote_ident(key) for key in upsert_keys)
+            update_targets = [col for col in columns if col not in upsert_keys]
+            if not update_targets:
+                update_targets = columns
+            set_clause = ", ".join(
+                f"{quote_ident(col)} = EXCLUDED.{quote_ident(col)}"
+                for col in update_targets
+            )
+            query += f" ON CONFLICT ({quoted_conflict}) DO UPDATE SET {set_clause}"
+
+        query += " RETURNING (xmax = 0) AS inserted"
+        return query
+
+    def load_dataframe(
+        self,
+        df: pd.DataFrame,
+        table: str,
+        schema: str = "public",
+        upsert_keys: Optional[List[str]] = None,
+    ) -> LoadResult:
+        """Load a DataFrame into PostgreSQL with ACID guarantees."""
+        if not isinstance(df, pd.DataFrame):
+            raise DataWarehouseLoaderError("load_dataframe() requires a pandas DataFrame")
+
+        execution_id = uuid.uuid4().hex
+        if df.empty:
+            self._logger.info(
+                "database.load.skipped",
+                reason="empty_dataframe",
+                table=table,
+                schema=schema,
+                execution_id=execution_id,
+            )
+            return LoadResult(True, 0, 0, 0.0, execution_id)
+
+        projected_df = self.project_columns(df, table, schema)
+        columns = list(projected_df.columns)
+        query = self._build_insert_query(columns, table, schema, upsert_keys)
+
+        conn = self._get_connection_with_retry()
+        start_time = time.perf_counter()
+        rows_inserted = 0
+        rows_updated = 0
+
+        self._logger.info(
+            "database.load.started",
+            table=table,
+            schema=schema,
+            rows=len(projected_df.index),
+            execution_id=execution_id,
+        )
+
+        try:
+            with conn.cursor() as cursor:
+                for batch in self._chunk_dataframe(projected_df):
+                    values = list(batch.itertuples(index=False, name=None))
+                    if not values:
+                        continue
+
+                    execute_values(
+                        cursor,
+                        query,
+                        values,
+                        page_size=min(len(values), self.batch_size),
+                    )
+                    result_flags = cursor.fetchall()
+                    inserted = sum(1 for flag, in result_flags if flag)
+                    rows_inserted += inserted
+                    rows_updated += len(result_flags) - inserted
+            conn.commit()
+        except Exception as exc:
+            try:
+                conn.rollback()
+            except Exception:  # pragma: no cover - best-effort rollback
+                pass
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            self._logger.error(
+                "database.load.failed",
+                table=table,
+                schema=schema,
+                execution_id=execution_id,
+                duration_ms=duration_ms,
+                error=str(exc),
+            )
+            raise DataWarehouseLoaderError(
+                f"Load failed for {schema}.{table}: {exc}"
+            ) from exc
+        finally:
+            self._pool.putconn(conn)
+
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        self._logger.info(
+            "database.load.completed",
+            table=table,
+            schema=schema,
+            execution_id=execution_id,
+            rows_inserted=rows_inserted,
+            rows_updated=rows_updated,
+            duration_ms=duration_ms,
+        )
+        return LoadResult(
+            success=True,
+            rows_inserted=rows_inserted,
+            rows_updated=rows_updated,
+            duration_ms=duration_ms,
+            execution_id=execution_id,
+        )
 def quote_ident(name: str) -> str:
     """
     Quote PostgreSQL identifier with double quotes and escape internal quotes.

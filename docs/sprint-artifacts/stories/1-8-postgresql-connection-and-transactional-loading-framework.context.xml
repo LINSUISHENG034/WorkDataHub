@@ -1,0 +1,574 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>8</storyId>
+    <title>PostgreSQL Connection and Transactional Loading Framework</title>
+    <status>done</status>
+    <generatedAt>2025-11-14</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>E:\Projects\WorkDataHub\docs\sprint-artifacts\1-8-postgresql-connection-and-transactional-loading-framework.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>a reliable database connection framework with transactional guarantees</iWant>
+    <soThat>I can safely load DataFrames to PostgreSQL without risk of partial data corruption</soThat>
+    <tasks>
+      - Implement WarehouseLoader class with connect(), load_dataframe(), disconnect() methods
+      - Add connection pooling (min=2, max=10 connections, configurable via DB_POOL_SIZE)
+      - Implement transactional bulk loading with all-or-nothing rollback semantics
+      - Support batch inserts in chunks of 1000 rows (configurable via DB_BATCH_SIZE)
+      - Use parameterized queries exclusively (no SQL string concatenation)
+      - Implement get_allowed_columns(table_name) to query database schema
+      - Implement project_columns(df, table_name) to filter DataFrame columns
+      - Add WARNING log when >5 columns are removed by projection
+      - Implement retry logic: 3 retries with exponential backoff on connection failures
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    **Given** I have schema management from Story 1.7
+    **When** I implement io/loader/warehouse_loader.py
+    **Then** I should have:
+    - WarehouseLoader class with methods: connect(), load_dataframe(), disconnect()
+    - Connection pooling: min=2, max=10 connections (configurable via DB_POOL_SIZE env var)
+    - Transactional bulk loading: all-or-nothing writes with rollback on error
+    - Batch inserts in chunks of 1000 rows (balance transaction size vs. speed)
+    - Parameterized queries only (no SQL string concatenation)
+    - get_allowed_columns(table_name) method that queries database schema
+    - project_columns(df, table_name) method that filters DataFrame to allowed columns
+    - When >5 columns removed by projection, log WARNING (potential data loss indicator)
+    - Retry logic: on database connection failures, retry 3 times with exponential backoff
+
+    **And** When I load a test DataFrame to a PostgreSQL table
+    **Then** All rows should be inserted within a single transaction
+
+    **And** When loading fails mid-batch (simulated error)
+    **Then** The entire batch should rollback (no partial data in database)
+
+    **And** When DataFrame contains extra columns not in database table
+    **Then** Loader automatically projects to allowed columns and logs removed column names
+
+    **And** When database connection fails transiently
+    **Then** Loader retries 3 times (backoff: 1s, 2s, 4s) before raising exception
+
+    **Prerequisites:** Story 1.7 (tables exist from migrations), Story 1.6 (architecture boundaries)
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      ## Epic 1: Foundation & Core Infrastructure
+      Source: docs/epics.md (lines 36-571)
+
+      **Story 1.8 Full Definition (lines 372-416):**
+      As a data engineer, I want a reliable database connection framework with transactional guarantees,
+      so that I can safely load DataFrames to PostgreSQL without risk of partial data corruption.
+
+      Technical Notes from epics.md:
+      - Use psycopg2 or SQLAlchemy for PostgreSQL connection
+      - Connection string from settings.DATABASE_URL (Story 1.4 config)
+      - Context manager pattern for transaction safety: with loader.transaction():
+      - Integration tests using temporary test database (created by Story 1.7 migrations)
+      - Support upsert: ON CONFLICT (pk_cols) DO UPDATE
+      - Batch size configurable via DB_BATCH_SIZE env var (default 1000)
+      - Connection pool prevents connection exhaustion on parallel loads
+      - Reference: PRD §879-906 (FR-4: Database Loading), §1252-1277 (Security NFRs)
+
+      ## Architecture Boundaries (Story 1.6)
+      Source: docs/architecture-boundaries.md (lines 1-117)
+
+      **Layer Responsibilities:**
+      - io/ layer: Filesystem, Excel readers, warehouse loaders, connectors, adapters
+      - Allowed dependencies: Everything domain can use PLUS infrastructure SDKs (psycopg2, openpyxl, yaml)
+      - Representative modules: src/work_data_hub/io/loader/warehouse_loader.py
+
+      **Medallion Alignment:**
+      - Bronze: I/O layer (work_data_hub.io) handles discovery, file normalization, landing zones
+      - Uses Story 1.5 structlog + config helpers (work_data_hub.utils.logging, work_data_hub.config.settings)
+
+      **Dependency Injection Example (lines 46-79):**
+      Shows orchestration injecting I/O services into domain layer. Key takeaway:
+      1. Domain logic has no knowledge of readers/loaders
+      2. Readers and loaders stay in I/O layer
+      3. Orchestration supplies configuration without making domain depend on Dagster/psycopg2
+
+      **Boundary Guardrails (lines 102-108):**
+      - Ruff configured with TID251 banned-import rules
+      - Any work_data_hub/domain module importing work_data_hub.io fails linting
+      - Run uv run ruff check locally—CI workflow runs same command
+
+      ## Brownfield Architecture
+      Source: docs/brownfield-architecture.md (lines 1-427)
+
+      **Current State - warehouse_loader.py:**
+      Module location: src/work_data_hub/io/loader/warehouse_loader.py
+      Status: Function-based implementation exists (lines 1-860 of current file)
+      - Transactional loading with commit/rollback (lines 797-858)
+      - Batch processing (chunk_size parameter)
+      - Parameterized queries via psycopg2
+      - Column filtering via _get_column_order() (lines 94-112)
+      - Delete/insert modes supported
+
+      **Tech Stack (lines 64-77):**
+      - Language: Python 3.10+
+      - Database: psycopg2-binary
+      - Testing: pytest-postgresql
+      - Locking: Ruff, MyPy
+
+      **Testing Reality (lines 376-398):**
+      - Integration tests: Run plan-only and execute paths against sample datasets
+      - Pytest markers: postgres (requires live DB), integration
+      - test_db_with_migrations fixture from conftest.py
+    </docs>
+
+    <code>
+      ## Existing Implementation
+      **File: src/work_data_hub/io/loader/warehouse_loader.py (860 lines)**
+
+      Current implementation provides:
+      - quote_ident(name) -> str: Quote PostgreSQL identifiers (line 22-44)
+      - quote_qualified(schema, table) -> str: Quote schema.table (line 47-79)
+      - build_insert_sql(table, cols, rows) -> (sql, params): Generate INSERT SQL (line 115-165)
+      - build_insert_sql_with_conflict(...): INSERT with ON CONFLICT (line 168-233)
+      - build_delete_sql(table, pk_cols, rows) -> (sql, params): Generate DELETE SQL (line 236-307)
+      - insert_missing(table, key_cols, rows, conn, ...): Insert with conflict resolution (line 360-560)
+      - fill_null_only(table, key_cols, rows, updatable_cols, conn, ...): Update NULL columns only (line 563-656)
+      - load(table, rows, mode, pk, chunk_size, conn): Main loader function (line 659-859)
+        * Supports delete_insert and append modes
+        * Transaction management with commit/rollback
+        * Chunked execution via chunk_size parameter (default 1000)
+        * Returns metadata: {"mode": str, "table": str, "deleted": int, "inserted": int, "batches": int}
+
+      **Gap Analysis - Missing from Story 1.8:**
+      1. ❌ Class-based API (functions only, no WarehouseLoader class)
+      2. ❌ Connection pooling implementation
+      3. ❌ connect() / disconnect() methods
+      4. ❌ load_dataframe() method (currently load() takes list of dicts)
+      5. ❌ Public get_allowed_columns() method (exists as _get_column_order but private)
+      6. ❌ project_columns(df, table_name) method
+      7. ❌ Retry logic with exponential backoff
+      8. ❌ WARNING when >5 columns removed
+
+      **File: src/work_data_hub/config/settings.py (353 lines)**
+
+      Configuration already present (Story 1.4):
+      - DATABASE_URL: Optional[str] (line 100-104, required for Story 1.4)
+      - DB_POOL_SIZE: int (line 125-129, default=10)
+      - DB_BATCH_SIZE: int (line 130-134, default=1000)
+      - get_database_connection_string() method (line 227-245)
+      - Validation: production requires PostgreSQL (line 264-295)
+      - Singleton pattern via @lru_cache (line 307-318)
+
+      **File: tests/io/test_warehouse_loader.py**
+
+      Existing test patterns:
+      - SQL builder unit tests (no database): test_quote_ident, test_build_insert_sql, test_build_delete_sql
+      - Mock-based testing for database operations
+      - Fixtures: sample_rows fixture (line 21-43)
+      - Test classes: TestSQLBuilders (line 46-150)
+      - Uses pytest with MagicMock for connection mocking
+
+      **File: tests/conftest.py (lines 71-101)**
+
+      test_db_with_migrations fixture:
+      - Creates temporary SQLite database
+      - Runs Alembic migrations via migration_runner.upgrade()
+      - Yields database_url for tests
+      - Cleanup with migration_runner.downgrade() on teardown
+      - Session-scoped fixture for efficiency
+
+      **File: src/work_data_hub/io/schema/migration_runner.py**
+
+      Programmatic migration execution (used by tests):
+      - migration_runner.upgrade(database_url)
+      - migration_runner.downgrade(database_url, "base")
+    </code>
+
+    <dependencies>
+      ## Core Dependencies
+      Source: pyproject.toml
+
+      **Database Stack:**
+      - psycopg2-binary: PostgreSQL database driver (line 13)
+      - sqlalchemy>=2.0: ORM with connection pooling support (line 15)
+      - alembic: Schema migration tool (line 14)
+
+      **Testing Stack:**
+      - pytest: Test framework (line 32)
+      - pytest-cov: Coverage reporting (line 33)
+      - pytest-postgresql: Test database provisioning (line 34)
+
+      **Data Processing:**
+      - pandas: DataFrame library (line 10)
+      - pydantic>=2.11.7: Data validation (line 11)
+
+      **Development:**
+      - ruff>=0.12.12: Linter with TID251 rules for architecture boundaries (line 35)
+      - mypy>=1.17.1: Type checking (line 36)
+
+      ## Cross-Story Dependencies
+
+      **Prerequisites (from epics.md):**
+      1. Story 1.7 - Database Schema Management Framework
+         - Migration system (Alembic or raw SQL)
+         - Tables exist: pipeline_executions, data_quality_metrics
+         - Migration command: alembic upgrade head
+         - Test database setup runs migrations automatically
+
+      2. Story 1.6 - Clean Architecture Boundaries Enforcement
+         - Ruff TID251 rules: domain/ cannot import io/ or orchestration/
+         - Dependency injection pattern established
+         - Context: Domain services receive loaders via DI, never import directly
+
+      **Dependencies on Story 1.8 (reverse lookup):**
+      - Story 1.9 (Dagster Orchestration): Uses warehouse loader for database writes
+      - Story 1.10 (Pipeline Framework Advanced): Retry logic patterns
+      - Story 1.11 (Enhanced CI/CD): Integration tests with database
+      - Epic 2 stories: Data validation pipelines need reliable database loading
+      - Epic 4 stories: Annuity domain migration depends on transactional loading
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    ## Architecture Constraints (Story 1.6)
+
+    1. **Layer Placement:**
+       - WarehouseLoader MUST reside in src/work_data_hub/io/loader/
+       - I/O layer constraint: Can import domain types but domain cannot import io
+       - Ruff enforcement: TID251 rule blocks domain → io imports
+
+    2. **Dependency Injection Pattern:**
+       - Domain services receive loader instances via constructor/parameters
+       - Orchestration layer instantiates and injects loaders
+       - Example from architecture-boundaries.md (line 46-79):
+         ```python
+         from work_data_hub.io.loader import warehouse_loader
+         def transform_annuity_data(source_path, reader, enrichment):
+             # Domain logic
+             result = process_with_enrichment(...)
+             # Orchestration calls loader
+             warehouse_loader.load(...)
+         ```
+
+    3. **Configuration Management (Story 1.4):**
+       - Connection string via settings.DATABASE_URL
+       - Pool size via settings.DB_POOL_SIZE (default 10)
+       - Batch size via settings.DB_BATCH_SIZE (default 1000)
+       - Use get_settings() singleton from config/settings.py
+
+    4. **Schema Management (Story 1.7):**
+       - Tables must exist before loading (migrations applied)
+       - get_allowed_columns() queries actual database schema
+       - No assumptions about table structure in code
+
+    5. **Transaction Safety:**
+       - All-or-nothing semantics required
+       - Rollback on any error during batch
+       - Context manager pattern for transaction lifecycle
+
+    6. **Security Constraints:**
+       - Parameterized queries only (prevent SQL injection)
+       - No SQL string concatenation with user data
+       - Connection pooling prevents exhaustion attacks
+       - Credential management via environment variables
+
+    7. **Performance Constraints:**
+       - Batch size 1000 rows (configurable, balance speed vs transaction size)
+       - Connection pool: min=2, max=10 (prevent resource exhaustion)
+       - Chunked operations to avoid memory issues with large datasets
+
+    8. **Testing Constraints:**
+       - Unit tests: No database required (SQL builders)
+       - Integration tests: Use test_db_with_migrations fixture
+       - Marker: @pytest.mark.postgres for tests requiring database
+       - CI runs integration tests with temporary database
+  </constraints>
+
+  <interfaces>
+    ## WarehouseLoader Class Interface (Story 1.8 Specification)
+
+    ```python
+    class WarehouseLoader:
+        """
+        Transactional database loader with connection pooling and retry logic.
+
+        Manages PostgreSQL connections and provides DataFrame-to-table loading
+        with all-or-nothing transaction semantics.
+        """
+
+        def __init__(self, connection_string: str, pool_size: int = 10,
+                     batch_size: int = 1000):
+            """
+            Initialize loader with connection pooling.
+
+            Args:
+                connection_string: PostgreSQL connection URL
+                pool_size: Maximum connections in pool (from DB_POOL_SIZE)
+                batch_size: Rows per batch (from DB_BATCH_SIZE)
+            """
+            pass
+
+        def connect(self) -> None:
+            """
+            Establish connection pool.
+
+            Creates ThreadedConnectionPool with min=2, max=pool_size.
+            Raises ConnectionError if unable to connect after retries.
+            """
+            pass
+
+        def disconnect(self) -> None:
+            """
+            Close all connections and cleanup pool.
+
+            Safe to call multiple times (idempotent).
+            """
+            pass
+
+        def load_dataframe(self, df: pd.DataFrame, table: str,
+                          mode: str = "delete_insert",
+                          pk: Optional[List[str]] = None) -> Dict[str, Any]:
+            """
+            Load pandas DataFrame to PostgreSQL table.
+
+            Args:
+                df: DataFrame with data to load
+                table: Target table name
+                mode: "delete_insert" or "append"
+                pk: Primary key columns (required for delete_insert)
+
+            Returns:
+                {"mode": str, "table": str, "deleted": int,
+                 "inserted": int, "batches": int}
+
+            Raises:
+                DataWarehouseLoaderError: On validation or execution errors
+
+            Implementation:
+                1. Convert df to list of dicts
+                2. Project to allowed columns (call project_columns())
+                3. Call existing load() function with retry wrapper
+                4. Return metadata
+            """
+            pass
+
+        def get_allowed_columns(self, table_name: str) -> List[str]:
+            """
+            Query database schema for table columns.
+
+            Args:
+                table_name: Table to inspect
+
+            Returns:
+                List of column names (excluding auto-generated IDs)
+
+            Uses: information_schema.columns or pg_catalog queries
+            """
+            pass
+
+        def project_columns(self, df: pd.DataFrame,
+                           table_name: str) -> pd.DataFrame:
+            """
+            Filter DataFrame to allowed table columns.
+
+            Args:
+                df: Source DataFrame
+                table_name: Target table
+
+            Returns:
+                DataFrame with only allowed columns
+
+            Side effects:
+                - Logs WARNING if >5 columns removed
+                - Logs removed column names at INFO level
+
+            Implementation:
+                1. Call get_allowed_columns(table_name)
+                2. Find columns in df not in allowed list
+                3. If len(removed) > 5: logger.warning(...)
+                4. Return df[allowed_cols]
+            """
+            pass
+    ```
+
+    ## Retry Logic Interface
+
+    ```python
+    @retry_on_transient_errors(max_retries=3, backoff_base=1.0)
+    def _execute_with_retry(self, operation: Callable, *args, **kwargs):
+        """
+        Execute database operation with exponential backoff retry.
+
+        Retry on:
+            - psycopg2.OperationalError (connection errors)
+            - psycopg2.InterfaceError (network issues)
+            - NOT psycopg2.IntegrityError (data errors, no retry)
+
+        Backoff: 1s, 2s, 4s (exponential: base * 2^attempt)
+
+        Logs each retry attempt with error details.
+        """
+        pass
+    ```
+
+    ## Integration Points
+
+    **From Domain Services (via DI):**
+    ```python
+    # In orchestration/ops.py
+    from io.loader.warehouse_loader import WarehouseLoader
+    from config import get_settings
+
+    settings = get_settings()
+    loader = WarehouseLoader(
+        connection_string=settings.DATABASE_URL,
+        pool_size=settings.DB_POOL_SIZE,
+        batch_size=settings.DB_BATCH_SIZE
+    )
+    loader.connect()
+
+    # Pass to domain service
+    result_df = domain_service.process(data)
+    loader.load_dataframe(result_df, "gold.annuity_performance",
+                         mode="delete_insert", pk=["月度", "计划代码", "company_id"])
+
+    loader.disconnect()
+    ```
+
+    **Existing Functions to Preserve:**
+    - quote_ident(name) -> str
+    - quote_qualified(schema, table) -> str
+    - build_insert_sql(table, cols, rows) -> (sql, params)
+    - build_delete_sql(table, pk_cols, rows) -> (sql, params)
+    - load(table, rows, mode, pk, chunk_size, conn) -> Dict
+
+    These remain as module-level functions, used internally by WarehouseLoader class.
+  </interfaces>
+
+  <tests>
+    <standards>
+      ## Testing Standards (from conftest.py and test_warehouse_loader.py)
+
+      **Test Categories:**
+      1. Unit tests (no database):
+         - SQL builder functions (quote_ident, build_insert_sql, build_delete_sql)
+         - Input validation and edge cases
+         - Marker: @pytest.mark.unit
+
+      2. Integration tests (with database):
+         - Full load operations with test_db_with_migrations fixture
+         - Transaction rollback scenarios
+         - Connection pool behavior
+         - Marker: @pytest.mark.integration @pytest.mark.postgres
+
+      **Test Fixtures:**
+      - sample_rows: Standard test dataset (tests/io/test_warehouse_loader.py:21-43)
+      - test_db_with_migrations: Temporary database with migrations applied (tests/conftest.py:71-101)
+
+      **Assertion Patterns:**
+      - SQL structure validation: assert sql == expected_sql
+      - Parameter ordering: assert params == expected_params
+      - Error handling: with pytest.raises(ErrorType, match="message pattern")
+      - Mock verification: mock.assert_called_with(...)
+
+      **Coverage Requirements:**
+      - Domain layer: >90% (core business logic)
+      - I/O layer: >70% (warehouse_loader.py target)
+      - Integration paths: Key scenarios (success, rollback, retry)
+    </standards>
+
+    <locations>
+      ## Test File Locations
+
+      **Primary test file:** tests/io/test_warehouse_loader.py
+      - Existing: SQL builder unit tests (lines 1-150+)
+      - Add: WarehouseLoader class tests (new test class)
+      - Add: Connection pooling tests
+      - Add: Retry logic tests
+      - Add: project_columns() tests with WARNING verification
+
+      **Integration test file:** tests/io/test_warehouse_loader_integration.py (NEW)
+      - Create new file for database-dependent tests
+      - Use test_db_with_migrations fixture from conftest.py
+      - Test full load_dataframe() workflow
+      - Test transaction rollback on mid-batch failure
+      - Test connection pool exhaustion handling
+
+      **Fixtures:** tests/conftest.py
+      - Existing: test_db_with_migrations (line 71-101)
+      - Add: warehouse_loader_instance fixture (instantiated WarehouseLoader with test DB)
+
+      **Supporting files:**
+      - tests/fixtures/: Sample DataFrames for load testing
+      - tests/io/test_warehouse_loader_backfill.py: Backfill-specific scenarios (already exists)
+    </locations>
+
+    <ideas>
+      ## Test Ideas for Story 1.8 Implementation
+
+      **1. WarehouseLoader Class Tests:**
+      - test_warehouse_loader_init: Verify pool_size and batch_size from settings
+      - test_connect_creates_pool: Assert connection pool initialized with correct min/max
+      - test_disconnect_closes_pool: Verify all connections closed and pool None
+      - test_disconnect_idempotent: Call disconnect() twice, no errors
+      - test_load_dataframe_converts_to_dict: Pass DataFrame, verify internal load() called
+      - test_load_dataframe_projects_columns: DataFrame with extra columns → project_columns called
+      - test_load_dataframe_returns_metadata: Verify {"mode", "table", "deleted", "inserted", "batches"}
+
+      **2. Connection Pooling Tests:**
+      - test_pool_min_connections: Verify min=2 connections created on connect()
+      - test_pool_max_connections: Verify max=pool_size enforced
+      - test_pool_concurrent_access: Simulate concurrent load_dataframe calls, verify pool shares connections
+      - test_pool_connection_reuse: Load twice, verify same connection reused
+      - test_pool_exhaustion_waits: Max connections in use → next request waits (not fails)
+
+      **3. Retry Logic Tests:**
+      - test_retry_on_operational_error: Simulate psycopg2.OperationalError → retry 3 times
+      - test_retry_exponential_backoff: Verify backoff delays: 1s, 2s, 4s (mock time.sleep)
+      - test_retry_logs_attempts: Check logger for "Retry 1/3", "Retry 2/3" messages
+      - test_retry_succeeds_on_second_attempt: First call fails, second succeeds → return success
+      - test_no_retry_on_integrity_error: psycopg2.IntegrityError → fail immediately (no retry)
+      - test_retry_exhausted_raises: All 3 retries fail → raise original exception
+
+      **4. get_allowed_columns() Tests:**
+      - test_get_allowed_columns_queries_schema: Verify SELECT from information_schema.columns
+      - test_get_allowed_columns_excludes_id: Auto-generated ID columns not in result
+      - test_get_allowed_columns_returns_sorted: Column names returned alphabetically
+      - test_get_allowed_columns_table_not_exists: Raises DataWarehouseLoaderError
+
+      **5. project_columns() Tests:**
+      - test_project_columns_filters_extra: DataFrame [A, B, C, D], table [A, B] → DataFrame [A, B]
+      - test_project_columns_logs_removed: Verify INFO log with removed column names
+      - test_project_columns_warns_when_many_removed: >5 columns removed → WARNING log
+      - test_project_columns_preserves_order: Column order matches table schema
+      - test_project_columns_handles_missing: DataFrame [A], table [A, B] → DataFrame [A] (no error)
+
+      **6. Transaction Rollback Tests (Integration):**
+      - test_rollback_on_mid_batch_failure: Insert 1000 rows, fail at row 500 → all rolled back
+      - test_rollback_on_connection_loss: Simulate connection drop mid-transaction → rollback
+      - test_no_partial_data: Query table after rollback → count = 0
+      - test_commit_on_success: Load completes → data visible in database
+
+      **7. Edge Cases:**
+      - test_empty_dataframe: df = pd.DataFrame() → load succeeds, 0 rows inserted
+      - test_large_dataframe: 10,000 rows → verify chunking (10 batches of 1000)
+      - test_unicode_column_names: Chinese column names → quote_ident handles correctly
+      - test_null_values: DataFrame with None/NaN → loaded as NULL in database
+      - test_duplicate_primary_keys: delete_insert mode with dupes → deletes once, inserts once
+
+      **8. Configuration Tests:**
+      - test_uses_db_pool_size_setting: settings.DB_POOL_SIZE=5 → pool max=5
+      - test_uses_db_batch_size_setting: settings.DB_BATCH_SIZE=500 → chunks of 500
+      - test_requires_database_url: settings.DATABASE_URL=None → raises ValueError
+
+      **9. Performance/Load Tests (Optional, @pytest.mark.performance):**
+      - test_load_10k_rows_under_5_seconds: Benchmark large load
+      - test_connection_pool_prevents_exhaustion: 20 concurrent loads with pool_size=10 → no failures
+      - test_memory_usage_with_chunking: Load 100k rows → memory stays bounded
+
+      **10. Legacy Compatibility:**
+      - test_existing_load_function_unchanged: Module-level load() still works (no breaking changes)
+      - test_sql_builders_unchanged: quote_ident, build_insert_sql preserve exact behavior
+    </ideas>
+  </tests>
+</story-context>

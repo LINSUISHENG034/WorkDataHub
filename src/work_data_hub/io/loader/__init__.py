@@ -7,6 +7,8 @@ protection, performance optimization through chunking, and comprehensive error h
 
 from .warehouse_loader import (
     DataWarehouseLoaderError,
+    LoadResult,
+    WarehouseLoader,
     build_delete_sql,
     build_insert_sql,
     load,
@@ -15,6 +17,8 @@ from .warehouse_loader import (
 
 __all__ = [
     "DataWarehouseLoaderError",
+    "LoadResult",
+    "WarehouseLoader",
     "build_delete_sql",
     "build_insert_sql",
     "load",

@@ -5,17 +5,61 @@ This module tests the DataWarehouseLoader SQL builders and orchestration
 with both unit tests (no database required) and integration tests.
 """
 
+import os
+import time
+import uuid
 from unittest.mock import MagicMock, Mock, patch
 
+import pandas as pd
 import pytest
+
+if not os.getenv("WDH_TEST_DATABASE_URI"):
+    os.environ["WDH_TEST_DATABASE_URI"] = (
+        "postgresql://root:Post.169828@192.168.0.200:5432/annuity"
+    )
+
+if not os.getenv("DATABASE_URL"):
+    os.environ["DATABASE_URL"] = os.environ["WDH_TEST_DATABASE_URI"]
+
 
 from src.work_data_hub.io.loader.warehouse_loader import (
     DataWarehouseLoaderError,
+    LoadResult,
+    WarehouseLoader,
     build_delete_sql,
     build_insert_sql,
     load,
     quote_ident,
 )
+
+
+def _build_fake_connection():
+    """Create a fake psycopg2 connection with context-aware cursor."""
+    conn = MagicMock()
+    cursor = MagicMock()
+    cursor.__enter__.return_value = cursor
+    cursor.__exit__.return_value = False
+    conn.cursor.return_value = cursor
+    return conn, cursor
+
+
+def _create_loader(monkeypatch, operational_error=Exception):
+    """Instantiate WarehouseLoader with patched psycopg2 pool for unit tests."""
+    pool_instance = MagicMock()
+    health_conn, health_cursor = _build_fake_connection()
+    pool_instance.getconn.return_value = health_conn
+    pool_instance.putconn.return_value = None
+    pool_cls = MagicMock(return_value=pool_instance)
+    monkeypatch.setattr(
+        "src.work_data_hub.io.loader.warehouse_loader.ThreadedConnectionPool",
+        pool_cls,
+    )
+    monkeypatch.setattr(
+        "src.work_data_hub.io.loader.warehouse_loader.OperationalError",
+        operational_error,
+    )
+    loader = WarehouseLoader(connection_url="postgresql://user:pass@test/db")
+    return loader, pool_instance, health_conn, health_cursor
 
 
 @pytest.fixture
@@ -259,6 +303,110 @@ class TestLoaderOrchestration:
             load("test", ["not_a_dict"], mode="append", conn=None)
 
 
+class TestWarehouseLoaderClass:
+    """Unit tests for the WarehouseLoader dataclass-driven implementation."""
+
+    def test_project_columns_warns_when_many_removed(self, monkeypatch):
+        """Ensure projection logs warning when >5 columns are removed."""
+        loader, _, _, _ = _create_loader(monkeypatch)
+        loader.get_allowed_columns = MagicMock(return_value=["col_a", "col_b"])
+        loader._logger = MagicMock()
+
+        df = pd.DataFrame(
+            {
+                "col_a": [1],
+                "col_b": [2],
+                "extra1": [3],
+                "extra2": [4],
+                "extra3": [5],
+                "extra4": [6],
+                "extra5": [7],
+                "extra6": [8],
+            }
+        )
+
+        projected = loader.project_columns(df, table="test_table")
+        assert list(projected.columns) == ["col_a", "col_b"]
+        loader._logger.warning.assert_called_once()
+
+    def test_get_allowed_columns_cached(self, monkeypatch):
+        """get_allowed_columns should cache schema introspection results."""
+        loader, _, _, _ = _create_loader(monkeypatch)
+        conn, cursor = _build_fake_connection()
+        cursor.fetchall.return_value = [("plan_code",), ("return_rate",)]
+        loader._get_connection_with_retry = MagicMock(return_value=conn)
+        loader._pool.putconn = MagicMock()
+
+        first = loader.get_allowed_columns("trustee_performance")
+        second = loader.get_allowed_columns("trustee_performance")
+
+        assert first == ["plan_code", "return_rate"]
+        assert second == first
+        cursor.execute.assert_called_once()
+        loader._get_connection_with_retry.assert_called_once()
+        loader._pool.putconn.assert_called_once_with(conn)
+
+    def test_load_dataframe_executes_batches(self, monkeypatch):
+        """load_dataframe should batch inserts and report row counts."""
+        loader, _, _, _ = _create_loader(monkeypatch)
+        df = pd.DataFrame(
+            [
+                {"plan_code": "A", "return_rate": 0.01},
+                {"plan_code": "B", "return_rate": 0.02},
+                {"plan_code": "C", "return_rate": 0.03},
+            ]
+        )
+        loader.project_columns = MagicMock(return_value=df)
+        loader.batch_size = 2
+        loader._pool.putconn = MagicMock()
+
+        conn, cursor = _build_fake_connection()
+        cursor.fetchall.side_effect = [[(True,), (False,)], [(True,)]]
+        loader._get_connection_with_retry = MagicMock(return_value=conn)
+
+        mocked_execute_values = MagicMock()
+        monkeypatch.setattr(
+            "src.work_data_hub.io.loader.warehouse_loader.execute_values",
+            mocked_execute_values,
+        )
+
+        result = loader.load_dataframe(df, table="trustee_performance", upsert_keys=["plan_code"])
+
+        assert isinstance(result, LoadResult)
+        assert result.rows_inserted == 2
+        assert result.rows_updated == 1
+        assert mocked_execute_values.call_count == 2
+        assert conn.commit.called
+        loader.project_columns.assert_called_once()
+        loader._pool.putconn.assert_called_once_with(conn)
+
+    def test_connection_retry_on_operational_error(self, monkeypatch):
+        """_get_connection_with_retry should handle transient OperationalErrors."""
+        class FakeOperationalError(Exception):
+            """Sentinel error type for retry verification."""
+
+        loader, pool, _, _ = _create_loader(monkeypatch, operational_error=FakeOperationalError)
+        conn, _ = _build_fake_connection()
+        initial_calls = pool.getconn.call_count
+        pool.getconn.side_effect = [FakeOperationalError("boom"), conn]
+
+        acquired = loader._get_connection_with_retry()
+        assert acquired is conn
+        assert pool.getconn.call_count == initial_calls + 2
+
+    def test_chunk_dataframe_meets_performance_target(self, monkeypatch):
+        """Chunking more than 1000 rows should stay under 500ms."""
+        loader, _, _, _ = _create_loader(monkeypatch)
+        rows = [{"value": i} for i in range(1200)]
+        df = pd.DataFrame(rows)
+        start = time.perf_counter()
+        chunks = list(loader._chunk_dataframe(df))
+        duration_ms = (time.perf_counter() - start) * 1000
+
+        assert duration_ms < 500, f"Chunking took too long: {duration_ms:.2f} ms"
+        assert sum(len(chunk) for chunk in chunks) == len(df)
+
+
 class TestDatabaseSettings:
     """Test database configuration."""
 
@@ -375,6 +523,108 @@ class TestDatabaseIntegration:
 
         assert result["inserted"] == 1
         assert result["deleted"] == 0
+
+
+def _get_postgres_dsn_or_skip() -> str:
+    """Return a PostgreSQL DSN or skip tests when unavailable."""
+    conn_str = os.getenv("WDH_TEST_DATABASE_URI")
+    if conn_str:
+        return conn_str
+    try:
+        from src.work_data_hub.config.settings import get_settings
+
+        settings = get_settings()
+        return settings.get_database_connection_string()
+    except Exception:
+        pytest.skip("Test database not configured")
+
+
+def _reset_test_table(dsn: str, table_name: str) -> None:
+    """Create a deterministic test table for WarehouseLoader integration tests."""
+    psycopg2 = pytest.importorskip("psycopg2")
+    from psycopg2 import sql
+
+    with psycopg2.connect(dsn) as conn:
+        conn.autocommit = True
+        with conn.cursor() as cursor:
+            cursor.execute(sql.SQL("DROP TABLE IF EXISTS {}").format(sql.Identifier(table_name)))
+            cursor.execute(
+                sql.SQL(
+                    """
+                    CREATE TABLE {} (
+                        plan_code TEXT PRIMARY KEY,
+                        report_date DATE NOT NULL,
+                        return_rate NUMERIC(8,6) NOT NULL,
+                        note TEXT
+                    )
+                    """
+                ).format(sql.Identifier(table_name))
+            )
+
+
+@pytest.mark.postgres
+class TestWarehouseLoaderIntegration:
+    """Integration tests for the WarehouseLoader class."""
+
+    def test_dataframe_loads_successfully(self):
+        """End-to-end verification of load_dataframe success path."""
+        dsn = _get_postgres_dsn_or_skip()
+        table_name = f"warehouse_loader_story18_{uuid.uuid4().hex[:6]}"
+        _reset_test_table(dsn, table_name)
+
+        loader = WarehouseLoader(connection_url=dsn, pool_size=2, batch_size=2)
+        df = pd.DataFrame(
+            [
+                {"plan_code": "A101", "report_date": "2024-01-01", "return_rate": 0.01, "extra": "x"},
+                {"plan_code": "A102", "report_date": "2024-01-02", "return_rate": 0.02, "extra": "y"},
+            ]
+        )
+
+        result = loader.load_dataframe(df, table=table_name, schema="public", upsert_keys=["plan_code"])
+        assert result.success is True
+        assert result.rows_inserted == 2
+        assert result.rows_updated == 0
+
+        psycopg2 = pytest.importorskip("psycopg2")
+        from psycopg2 import sql
+
+        with psycopg2.connect(dsn) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    sql.SQL("SELECT COUNT(*) FROM {}").format(sql.Identifier(table_name))
+                )
+                assert cursor.fetchone()[0] == 2
+
+        loader.close()
+
+    def test_dataframe_load_rolls_back_on_error(self):
+        """Ensure transactional rollback occurs when batch fails."""
+        dsn = _get_postgres_dsn_or_skip()
+        table_name = f"warehouse_loader_story18_{uuid.uuid4().hex[:6]}"
+        _reset_test_table(dsn, table_name)
+
+        loader = WarehouseLoader(connection_url=dsn, pool_size=2, batch_size=2)
+        df = pd.DataFrame(
+            [
+                {"plan_code": "B201", "report_date": "2024-02-01", "return_rate": 0.01},
+                {"plan_code": "B202", "report_date": "2024-02-01", "return_rate": "invalid"},
+            ]
+        )
+
+        with pytest.raises(DataWarehouseLoaderError):
+            loader.load_dataframe(df, table=table_name, schema="public")
+
+        psycopg2 = pytest.importorskip("psycopg2")
+        from psycopg2 import sql
+
+        with psycopg2.connect(dsn) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    sql.SQL("SELECT COUNT(*) FROM {}").format(sql.Identifier(table_name))
+                )
+                assert cursor.fetchone()[0] == 0
+
+        loader.close()
 
 
 class TestJSONBParameterAdaptation:
