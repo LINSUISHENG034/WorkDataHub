@@ -1,0 +1,15 @@
+# Dagster Workspace Configuration
+# This file tells Dagster where to find job definitions, schedules, and sensors
+# for the WorkDataHub project.
+#
+# Usage:
+#   dagster dev              # Start development server with UI at http://localhost:3000
+#   dagster job list         # List all available jobs
+#   dagster job execute -j <job_name>  # Execute a specific job
+
+load_from:
+  - python_module:
+      module_name: src.work_data_hub.orchestration.repository
+      attribute: defs
+      working_directory: .
+      location_name: workdatahub

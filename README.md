@@ -203,6 +203,41 @@ uv run ruff format --check src/work_data_hub docs
 
 > ℹ️ The `legacy/` tree and the broad `tests/` tree carry outstanding lint debt from the historical codebase. The default Ruff command excludes those paths so guardrails stay green. Opt-in linting for them is still available with `uv run ruff check legacy tests/legacy` when you are ready to tackle the backlog.
 
+### Dagster Orchestration
+
+WorkDataHub uses Dagster for job orchestration and pipeline scheduling. The Dagster UI provides visibility into job execution, logs, and schedules.
+
+**Starting the Dagster Development Server:**
+
+```bash
+# Launch Dagster UI (requires workspace.yaml in project root)
+dagster dev
+
+# Access the UI at: http://localhost:3000
+# Press Ctrl+C to stop the server
+```
+
+**Available Jobs:**
+- `sample_trustee_performance_job`: Sample multi-file processing pipeline
+- `annuity_performance_job`: End-to-end annuity ETL with enrichment
+- `import_company_mappings_job`: Reference data loading
+
+**Executing Jobs:**
+
+```bash
+# Execute job via CLI (without UI)
+dagster job execute -f src/work_data_hub/orchestration/jobs.py -j annuity_performance_job
+
+# List all available jobs
+dagster job list
+```
+
+**Configuration:**
+- **DAGSTER_HOME** (default: `~/.dagster`): SQLite metadata storage for local development
+- **DAGSTER_POSTGRES_URL** (optional): PostgreSQL backend for production metadata storage
+
+See `workspace.yaml` for Dagster code location configuration and `orchestration/` directory for job definitions.
+
 ## Configuration
 
 WorkDataHub uses centralized configuration management powered by Pydantic Settings (Story 1.4). Configuration is loaded from environment variables with validation at startup to catch configuration errors early.

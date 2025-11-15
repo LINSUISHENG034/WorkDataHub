@@ -14,6 +14,7 @@ from dagster import Definitions
 # Import jobs from the jobs module
 from .jobs import (
     annuity_performance_job,
+    sample_pipeline_job,
     sample_trustee_performance_job,
     sample_trustee_performance_multi_file_job,
 )
@@ -28,6 +29,7 @@ from .sensors import trustee_data_quality_sensor, trustee_new_files_sensor
 # This is the single source of truth for all orchestration components
 defs = Definitions(
     jobs=[
+        sample_pipeline_job,
         sample_trustee_performance_job,
         sample_trustee_performance_multi_file_job,
         annuity_performance_job,

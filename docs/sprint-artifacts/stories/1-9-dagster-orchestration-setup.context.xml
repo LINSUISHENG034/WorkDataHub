@@ -1,0 +1,488 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>9</storyId>
+    <title>Dagster Orchestration Setup</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-15</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/1-9-dagster-orchestration-setup.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>Dagster configured as the orchestration layer</iWant>
+    <soThat>I can define, schedule, and monitor data pipelines through a unified interface</soThat>
+    <tasks>
+      <task id="1" ac="1">
+        <title>Install and configure Dagster</title>
+        <subtasks>
+          <subtask id="1.1">Install Dagster 1.5+ and dagster-webserver via uv (add to pyproject.toml dependencies)</subtask>
+          <subtask id="1.2">Create workspace.yaml in project root defining code location pointing to orchestration module</subtask>
+          <subtask id="1.3">Document DAGSTER_HOME environment variable in .env.example (default: ~/.dagster for SQLite metadata storage)</subtask>
+          <subtask id="1.4">Document DAGSTER_POSTGRES_URL environment variable in .env.example (optional, for production PostgreSQL backend)</subtask>
+          <subtask id="1.5">Add README section documenting how to start Dagster UI: `dagster dev` and access http://localhost:3000</subtask>
+        </subtasks>
+      </task>
+      <task id="2" ac="2">
+        <title>Create sample job definition</title>
+        <subtasks>
+          <subtask id="2.1">Create orchestration/jobs.py with sample_pipeline_job decorator defining concrete workflow</subtask>
+          <subtask id="2.2">Define job ops: read_csv_op() → validate_op() → load_to_db_op() using Story 1.5 pipeline framework patterns</subtask>
+          <subtask id="2.3">Use sample CSV fixture (create tests/fixtures/sample_data.csv with test data for validation)</subtask>
+          <subtask id="2.4">Integrate Story 1.8 WarehouseLoader in load_to_db_op for database persistence</subtask>
+        </subtasks>
+      </task>
+      <task id="3" ac="3">
+        <title>Implement sample ops</title>
+        <subtasks>
+          <subtask id="3.1">Create orchestration/ops.py with @op decorators for read_csv, validate, load_to_db operations</subtask>
+          <subtask id="3.2">Keep ops thin: delegate CSV reading to io/readers (if exists) or use pandas directly with minimal logic</subtask>
+          <subtask id="3.3">Delegate validation to domain service (create sample validation function in domain/ for demo purposes)</subtask>
+          <subtask id="3.4">Delegate database loading to Story 1.8 WarehouseLoader (import from io.loader.warehouse_loader)</subtask>
+          <subtask id="3.5">Add context.log.info() calls in each op to demonstrate Dagster logging integration</subtask>
+        </subtasks>
+      </task>
+      <task id="4" ac="4">
+        <title>Create repository definition</title>
+        <subtasks>
+          <subtask id="4.1">Create orchestration/__init__.py with Definitions object importing sample_pipeline_job</subtask>
+          <subtask id="4.2">Add placeholder schedule and sensor definitions (commented out, activated in Epic 7)</subtask>
+          <subtask id="4.3">Verify workspace.yaml code_location points to orchestration module correctly</subtask>
+        </subtasks>
+      </task>
+      <task id="5" ac="5">
+        <title>Verify UI functionality</title>
+        <subtasks>
+          <subtask id="5.1">Launch dagster dev and verify UI accessible at http://localhost:3000</subtask>
+          <subtask id="5.2">Verify sample_pipeline_job appears in UI jobs list with correct name and description</subtask>
+          <subtask id="5.3">Manually trigger sample job from UI, verify execution proceeds through all ops in order</subtask>
+          <subtask id="5.4">Verify execution logs show step-by-step progress with context.log.info() messages</subtask>
+          <subtask id="5.5">Introduce intentional error in validate_op, verify Dagster captures exception with full stack trace in UI</subtask>
+          <subtask id="5.6">Document shutdown process in README: Ctrl+C to stop dagster dev process</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">
+      <title>Dagster Installation and Configuration</title>
+      <description>Dagster 1.5+ installed with workspace.yaml configured, environment variables documented (DAGSTER_HOME for metadata storage path, DAGSTER_POSTGRES_URL optional for production), Dagster UI accessible at http://localhost:3000</description>
+      <source>docs/epics.md#story-19-dagster-orchestration-setup</source>
+    </criterion>
+    <criterion id="2">
+      <title>Sample Job Definition</title>
+      <description>Sample job in orchestration/jobs.py using simple pipeline framework from Story 1.5, implements concrete workflow: read CSV → validate with Pydantic → write to database using Story 1.8 WarehouseLoader</description>
+      <source>docs/epics.md#story-19-dagster-orchestration-setup</source>
+    </criterion>
+    <criterion id="3">
+      <title>Sample Ops Implementation</title>
+      <description>Sample op (operation) in orchestration/ops.py that calls domain service, keeps ops thin by delegating to domain layer (Clean Architecture from Story 1.6)</description>
+      <source>docs/epics.md#story-19-dagster-orchestration-setup</source>
+    </criterion>
+    <criterion id="4">
+      <title>Repository Definition</title>
+      <description>Repository definition in orchestration/__init__.py exposing Definitions object with jobs accessible to Dagster, workspace.yaml configured to discover repository</description>
+      <source>docs/epics.md#story-19-dagster-orchestration-setup</source>
+    </criterion>
+    <criterion id="5">
+      <title>UI Functionality Verified</title>
+      <description>When dagster dev launches, UI shows sample job with ability to run manually, displays execution logs with step-by-step progress/success/failure/duration, captures exceptions with full stack trace on failure</description>
+      <source>docs/epics.md#story-19-dagster-orchestration-setup</source>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>FR-5: Orchestration &amp; Automation</section>
+        <snippet>Dagster configured as orchestration layer with jobs, schedules, sensors in orchestration/ module. Jobs composed of ops (read → transform → validate → load). Local development: SQLite storage. Production: PostgreSQL backend via DAGSTER_POSTGRES_URL.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Story 1.9: Dagster Orchestration Setup</section>
+        <snippet>Sample job definition demonstrating concrete workflow: read CSV → validate → load to database. Sample ops delegation pattern: thin ops calling domain services. Dagster UI accessible at http://localhost:3000 with job execution visibility.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-1.md</path>
+        <title>Epic 1 Technical Specification</title>
+        <section>Story 1.9 Acceptance Criteria</section>
+        <snippet>Dagster 1.5+ installed with workspace.yaml configured. Sample job uses Story 1.5 pipeline framework + Story 1.8 WarehouseLoader. Dagster UI shows sample_pipeline_job with step-by-step logs (from Story 1.3 structlog). Ops are thin wrappers delegating to domain/ and io/ modules.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Document</title>
+        <section>Technology Stack - Dagster</section>
+        <snippet>Dagster configured as orchestration layer. Definitions ready, CLI-first execution for MVP. Jobs, schedules, sensors in orchestration/ module following Clean Architecture separation. Local development uses SQLite metadata default, production uses PostgreSQL via DAGSTER_POSTGRES_URL.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <existing>
+        <module>
+          <path>src/work_data_hub/domain/pipelines/core.py</path>
+          <description>Pipeline framework from Story 1.5</description>
+          <key_components>
+            <component>Pipeline class with add_step() and run() methods - orchestrates DataFrame and row-level transformation steps</component>
+            <component>ContextInput type for pipeline context management</component>
+            <component>Supports both synchronous execution and error collection modes</component>
+          </key_components>
+          <integration_note>Sample job will use Pipeline class to demonstrate concrete workflow execution pattern</integration_note>
+        </module>
+        <module>
+          <path>src/work_data_hub/io/loader/warehouse_loader.py</path>
+          <description>Database loading framework from Story 1.8</description>
+          <key_components>
+            <component>WarehouseLoader class with load_dataframe() method - transactional bulk loading</component>
+            <component>LoadResult class for tracking insertion results</component>
+            <component>Helper functions: load(), insert_missing(), fill_null_only() for different loading strategies</component>
+            <component>Column projection: get_allowed_columns() and project_columns() for schema safety</component>
+          </key_components>
+          <integration_note>load_to_db_op in sample job will delegate to WarehouseLoader for database persistence</integration_note>
+        </module>
+        <module>
+          <path>src/work_data_hub/orchestration/jobs.py</path>
+          <description>Existing job definitions (reference implementations)</description>
+          <key_components>
+            <component>annuity_performance_job - complete ETL pipeline with file discovery, Excel reading, processing, and database loading</component>
+            <component>sample_trustee_performance_job - demonstrates multi-file processing pattern</component>
+            <component>import_company_mappings_job - reference data loading pattern</component>
+            <component>Helper functions: build_run_config() for job configuration</component>
+          </key_components>
+          <integration_note>Existing jobs demonstrate patterns for sample_pipeline_job to follow - thin ops delegating to domain services</integration_note>
+        </module>
+        <module>
+          <path>src/work_data_hub/orchestration/ops.py</path>
+          <description>Dagster ops that inject I/O adapters into domain services (Story 1.6)</description>
+          <key_components>
+            <component>discover_files_op - file discovery integration</component>
+            <component>read_excel_op - Excel reading with domain-specific sheet selection</component>
+            <component>process_annuity_performance_op - domain service orchestration</component>
+            <component>load_op - database loading delegation to WarehouseLoader</component>
+          </key_components>
+          <integration_note>Sample job will create new ops following same delegation pattern: thin wrappers around domain/io modules</integration_note>
+        </module>
+        <module>
+          <path>src/work_data_hub/utils/logging.py</path>
+          <description>Structured logging framework from Story 1.3</description>
+          <integration_note>Sample ops will use context.log.info() for Dagster logging integration, demonstrating structured logging in orchestration layer</integration_note>
+        </module>
+      </existing>
+      <to_create>
+        <file>
+          <path>workspace.yaml</path>
+          <purpose>Dagster workspace configuration - defines code location pointing to orchestration module</purpose>
+          <note>Critical file missing - Story 1.9 subtask 1.2 will create this</note>
+        </file>
+        <file>
+          <path>orchestration/sample_ops.py</path>
+          <purpose>Sample ops for demonstration: read_csv_op(), validate_op(), load_to_db_op()</purpose>
+          <note>New file for Story 1.9 subtask 3.1 - demonstrates thin op pattern with context.log.info() calls</note>
+        </file>
+        <file>
+          <path>orchestration/sample_job.py</path>
+          <purpose>Sample pipeline job definition: sample_pipeline_job decorator defining read CSV → validate → load workflow</purpose>
+          <note>New file for Story 1.9 subtask 2.1 - demonstrates concrete job using Story 1.5 pipeline framework + Story 1.8 WarehouseLoader</note>
+        </file>
+        <file>
+          <path>tests/fixtures/sample_data.csv</path>
+          <purpose>Test CSV fixture for sample job validation</purpose>
+          <note>New fixture for Story 1.9 subtask 2.3 - provides test data for sample_pipeline_job</note>
+        </file>
+      </to_create>
+    </code>
+    <dependencies>
+      <story>
+        <id>1.5</id>
+        <title>Shared Pipeline Framework Core (Simple)</title>
+        <status>completed</status>
+        <provides>Pipeline class in domain/pipelines/core.py for transformation orchestration</provides>
+        <integration>Sample job will use Pipeline.add_step() and Pipeline.run() to demonstrate concrete workflow</integration>
+      </story>
+      <story>
+        <id>1.8</id>
+        <title>PostgreSQL Connection and Transactional Loading Framework</title>
+        <status>completed</status>
+        <provides>WarehouseLoader class in io/loader/warehouse_loader.py for database persistence</provides>
+        <integration>load_to_db_op in sample job will call WarehouseLoader.load_dataframe() for transactional bulk loading</integration>
+      </story>
+      <story>
+        <id>1.3</id>
+        <title>Structured Logging Framework</title>
+        <status>completed</status>
+        <provides>Structured logging via utils/logging.py with JSON output</provides>
+        <integration>Sample ops will use context.log.info() to demonstrate Dagster logging integration showing step-by-step progress</integration>
+      </story>
+      <story>
+        <id>1.6</id>
+        <title>Clean Architecture Boundaries Enforcement</title>
+        <status>completed</status>
+        <provides>domain/io/orchestration layer separation with dependency injection pattern</provides>
+        <integration>Sample ops demonstrate thin wrapper pattern - orchestration layer injects I/O adapters into domain services without reversing dependencies</integration>
+      </story>
+      <package>
+        <name>dagster</name>
+        <version>1.5+</version>
+        <purpose>Orchestration framework - provides @job, @op decorators, Definitions object, and CLI/UI</purpose>
+        <install>Add to pyproject.toml dependencies via uv (Story 1.9 subtask 1.1)</install>
+      </package>
+      <package>
+        <name>dagster-webserver</name>
+        <version>1.5+</version>
+        <purpose>Dagster UI server for http://localhost:3000 web interface</purpose>
+        <install>Add to pyproject.toml dependencies via uv (Story 1.9 subtask 1.1)</install>
+      </package>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <architectural>
+      <constraint>
+        <name>Clean Architecture Boundaries</name>
+        <description>Ops in orchestration layer MUST delegate to domain services, not contain business logic (Story 1.6 enforcement)</description>
+        <rationale>Maintains testability of domain logic without Dagster dependencies, enables reuse of domain services outside orchestration</rationale>
+      </constraint>
+      <constraint>
+        <name>Thin Ops Pattern</name>
+        <description>Each op should be &lt;50 lines, primary role is dependency injection and logging, not transformation</description>
+        <rationale>Keeps orchestration layer maintainable, delegates complexity to domain/io modules where it belongs</rationale>
+      </constraint>
+      <constraint>
+        <name>No Domain Imports in Orchestration __init__</name>
+        <description>orchestration/__init__.py should only import jobs/schedules/sensors for Definitions object, not domain services</description>
+        <rationale>Prevents circular dependencies, maintains unidirectional dependency flow (orchestration → domain/io, never reverse)</rationale>
+      </constraint>
+    </architectural>
+    <technical>
+      <constraint>
+        <name>Dagster Version</name>
+        <description>Dagster 1.5+ required (both dagster and dagster-webserver packages)</description>
+        <rationale>1.5+ provides Definitions object pattern, improved UI, better error messages</rationale>
+      </constraint>
+      <constraint>
+        <name>Workspace Configuration</name>
+        <description>workspace.yaml MUST point code_location to orchestration module, not individual job files</description>
+        <rationale>Enables Dagster to discover all jobs/schedules/sensors from single entry point</rationale>
+      </constraint>
+      <constraint>
+        <name>Metadata Storage</name>
+        <description>Local development: SQLite (DAGSTER_HOME default ~/.dagster). Production: PostgreSQL via DAGSTER_POSTGRES_URL</description>
+        <rationale>SQLite sufficient for MVP, PostgreSQL required for production concurrency and reliability</rationale>
+      </constraint>
+      <constraint>
+        <name>Sample Job Concreteness</name>
+        <description>Sample job MUST implement concrete workflow (read CSV → validate → load), not abstract demonstration</description>
+        <rationale>Proves integration with Story 1.5 pipeline framework and Story 1.8 WarehouseLoader with real data flow</rationale>
+      </constraint>
+    </technical>
+    <security>
+      <constraint>
+        <name>No Secrets in Code</name>
+        <description>workspace.yaml and job definitions MUST NOT contain database URLs, API keys, or passwords (use environment variables)</description>
+        <rationale>Prevents credential leakage in git, enables environment-specific configuration</rationale>
+      </constraint>
+      <constraint>
+        <name>Environment Variable Documentation</name>
+        <description>All required environment variables (DAGSTER_HOME, DAGSTER_POSTGRES_URL) MUST be documented in .env.example</description>
+        <rationale>Ensures reproducible setup for new developers, prevents runtime configuration errors</rationale>
+      </constraint>
+    </security>
+    <performance>
+      <constraint>
+        <name>Sample Job Execution Time</name>
+        <description>Sample job should complete in &lt;30 seconds for demonstration purposes</description>
+        <rationale>Enables quick feedback during development, makes UI demonstration practical</rationale>
+      </constraint>
+      <constraint>
+        <name>UI Responsiveness</name>
+        <description>Dagster UI at localhost:3000 should load in &lt;5 seconds after dagster dev startup</description>
+        <rationale>Provides acceptable user experience for local development and manual job triggering</rationale>
+      </constraint>
+    </performance>
+  </constraints>
+  <interfaces>
+    <dagster>
+      <interface>
+        <name>@job Decorator</name>
+        <module>dagster</module>
+        <purpose>Defines Dagster job - orchestrates ops into execution graph</purpose>
+        <usage_pattern>
+          @job
+          def sample_pipeline_job():
+              op1_result = read_csv_op()
+              op2_result = validate_op(op1_result)
+              load_to_db_op(op2_result)
+        </usage_pattern>
+      </interface>
+      <interface>
+        <name>@op Decorator</name>
+        <module>dagster</module>
+        <purpose>Defines Dagster op - atomic unit of work in job graph</purpose>
+        <usage_pattern>
+          @op
+          def read_csv_op(context: OpExecutionContext) -> pd.DataFrame:
+              context.log.info("Reading CSV...")
+              return pd.read_csv("sample.csv")
+        </usage_pattern>
+      </interface>
+      <interface>
+        <name>Definitions Object</name>
+        <module>dagster</module>
+        <purpose>Exposes jobs, schedules, sensors to Dagster repository</purpose>
+        <usage_pattern>
+          from dagster import Definitions
+          defs = Definitions(
+              jobs=[sample_pipeline_job],
+              schedules=[],  # Placeholder for Epic 7
+              sensors=[]     # Placeholder for Epic 7
+          )
+        </usage_pattern>
+      </interface>
+      <interface>
+        <name>OpExecutionContext</name>
+        <module>dagster</module>
+        <purpose>Provides logging, configuration, and resources to ops</purpose>
+        <key_methods>
+          - context.log.info() - structured logging integration
+          - context.op_config - op-specific configuration
+          - context.run_id - unique execution identifier
+        </key_methods>
+      </interface>
+    </dagster>
+    <pipeline_framework>
+      <interface>
+        <name>Pipeline.add_step()</name>
+        <module>src.work_data_hub.domain.pipelines.core</module>
+        <purpose>Add transformation step to pipeline execution sequence</purpose>
+        <integration>Sample job ops will call Pipeline.add_step() to register transformation steps</integration>
+      </interface>
+      <interface>
+        <name>Pipeline.run()</name>
+        <module>src.work_data_hub.domain.pipelines.core</module>
+        <purpose>Execute all registered pipeline steps in sequence</purpose>
+        <integration>Sample job will call Pipeline.run() within Dagster op to execute transformation workflow</integration>
+      </interface>
+    </pipeline_framework>
+    <database_loader>
+      <interface>
+        <name>WarehouseLoader.load_dataframe()</name>
+        <module>src.work_data_hub.io.loader.warehouse_loader</module>
+        <purpose>Transactional bulk loading of DataFrame to PostgreSQL</purpose>
+        <parameters>
+          - df: pd.DataFrame - data to load
+          - table: str - target table name
+          - schema: str - database schema (default: public)
+        </parameters>
+        <integration>load_to_db_op will call WarehouseLoader.load_dataframe() to persist validated data</integration>
+      </interface>
+    </database_loader>
+    <environment_variables>
+      <variable>
+        <name>DAGSTER_HOME</name>
+        <type>Path</type>
+        <default>~/.dagster</default>
+        <purpose>Dagster metadata storage location (SQLite database for run history, logs, schedules)</purpose>
+        <required>false</required>
+      </variable>
+      <variable>
+        <name>DAGSTER_POSTGRES_URL</name>
+        <type>PostgreSQL connection string</type>
+        <default>None (uses SQLite)</default>
+        <purpose>Optional PostgreSQL backend for production Dagster metadata storage</purpose>
+        <required>false</required>
+        <format>postgresql://user:password@host:port/database</format>
+      </variable>
+    </environment_variables>
+    <cli>
+      <command>
+        <name>dagster dev</name>
+        <purpose>Launch Dagster development server with UI at http://localhost:3000</purpose>
+        <usage>Run from project root after workspace.yaml created</usage>
+      </command>
+      <command>
+        <name>dagster job execute</name>
+        <purpose>Execute job via CLI without UI</purpose>
+        <usage>dagster job execute -f orchestration/jobs.py -j sample_pipeline_job</usage>
+      </command>
+    </cli>
+  </interfaces>
+  <tests>
+    <standards>
+      <standard>Integration tests REQUIRED for sample job end-to-end execution (validate job completes successfully)</standard>
+      <standard>Unit tests REQUIRED for individual ops (mock dependencies, verify delegation pattern)</standard>
+      <standard>Test fixtures REQUIRED for sample CSV data (tests/fixtures/sample_data.csv)</standard>
+      <standard>UI accessibility test REQUIRED (verify localhost:3000 responds after dagster dev)</standard>
+      <standard>Logging integration test REQUIRED (verify context.log.info() calls appear in Dagster UI logs)</standard>
+    </standards>
+    <locations>
+      <location>
+        <path>tests/integration/orchestration/test_dagster_setup.py</path>
+        <purpose>Integration test for sample_pipeline_job execution</purpose>
+        <coverage>
+          - Test job discovery from workspace.yaml
+          - Test sample job execution end-to-end
+          - Test database loading via WarehouseLoader
+          - Test execution logs captured in Dagster
+        </coverage>
+      </location>
+      <location>
+        <path>tests/unit/orchestration/test_sample_ops.py</path>
+        <purpose>Unit tests for sample ops (read_csv_op, validate_op, load_to_db_op)</purpose>
+        <coverage>
+          - Test each op in isolation with mocked dependencies
+          - Test context.log.info() calls made correctly
+          - Test error handling (invalid CSV, validation failures)
+        </coverage>
+      </location>
+      <location>
+        <path>tests/fixtures/sample_data.csv</path>
+        <purpose>Test CSV fixture for sample job validation</purpose>
+        <content>Simple CSV with valid data matching expected schema (e.g., id, name, value columns)</content>
+      </location>
+      <location>
+        <path>tests/integration/test_dagster_ui.py</path>
+        <purpose>Dagster UI accessibility test</purpose>
+        <coverage>
+          - Test dagster dev server starts successfully
+          - Test http://localhost:3000 responds
+          - Test sample job appears in UI jobs list
+        </coverage>
+      </location>
+    </locations>
+    <ideas>
+      <test_idea>
+        <name>Manual Job Trigger Test</name>
+        <description>Verify sample_pipeline_job can be manually triggered from Dagster UI with parameter configuration</description>
+        <acceptance>Job executes successfully, shows step-by-step progress in UI, completes with success status</acceptance>
+      </test_idea>
+      <test_idea>
+        <name>Intentional Error Handling Test</name>
+        <description>Introduce intentional error in validate_op (e.g., invalid data), verify Dagster captures exception with full stack trace in UI</description>
+        <acceptance>Job fails gracefully, UI shows failed step, stack trace visible, logs indicate specific validation error</acceptance>
+      </test_idea>
+      <test_idea>
+        <name>Context Logging Integration Test</name>
+        <description>Verify context.log.info() calls in ops appear in Dagster UI execution logs with correct timestamps and step attribution</description>
+        <acceptance>Each log message appears in UI logs panel, associated with correct op, includes timestamp and message text</acceptance>
+      </test_idea>
+      <test_idea>
+        <name>Workspace Discovery Test</name>
+        <description>Verify workspace.yaml correctly points to orchestration module and Dagster discovers all jobs</description>
+        <acceptance>dagster dev starts without errors, workspace.yaml loads successfully, all jobs in orchestration/ appear in UI</acceptance>
+      </test_idea>
+      <test_idea>
+        <name>Pipeline Framework Integration Test</name>
+        <description>Verify sample job correctly uses Story 1.5 Pipeline class for transformation orchestration</description>
+        <acceptance>Sample job creates Pipeline instance, adds steps via add_step(), executes via run(), pipeline metrics logged</acceptance>
+      </test_idea>
+      <test_idea>
+        <name>Database Loader Integration Test</name>
+        <description>Verify sample job correctly uses Story 1.8 WarehouseLoader for database persistence</description>
+        <acceptance>load_to_db_op calls WarehouseLoader.load_dataframe(), data inserted to test database, transaction committed successfully</acceptance>
+      </test_idea>
+    </ideas>
+  </tests>
+</story-context>

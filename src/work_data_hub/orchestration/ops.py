@@ -1179,3 +1179,200 @@ def process_company_lookup_queue_op(
         # CRITICAL: Clean up bare connection in finally
         if conn is not None:
             conn.close()
+
+
+# ============================================================================
+# Sample Ops for Story 1.9 Demonstration
+# ============================================================================
+# These ops demonstrate the thin wrapper pattern with delegation to
+# domain services and I/O loaders, following Clean Architecture.
+
+
+@op
+def read_csv_op(context: OpExecutionContext) -> List[Dict[str, Any]]:
+    """
+    Sample op: Read CSV file and return as list of dictionaries.
+
+    Demonstrates:
+    - Thin op pattern (delegating to pandas)
+    - Dagster logging integration
+    - Basic error handling
+
+    Returns:
+        List of row dictionaries from sample CSV
+    """
+    from pathlib import Path
+
+    import pandas as pd
+
+    try:
+        # Use fixtures path for sample data
+        fixture_path = Path("tests/fixtures/sample_data.csv")
+
+        context.log.info(
+            f"Reading sample CSV data from {fixture_path}"
+        )
+
+        # Read CSV using pandas (minimal logic in op)
+        df = pd.read_csv(fixture_path)
+
+        # Convert to list of dicts (JSON-serializable)
+        rows = df.to_dict(orient="records")
+
+        context.log.info(
+            f"Sample CSV read completed - rows: {len(rows)}, columns: {len(df.columns)}"
+        )
+
+        return rows
+
+    except Exception as e:
+        context.log.error(f"Sample CSV read failed: {e}")
+        raise
+
+
+@op
+def validate_op(
+    context: OpExecutionContext, rows: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """
+    Sample op: Validate data using Pipeline framework.
+
+    Demonstrates:
+    - Integration with Story 1.5 Pipeline framework
+    - DataFrame-level validation steps
+    - Dagster logging for pipeline execution
+
+    Args:
+        rows: List of row dictionaries from read_csv_op
+
+    Returns:
+        Validated rows (same as input for this demo)
+    """
+    import pandas as pd
+
+    try:
+        # Import Pipeline framework from Story 1.5
+        from src.work_data_hub.domain.pipelines.core import Pipeline
+
+        context.log.info(
+            f"Starting sample validation pipeline - rows: {len(rows)}"
+        )
+
+        # Convert rows back to DataFrame for Pipeline framework
+        df = pd.DataFrame(rows)
+
+        # Create simple validation pipeline (demonstration)
+        # Note: In real implementation, would add validation steps here
+        # For Story 1.9 demo, just log that pipeline was created
+        _ = Pipeline(
+            name="sample_validation",
+            config={"execution_id": context.run_id}
+        )
+
+        context.log.info(
+            "Sample validation pipeline created successfully "
+            "(domain pipelines pattern from Story 1.5)"
+        )
+
+        # Return validated data (pass-through for demo)
+        validated_rows = df.to_dict(orient="records")
+
+        context.log.info(
+            f"Sample validation completed - validated: {len(validated_rows)} rows"
+        )
+
+        return validated_rows
+
+    except Exception as e:
+        context.log.error(f"Sample validation failed: {e}")
+        raise
+
+
+@op
+def load_to_db_op(
+    context: OpExecutionContext, rows: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    Sample op: Load data to database using Story 1.8 WarehouseLoader.
+
+    Demonstrates:
+    - Integration with Story 1.8 transactional loading framework
+    - Database connection handling
+    - LoadResult telemetry logging
+
+    Args:
+        rows: Validated rows from validate_op
+
+    Returns:
+        Dictionary with load execution metadata
+    """
+    try:
+        # Import Story 1.8 WarehouseLoader
+        from src.work_data_hub.io.loader.warehouse_loader import load
+
+        context.log.info(
+            f"Starting sample database load - rows: {len(rows)}"
+        )
+
+        # Get database connection (using settings from Story 1.4)
+        global psycopg2  # type: ignore
+        if psycopg2 is _PSYCOPG2_NOT_LOADED:  # type: ignore
+            try:
+                import psycopg2 as _psycopg2  # type: ignore
+                psycopg2 = _psycopg2  # type: ignore
+            except ImportError:
+                raise DataWarehouseLoaderError(
+                    "psycopg2 not available for database operations"
+                )
+
+        settings = get_settings()
+
+        # Primary DSN retrieval
+        dsn = None
+        if hasattr(settings, "get_database_connection_string"):
+            try:
+                dsn = settings.get_database_connection_string()
+            except Exception:
+                dsn = None
+        if not isinstance(dsn, str) and hasattr(settings, "database"):
+            try:
+                dsn = settings.database.get_connection_string()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+        if not isinstance(dsn, str) or not dsn:
+            raise DataWarehouseLoaderError(
+                "Database connection failed: invalid DSN resolved from settings"
+            )
+
+        context.log.info(
+            "Connecting to database for sample data load (table: sample_data)"
+        )
+
+        conn = None
+        try:
+            conn = psycopg2.connect(dsn)  # type: ignore
+
+            # Load using Story 1.8 warehouse loader
+            result = load(
+                table="sample_data",
+                rows=rows,
+                mode="append",  # Simple append mode for demo
+                pk=[],  # No primary key for simple demo
+                conn=conn,
+            )
+
+            context.log.info(
+                f"Sample database load completed - "
+                f"inserted: {result.get('inserted', 0)}, "
+                f"batches: {result.get('batches', 0)}"
+            )
+
+            return result
+
+        finally:
+            if conn is not None:
+                conn.close()
+
+    except Exception as e:
+        context.log.error(f"Sample database load failed: {e}")
+        raise

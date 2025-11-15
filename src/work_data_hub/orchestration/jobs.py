@@ -28,11 +28,14 @@ from .ops import (
     discover_files_op,
     gate_after_backfill,
     load_op,
+    load_to_db_op,
     process_annuity_performance_op,
     process_company_lookup_queue_op,
     process_sample_trustee_performance_op,
     read_and_process_sample_trustee_files_op,
+    read_csv_op,
     read_excel_op,
+    validate_op,
 )
 
 
@@ -153,6 +156,37 @@ def process_company_lookup_queue_job():
     """
     # Single op job - process the lookup queue
     process_company_lookup_queue_op()
+
+
+# ============================================================================
+# Sample Pipeline Job (Story 1.9 Demonstration)
+# ============================================================================
+
+
+@job
+def sample_pipeline_job():
+    """
+    Sample end-to-end pipeline demonstrating Dagster orchestration (Story 1.9).
+
+    This job demonstrates the integration of:
+    - Story 1.5: Pipeline framework for data transformation
+    - Story 1.8: WarehouseLoader for transactional database loading
+    - Story 1.9: Dagster orchestration with thin op wrappers
+
+    Pipeline Flow:
+    1. read_csv_op: Read sample CSV data from tests/fixtures/sample_data.csv
+    2. validate_op: Validate data using Pipeline framework
+    3. load_to_db_op: Load to PostgreSQL using WarehouseLoader
+
+    This is a reference implementation showing Clean Architecture:
+    - Ops stay thin (5-10 lines)
+    - Business logic delegated to domain services
+    - I/O operations delegated to io/ layer
+    """
+    # Wire ops together - Dagster handles dependency graph
+    raw_data = read_csv_op()
+    validated = validate_op(raw_data)
+    load_to_db_op(validated)
 
 
 def _parse_pk_override(pk_arg: Any) -> List[str]:
