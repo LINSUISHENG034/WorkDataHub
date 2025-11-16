@@ -1,0 +1,208 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2.1</storyId>
+    <title>Pydantic Models for Row-Level Validation (Silver Layer)</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-16</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/2-1-pydantic-models-for-row-level-validation-silver-layer.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>Pydantic v2 models that validate individual rows during transformation</iWant>
+    <soThat>business rules are enforced consistently and invalid data is caught with clear error messages</soThat>
+    <tasks>
+- **Task 1: Implement AnnuityPerformanceIn (Loose Validation Model)** (AC: 1)
+  - Subtask 1.1: Create `domain/annuity_performance/models.py` with Pydantic BaseModel
+  - Subtask 1.2: Define Chinese field names with Optional[Union[...]] types for Excel messiness
+  - Subtask 1.3: Add field descriptions documenting Chinese field meanings
+  - Subtask 1.4: Test with sample Excel data (handle nulls, mixed types, comma-separated numbers)
+
+- **Task 2: Implement AnnuityPerformanceOut (Strict Validation Model)** (AC: 2)
+  - Subtask 2.1: Define strict required types (date, str, float with constraints)
+  - Subtask 2.2: Add Field validators for non-negative constraints (`期末资产规模 >= 0`)
+  - Subtask 2.3: Add computed fields or post-validation logic if needed
+  - Subtask 2.4: Test conversion from In → Out model with business rule enforcement
+
+- **Task 3: Implement Custom Validators** (AC: 3)
+  - Subtask 3.1: Add `@field_validator('月度', mode='before')` using Epic 2 Story 2.4 date parser
+  - Subtask 3.2: Add `@field_validator('客户名称', mode='before')` using Epic 2 Story 2.3 cleansing registry
+  - Subtask 3.3: Add `@field_validator('期末资产规模', mode='before')` to clean comma-separated numbers
+  - Subtask 3.4: Ensure validators provide clear error messages with field name and expected format
+
+- **Task 4: Integrate with Pipeline Framework** (AC: 5)
+  - Subtask 4.1: Create `ValidateInputRowsStep` implementing Epic 1 Story 1.5 `TransformStep` protocol
+  - Subtask 4.2: Create `ValidateOutputRowsStep` for strict output validation
+  - Subtask 4.3: Implement batch validation: iterate DataFrame rows, validate each, collect errors
+  - Subtask 4.4: Return validated DataFrame and error list for Epic 2 Story 2.5 CSV export
+
+- **Task 5: Add Unit Tests** (AC: 1-5)
+  - Subtask 5.1: Test `AnnuityPerformanceIn` accepts messy Excel data
+  - Subtask 5.2: Test `AnnuityPerformanceOut` enforces business rules
+  - Subtask 5.3: Test custom validators (date parsing, company name cleaning, number cleaning)
+  - Subtask 5.4: Test error messages include field name and clear guidance
+  - Subtask 5.5: Test batch validation collects all errors (not just first failure)
+  - Subtask 5.6: Mark tests with `@pytest.mark.unit` per Story 1.11 testing framework
+
+- **Task 6: Add Performance Tests (MANDATORY)** (AC: 6)
+  - Subtask 6.1: Create `tests/integration/test_story_2_1_performance.py` per Epic 2 performance criteria
+  - Subtask 6.2: Test with 10,000-row fixture from `tests/fixtures/performance/annuity_performance_10k.csv`
+  - Subtask 6.3: Measure validation throughput (rows/second) and validate ≥1000 rows/s
+  - Subtask 6.4: Measure validation overhead and validate <20% of total pipeline time
+  - Subtask 6.5: Record baseline in `tests/.performance_baseline.json` per Story 1.11 pattern
+  - Subtask 6.6: If throughput <1000 rows/s: optimize (vectorize, cache, batch mode) before completing story
+
+- **Task 7: Documentation and Integration**
+  - Subtask 7.1: Add docstrings to all models and validators explaining business logic
+  - Subtask 7.2: Document field mapping: Excel column name → Pydantic field → database column
+  - Subtask 7.3: Add usage examples in model docstrings (In → Out conversion pattern)
+  - Subtask 7.4: Update story file with Completion Notes, File List, and Change Log
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+### AC1: Input Model Handles Messy Excel Data
+- Accept Chinese field names matching Excel sources: 月度, 计划代码, 客户名称, 期初资产规模, 期末资产规模, 投资收益, 年化收益率
+- Use loose validation with Optional[Union[...]] types for data quality issues
+- Parse and coerce data without failing on typical Excel messiness
+
+### AC2: Output Model Enforces Business Rules
+- Use strict validation with required, non-nullable types
+- Enforce business rules: non-negative assets, required fields, valid dates
+- Raise ValidationError with field-specific messages when rules violated
+
+### AC3: Custom Validators for Business Logic
+- Parse Chinese dates using Epic 2 Story 2.4 date parser
+- Clean company names using Epic 2 Story 2.3 cleansing rules
+- Validate numeric ranges with clear error messages
+
+### AC4: Clear Error Messages with Row Context
+- Include row number, field name, invalid value, expected format
+- Support batch validation (collect all errors, not fail-fast)
+- Export errors to CSV via Epic 2 Story 2.5 pattern
+
+### AC5: Validation Summary and Integration
+- Provide validation summary: total rows, successful, failed with reasons
+- Return list of validated objects and error list
+- Integrate with Epic 1 Story 1.5 pipeline framework as TransformStep
+
+### AC6: Performance Compliance (MANDATORY)
+- Process ≥1000 rows/second on standard hardware
+- Validation overhead <20% of total pipeline execution time
+- Baseline recorded in tests/.performance_baseline.json
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/sprint-artifacts/tech-spec-epic-2.md" title="Epic 2 Technical Specification" section="Pydantic Models (Story 2.1)">
+Comprehensive technical design for Pydantic row-level validation. Defines AnnuityPerformanceIn (loose validation) and AnnuityPerformanceOut (strict validation) models with Chinese field names, custom validators, and integration with cleansing registry and date parser.
+      </doc>
+      <doc path="docs/epic-2-performance-acceptance-criteria.md" title="Epic 2 Performance Criteria" section="AC-PERF-1, AC-PERF-2, AC-PERF-3">
+MANDATORY performance requirements: ≥1000 rows/s throughput, <20% validation overhead, baseline regression tracking. Story 2.1 target: 1500+ rows/s with 10,000-row test fixture.
+      </doc>
+      <doc path="docs/architecture-boundaries.md" title="Clean Architecture Boundaries" section="Domain Layer Dependencies">
+Domain layer (domain/) MUST NOT import from io/ or orchestration/ layers. Validation logic must be pure, testable without infrastructure. Ruff enforces TID251 banned-import rules.
+      </doc>
+      <doc path="docs/brownfield-architecture.md" title="Brownfield Architecture" section="Pydantic v2 Models, Test Strategy">
+Current state: Pydantic v2 models enforce strict typing and custom validators. Test pyramid: unit tests (fast) > integration tests (10k fixtures) > type checking. Coverage targets: domain ≥90%.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/work_data_hub/domain/pipelines/types.py" kind="protocol" symbol="TransformStep" lines="all" reason="Story 1.5 pipeline framework protocol that validation steps must implement">
+TransformStep, DataFrameStep, RowTransformStep protocols define execute(df, context) interface for pipeline integration.
+      </artifact>
+      <artifact path="src/work_data_hub/domain/pipelines/core.py" kind="executor" symbol="Pipeline" lines="all" reason="Pipeline executor that orchestrates validation steps and tracks metrics">
+Pipeline class provides run(df, context) method with step execution, error handling, and metrics collection (duration, row counts).
+      </artifact>
+      <artifact path="src/work_data_hub/domain/annuity_performance/models.py" kind="models" symbol="AnnuityPerformanceIn, AnnuityPerformanceOut" lines="all" reason="EXISTING Pydantic models for annuity domain - may need enhancement for Story 2.1 requirements">
+Current models exist but may need updates for AC compliance (field validators, error messages, performance optimization).
+      </artifact>
+      <artifact path="src/work_data_hub/domain/annuity_performance/pipeline_steps.py" kind="pipeline_steps" symbol="all" lines="all" reason="Existing pipeline steps that integrate Pydantic validation with Epic 1 framework">
+Contains ValidateInputRowsStep and ValidateOutputRowsStep that wrap Pydantic models in TransformStep protocol.
+      </artifact>
+      <artifact path="tests/conftest.py" kind="test_config" symbol="pytest fixtures" lines="1-100" reason="Pytest configuration with markers (unit, integration, performance), database fixtures, opt-in suites">
+Defines test markers and ephemeral PostgreSQL fixtures for integration tests. Performance marker exists for AC-PERF tests.
+      </artifact>
+      <artifact path="tests/fixtures/performance/annuity_performance_10k.csv" kind="test_fixture" symbol="N/A" lines="N/A" reason="10,000-row performance test fixture (AC-PERF-1 requirement)">
+Pre-existing performance fixture for validating ≥1000 rows/s throughput requirement.
+      </artifact>
+      <artifact path="tests/.performance_baseline.json" kind="baseline" symbol="N/A" lines="N/A" reason="Performance baseline tracking file (AC-PERF-3)">
+Stores baseline metrics for regression detection (>20% degradation triggers warning).
+      </artifact>
+    </code>
+    <dependencies>
+      <python>
+        <package name="pydantic" version=">=2.11.7" reason="Row-level validation with field validators (@field_validator decorator)"/>
+        <package name="pandas" version="latest" reason="DataFrame operations for batch validation"/>
+        <package name="pytest" version="latest" reason="Unit and integration testing"/>
+        <package name="pytest-cov" version=">=6.2.1" reason="Coverage tracking (domain >90% requirement)"/>
+        <package name="mypy" version=">=1.17.1" reason="Type checking enforcement"/>
+        <package name="ruff" version=">=0.12.12" reason="Linting and Clean Architecture enforcement (TID251)"/>
+      </python>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">
+Domain layer MUST NOT import from work_data_hub.io or work_data_hub.orchestration (Clean Architecture Story 1.6). Ruff TID251 rule enforces this.
+    </constraint>
+    <constraint type="performance">
+MANDATORY: Validation throughput ≥1000 rows/s (AC-PERF-1), overhead <20% (AC-PERF-2). Story 2.1 target: 1500+ rows/s. Story BLOCKED if not met.
+    </constraint>
+    <constraint type="dependency">
+Use Pydantic v2 API only: @field_validator (not v1 @validator), Field(...) for constraints, model_dump() (not dict()). Pin pydantic>=2.11.7,<3.0.
+    </constraint>
+    <constraint type="testing">
+Domain layer coverage target: >90%. Unit tests must complete in <30s (Story 1.11 CI enforcement). Performance tests use 10k-row fixtures minimum.
+    </constraint>
+    <constraint type="integration">
+Validation steps implement TransformStep protocol from Story 1.5. Use PipelineContext for execution metadata, return (validated_df, errors) tuple.
+    </constraint>
+    <constraint type="workaround">
+Story 2.3 (Cleansing Registry) and Story 2.4 (Date Parser) are in backlog. Implement inline placeholder functions in validators until those stories complete.
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="TransformStep" kind="protocol" signature="execute(df: DataFrame, context: PipelineContext) -> StepResult" path="src/work_data_hub/domain/pipelines/types.py">
+Protocol for pipeline steps. StepResult contains output DataFrame, metrics (duration_seconds, rows_processed), and errors list.
+    </interface>
+    <interface name="DataFrameStep" kind="protocol" signature="execute(df: DataFrame, context: PipelineContext) -> DataFrame" path="src/work_data_hub/domain/pipelines/types.py">
+Simplified protocol for DataFrame-to-DataFrame transformations without explicit StepResult.
+    </interface>
+    <interface name="RowTransformStep" kind="protocol" signature="execute(df: DataFrame, context: PipelineContext) -> DataFrame" path="src/work_data_hub/domain/pipelines/types.py">
+Protocol for row-by-row transformations (e.g., Pydantic validation). Returns transformed DataFrame.
+    </interface>
+    <interface name="PipelineContext" kind="class" signature="PipelineContext(source_name: str, metadata: dict)" path="src/work_data_hub/domain/pipelines/types.py">
+Execution context carrying source file name, run metadata, and configuration. Passed to all pipeline steps.
+    </interface>
+    <interface name="AnnuityPerformanceIn" kind="pydantic_model" signature="BaseModel with Optional[Union[...]] fields" path="src/work_data_hub/domain/annuity_performance/models.py">
+Input model with loose validation for messy Excel data. Fields: 月度, 计划代码, 客户名称, 期初资产规模, 期末资产规模, 投资收益, 年化收益率.
+    </interface>
+    <interface name="AnnuityPerformanceOut" kind="pydantic_model" signature="BaseModel with strict Field(...) constraints" path="src/work_data_hub/domain/annuity_performance/models.py">
+Output model with strict validation for database-ready data. Enforces required fields, non-negative constraints, date parsing, company name cleansing.
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+Use pytest markers: @pytest.mark.unit for fast unit tests, @pytest.mark.integration for database/performance tests, @pytest.mark.performance for AC-PERF validations. Coverage target: >90% for domain layer. Unit tests must complete in <30s (Story 1.11 CI enforcement). Type hints mandatory (mypy --strict). Organize tests: tests/unit/domain/annuity_performance/test_models.py for model unit tests, tests/integration/test_story_2_1_performance.py for performance tests.
+    </standards>
+    <locations>
+      <location>tests/unit/domain/annuity_performance/test_models.py</location>
+      <location>tests/integration/test_story_2_1_performance.py</location>
+      <location>tests/fixtures/performance/annuity_performance_10k.csv</location>
+      <location>tests/.performance_baseline.json</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Test AnnuityPerformanceIn accepts messy Excel data: nulls, mixed types (str/int/date), comma-separated numbers, Chinese date formats (202501, "2025年1月"). Validate type coercion without errors.</idea>
+      <idea ac="AC2">Test AnnuityPerformanceOut enforces business rules: required fields raise ValidationError, non-negative constraints (期末资产规模 >= 0), date parsing ("202501" → date(2025,1,1)), company_id presence.</idea>
+      <idea ac="AC3">Test custom validators: @field_validator('月度') with inline date parser (placeholder for Story 2.4), @field_validator('客户名称') with inline cleansing (placeholder for Story 2.3), @field_validator('期末资产规模') cleans comma-separated numbers.</idea>
+      <idea ac="AC4">Test error messages include row index (if available from context), field name, invalid value, and expected format. Example: "Row 15, field '月度': Cannot parse 'INVALID' as date, expected format: YYYYMM or YYYY年MM月".</idea>
+      <idea ac="AC5">Test batch validation: iterate 100 rows, collect all errors (not fail-fast), return (validated_objects, errors) tuple. Integration with Epic 1 Story 1.5 pipeline: ValidateInputRowsStep implements TransformStep.</idea>
+      <idea ac="AC6 - MANDATORY">Performance test with 10,000-row fixture: measure throughput (rows/s), assert ≥1000 rows/s, measure overhead (<20% of pipeline time), record baseline in .performance_baseline.json. If <1000 rows/s: optimize with batch validation, caching, vectorization.</idea>
+    </ideas>
+  </tests>
+</story-context>

@@ -4,10 +4,17 @@ Pydantic v2 data models for annuity performance domain.
 This module defines the input and output data contracts for annuity performance
 data processing, providing robust validation and type safety using Pydantic v2.
 Handles Chinese column names from "规模明细" Excel sheets.
+
+Story 2.1 Enhancements:
+- AC1: Loose validation with Optional[Union[...]] for messy Excel data
+- AC2: Strict validation with required fields and business rules
+- AC3: Custom validators with inline placeholders for Story 2.3/2.4
+- AC4: Clear error messages with field context
 """
 
 import logging
-from datetime import date
+import re
+from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, List, Optional, Union
 
@@ -23,6 +30,205 @@ from pydantic import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ===== Inline Placeholder Functions for Story 2.3 and 2.4 =====
+# These will be replaced by proper cleansing registry and date parser
+# when those stories are completed
+
+def parse_yyyymm_or_chinese(value: Any) -> date:
+    """
+    PLACEHOLDER for Story 2.4: Chinese Date Parsing Utilities
+
+    Parse various Chinese date formats to Python date object.
+    Will be replaced by utils/date_parser.py when Story 2.4 completes.
+
+    Supported formats:
+    - Integer: 202501 → date(2025, 1, 1)
+    - String: "2025年1月" → date(2025, 1, 1)
+    - String: "2025-01" → date(2025, 1, 1)
+    - Date: date(2025, 1, 1) → date(2025, 1, 1) (passthrough)
+
+    Args:
+        value: Input date in various formats
+
+    Returns:
+        Parsed date object
+
+    Raises:
+        ValueError: If value cannot be parsed or is outside valid range (2000-2030)
+    """
+    # Passthrough for date objects
+    if isinstance(value, date):
+        if not (2000 <= value.year <= 2030):
+            raise ValueError(
+                f"Date {value.year}-{value.month:02d} outside valid range 2000-2030"
+            )
+        return value
+
+    if isinstance(value, datetime):
+        result = value.date()
+        if not (2000 <= result.year <= 2030):
+            raise ValueError(
+                f"Date {result.year}-{result.month:02d} outside valid range 2000-2030"
+            )
+        return result
+
+    # Convert to string
+    s = str(value).strip()
+
+    # Normalize full-width digits (０-９ → 0-9)
+    trans = str.maketrans('０１２３４５６７８９', '0123456789')
+    s = s.translate(trans)
+
+    # Try parsing in priority order
+    try:
+        # YYYYMMDD (8 digits)
+        if re.match(r'^\d{8}$', s):
+            result = datetime.strptime(s, '%Y%m%d').date()
+        # YYYYMM (6 digits) → first day of month
+        elif re.match(r'^\d{6}$', s):
+            result = datetime.strptime(s + '01', '%Y%m%d').date()
+        # YYYY-MM-DD
+        elif re.match(r'^\d{4}-\d{2}-\d{2}$', s):
+            result = datetime.strptime(s, '%Y-%m-%d').date()
+        # YYYY-MM → first day of month
+        elif re.match(r'^\d{4}-\d{2}$', s):
+            result = datetime.strptime(s + '-01', '%Y-%m-%d').date()
+        # YYYY年MM月DD日
+        elif re.match(r'^\d{4}年\d{1,2}月\d{1,2}日$', s):
+            result = datetime.strptime(s, '%Y年%m月%d日').date()
+        # YYYY年MM月 → first day of month
+        elif re.match(r'^\d{4}年\d{1,2}月$', s):
+            result = datetime.strptime(s + '1日', '%Y年%m月%d日').date()
+        # YY年MM月 (2-digit year) → first day of month
+        elif re.match(r'^\d{2}年\d{1,2}月$', s):
+            result = datetime.strptime(s + '1日', '%y年%m月%d日').date()
+        else:
+            raise ValueError(
+                f"Cannot parse '{value}' as date. Supported formats: "
+                f"YYYYMM, YYYYMMDD, YYYY年MM月, YYYY年MM月DD日, YYYY-MM, YYYY-MM-DD, YY年MM月"
+            )
+
+        # Validate range
+        if not (2000 <= result.year <= 2030):
+            raise ValueError(
+                f"Date {result.year}-{result.month:02d} outside valid range 2000-2030"
+            )
+
+        return result
+
+    except ValueError:
+        raise
+    except Exception as e:
+        raise ValueError(
+            f"Cannot parse '{value}' as date. Supported formats: "
+            f"YYYYMM, YYYYMMDD, YYYY年MM月, YYYY年MM月DD日, YYYY-MM, YYYY-MM-DD, YY年MM月. "
+            f"Error: {e}"
+        )
+
+
+def clean_company_name_inline(value: str) -> str:
+    """
+    PLACEHOLDER for Story 2.3: Cleansing Registry Framework
+
+    Basic company name normalization.
+    Will be replaced by cleansing/registry.py when Story 2.3 completes.
+
+    Rules:
+    - Trim whitespace
+    - Normalize full-width spaces to half-width
+    - Remove quotes and brackets
+    - Collapse multiple spaces
+
+    Args:
+        value: Raw company name from Excel
+
+    Returns:
+        Normalized company name
+    """
+    if not isinstance(value, str):
+        return value
+
+    # Trim whitespace
+    value = value.strip()
+
+    # Replace full-width spaces with half-width
+    value = value.replace('　', ' ')
+
+    # Remove quotes and brackets
+    value = value.strip('「」『』""')
+
+    # Collapse multiple spaces
+    value = ' '.join(value.split())
+
+    return value
+
+
+def clean_comma_separated_number(value: Any) -> Optional[float]:
+    """
+    PLACEHOLDER for Story 2.3: Cleansing Registry - Numeric Rules
+
+    Clean comma-separated numbers from Excel.
+    Handles formats like "1,234.56", "¥1,234", "$1,234", "5.5%"
+    Also handles placeholders: "N/A", "无", "-", "null", ""
+
+    Args:
+        value: Numeric value (can be str, int, float, or None)
+
+    Returns:
+        Cleaned float value or None
+    """
+    if value is None:
+        return None
+
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    if isinstance(value, str):
+        # Trim whitespace
+        value = value.strip()
+
+        # Handle empty or placeholder values
+        if not value or value.lower() in ['n/a', 'na', 'null', '-', '无', '暂无', '待定']:
+            return None
+
+        # Handle percentage (e.g., "5.5%" → 0.055)
+        if '%' in value:
+            try:
+                # Remove % and convert to decimal form
+                numeric_part = value.replace('%', '').strip()
+                # Remove commas and currency symbols
+                numeric_part = numeric_part.replace('¥', '').replace('$', '').replace(',', '')
+                return float(numeric_part) / 100.0
+            except ValueError:
+                raise ValueError(
+                    f"Cannot convert percentage '{value}' to number. "
+                    f"Expected format: '5.5%' or '12.34%'"
+                )
+
+        # Remove currency symbols and commas
+        cleaned = value.replace('¥', '').replace('$', '').replace(',', '').strip()
+        if not cleaned:
+            return None
+        try:
+            return float(cleaned)
+        except ValueError:
+            raise ValueError(
+                f"Cannot convert '{value}' to number. "
+                f"Expected format: '1234.56' or '1,234.56' or '¥1,234' or '5.5%'"
+            )
+
+    # Try converting other types
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        raise ValueError(
+            f"Cannot convert '{value}' to number. Type: {type(value).__name__}"
+        )
+
+
+# ===== End Placeholder Functions =====
 
 
 class AnnuityPerformanceIn(BaseModel):
@@ -124,7 +330,7 @@ class AnnuityPerformanceIn(BaseModel):
 
     @field_validator("年", "月", mode="before")
     @classmethod
-    def clean_date_fields(cls, v):
+    def clean_date_component_fields(cls, v):
         """Clean year/month fields that may contain non-numeric characters."""
         if v is None:
             return v
@@ -139,6 +345,29 @@ class AnnuityPerformanceIn(BaseModel):
 
         # Return cleaned string (will be validated later in transformation)
         return v_str if v_str else None
+
+    @field_validator(
+        "期初资产规模",
+        "期末资产规模",
+        "供款",
+        "流失_含待遇支付",
+        "流失",
+        "待遇支付",
+        "投资收益",
+        "当期收益率",
+        mode="before",
+    )
+    @classmethod
+    def clean_numeric_fields(cls, v):
+        """
+        Clean numeric fields from Excel with comma-separated numbers.
+
+        AC1: Handle messy Excel data like "1,234.56", "¥1,234", "5.5%", placeholders
+        Uses inline placeholder until Story 2.3 completes.
+        """
+        if v is None:
+            return v
+        return clean_comma_separated_number(v)
 
     @field_validator("月度", mode="before")
     @classmethod
@@ -187,6 +416,11 @@ class AnnuityPerformanceOut(BaseModel):
     This model enforces strict validation rules and provides clean, typed data
     suitable for loading into the "规模明细" PostgreSQL table with consistent
     field names and formats matching the DDL schema.
+
+    Story 2.1 AC2 Enhancements:
+    - Strict required types for critical fields
+    - Non-negative constraints on asset values
+    - Business rule validation via @model_validator
     """
 
     model_config = ConfigDict(
@@ -224,14 +458,16 @@ class AnnuityPerformanceOut(BaseModel):
     组合名称: Optional[str] = Field(None, max_length=255, description="Portfolio name")
     客户名称: Optional[str] = Field(None, max_length=255, description="Customer name")
 
-    # Financial metrics with proper precision (double precision in PostgreSQL)
+    # Financial metrics with proper precision and constraints (AC2: non-negative)
     期初资产规模: Optional[Decimal] = Field(
-        None, decimal_places=4, description="Initial asset scale"
+        None, decimal_places=4, ge=0, description="Initial asset scale (non-negative)"
     )
     期末资产规模: Optional[Decimal] = Field(
-        None, decimal_places=4, description="Final asset scale"
+        None, decimal_places=4, ge=0, description="Final asset scale (non-negative, AC2 requirement)"
     )
-    供款: Optional[Decimal] = Field(None, decimal_places=4, description="Contribution")
+    供款: Optional[Decimal] = Field(
+        None, decimal_places=4, ge=0, description="Contribution (non-negative)"
+    )
     # Preserve original alias throughout serialization so downstream SQL can reuse it
     流失_含待遇支付: Optional[Decimal] = Field(
         None,
@@ -246,14 +482,14 @@ class AnnuityPerformanceOut(BaseModel):
         None, decimal_places=4, description="Benefit payment"
     )
     投资收益: Optional[Decimal] = Field(
-        None, decimal_places=4, description="Investment return"
+        None, decimal_places=4, description="Investment return (can be negative)"
     )
-    当期收益率: Optional[Decimal] = Field(
+    年化收益率: Optional[Decimal] = Field(
         None,
         decimal_places=6,
         ge=-1.0,
         le=10.0,
-        description="Current period return rate",
+        description="Current period return rate (sanity check range)"
     )
 
     # Organizational fields
@@ -274,6 +510,53 @@ class AnnuityPerformanceOut(BaseModel):
     年金账户名: Optional[str] = Field(
         None, max_length=255, description="Pension account name"
     )
+
+    @field_validator('月度', mode='before')
+    @classmethod
+    def parse_date_field(cls, v):
+        """
+        AC3: Parse dates using inline placeholder for Story 2.4
+
+        Parse various Chinese date formats to Python date object.
+        Will integrate with utils/date_parser.py when Story 2.4 completes.
+
+        Examples:
+            202501 → date(2025, 1, 1)
+            "2025年1月" → date(2025, 1, 1)
+            "2025-01" → date(2025, 1, 1)
+
+        Raises:
+            ValueError: If date cannot be parsed or is outside 2000-2030 range
+        """
+        if v is None:
+            return v
+        try:
+            return parse_yyyymm_or_chinese(v)
+        except ValueError as e:
+            raise ValueError(
+                f"Field '月度': {str(e)}"
+            )
+
+    @field_validator('客户名称', mode='before')
+    @classmethod
+    def clean_customer_name(cls, v):
+        """
+        AC3: Clean company names using inline placeholder for Story 2.3
+
+        Basic normalization: trim whitespace, remove quotes, normalize spacing.
+        Will integrate with cleansing/registry.py when Story 2.3 completes.
+
+        Raises:
+            ValueError: If cleaning fails
+        """
+        if v is None:
+            return v
+        try:
+            return clean_company_name_inline(v)
+        except Exception as e:
+            raise ValueError(
+                f"Field '客户名称': Cannot clean company name '{v}'. Error: {e}"
+            )
 
     @field_validator("计划代码", "company_id", mode="after")
     @classmethod
@@ -299,47 +582,58 @@ class AnnuityPerformanceOut(BaseModel):
         "流失",
         "待遇支付",
         "投资收益",
-        "当期收益率",
+        "年化收益率",
         mode="before",
     )
     @classmethod
-    def clean_decimal_fields(cls, v, info: Any):
-        """Clean decimal fields using the unified cleansing framework."""
-        from work_data_hub.cleansing.rules.numeric_rules import (
-            comprehensive_decimal_cleaning,
-        )
+    def clean_decimal_fields_output(cls, v):
+        """
+        AC2: Clean decimal fields for strict output validation.
 
-        # Field-specific precision configuration
-        precision_config = {
-            "当期收益率": 6,  # Return rate needs higher precision
-            "期初资产规模": 4,
-            "期末资产规模": 4,
-            "供款": 4,
-            "流失_含待遇支付": 4,
-            "流失": 4,
-            "待遇支付": 4,
-            "投资收益": 4,
-        }
-
-        return comprehensive_decimal_cleaning(
-            value=v, field_name=info.field_name, precision_config=precision_config
-        )
+        Uses inline placeholder until Story 2.3 cleansing module completes.
+        Handles comma-separated numbers, currency symbols, and percentage formats.
+        """
+        if v is None:
+            return v
+        return clean_comma_separated_number(v)
 
     @model_validator(mode="after")
-    def validate_report_date(self) -> "AnnuityPerformanceOut":
-        """Validate report date is reasonable and consistent."""
+    def validate_business_rules(self) -> "AnnuityPerformanceOut":
+        """
+        AC2: Cross-field business rules validation
+
+        Business Rules:
+        1. Report date must not be in the future
+        2. Report date should not be older than 10 years (warning only)
+        3. When 期末资产规模=0, 年化收益率 should be None (AC2 requirement)
+
+        Raises:
+            ValueError: If business rules are violated
+        """
+        # Rule 1: Check report date is not in the future
         report_date = self.月度
         if report_date:
             current_date = date.today()
 
-            # Check date is not in the future
             if report_date > current_date:
-                raise ValueError(f"Report date cannot be in future: {report_date}")
+                raise ValueError(
+                    f"Field '月度': Report date {report_date} cannot be in the future "
+                    f"(today: {current_date})"
+                )
 
-            # Check date is not too old (more than 10 years) - just warn, don't fail
+            # Rule 2: Warn if date is too old (more than 10 years) - just log, don't fail
             if (current_date - report_date).days > 3650:
-                # Just log warning, don't store in model since field doesn't exist
-                pass
+                logger.warning(
+                    f"Report date {report_date} is older than 10 years (today: {current_date})"
+                )
+
+        # Rule 3 (AC2): When 期末资产规模=0, 年化收益率 should be None
+        if self.期末资产规模 is not None and self.期末资产规模 == 0:
+            if self.年化收益率 is not None:
+                raise ValueError(
+                    f"Business Rule Violation: When 期末资产规模=0, 年化收益率 must be None "
+                    f"(got: {self.年化收益率})"
+                )
 
         return self
 

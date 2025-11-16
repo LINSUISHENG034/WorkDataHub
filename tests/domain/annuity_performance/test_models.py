@@ -37,7 +37,7 @@ class TestAnnuityPerformanceIn:
         assert model.业务类型 == "企业年金"
 
     def test_financial_fields_flexible_types(self):
-        """Test that financial fields accept various input types."""
+        """Test that financial fields accept various input types and clean them."""
         data = {
             "期初资产规模": "1000000.50",
             "期末资产规模": 2000000,
@@ -46,17 +46,19 @@ class TestAnnuityPerformanceIn:
         }
 
         model = AnnuityPerformanceIn(**data)
-        assert model.期初资产规模 == "1000000.50"
-        assert model.期末资产规模 == 2000000
-        assert model.投资收益 == Decimal("50000.25")
-        assert model.当期收益率 == "5.5%"
+        # Story 2.1: Numeric fields are cleaned to float/Decimal
+        assert model.期初资产规模 == 1000000.5  # Cleaned from string
+        assert model.期末资产规模 == 2000000.0  # Cleaned from int
+        assert model.投资收益 == Decimal("50000.25")  # Decimal passthrough
+        assert model.当期收益率 == 0.055  # Percentage converted to decimal
 
     def test_special_column_with_parentheses(self):
         """Test handling of special column name with parentheses."""
         data = {"流失(含待遇支付)": "10000.00"}
 
         model = AnnuityPerformanceIn(**data)
-        assert model.流失_含待遇支付 == "10000.00"
+        # Story 2.1: Numeric fields are cleaned to float
+        assert model.流失_含待遇支付 == 10000.0
 
     def test_extra_fields_allowed(self):
         """Test that extra fields are allowed in input model."""

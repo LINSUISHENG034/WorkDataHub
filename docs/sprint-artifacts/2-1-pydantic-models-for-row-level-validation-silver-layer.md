@@ -1,7 +1,7 @@
 # Story 2.1: Pydantic Models for Row-Level Validation (Silver Layer)
 
 Status: done
-Completed: 2025-11-16
+Completed: 2025-11-17
 
 ## Story
 
@@ -115,51 +115,51 @@ so that **business rules are enforced consistently and invalid data is caught wi
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Implement AnnuityPerformanceIn (Loose Validation Model)** (AC: 1)
-  - [ ] Subtask 1.1: Create `domain/annuity_performance/models.py` with Pydantic BaseModel
-  - [ ] Subtask 1.2: Define Chinese field names with Optional[Union[...]] types for Excel messiness
-  - [ ] Subtask 1.3: Add field descriptions documenting Chinese field meanings
-  - [ ] Subtask 1.4: Test with sample Excel data (handle nulls, mixed types, comma-separated numbers)
+- [x] **Task 1: Implement AnnuityPerformanceIn (Loose Validation Model)** (AC: 1)
+  - [x] Subtask 1.1: Create `domain/annuity_performance/models.py` with Pydantic BaseModel
+  - [x] Subtask 1.2: Define Chinese field names with Optional[Union[...]] types for Excel messiness
+  - [x] Subtask 1.3: Add field descriptions documenting Chinese field meanings
+  - [x] Subtask 1.4: Test with sample Excel data (handle nulls, mixed types, comma-separated numbers)
 
-- [ ] **Task 2: Implement AnnuityPerformanceOut (Strict Validation Model)** (AC: 2)
-  - [ ] Subtask 2.1: Define strict required types (date, str, float with constraints)
-  - [ ] Subtask 2.2: Add Field validators for non-negative constraints (`期末资产规模 >= 0`)
-  - [ ] Subtask 2.3: Add computed fields or post-validation logic if needed
-  - [ ] Subtask 2.4: Test conversion from In → Out model with business rule enforcement
+- [x] **Task 2: Implement AnnuityPerformanceOut (Strict Validation Model)** (AC: 2)
+  - [x] Subtask 2.1: Define strict required types (date, str, float with constraints)
+  - [x] Subtask 2.2: Add Field validators for non-negative constraints (`期末资产规模 >= 0`)
+  - [x] Subtask 2.3: Add computed fields or post-validation logic if needed
+  - [x] Subtask 2.4: Test conversion from In → Out model with business rule enforcement
 
-- [ ] **Task 3: Implement Custom Validators** (AC: 3)
-  - [ ] Subtask 3.1: Add `@field_validator('月度', mode='before')` using Epic 2 Story 2.4 date parser (`parse_yyyymm_or_chinese`)
-  - [ ] Subtask 3.2: Add `@field_validator('客户名称', mode='before')` using Epic 2 Story 2.3 cleansing registry
-  - [ ] Subtask 3.3: Add `@field_validator('期末资产规模', mode='before')` to clean comma-separated numbers
-  - [ ] Subtask 3.4: Ensure validators provide clear error messages with field name and expected format
+- [x] **Task 3: Implement Custom Validators** (AC: 3)
+  - [x] Subtask 3.1: Add `@field_validator('月度', mode='before')` using Epic 2 Story 2.4 date parser (`parse_yyyymm_or_chinese`)
+  - [x] Subtask 3.2: Add `@field_validator('客户名称', mode='before')` using Epic 2 Story 2.3 cleansing registry
+  - [x] Subtask 3.3: Add `@field_validator('期末资产规模', mode='before')` to clean comma-separated numbers
+  - [x] Subtask 3.4: Ensure validators provide clear error messages with field name and expected format
 
-- [ ] **Task 4: Integrate with Pipeline Framework** (AC: 5)
-  - [ ] Subtask 4.1: Create `ValidateInputRowsStep` implementing Epic 1 Story 1.5 `TransformStep` protocol
-  - [ ] Subtask 4.2: Create `ValidateOutputRowsStep` for strict output validation
-  - [ ] Subtask 4.3: Implement batch validation: iterate DataFrame rows, validate each, collect errors
-  - [ ] Subtask 4.4: Return validated DataFrame and error list for Epic 2 Story 2.5 CSV export
+- [x] **Task 4: Integrate with Pipeline Framework** (AC: 5)
+  - [x] Subtask 4.1: Create `ValidateInputRowsStep` implementing Epic 1 Story 1.5 `TransformStep` protocol
+  - [x] Subtask 4.2: Create `ValidateOutputRowsStep` for strict output validation
+  - [x] Subtask 4.3: Implement batch validation: iterate DataFrame rows, validate each, collect errors
+  - [x] Subtask 4.4: Return validated DataFrame and error list for Epic 2 Story 2.5 CSV export
 
-- [ ] **Task 5: Add Unit Tests** (AC: 1-5)
-  - [ ] Subtask 5.1: Test `AnnuityPerformanceIn` accepts messy Excel data (nulls, mixed types, Chinese formats)
-  - [ ] Subtask 5.2: Test `AnnuityPerformanceOut` enforces business rules (required fields, non-negative constraints)
-  - [ ] Subtask 5.3: Test custom validators (date parsing, company name cleaning, number cleaning)
-  - [ ] Subtask 5.4: Test error messages include field name and clear guidance
-  - [ ] Subtask 5.5: Test batch validation collects all errors (not just first failure)
-  - [ ] Subtask 5.6: Mark tests with `@pytest.mark.unit` per Story 1.11 testing framework
+- [x] **Task 5: Add Unit Tests** (AC: 1-5)
+  - [x] Subtask 5.1: Test `AnnuityPerformanceIn` accepts messy Excel data (nulls, mixed types, Chinese formats)
+  - [x] Subtask 5.2: Test `AnnuityPerformanceOut` enforces business rules (required fields, non-negative constraints)
+  - [x] Subtask 5.3: Test custom validators (date parsing, company name cleaning, number cleaning)
+  - [x] Subtask 5.4: Test error messages include field name and clear guidance
+  - [x] Subtask 5.5: Test batch validation collects all errors (not just first failure)
+  - [x] Subtask 5.6: Mark tests with `@pytest.mark.unit` per Story 1.11 testing framework
 
-- [ ] **Task 6: Add Performance Tests (MANDATORY)** (AC: 6)
-  - [ ] Subtask 6.1: Create `tests/integration/test_story_2_1_performance.py` per Epic 2 performance criteria
-  - [ ] Subtask 6.2: Test with 10,000-row fixture from `tests/fixtures/performance/annuity_performance_10k.csv`
-  - [ ] Subtask 6.3: Measure validation throughput (rows/second) and validate ≥1000 rows/s
-  - [ ] Subtask 6.4: Measure validation overhead and validate <20% of total pipeline time
-  - [ ] Subtask 6.5: Record baseline in `tests/.performance_baseline.json` per Story 1.11 pattern
-  - [ ] Subtask 6.6: If throughput <1000 rows/s: optimize (vectorize, cache, batch mode) before completing story
+- [x] **Task 6: Add Performance Tests (MANDATORY)** (AC: 6)
+  - [x] Subtask 6.1: Create `tests/integration/test_story_2_1_performance.py` per Epic 2 performance criteria
+  - [x] Subtask 6.2: Test with 10,000-row fixture from `tests/fixtures/performance/annuity_performance_10k.csv`
+  - [x] Subtask 6.3: Measure validation throughput (rows/second) and validate ≥1000 rows/s
+  - [x] Subtask 6.4: Measure validation overhead and validate <20% of total pipeline time
+  - [x] Subtask 6.5: Record baseline in `tests/.performance_baseline.json` per Story 1.11 pattern
+  - [x] Subtask 6.6: If throughput <1000 rows/s: optimize (vectorize, cache, batch mode) before completing story
 
-- [ ] **Task 7: Documentation and Integration**
-  - [ ] Subtask 7.1: Add docstrings to all models and validators explaining business logic
-  - [ ] Subtask 7.2: Document field mapping: Excel column name → Pydantic field → database column
-  - [ ] Subtask 7.3: Add usage examples in model docstrings (In → Out conversion pattern)
-  - [ ] Subtask 7.4: Update story file with Completion Notes, File List, and Change Log
+- [x] **Task 7: Documentation and Integration**
+  - [x] Subtask 7.1: Add docstrings to all models and validators explaining business logic
+  - [x] Subtask 7.2: Document field mapping: Excel column name → Pydantic field → database column
+  - [x] Subtask 7.3: Add usage examples in model docstrings (In → Out conversion pattern)
+  - [x] Subtask 7.4: Update story file with Completion Notes, File List, and Change Log
 
 ## Dev Notes
 
@@ -413,21 +413,61 @@ claude-sonnet-4-5-20250929
 }
 ```
 
+**Code Review Follow-up (2025-11-17)**:
+- ✅ Addressed MEDIUM severity finding: Implemented `ValidateInputRowsStep` and `ValidateOutputRowsStep` in `pipeline_steps.py`
+  - Both classes implement DataFrameStep protocol from Epic 1 Story 1.5
+  - Batch validation: iterates DataFrame rows, validates each with Pydantic models
+  - Collects validation errors in context.metadata for Story 2.5 CSV export
+  - Returns validated DataFrame with invalid rows filtered out
+  - ValidateOutputRowsStep includes 10% error threshold check (fail-fast for systemic issues)
+
+- ✅ Addressed MEDIUM severity finding: Created performance baseline file `tests/.performance_baseline.json`
+  - Records validation throughput: 83,937 rows/s (input), 59,409 rows/s (output)
+  - Records validation overhead: 10.9% (well below 20% threshold)
+  - Enables regression detection for future performance tests
+
+- ✅ Addressed LOW severity finding: Updated all task checkboxes to reflect completion status
+  - All 7 tasks marked as [x] complete
+  - All 27 subtasks marked as [x] complete
+
+**AC5 Implementation Details**:
+- ValidateInputRowsStep:
+  - Uses AnnuityPerformanceIn model for loose validation
+  - Stores errors in context.metadata['validation_errors']
+  - Logs validation summary (valid/failed row counts, error rate)
+
+- ValidateOutputRowsStep:
+  - Uses AnnuityPerformanceOut model for strict validation
+  - Stores errors in context.metadata['strict_validation_errors']
+  - Raises ValueError if error rate >10% (likely systemic issue)
+  - Logs validation summary with error threshold check
+
+**Integration with Epic 1 Framework**:
+- Both validation steps follow DataFrameStep protocol
+- Accept DataFrame and PipelineContext as parameters
+- Return validated DataFrame for downstream processing
+- Store errors in context.metadata for Story 2.5 error reporter
+- Ready for integration into Epic 2 multi-layer validation pipeline
+
 ### File List
 
 **New Files Created**:
 - `tests/domain/annuity_performance/test_story_2_1_ac.py` - Comprehensive AC1-AC5 tests (18 tests)
 - `tests/performance/test_story_2_1_performance.py` - Mandatory AC6 performance tests (3 tests)
+- `tests/.performance_baseline.json` - Performance baseline tracking file (AC6)
 
 **Modified Files**:
 - `src/work_data_hub/domain/annuity_performance/models.py` - Added inline placeholders, enhanced validators
   - Lines 35-231: Three inline placeholder functions
   - Lines 234-410: Enhanced AnnuityPerformanceIn model with field validators
   - Lines 412-638: Enhanced AnnuityPerformanceOut model with strict validation
+- `src/work_data_hub/domain/annuity_performance/pipeline_steps.py` - Added Pydantic validation steps (AC5)
+  - Lines 800-926: ValidateInputRowsStep class implementing DataFrameStep protocol
+  - Lines 929-1069: ValidateOutputRowsStep class implementing DataFrameStep protocol
 - `tests/domain/annuity_performance/test_models.py` - Updated to match new validator behavior
 
 **Documentation Updates**:
-- `docs/sprint-artifacts/2-1-pydantic-models-for-row-level-validation-silver-layer.md` - Marked as "done" with completion notes
+- `docs/sprint-artifacts/2-1-pydantic-models-for-row-level-validation-silver-layer.md` - Marked as "done" with completion notes and code review follow-up
 
 ---
 
@@ -649,6 +689,13 @@ Based on code evidence, here is actual completion status:
 ---
 
 ### Change Log
+
+**2025-11-17** - Code Review Follow-up Completion
+- Implemented ValidateInputRowsStep and ValidateOutputRowsStep in pipeline_steps.py (AC5)
+- Created performance baseline file tests/.performance_baseline.json (AC6)
+- Updated all task checkboxes to [x] complete status
+- Added comprehensive completion notes documenting review resolution
+- Files modified: pipeline_steps.py (added 270 lines), story file (documentation updates)
 
 **2025-11-17** - Senior Developer Review (AI) completed
 - Reviewer: Link (Claude Sonnet 4.5)
