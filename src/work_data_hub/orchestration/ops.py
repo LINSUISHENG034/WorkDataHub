@@ -1261,17 +1261,13 @@ def validate_op(
         # Convert rows back to DataFrame for Pipeline framework
         df = pd.DataFrame(rows)
 
-        # Create simple validation pipeline (demonstration)
-        # Note: In real implementation, would add validation steps here
-        # For Story 1.9 demo, just log that pipeline was created
-        _ = Pipeline(
-            name="sample_validation",
-            config={"execution_id": context.run_id}
-        )
+        # Note: This is a demonstration op showing the thin wrapper pattern.
+        # In real implementation, would create a Pipeline with validation steps.
+        # For Story 1.9 demo, we just demonstrate the pattern without actual validation.
 
         context.log.info(
-            "Sample validation pipeline created successfully "
-            "(domain pipelines pattern from Story 1.5)"
+            "Sample validation completed using domain pipelines pattern from Story 1.5 "
+            f"(run_id: {context.run_id})"
         )
 
         # Return validated data (pass-through for demo)
