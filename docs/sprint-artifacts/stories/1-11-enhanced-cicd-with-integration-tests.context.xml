@@ -1,0 +1,1257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <meta>
+    <story-id>1.11</story-id>
+    <epic-id>1</epic-id>
+    <story-key>1-11-enhanced-cicd-with-integration-tests</story-key>
+    <title>Enhanced CI/CD with Integration Tests</title>
+    <generated-at>2025-11-16</generated-at>
+    <generated-by>story-context workflow</generated-by>
+  </meta>
+
+  <user-story>
+    <as-a>data engineer</as-a>
+    <i-want>comprehensive CI/CD checks including integration tests</i-want>
+    <so-that>database interactions, pipeline execution, and end-to-end flows are validated before merge</so-that>
+  </user-story>
+
+  <acceptance-criteria>
+    <criterion id="AC-1.11.1">
+      <title>Pytest markers configured</title>
+      <description>pytest.ini or pyproject.toml defines markers: `unit`, `integration`, `performance`. Tests tagged with appropriate markers.</description>
+      <verification>
+        - Check pyproject.toml [tool.pytest.ini_options] section contains all required markers
+        - Verify test files use @pytest.mark.unit, @pytest.mark.integration decorators appropriately
+      </verification>
+      <status>PARTIALLY_COMPLETE</status>
+      <notes>Markers already exist in pyproject.toml. Need to ensure all tests are properly tagged.</notes>
+    </criterion>
+
+    <criterion id="AC-1.11.2">
+      <title>Integration test database setup</title>
+      <description>pytest-postgresql plugin configured. Fixture `test_db` provisions temporary PostgreSQL. Runs Alembic migrations before tests (Story 1.7 migrations applied).</description>
+      <verification>
+        - Verify pytest-postgresql in dev dependencies
+        - Check conftest.py has test_db_with_migrations fixture
+        - Ensure fixture applies Alembic migrations via migration_runner.upgrade()
+      </verification>
+      <status>PARTIALLY_COMPLETE</status>
+      <notes>SQLite-based fixture exists. Story requires PostgreSQL-based fixture using pytest-postgresql for true database integration tests.</notes>
+    </criterion>
+
+    <criterion id="AC-1.11.3">
+      <title>Integration tests implemented</title>
+      <description>Test end-to-end pipeline: CSV → validate → database. Test WarehouseLoader with real PostgreSQL. Test Dagster job execution. Minimum 3 integration tests covering critical paths.</description>
+      <verification>
+        - Run pytest -v -m integration and verify ≥3 tests pass
+        - Check tests cover: pipeline execution, database loading, Dagster jobs
+        - Verify tests use test_db_with_migrations fixture
+      </verification>
+      <status>NEEDS_ENHANCEMENT</status>
+      <notes>Some integration tests exist (test_migrations.py) but need more comprehensive coverage per AC requirements.</notes>
+    </criterion>
+
+    <criterion id="AC-1.11.4">
+      <title>CI pipeline enhanced</title>
+      <description>CI runs unit tests: `pytest -v -m unit`. CI runs integration tests: `pytest -v -m integration`. CI collects coverage: `pytest --cov=src --cov-report=term-missing`.</description>
+      <verification>
+        - Check .github/workflows/ci.yml has separate unit and integration test steps
+        - Verify coverage collection flags in CI pytest commands
+        - Ensure coverage reports are generated and uploaded
+      </verification>
+      <status>NOT_STARTED</status>
+      <notes>Current CI runs basic pytest without markers or coverage. Need to add separate unit/integration runs with coverage.</notes>
+    </criterion>
+
+    <criterion id="AC-1.11.5">
+      <title>Coverage thresholds defined</title>
+      <description>`domain/` modules: &gt;90% coverage target. `io/` modules: &gt;70% coverage target. `orchestration/` modules: &gt;60% coverage target. CI warns (not blocks) if below threshold (enforcement after 30 days).</description>
+      <verification>
+        - Check pytest coverage config defines thresholds for each module category
+        - Verify CI logs show warnings when coverage below threshold
+        - Confirm thresholds: domain 90%, io 70%, orchestration 60%
+      </verification>
+      <status>NOT_STARTED</status>
+      <notes>No coverage thresholds currently configured. Need to add to pyproject.toml or CI workflow.</notes>
+    </criterion>
+
+    <criterion id="AC-1.11.6">
+      <title>CI execution time acceptable</title>
+      <description>Unit tests: &lt;30 seconds. Integration tests: &lt;3 minutes. Total CI pipeline (type + lint + unit + integration): &lt;5 minutes.</description>
+      <verification>
+        - Measure CI run time from GitHub Actions logs
+        - Verify unit tests complete in &lt;30s
+        - Verify integration tests complete in &lt;3min
+        - Verify total pipeline &lt;5min
+      </verification>
+      <status>UNKNOWN</status>
+      <notes>Current CI runs but timing not measured/enforced. Need to add timing validation.</notes>
+    </criterion>
+
+    <criterion id="AC-1.11.7">
+      <title>Coverage report generated</title>
+      <description>CI uploads coverage report (Codecov, Coveralls, or artifact). Coverage visible in PR comments or CI logs.</description>
+      <verification>
+        - Check CI workflow uploads coverage report
+        - Verify coverage report accessible in PR or CI artifacts
+        - Ensure coverage data persists across runs
+      </verification>
+      <status>NOT_STARTED</status>
+      <notes>No coverage upload currently configured. Need to add Codecov or artifact upload.</notes>
+    </criterion>
+  </acceptance-criteria>
+
+  <artifacts>
+    <docs>
+      <prd>
+## Relevant PRD Sections
+
+### Non-Functional Requirements: Quality & Testing
+
+**REQ-040: Type Safety (mypy strict)**
+- 100% type coverage NFR
+- mypy strict mode enforced in CI (Story 1.2)
+- Blocks merge on type errors
+
+**REQ-045: Test Coverage >80%**
+- Automated unit + integration tests (Story 1.11)
+- Coverage thresholds: domain/ >90%, io/ >70%, orchestration/ >60%
+- pytest with markers for categorization
+
+**CI/CD Requirements:**
+- CI pipeline must complete in <5 minutes total
+- Separate unit and integration test runs
+- Coverage reporting integrated
+- Secret scanning with gitleaks
+
+### Testing Philosophy
+
+The PRD emphasizes **comprehensive automated testing** as a core requirement:
+- Unit tests for all domain logic (fast, no dependencies)
+- Integration tests for database and external systems
+- Performance benchmarks for critical paths
+- E2E tests for complete pipeline flows (Epic 6)
+      </prd>
+
+      <architecture>
+## Architecture Decisions Relevant to Story 1.11
+
+**Decision #3: Hybrid Pipeline Step Protocol**
+- Enables both DataFrame and Row-level testing patterns
+- Performance tests must verify DataFrame steps have <100ms overhead
+- Row steps must be <1ms per row for simple validation
+
+**Clean Architecture Impact on Testing:**
+- Domain layer tests: Pure unit tests with mocks, no I/O
+- I/O layer tests: Integration tests with real databases
+- Orchestration layer tests: E2E tests with Dagster execution
+
+**Medallion Architecture Testing Strategy:**
+- Bronze layer: Integration tests (file reading, normalization)
+- Silver layer: Unit tests (transformations, validation)
+- Gold layer: Integration tests (database loading, aggregations)
+      </architecture>
+
+      <brownfield_architecture>
+## Current Testing Infrastructure
+
+**Test Directory Structure:**
+```
+tests/
+├── unit/                  # Fast unit tests, no dependencies
+│   ├── test_cleansing_framework.py
+│   ├── test_integration.py
+│   ├── test_project_structure.py
+│   └── utils/
+│       └── test_logging.py
+├── integration/          # Database/filesystem integration tests
+│   (Currently limited, Story 1.11 expands this)
+├── domain/               # Domain logic tests
+│   ├── pipelines/
+│   │   ├── test_core.py
+│   │   ├── test_adapters.py
+│   │   └── test_config_builder.py
+│   ├── annuity_performance/
+│   ├── company_enrichment/
+│   └── trustee_performance/
+├── io/                   # I/O layer tests
+│   ├── test_warehouse_loader.py
+│   ├── test_excel_reader.py
+│   ├── test_file_connector.py
+│   └── schema/
+│       └── test_migrations.py
+├── orchestration/        # Dagster tests
+│   ├── test_jobs.py
+│   ├── test_ops.py
+│   └── test_repository.py
+├── e2e/                  # End-to-end tests
+│   ├── test_pipeline_vs_legacy.py
+│   └── test_trustee_performance_e2e.py
+└── conftest.py           # Shared fixtures
+```
+
+**Existing Test Patterns:**
+- Mock-based unit tests (test_warehouse_loader.py lines 36-62)
+- Integration tests with migration runner (test_migrations.py)
+- Legacy compatibility tests (test_core.py)
+- Opt-in test suites via environment flags (conftest.py)
+
+**Current Limitations (Story 1.11 addresses these):**
+- No coverage collection in CI
+- No separation of unit vs integration tests in CI
+- SQLite-based fixtures instead of real PostgreSQL
+- No performance benchmarks
+- No coverage threshold enforcement
+      </brownfield_architecture>
+
+      <epic_tech_spec>
+## Story 1.11 Technical Specification (from Epic 1 Tech Spec)
+
+### Test Strategy Summary
+
+Epic 1 establishes the testing foundation that all subsequent epics will build upon. Story 1.11 delivers comprehensive test infrastructure covering unit, integration, and performance testing.
+
+**Testing Pyramid:**
+```
+                    /\
+                   /  \
+                  / E2E \        ← Epic 6 (Parity Tests vs. Legacy)
+                 /______\          Deferred to future epic
+                /        \
+               / Integration \     ← Story 1.11 (Database, Dagster, End-to-End)
+              /______________\      ~10 tests, <3 min execution
+             /                \
+            /   Unit Tests     \   ← Stories 1.3-1.10 (Functions, Classes)
+           /____________________\    ~50 tests, <30 sec execution
+```
+
+### Test Categories
+
+**1. Unit Tests (Stories 1.3-1.10)**
+- Scope: Pure functions, classes, business logic in `domain/` and `utils/`
+- No external dependencies (database, files, network)
+- Mock all I/O operations
+- Fast execution (<30 seconds total)
+- High coverage target (>90% for `domain/`, `utils/`)
+- Pytest Marker: `@pytest.mark.unit`
+
+**2. Integration Tests (Story 1.11)**
+- Scope: Component integration with real external systems (PostgreSQL, filesystem)
+- Uses pytest-postgresql for temporary databases
+- Runs Alembic migrations before tests
+- Tests `io/` modules with real dependencies
+- Medium execution time (<3 minutes total)
+- Coverage target (>70% for `io/`, >60% for `orchestration/`)
+- Pytest Marker: `@pytest.mark.integration`
+
+**3. Performance Tests (Story 1.10)**
+- Scope: Verify NFR performance targets are met
+- Benchmarks critical paths (pipeline overhead, database loading)
+- Fails test if performance degrades below threshold
+- Pytest Marker: `@pytest.mark.performance`
+
+### CI/CD Test Execution
+
+**GitHub Actions Workflow:**
+```yaml
+jobs:
+  test:
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test
+    steps:
+      - name: Run unit tests
+        run: uv run pytest -v -m unit --cov=src/domain --cov=src/utils --cov-report=xml
+
+      - name: Run integration tests
+        env:
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/test
+        run: uv run pytest -v -m integration --cov=src/io --cov=src/orchestration --cov-report=xml --cov-append
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+```
+
+**Execution Time Targets:**
+- Type check + Lint + Format: <1 min
+- Unit tests: <30 sec
+- Integration tests: <3 min
+- **Total CI pipeline: <5 min**
+
+### Coverage Thresholds
+
+| Module Category | Minimum Coverage | Enforcement |
+|-----------------|------------------|-------------|
+| `src/domain/` | **90%** | CI warns if below (blocks after 30 days) |
+| `src/utils/` | **90%** | CI warns if below |
+| `src/io/` | **70%** | CI warns if below |
+| `src/orchestration/` | **60%** | CI warns if below |
+      </epic_tech_spec>
+    </docs>
+
+    <code>
+      <ci_workflow file=".github/workflows/ci.yml">
+## Current CI Workflow Structure
+
+**Current Jobs:**
+1. **quality** (matrix strategy):
+   - ruff-lint: `uv run ruff check src/`
+   - ruff-format: `uv run ruff format --check src/`
+   - mypy: `uv run mypy src/ --strict`
+   - Runs in parallel, fail-fast: false
+
+2. **tests**:
+   - Single pytest run: `uv run pytest -v`
+   - No marker filtering
+   - No coverage collection
+   - No PostgreSQL service
+
+3. **secrets**:
+   - gitleaks scan for secret detection
+
+**What Story 1.11 Adds:**
+- PostgreSQL service container in tests job
+- Separate unit and integration test steps
+- Coverage collection with --cov flags
+- Coverage thresholds validation
+- Coverage report upload (Codecov or artifact)
+- Execution time measurement and validation
+
+**Current Cache Strategy:**
+- uv cache: `~/.cache/uv` with uv.lock hash
+- mypy cache: `.mypy_cache` with pyproject.toml hash
+- Story 1.11 should preserve this pattern
+      </ci_workflow>
+
+      <pytest_config file="pyproject.toml">
+## pytest Configuration
+
+**Existing Markers:**
+```toml
+[tool.pytest.ini_options]
+markers = [
+    "unit: marks tests as fast unit tests with no external dependencies",
+    "integration: marks tests as integration tests with database or filesystem",
+    "postgres: marks tests as requiring a PostgreSQL database (deselect with '-m \"not postgres\"')",
+    "monthly_data: marks tests requiring reference/monthly data (opt-in)",
+    "legacy_data: marks tests as requiring legacy sample data (opt-in)",
+    "e2e: legacy marker for parity/end-to-end scenarios (see e2e_suite)",
+    "performance: marks slow or resource-intensive scenarios",
+    "legacy_suite: opt-in regression tests that exercise the legacy annuity stack",
+    "e2e_suite: opt-in Dagster/warehouse E2E flows that require heavy fixtures",
+    "sample_domain: marks tests for the non-production sample domain"
+]
+```
+
+**Story 1.11 Coverage Configuration (to add):**
+```toml
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "tests/*",
+    "legacy/*",
+    "scripts/*",
+]
+
+[tool.coverage.report]
+precision = 2
+skip_empty = true
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+
+[tool.coverage.paths]
+source = ["src/work_data_hub"]
+```
+      </pytest_config>
+
+      <conftest file="tests/conftest.py">
+## Shared Test Fixtures
+
+**Current Fixtures:**
+
+1. **test_db_with_migrations** (session scope):
+   - Provisions temporary SQLite database
+   - Applies Alembic migrations via migration_runner.upgrade()
+   - Cleans up with downgrade("base") after tests
+   - Story 1.11 needs PostgreSQL variant using pytest-postgresql
+
+2. **Opt-in Suite Control:**
+   - --run-legacy-tests / RUN_LEGACY_TESTS=1 for legacy_suite
+   - --run-e2e-tests / RUN_E2E_TESTS=1 for e2e_suite
+   - pytest_collection_modifyitems skips tests if flags not set
+
+**Story 1.11 Additions Needed:**
+- PostgreSQL fixture using pytest-postgresql plugin
+- Session-scoped PostgreSQL database for all integration tests
+- Migration application before integration test suite
+- Connection pooling for parallel test execution
+- Database cleanup/teardown after test session
+
+**Example PostgreSQL Fixture:**
+```python
+import pytest
+from pytest_postgresql import factories
+
+# Provision temporary PostgreSQL
+postgresql_proc = factories.postgresql_proc(port=None)
+postgresql = factories.postgresql("postgresql_proc")
+
+@pytest.fixture(scope="session")
+def postgres_db_with_migrations(postgresql):
+    """PostgreSQL with migrations for integration tests."""
+    database_url = f"postgresql://{postgresql.info.user}:@{postgresql.info.host}:{postgresql.info.port}/{postgresql.info.dbname}"
+
+    # Apply migrations
+    migration_runner.upgrade(database_url)
+
+    yield database_url
+
+    # Cleanup
+    migration_runner.downgrade(database_url, "base")
+```
+      </conftest>
+
+      <existing_tests>
+## Example Test Patterns
+
+**Unit Test Pattern (tests/domain/pipelines/test_core.py):**
+```python
+@pytest.mark.unit
+def test_execute_single_row_backwards_compatibility():
+    """Verify pipeline executes single row transformations."""
+    pipeline = build_row_pipeline()
+    result = pipeline.execute({"value": 1})
+
+    assert result.row["step1_value"] == "processed"
+    assert result.metrics.executed_steps == ["step1", "step2"]
+```
+
+**Integration Test Pattern (tests/io/schema/test_migrations.py):**
+```python
+@pytest.mark.integration
+def test_core_tables_exist(test_db_with_migrations: str):
+    """Migrations should create the schema described in Story 1.7."""
+    engine = create_engine(test_db_with_migrations, future=True)
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+
+    assert {"pipeline_executions", "data_quality_metrics"}.issubset(tables)
+```
+
+**Mock Pattern (tests/io/test_warehouse_loader.py):**
+```python
+def _create_loader(monkeypatch):
+    """Instantiate WarehouseLoader with patched psycopg2 pool."""
+    pool_instance = MagicMock()
+    health_conn, health_cursor = _build_fake_connection()
+    pool_instance.getconn.return_value = health_conn
+
+    monkeypatch.setattr(
+        "src.work_data_hub.io.loader.warehouse_loader.ThreadedConnectionPool",
+        pool_cls,
+    )
+
+    loader = WarehouseLoader(connection_url="postgresql://user:pass@test/db")
+    return loader, pool_instance, health_conn, health_cursor
+```
+      </existing_tests>
+    </code>
+  </artifacts>
+
+  <dependencies>
+    <dependency>
+      <name>pytest</name>
+      <type>dev-dependency</type>
+      <version>latest</version>
+      <purpose>Testing framework - core test execution engine</purpose>
+      <usage>All test files use pytest for discovery, fixtures, assertions</usage>
+    </dependency>
+
+    <dependency>
+      <name>pytest-cov</name>
+      <type>dev-dependency</type>
+      <version>latest (≥6.2.1)</version>
+      <purpose>Coverage collection and reporting</purpose>
+      <usage>CI uses --cov flags to measure code coverage, generate reports</usage>
+    </dependency>
+
+    <dependency>
+      <name>pytest-postgresql</name>
+      <type>dev-dependency</type>
+      <version>latest</version>
+      <purpose>Temporary PostgreSQL database for integration tests</purpose>
+      <usage>Provides fixtures for provisioning/tearing down test databases</usage>
+      <notes>Story 1.11 adds this to enable real PostgreSQL integration tests</notes>
+    </dependency>
+
+    <dependency>
+      <name>ruff</name>
+      <type>dev-dependency</type>
+      <version>≥0.12.12</version>
+      <purpose>Linting and formatting</purpose>
+      <usage>CI runs ruff check and ruff format --check</usage>
+    </dependency>
+
+    <dependency>
+      <name>mypy</name>
+      <type>dev-dependency</type>
+      <version>≥1.17.1</version>
+      <purpose>Static type checking</purpose>
+      <usage>CI runs mypy src/ --strict to enforce type safety</usage>
+    </dependency>
+
+    <dependency>
+      <name>psycopg2-binary</name>
+      <type>runtime-dependency</type>
+      <version>latest</version>
+      <purpose>PostgreSQL driver for database tests</purpose>
+      <usage>Integration tests connect to PostgreSQL via psycopg2</usage>
+    </dependency>
+
+    <dependency>
+      <name>sqlalchemy</name>
+      <type>runtime-dependency</type>
+      <version>≥2.0</version>
+      <purpose>Database ORM and migrations</purpose>
+      <usage>Alembic (migration runner) and test database inspection</usage>
+    </dependency>
+
+    <dependency>
+      <name>alembic</name>
+      <type>runtime-dependency</type>
+      <version>latest</version>
+      <purpose>Database schema migrations</purpose>
+      <usage>Migration runner applies/rolls back schemas in test databases</usage>
+    </dependency>
+
+    <dependency>
+      <name>GitHub Actions</name>
+      <type>ci-platform</type>
+      <version>N/A</version>
+      <purpose>CI/CD pipeline execution</purpose>
+      <usage>Runs quality gates, tests, coverage, secret scanning</usage>
+    </dependency>
+
+    <dependency>
+      <name>gitleaks</name>
+      <type>security-tool</type>
+      <version>v2 (GitHub Action)</version>
+      <purpose>Secret scanning</purpose>
+      <usage>CI scans commits for leaked credentials</usage>
+    </dependency>
+
+    <dependency>
+      <name>Codecov (optional)</name>
+      <type>coverage-service</type>
+      <version>N/A</version>
+      <purpose>Coverage report hosting and PR comments</purpose>
+      <usage>CI uploads coverage reports, displays in PRs</usage>
+      <notes>Alternative: GitHub artifacts for coverage reports</notes>
+    </dependency>
+  </dependencies>
+
+  <interfaces>
+    <interface>
+      <name>pytest markers</name>
+      <type>test-categorization</type>
+      <description>Pytest markers for categorizing and filtering tests</description>
+      <specification>
+**Core Markers (Story 1.11):**
+- `@pytest.mark.unit` - Fast unit tests, no external dependencies, <30s total
+- `@pytest.mark.integration` - Database/filesystem tests, <3min total
+- `@pytest.mark.performance` - Performance benchmarks, verify NFR targets
+
+**Usage Pattern:**
+```python
+@pytest.mark.unit
+def test_pure_function():
+    """Unit test example - no I/O."""
+    assert calculate(5) == 10
+
+@pytest.mark.integration
+def test_database_load(postgres_db_with_migrations):
+    """Integration test - real PostgreSQL."""
+    loader = WarehouseLoader(connection_url=postgres_db_with_migrations)
+    result = loader.load_dataframe(df, table="test_table")
+    assert result.rows_inserted == 100
+```
+
+**CI Usage:**
+```bash
+# Run only unit tests (fast)
+pytest -v -m unit --cov=src/domain --cov=src/utils
+
+# Run only integration tests (requires PostgreSQL)
+pytest -v -m integration --cov=src/io --cov=src/orchestration
+```
+      </specification>
+    </interface>
+
+    <interface>
+      <name>test_db_with_migrations fixture</name>
+      <type>pytest-fixture</type>
+      <description>Shared fixture providing temporary database with migrations applied</description>
+      <specification>
+**Current Implementation (SQLite):**
+```python
+@pytest.fixture(scope="session")
+def test_db_with_migrations(tmp_path_factory) -> Generator[str, None, None]:
+    """Provision temporary database and apply migrations."""
+    db_dir = tmp_path_factory.mktemp("migrations")
+    database_url = f"sqlite:///{db_dir / 'test.db'}"
+
+    migration_runner.upgrade(database_url)
+    yield database_url
+    migration_runner.downgrade(database_url, "base")
+```
+
+**Story 1.11 Enhancement (PostgreSQL):**
+```python
+import pytest
+from pytest_postgresql import factories
+
+postgresql_proc = factories.postgresql_proc(port=None)
+postgresql = factories.postgresql("postgresql_proc")
+
+@pytest.fixture(scope="session")
+def postgres_db_with_migrations(postgresql) -> Generator[str, None, None]:
+    """PostgreSQL with Alembic migrations for integration tests."""
+    database_url = f"postgresql://{postgresql.info.user}:@{postgresql.info.host}:{postgresql.info.port}/{postgresql.info.dbname}"
+
+    migration_runner.upgrade(database_url)
+    yield database_url
+    migration_runner.downgrade(database_url, "base")
+```
+
+**Usage in Tests:**
+```python
+@pytest.mark.integration
+def test_warehouse_loader(postgres_db_with_migrations):
+    loader = WarehouseLoader(connection_url=postgres_db_with_migrations)
+    # Test database operations...
+```
+      </specification>
+    </interface>
+
+    <interface>
+      <name>CI Workflow Structure</name>
+      <type>github-actions</type>
+      <description>GitHub Actions workflow jobs and steps</description>
+      <specification>
+**Current Jobs:**
+1. quality (matrix: ruff-lint, ruff-format, mypy)
+2. tests (single pytest run)
+3. secrets (gitleaks)
+
+**Story 1.11 Enhanced Tests Job:**
+```yaml
+jobs:
+  tests:
+    name: Test Suite (Unit + Integration)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Run unit tests
+        run: |
+          start=$(date +%s)
+          uv run pytest -v -m unit --cov=src/domain --cov=src/utils --cov-report=xml
+          end=$(date +%s)
+          echo "Unit tests: $((end-start))s (target: <30s)"
+
+      - name: Run integration tests
+        env:
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/test
+        run: |
+          start=$(date +%s)
+          uv run pytest -v -m integration --cov=src/io --cov=src/orchestration --cov-report=xml --cov-append
+          end=$(date +%s)
+          echo "Integration tests: $((end-start))s (target: <180s)"
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+```
+      </specification>
+    </interface>
+
+    <interface>
+      <name>Coverage Thresholds</name>
+      <type>configuration</type>
+      <description>Module-specific coverage requirements</description>
+      <specification>
+**Thresholds by Module:**
+- `src/domain/`: ≥90% (core business logic)
+- `src/utils/`: ≥90% (shared utilities)
+- `src/io/`: ≥70% (I/O adapters, infrastructure)
+- `src/orchestration/`: ≥60% (Dagster integration)
+
+**Enforcement Strategy:**
+- Phase 1 (30 days): CI warns if below threshold, does not block
+- Phase 2 (after 30 days): CI fails if below threshold
+
+**Coverage Report Format:**
+```
+Name                                Stmts   Miss  Cover   Missing
+-----------------------------------------------------------------
+src/domain/pipelines/core.py          120      5    96%   45-47, 89
+src/utils/logging.py                   45      2    96%   67-68
+src/io/loader/warehouse_loader.py     150     30    80%   120-145
+-----------------------------------------------------------------
+TOTAL                                 500     50    90%
+```
+
+**CI Implementation:**
+```bash
+# Generate coverage report
+uv run pytest --cov=src --cov-report=term-missing
+
+# Validate thresholds (Phase 2)
+uv run coverage report --fail-under=90 src/domain/
+uv run coverage report --fail-under=70 src/io/
+```
+      </specification>
+    </interface>
+  </interfaces>
+
+  <constraints>
+    <constraint>
+      <name>CI Execution Time</name>
+      <type>performance</type>
+      <description>Total CI pipeline must complete in &lt;5 minutes</description>
+      <rationale>Fast feedback loop for developers, prevents CI bottlenecks</rationale>
+      <validation>
+        - Measure total CI time from GitHub Actions logs
+        - Unit tests: <30 seconds
+        - Integration tests: <3 minutes
+        - Quality gates (mypy, ruff): <1 minute
+        - Total: <5 minutes
+      </validation>
+    </constraint>
+
+    <constraint>
+      <name>Coverage Thresholds</name>
+      <type>quality-gate</type>
+      <description>Module-specific coverage minimums must be met</description>
+      <rationale>Ensure adequate test coverage for maintainability and reliability</rationale>
+      <validation>
+        - domain/: ≥90%
+        - utils/: ≥90%
+        - io/: ≥70%
+        - orchestration/: ≥60%
+        - Warns for 30 days, then blocks
+      </validation>
+    </constraint>
+
+    <constraint>
+      <name>Clean Architecture Boundaries</name>
+      <type>architectural</type>
+      <description>Tests must respect domain ← io ← orchestration dependency rules</description>
+      <rationale>Enforce separation of concerns, prevent circular dependencies</rationale>
+      <validation>
+        - Domain tests: Only mock I/O, no real database/filesystem
+        - I/O tests: Can import domain types, test with real systems
+        - Orchestration tests: Can import both domain and I/O layers
+        - Ruff TID251 enforces import restrictions
+      </validation>
+    </constraint>
+
+    <constraint>
+      <name>Backward Compatibility</name>
+      <type>compatibility</type>
+      <description>Existing tests must continue to pass after Story 1.11 changes</description>
+      <rationale>Avoid breaking existing test suite during enhancement</rationale>
+      <validation>
+        - All existing tests pass with new pytest configuration
+        - Existing fixtures (test_db_with_migrations) remain available
+        - New PostgreSQL fixtures coexist with SQLite fixtures
+        - Opt-in suites (legacy_suite, e2e_suite) unchanged
+      </validation>
+    </constraint>
+
+    <constraint>
+      <name>No Production Secrets in Tests</name>
+      <type>security</type>
+      <description>Integration tests must use test-only credentials and databases</description>
+      <rationale>Prevent accidental production data access or corruption</rationale>
+      <validation>
+        - Integration tests use temporary PostgreSQL (pytest-postgresql)
+        - Test fixtures use localhost/test credentials only
+        - No DATABASE_URL pointing to production
+        - Gitleaks scan catches any leaked credentials
+      </validation>
+    </constraint>
+
+    <constraint>
+      <name>Platform Compatibility</name>
+      <type>portability</type>
+      <description>Tests must run on Linux (CI), macOS, and Windows</description>
+      <rationale>Developers use different platforms, CI runs on Linux</rationale>
+      <validation>
+        - Use pathlib for cross-platform file paths
+        - Avoid shell-specific commands in tests
+        - PostgreSQL via pytest-postgresql works on all platforms
+        - CI validates Linux compatibility
+      </validation>
+    </constraint>
+
+    <constraint>
+      <name>Test Isolation</name>
+      <type>reliability</type>
+      <description>Integration tests must be isolated and idempotent</description>
+      <rationale>Prevent test interdependencies and flakiness</rationale>
+      <validation>
+        - Each integration test uses fresh database (session scope)
+        - Migrations applied/rolled back per test session
+        - No shared state between tests
+        - Tests can run in any order
+      </validation>
+    </constraint>
+  </constraints>
+
+  <testing-standards>
+    <standard>
+      <name>Test Organization</name>
+      <description>Tests organized by layer matching source structure</description>
+      <rules>
+        - `tests/unit/` for pure unit tests (no I/O)
+        - `tests/domain/` for domain logic tests
+        - `tests/io/` for I/O layer tests
+        - `tests/orchestration/` for Dagster tests
+        - `tests/integration/` for cross-layer integration tests (NEW in Story 1.11)
+        - Mirror source structure: `tests/domain/pipelines/test_core.py` tests `src/work_data_hub/domain/pipelines/core.py`
+      </rules>
+    </standard>
+
+    <standard>
+      <name>Test Naming Conventions</name>
+      <description>Consistent naming for test files, classes, and functions</description>
+      <rules>
+        - Test files: `test_*.py`
+        - Test functions: `test_<what>_<condition>_<expected>()`
+        - Example: `test_pipeline_execute_with_error_stops_execution()`
+        - Test classes: `Test<ClassName>` (e.g., `TestWarehouseLoader`)
+        - Descriptive names over short names
+      </rules>
+    </standard>
+
+    <standard>
+      <name>Pytest Markers</name>
+      <description>All tests must be tagged with appropriate markers</description>
+      <rules>
+        - Required markers: `@pytest.mark.unit` OR `@pytest.mark.integration`
+        - Optional markers: `@pytest.mark.performance`, `@pytest.mark.postgres`
+        - Opt-in markers: `@pytest.mark.legacy_suite`, `@pytest.mark.e2e_suite`
+        - CI runs: `pytest -v -m unit` and `pytest -v -m integration` separately
+        - Never mix unit and integration logic in same test
+      </rules>
+    </standard>
+
+    <standard>
+      <name>Fixture Usage</name>
+      <description>Shared fixtures in conftest.py, test-specific in test files</description>
+      <rules>
+        - Session-scoped fixtures: `postgres_db_with_migrations` (shared database)
+        - Function-scoped fixtures: Test-specific data, mocks
+        - Use fixture dependency injection over global state
+        - Document fixture purpose and scope in docstring
+        - Example: `def test_function(postgres_db_with_migrations, sample_data):`
+      </rules>
+    </standard>
+
+    <standard>
+      <name>Assertion Patterns</name>
+      <description>Clear, specific assertions with helpful failure messages</description>
+      <rules>
+        - Use `assert condition, "helpful message"` format
+        - Prefer specific assertions: `assert result.success` over `assert result`
+        - Multiple assertions OK if testing single concept
+        - For DataFrames: use `pd.testing.assert_frame_equal()`
+        - For floats: use `pytest.approx()` for tolerance
+      </rules>
+    </standard>
+
+    <standard>
+      <name>Coverage Best Practices</name>
+      <description>Achieve meaningful coverage, not just high percentages</description>
+      <rules>
+        - Test both happy path and error cases
+        - Test boundary conditions (empty input, max values, etc.)
+        - Test integration points (database, files, APIs)
+        - Exclude trivial code: `# pragma: no cover` for `__repr__`, etc.
+        - Focus on domain/ and utils/ for highest coverage (90%+)
+        - Lower threshold for I/O (70%) due to external dependencies
+      </rules>
+    </standard>
+
+    <standard>
+      <name>Mock Guidelines</name>
+      <description>When and how to use mocks effectively</description>
+      <rules>
+        - Unit tests: Mock all I/O (databases, files, network)
+        - Integration tests: Use real systems (PostgreSQL, filesystem)
+        - Use `unittest.mock.MagicMock` for Python objects
+        - Use `monkeypatch` for patching imports
+        - Mock at boundary: patch `psycopg2.pool.ThreadedConnectionPool`, not individual methods
+        - Document why mocking (e.g., "Mock to avoid real database in unit test")
+      </rules>
+    </standard>
+
+    <standard>
+      <name>Performance Testing</name>
+      <description>Benchmark critical paths to enforce NFR targets</description>
+      <rules>
+        - Use `@pytest.mark.performance` marker
+        - Measure time with `time.perf_counter()` for sub-second precision
+        - Assert against NFR targets (pipeline <100ms, batch insert <500ms)
+        - Run performance tests in CI (not opt-in)
+        - Example:
+          ```python
+          start = time.perf_counter()
+          result = pipeline.run(df)
+          duration_ms = (time.perf_counter() - start) * 1000
+          assert duration_ms < 100, f"Pipeline overhead {duration_ms:.2f}ms exceeds target"
+          ```
+      </rules>
+    </standard>
+  </testing-standards>
+
+  <test-ideas>
+    <idea id="TI-1.11.1">
+      <title>PostgreSQL Integration Test Fixture</title>
+      <description>Replace SQLite-based test_db_with_migrations with real PostgreSQL using pytest-postgresql</description>
+      <rationale>AC-1.11.2 requires real PostgreSQL for true database integration tests</rationale>
+      <implementation>
+        - Add pytest-postgresql to dev dependencies
+        - Create postgres_db_with_migrations fixture in conftest.py
+        - Use postgresql_proc and postgresql factories from pytest-postgresql
+        - Apply Alembic migrations via migration_runner.upgrade()
+        - Yield connection URL for tests
+        - Teardown with migration_runner.downgrade("base")
+      </implementation>
+      <priority>HIGH</priority>
+    </idea>
+
+    <idea id="TI-1.11.2">
+      <title>End-to-End Pipeline Integration Test</title>
+      <description>Test complete CSV → validate → database flow with real PostgreSQL</description>
+      <rationale>AC-1.11.3 requires E2E pipeline test covering critical path</rationale>
+      <implementation>
+        ```python
+        @pytest.mark.integration
+        def test_csv_to_database_pipeline(postgres_db_with_migrations, tmp_path):
+            # Create sample CSV
+            csv_path = tmp_path / "sample.csv"
+            df = pd.DataFrame({"col1": [1, 2, 3], "col2": ["a", "b", "c"]})
+            df.to_csv(csv_path, index=False)
+
+            # Run pipeline
+            from src.work_data_hub.orchestration.jobs import sample_pipeline_job
+            result = sample_pipeline_job.execute_in_process(
+                run_config={"csv_path": str(csv_path)}
+            )
+
+            # Verify database
+            engine = create_engine(postgres_db_with_migrations)
+            with engine.connect() as conn:
+                rows = conn.execute(text("SELECT * FROM test_table")).fetchall()
+                assert len(rows) == 3
+        ```
+      </implementation>
+      <priority>HIGH</priority>
+    </idea>
+
+    <idea id="TI-1.11.3">
+      <title>WarehouseLoader Transactional Rollback Test</title>
+      <description>Verify all-or-nothing transaction behavior on batch failure</description>
+      <rationale>Epic Tech Spec requires transactional integrity validation</rationale>
+      <implementation>
+        ```python
+        @pytest.mark.integration
+        def test_warehouse_loader_transaction_rollback(postgres_db_with_migrations):
+            loader = WarehouseLoader(connection_url=postgres_db_with_migrations)
+
+            # Create table
+            engine = create_engine(postgres_db_with_migrations)
+            with engine.begin() as conn:
+                conn.execute(text("CREATE TABLE test_table (id INT PRIMARY KEY, value TEXT)"))
+
+            # Prepare data with duplicate key (will cause constraint violation)
+            df = pd.DataFrame({"id": [1, 2, 1], "value": ["a", "b", "c"]})
+
+            # Attempt load (should fail and rollback)
+            with pytest.raises(DataWarehouseLoaderError):
+                loader.load_dataframe(df, table="test_table")
+
+            # Verify NO rows inserted (transaction rolled back)
+            with engine.connect() as conn:
+                count = conn.execute(text("SELECT COUNT(*) FROM test_table")).scalar()
+                assert count == 0, "Transaction should have rolled back all inserts"
+        ```
+      </implementation>
+      <priority>HIGH</priority>
+    </idea>
+
+    <idea id="TI-1.11.4">
+      <title>CI Coverage Thresholds Validation</title>
+      <description>Add CI step to validate coverage meets module-specific thresholds</description>
+      <rationale>AC-1.11.5 requires coverage threshold enforcement</rationale>
+      <implementation>
+        ```yaml
+        - name: Validate coverage thresholds
+          run: |
+            # Generate coverage report
+            uv run pytest --cov=src --cov-report=term-missing --cov-report=json
+
+            # Parse coverage.json and validate thresholds
+            python scripts/validate_coverage_thresholds.py \
+              --domain-min 90 \
+              --utils-min 90 \
+              --io-min 70 \
+              --orchestration-min 60 \
+              --warn-only  # Remove after 30-day grace period
+        ```
+
+        Create `scripts/validate_coverage_thresholds.py`:
+        ```python
+        import json
+        import sys
+        from pathlib import Path
+
+        def validate_thresholds(coverage_file, thresholds, warn_only=False):
+            with open(coverage_file) as f:
+                data = json.load(f)
+
+            violations = []
+            for module, min_coverage in thresholds.items():
+                actual = data["totals"].get(module, 0)
+                if actual < min_coverage:
+                    violations.append(f"{module}: {actual:.1f}% < {min_coverage}%")
+
+            if violations:
+                message = "\n".join([f"  - {v}" for v in violations])
+                if warn_only:
+                    print(f"::warning::Coverage below thresholds:\n{message}")
+                else:
+                    print(f"::error::Coverage below thresholds:\n{message}")
+                    sys.exit(1)
+        ```
+      </implementation>
+      <priority>MEDIUM</priority>
+    </idea>
+
+    <idea id="TI-1.11.5">
+      <title>Performance Benchmark Test Suite</title>
+      <description>Add performance tests for pipeline overhead and database loading</description>
+      <rationale>Epic Tech Spec requires performance benchmarks (AC from Story 1.10)</rationale>
+      <implementation>
+        ```python
+        @pytest.mark.performance
+        @pytest.mark.unit
+        def test_pipeline_overhead_under_100ms():
+            """Verify Decision #3: DataFrame step overhead <100ms."""
+            pipeline = Pipeline(steps=[NoOpDataFrameStep()], config=PipelineConfig(name="perf"))
+            df = pd.DataFrame({"col": range(10000)})
+
+            start = time.perf_counter()
+            result = pipeline.execute(df)
+            duration_ms = (time.perf_counter() - start) * 1000
+
+            assert duration_ms < 100, f"Pipeline overhead {duration_ms:.2f}ms exceeds 100ms target"
+
+        @pytest.mark.performance
+        @pytest.mark.integration
+        def test_database_batch_insert_under_500ms(postgres_db_with_migrations):
+            """Verify Story 1.8: Batch insert (1000 rows) <500ms."""
+            loader = WarehouseLoader(connection_url=postgres_db_with_migrations)
+
+            # Create table
+            engine = create_engine(postgres_db_with_migrations)
+            with engine.begin() as conn:
+                conn.execute(text("CREATE TABLE perf_test (col1 INT, col2 TEXT)"))
+
+            # Prepare 1000 rows
+            df = pd.DataFrame({"col1": range(1000), "col2": ["test"] * 1000})
+
+            start = time.perf_counter()
+            result = loader.load_dataframe(df, table="perf_test")
+            duration_ms = (time.perf_counter() - start) * 1000
+
+            assert duration_ms < 500, f"Batch insert {duration_ms:.2f}ms exceeds 500ms target"
+        ```
+      </implementation>
+      <priority>MEDIUM</priority>
+    </idea>
+
+    <idea id="TI-1.11.6">
+      <title>Codecov Integration for Coverage Reports</title>
+      <description>Upload coverage reports to Codecov for PR visibility</description>
+      <rationale>AC-1.11.7 requires coverage report upload and visibility</rationale>
+      <implementation>
+        ```yaml
+        - name: Upload coverage to Codecov
+          uses: codecov/codecov-action@v3
+          with:
+            files: ./coverage.xml
+            flags: unittests,integrationtests
+            name: codecov-umbrella
+            fail_ci_if_error: false  # Don't block on Codecov upload failures
+        ```
+
+        Alternative (GitHub Artifacts):
+        ```yaml
+        - name: Upload coverage report as artifact
+          uses: actions/upload-artifact@v3
+          with:
+            name: coverage-report
+            path: |
+              coverage.xml
+              htmlcov/
+            retention-days: 30
+        ```
+      </implementation>
+      <priority>LOW</priority>
+    </idea>
+
+    <idea id="TI-1.11.7">
+      <title>Test Execution Time Monitoring</title>
+      <description>Add timing measurement and validation to CI test steps</description>
+      <rationale>AC-1.11.6 requires CI execution time validation</rationale>
+      <implementation>
+        ```yaml
+        - name: Run unit tests
+          run: |
+            start=$(date +%s)
+            uv run pytest -v -m unit --cov=src/domain --cov=src/utils --cov-report=xml
+            end=$(date +%s)
+            duration=$((end-start))
+            echo "::notice::Unit tests completed in ${duration}s (target: <30s)"
+            if [ $duration -gt 30 ]; then
+              echo "::warning::Unit tests exceeded 30s target: ${duration}s"
+            fi
+
+        - name: Run integration tests
+          run: |
+            start=$(date +%s)
+            uv run pytest -v -m integration --cov=src/io --cov=src/orchestration --cov-report=xml --cov-append
+            end=$(date +%s)
+            duration=$((end-start))
+            echo "::notice::Integration tests completed in ${duration}s (target: <180s)"
+            if [ $duration -gt 180 ]; then
+              echo "::warning::Integration tests exceeded 180s target: ${duration}s"
+            fi
+        ```
+      </implementation>
+      <priority>LOW</priority>
+    </idea>
+
+    <idea id="TI-1.11.8">
+      <title>Parallel Test Execution Research</title>
+      <description>Investigate pytest-xdist for parallel test execution to reduce CI time</description>
+      <rationale>If CI time exceeds 5min target, parallel execution may be needed</rationale>
+      <implementation>
+        - Add pytest-xdist to dev dependencies
+        - Configure pytest.ini: `addopts = -n auto`
+        - Ensure tests are thread-safe (no shared state)
+        - Measure impact: `pytest -v -n auto --dist loadgroup`
+        - Document tradeoffs: faster execution vs. resource consumption
+        - Decide whether to enable based on CI time measurements
+      </implementation>
+      <priority>LOW</priority>
+      <notes>Only implement if CI time exceeds 5min target after other optimizations</notes>
+    </idea>
+
+    <idea id="TI-1.11.9">
+      <title>Migration Test Coverage Enhancement</title>
+      <description>Expand test_migrations.py to cover edge cases and rollback scenarios</description>
+      <rationale>Comprehensive migration testing ensures database schema reliability</rationale>
+      <implementation>
+        ```python
+        @pytest.mark.integration
+        def test_migration_rollback(postgres_db_with_migrations):
+            """Verify migrations can be rolled back without errors."""
+            engine = create_engine(postgres_db_with_migrations)
+
+            # Verify tables exist after upgrade
+            inspector = inspect(engine)
+            assert "pipeline_executions" in inspector.get_table_names()
+
+            # Rollback to base
+            migration_runner.downgrade(postgres_db_with_migrations, "base")
+
+            # Verify tables removed
+            inspector = inspect(engine)
+            assert "pipeline_executions" not in inspector.get_table_names()
+
+        @pytest.mark.integration
+        def test_migration_idempotency(postgres_db_with_migrations):
+            """Running migrations twice should be safe."""
+            # Apply migrations again (should be no-op)
+            migration_runner.upgrade(postgres_db_with_migrations)
+
+            # Verify no errors and tables still exist
+            engine = create_engine(postgres_db_with_migrations)
+            inspector = inspect(engine)
+            assert "pipeline_executions" in inspector.get_table_names()
+        ```
+      </implementation>
+      <priority>LOW</priority>
+    </idea>
+
+    <idea id="TI-1.11.10">
+      <title>Test Data Factories and Builders</title>
+      <description>Create reusable test data factories for common test scenarios</description>
+      <rationale>Reduce test boilerplate, improve maintainability</rationale>
+      <implementation>
+        ```python
+        # tests/utils/factories.py
+        def create_sample_dataframe(rows: int = 100, columns: list[str] = None) -> pd.DataFrame:
+            """Generate test DataFrame with realistic data."""
+            columns = columns or ["id", "name", "value"]
+            return pd.DataFrame({
+                "id": range(rows),
+                "name": [f"Company_{i}" for i in range(rows)],
+                "value": [100.0 * i for i in range(rows)]
+            })
+
+        def create_pipeline_config(name: str = "test", **overrides) -> PipelineConfig:
+            """Create PipelineConfig with sensible defaults."""
+            defaults = {
+                "name": name,
+                "stop_on_error": True,
+                "max_retries": 3,
+            }
+            return PipelineConfig(**(defaults | overrides))
+
+        # Usage in tests
+        def test_pipeline_execution():
+            df = create_sample_dataframe(rows=10)
+            config = create_pipeline_config(stop_on_error=False)
+            pipeline = Pipeline(steps=[...], config=config)
+            result = pipeline.execute(df)
+        ```
+      </implementation>
+      <priority>LOW</priority>
+    </idea>
+  </test-ideas>
+</story-context>

@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
+    # Run on all branches to provide immediate feedback on every commit
     branches:
-      - main
+      - '**'
   pull_request:
     types:
       - opened
@@ -83,8 +84,27 @@ jobs:
           echo "::notice::${{ matrix.check }} completed in $((end-start))s"
 
   tests:
-    name: Pytest Suite
+    name: Pytest Suite (${{ matrix.suite }})
+    needs: quality
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        suite: [unit, integration]
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -110,13 +130,48 @@ jobs:
       - name: Install dependencies
         run: uv sync --dev
 
-      - name: Run pytest
+      - name: Configure integration database URL
+        if: matrix.suite == 'integration'
+        shell: bash
+        run: |
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/testdb" >> $GITHUB_ENV
+          echo "WDH_TEST_DATABASE_URI=postgresql://postgres:postgres@localhost:5432/testdb" >> $GITHUB_ENV
+
+      - name: Run pytest (${{ matrix.suite }})
         shell: bash
         run: |
           start=$(date +%s)
-          uv run pytest -v
+          if [ "${{ matrix.suite }}" = "unit" ]; then
+            export COVERAGE_FILE=".coverage.unit"
+            uv run pytest -v -m "unit and not integration and not postgres" --cov=src --cov-report=xml:coverage-unit.xml --cov-report=term-missing
+          else
+            export COVERAGE_FILE=".coverage.integration"
+            uv run pytest -v -m "integration or postgres" --cov=src --cov-report=xml:coverage-integration.xml --cov-report=term-missing
+          fi
           end=$(date +%s)
-          echo "::notice::pytest completed in $((end-start))s"
+          duration=$((end-start))
+          echo "::notice::${{ matrix.suite }} suite completed in ${duration}s"
+
+          # Enforce timing constraints (AC1: unit <30s, AC2: integration <3min)
+          if [ "${{ matrix.suite }}" = "unit" ]; then
+            if [ $duration -gt 30 ]; then
+              echo "::error::Unit test suite exceeded 30s limit (${duration}s). AC1 violated."
+              exit 1
+            fi
+          else
+            if [ $duration -gt 180 ]; then
+              echo "::error::Integration test suite exceeded 180s limit (${duration}s). AC2 violated."
+              exit 1
+            fi
+          fi
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.suite }}
+          path: |
+            .coverage.${{ matrix.suite }}
+            coverage-${{ matrix.suite }}.xml
 
   secrets:
     name: Secret Scan
@@ -131,3 +186,52 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         with:
           args: --verbose --redact --source . --log-opts="--all"
+
+  coverage:
+    name: Coverage Aggregation
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Download unit coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-unit
+          path: coverage-artifacts/unit
+
+      - name: Download integration coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-integration
+          path: coverage-artifacts/integration
+
+      - name: Install dependencies
+        uses: astral-sh/setup-uv@v1
+
+      - name: Sync dev dependencies
+        run: uv sync --dev
+
+      - name: Combine coverage
+        shell: bash
+        run: |
+          cp coverage-artifacts/unit/.coverage.unit . || true
+          cp coverage-artifacts/integration/.coverage.integration . || true
+          uv run coverage combine .coverage.unit .coverage.integration
+          uv run coverage xml -o coverage.xml
+          uv run coverage json -o coverage.json
+          uv run python scripts/validate_coverage_thresholds.py --coverage-file coverage.json --warn-only
+
+      - name: Upload combined coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-combined
+          path: |
+            coverage.xml
+            coverage.json

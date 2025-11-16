@@ -5,21 +5,12 @@ This module tests the DataWarehouseLoader SQL builders and orchestration
 with both unit tests (no database required) and integration tests.
 """
 
-import os
 import time
 import uuid
 from unittest.mock import MagicMock, Mock, patch
 
 import pandas as pd
 import pytest
-
-if not os.getenv("WDH_TEST_DATABASE_URI"):
-    os.environ["WDH_TEST_DATABASE_URI"] = (
-        "postgresql://root:Post.169828@192.168.0.200:5432/annuity"
-    )
-
-if not os.getenv("DATABASE_URL"):
-    os.environ["DATABASE_URL"] = os.environ["WDH_TEST_DATABASE_URI"]
 
 
 from src.work_data_hub.io.loader.warehouse_loader import (
@@ -437,43 +428,17 @@ class TestDatabaseSettings:
 
 
 # Integration tests (skipped by default)
+@pytest.mark.integration
 @pytest.mark.postgres
 class TestDatabaseIntegration:
     """Integration tests requiring actual PostgreSQL database."""
 
     @pytest.fixture
-    def db_connection(self):
-        """Create test database connection.
-
-        Preference order:
-        1) WDH_TEST_DATABASE_URI (explicit test DSN)
-        2) Settings-derived DSN from .env (development default)
-        """
-        import os
-
-        # Prefer explicit test DSN if provided
-        conn_str = os.getenv("WDH_TEST_DATABASE_URI")
-        if not conn_str:
-            # Fallback: use application settings (loads .env)
-            try:
-                from src.work_data_hub.config.settings import get_settings
-
-                settings = get_settings()
-                conn_str = settings.get_database_connection_string()
-            except Exception:
-                pytest.skip("Test database not configured")
-
-        try:
-            import psycopg2
-        except ImportError:
-            pytest.skip("psycopg2 not available")
-
-        # Keep a modest timeout to fail fast on misconfiguration
-        conn = psycopg2.connect(conn_str, connect_timeout=5)
-
-        # Setup test table
-        with conn.cursor() as cursor:
-            cursor.execute("""
+    def db_connection(self, postgres_connection):
+        """Create test database connection and seed temp table."""
+        with postgres_connection.cursor() as cursor:
+            cursor.execute(
+                """
                 CREATE TEMP TABLE test_trustee_performance (
                     report_date DATE,
                     plan_code VARCHAR(50),
@@ -481,10 +446,10 @@ class TestDatabaseIntegration:
                     return_rate NUMERIC(8,6),
                     PRIMARY KEY (report_date, plan_code, company_code)
                 )
-            """)
+                """
+            )
 
-        yield conn
-        conn.close()
+        yield postgres_connection
 
     def test_load_delete_insert_integration(self, db_connection, sample_rows):
         """Test actual database delete-insert operation."""
@@ -525,20 +490,6 @@ class TestDatabaseIntegration:
         assert result["deleted"] == 0
 
 
-def _get_postgres_dsn_or_skip() -> str:
-    """Return a PostgreSQL DSN or skip tests when unavailable."""
-    conn_str = os.getenv("WDH_TEST_DATABASE_URI")
-    if conn_str:
-        return conn_str
-    try:
-        from src.work_data_hub.config.settings import get_settings
-
-        settings = get_settings()
-        return settings.get_database_connection_string()
-    except Exception:
-        pytest.skip("Test database not configured")
-
-
 def _reset_test_table(dsn: str, table_name: str) -> None:
     """Create a deterministic test table for WarehouseLoader integration tests."""
     psycopg2 = pytest.importorskip("psycopg2")
@@ -562,13 +513,14 @@ def _reset_test_table(dsn: str, table_name: str) -> None:
             )
 
 
+@pytest.mark.integration
 @pytest.mark.postgres
 class TestWarehouseLoaderIntegration:
     """Integration tests for the WarehouseLoader class."""
 
-    def test_dataframe_loads_successfully(self):
+    def test_dataframe_loads_successfully(self, postgres_db_with_migrations: str):
         """End-to-end verification of load_dataframe success path."""
-        dsn = _get_postgres_dsn_or_skip()
+        dsn = postgres_db_with_migrations
         table_name = f"warehouse_loader_story18_{uuid.uuid4().hex[:6]}"
         _reset_test_table(dsn, table_name)
 
@@ -597,9 +549,9 @@ class TestWarehouseLoaderIntegration:
 
         loader.close()
 
-    def test_dataframe_load_rolls_back_on_error(self):
+    def test_dataframe_load_rolls_back_on_error(self, postgres_db_with_migrations: str):
         """Ensure transactional rollback occurs when batch fails."""
-        dsn = _get_postgres_dsn_or_skip()
+        dsn = postgres_db_with_migrations
         table_name = f"warehouse_loader_story18_{uuid.uuid4().hex[:6]}"
         _reset_test_table(dsn, table_name)
 

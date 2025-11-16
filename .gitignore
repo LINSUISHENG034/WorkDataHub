@@ -113,6 +113,7 @@ downloads/
 # Logs
 logs/
 *.log
+tests/.performance_baseline.json
 
 # Environment variables
 .env*

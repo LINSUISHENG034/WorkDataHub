@@ -124,6 +124,45 @@ tests/
    pytest tests/unit -v
    ```
 
+## Running Tests Locally
+
+The GitHub Actions workflow now runs quality gates, unit tests, integration tests, and aggregated coverage. Reproduce those stages locally as follows.
+
+### Unit Tests (fast / isolated)
+
+```bash
+PYTHONPATH=src uv run pytest -v -m "unit and not integration and not postgres" --maxfail=1
+```
+
+This covers Stories 1.1–1.6 with no external dependencies and completes in under 30 seconds. Add `--cov=src --cov-report=term-missing` to inspect coverage locally.
+
+### Integration Tests (PostgreSQL required)
+
+```bash
+set DATABASE_URL=postgresql://<user>:<password>@localhost:5432/<db>   # Windows (use `export` on Linux/macOS)
+PYTHONPATH=src uv run pytest -v -m "integration or postgres"
+```
+
+Integration tests exercise migrations, WarehouseLoader transactional behavior, and the sample pipeline → WarehouseLoader → PostgreSQL flow. They expect `DATABASE_URL` (or `WDH_TEST_DATABASE_URI`) to point to a disposable PostgreSQL database.
+
+### Performance Regression Probe
+
+```bash
+PYTHONPATH=src uv run pytest tests/integration/test_performance_baseline.py::test_sample_pipeline_performance_regression -v
+```
+
+This writes/reads `tests/performance_baseline.json`. The first run seeds the baseline; subsequent runs warn (not fail) when execution time regresses by >20%.
+
+### CI-equivalent Sweep
+
+```bash
+PYTHONPATH=src uv run pytest -v -m "unit and not integration and not postgres"
+PYTHONPATH=src uv run pytest -v -m "integration or postgres"
+PYTHONPATH=src uv run python scripts/validate_coverage_thresholds.py --coverage-file coverage.json --warn-only
+```
+
+The final command expects you to combine coverage files (via `coverage combine` + `coverage json`) before running the validator; it emits warnings when module-level targets (domain 90%, io 70%, orchestration 60%, overall 80%) are not met.
+
 ### Using uv Package Manager
 
 **Why uv?**
