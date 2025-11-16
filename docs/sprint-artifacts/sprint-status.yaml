@@ -51,7 +51,7 @@ development_status:
   1-7-database-schema-management-framework: done
   1-8-postgresql-connection-and-transactional-loading-framework: done
   1-9-dagster-orchestration-setup: done
-  1-10-pipeline-framework-advanced-features: backlog
+  1-10-pipeline-framework-advanced-features: done
   1-11-enhanced-cicd-with-integration-tests: backlog
   epic-1-retrospective: optional
 

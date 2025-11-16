@@ -93,3 +93,23 @@ class PipelineAssemblyError(PipelineError):
             full_message = message
 
         super().__init__(full_message)
+
+
+class StepSkipped(Exception):
+    """
+    Raised by optional steps to bypass execution without marking as error.
+
+    This exception signals that a step intentionally skipped execution
+    (e.g., due to service unavailability, optional enrichment failure).
+    The pipeline logs this as a warning and continues with remaining steps.
+
+    Args:
+        reason: Human-readable explanation for why the step was skipped
+
+    Example:
+        raise StepSkipped("External enrichment service unavailable")
+    """
+
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(f"Step skipped: {reason}")

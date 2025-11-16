@@ -70,12 +70,23 @@ class PipelineConfig(BaseModel):
     Configuration for an entire data transformation pipeline.
 
     Defines the complete pipeline structure including all steps,
-    error handling behavior, and execution metadata.
+    error handling behavior, retry logic, and execution metadata.
 
     Args:
         name: Human-readable pipeline identifier
         steps: List of step configurations in execution order
         stop_on_error: Whether to halt pipeline execution on first error
+            (backward compatible)
+        max_retries: Maximum retry attempts for retriable errors
+            (Story 1.10)
+        retry_backoff_base: Base delay in seconds for exponential backoff
+            (Story 1.10)
+        retryable_exceptions: Tuple of exception class names eligible
+            for retry (Story 1.10)
+        retryable_http_status_codes: HTTP status codes that trigger retry
+            (Story 1.10)
+        retry_limits: Tier-specific retry limits by error category
+            (Story 1.10)
     """
 
     name: str = Field(..., description="Pipeline name")
@@ -84,6 +95,48 @@ class PipelineConfig(BaseModel):
     )
     stop_on_error: bool = Field(
         default=True, description="Stop execution on first error"
+    )
+
+    # Advanced retry configuration (Story 1.10)
+    # All optional with backward-compatible defaults
+    max_retries: int = Field(
+        default=3,
+        ge=0,
+        le=10,
+        description="Maximum retry attempts for transient errors"
+    )
+    retry_backoff_base: float = Field(
+        default=1.0,
+        ge=0.1,
+        le=10.0,
+        description="Base delay in seconds for exponential backoff"
+    )
+    retryable_exceptions: tuple = Field(
+        default=(
+            # Database errors (5 retries)
+            "psycopg2.OperationalError",
+            "psycopg2.InterfaceError",
+            # Network errors (3 retries)
+            "requests.Timeout",
+            "requests.ConnectionError",
+            "builtins.ConnectionResetError",
+            "builtins.BrokenPipeError",
+            "builtins.TimeoutError",
+        ),
+        description="Exception class names eligible for retry"
+    )
+    retryable_http_status_codes: tuple = Field(
+        default=(429, 500, 502, 503, 504),
+        description="HTTP status codes that trigger retry"
+    )
+    retry_limits: Dict[str, int] = Field(
+        default={
+            "database": 5,
+            "network": 3,
+            "http_429_503": 3,
+            "http_500_502_504": 2,
+        },
+        description="Tier-specific retry limits by error category"
     )
 
     @field_validator("name")

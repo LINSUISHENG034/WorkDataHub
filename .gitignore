@@ -26,6 +26,7 @@ bmad/
 .gemini/
 .github/
 docs/sprint*.md
+.tmp_dagster_*/
 
 # Python Virtual Environments (Backend)
 # uv-managed environment

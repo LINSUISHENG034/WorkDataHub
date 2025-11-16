@@ -9,7 +9,7 @@ pipeline code, sample steps, and tests can all share common structures.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Mapping, MutableMapping, Optional
 
 import pandas as pd
@@ -66,11 +66,15 @@ class StepMetrics:
         name: Step identifier
         duration_ms: Execution time for the step in milliseconds
         rows_processed: Number of rows the step touched (row-level only)
+        memory_delta_bytes: Memory usage change during step execution (Story 1.10)
+        timestamp: UTC timestamp when step completed (Story 1.10)
     """
 
     name: str
     duration_ms: int
     rows_processed: int = 0
+    memory_delta_bytes: int = 0
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
@@ -99,14 +103,17 @@ class PipelineResult:
         output_data: Final DataFrame (immutably copied) from the pipeline
         warnings: Aggregated warnings emitted by steps
         errors: Aggregated errors emitted by steps
+        error_rows: Rows that failed processing with error details (Story 1.10)
         metrics: Aggregate PipelineMetrics for observability
         context: PipelineContext describing the execution
+        row: Single row result for backward compatibility
     """
 
     success: bool
     output_data: pd.DataFrame
     warnings: List[str] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
+    error_rows: List[Dict[str, Any]] = field(default_factory=list)  # Story 1.10
     metrics: PipelineMetrics = field(default_factory=PipelineMetrics)
     context: Optional[PipelineContext] = None
     row: Optional[Row] = None

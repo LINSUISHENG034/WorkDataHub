@@ -1,7 +1,8 @@
+import time
 import uuid
 from datetime import timezone
-from typing import Any, Dict, List
 from importlib import import_module
+from typing import Any, Dict, List
 
 import pandas as pd
 import pytest
@@ -10,7 +11,7 @@ from work_data_hub.config import get_settings
 from src.work_data_hub.domain.pipelines.config import PipelineConfig, StepConfig
 from src.work_data_hub.domain.pipelines.core import Pipeline
 from src.work_data_hub.domain.pipelines.examples import build_reference_pipeline
-from src.work_data_hub.domain.pipelines.exceptions import PipelineStepError
+from src.work_data_hub.domain.pipelines.exceptions import PipelineStepError, StepSkipped
 from src.work_data_hub.domain.pipelines.types import (
     DataFrameStep,
     PipelineContext,
@@ -62,6 +63,46 @@ class RowErrorStep(RowTransformStep):
 
     def apply(self, row: Row, context: PipelineContext) -> StepResult:
         return StepResult(row=row, warnings=[], errors=["boom"])
+
+
+class OptionalStep(DataFrameStep):
+    def __init__(self, reason: str):
+        self._name = "optional_enrichment"
+        self.reason = reason
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def execute(self, dataframe: pd.DataFrame, context: PipelineContext) -> pd.DataFrame:
+        raise StepSkipped(self.reason)
+
+
+class IntermittentFailureRowStep(RowTransformStep):
+    def __init__(self, failing_values: List[int]):
+        self._name = "intermittent_row_failure"
+        self.failing_values = set(failing_values)
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def apply(self, row: Row, context: PipelineContext) -> StepResult:
+        if row["value"] in self.failing_values:
+            raise ValueError(f"value {row['value']} failed validation")
+        return StepResult(row=row, warnings=[], errors=[])
+
+
+class RowPassThroughStep(RowTransformStep):
+    def __init__(self):
+        self._name = "row_passthrough"
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def apply(self, row: Row, context: PipelineContext) -> StepResult:
+        return StepResult(row=row, warnings=[], errors=[])
 
 
 class CaptureLogger:
@@ -233,23 +274,166 @@ def test_pipeline_metrics_capture_row_counts(pipeline_config):
     assert result.warnings == ["value_above_threshold"]
 
 
+@pytest.mark.unit
+def test_pipeline_continues_when_stop_on_error_disabled():
+    config = PipelineConfig(
+        name="soft_fail_pipeline",
+        steps=[
+            StepConfig(
+                name="intermittent_row_failure",
+                import_path="tests.unit.domain.pipelines.test_core.IntermittentFailureRowStep",
+            )
+        ],
+        stop_on_error=False,
+    )
+    pipeline = Pipeline(
+        steps=[IntermittentFailureRowStep(failing_values=[2])],
+        config=config,
+    )
+    data = pd.DataFrame([{"value": 1}, {"value": 2}, {"value": 3}])
+
+    result = pipeline.run(data)
+
+    assert not result.success
+    assert any("Row 1" in error for error in result.errors)
+    # Pipeline kept processing even though an error occurred.
+    pd.testing.assert_frame_equal(result.output_data.reset_index(drop=True), data)
+
+
+@pytest.mark.unit
+def test_error_rows_capture_row_context():
+    config = PipelineConfig(
+        name="error_row_pipeline",
+        steps=[
+            StepConfig(
+                name="intermittent_row_failure",
+                import_path="tests.unit.domain.pipelines.test_core.IntermittentFailureRowStep",
+            )
+        ],
+        stop_on_error=False,
+    )
+    pipeline = Pipeline(
+        steps=[IntermittentFailureRowStep(failing_values=[5])],
+        config=config,
+    )
+    data = pd.DataFrame([{"value": 4}, {"value": 5}])
+
+    result = pipeline.run(data)
+
+    assert result.error_rows, "Expected error_rows to capture failing rows"
+    captured = result.error_rows[0]
+    assert captured["row_index"] == 1
+    assert captured["row_data"]["value"] == 5
+    assert captured["step_name"] == "intermittent_row_failure"
+    assert "value 5 failed validation" in captured["error"]
+
+
+@pytest.mark.unit
+def test_optional_step_skip_emits_warning_and_continues():
+    config = PipelineConfig(
+        name="optional_pipeline",
+        steps=[
+            StepConfig(
+                name="add_one_pre",
+                import_path="tests.unit.domain.pipelines.test_core.AddOneStep",
+            ),
+            StepConfig(
+                name="optional_enrichment",
+                import_path="tests.unit.domain.pipelines.test_core.OptionalStep",
+            ),
+            StepConfig(
+                name="add_one_post",
+                import_path="tests.unit.domain.pipelines.test_core.AddOneStep",
+            ),
+        ],
+    )
+    pipeline = Pipeline(
+        steps=[AddOneStep(), OptionalStep("Service unavailable"), AddOneStep()],
+        config=config,
+    )
+    data = pd.DataFrame([{"value": 1}])
+
+    result = pipeline.run(data)
+
+    assert result.success
+    assert result.warnings == ["Step skipped: Service unavailable"]
+    assert result.row == {"value": 3}
+
+
+def _measure_runtime(callable_obj, repetitions: int = 3) -> float:
+    """Return the best runtime across repetitions to reduce noise."""
+    durations: List[float] = []
+    for _ in range(repetitions):
+        start = time.perf_counter()
+        callable_obj()
+        durations.append(time.perf_counter() - start)
+    return min(durations)
+
+
+@pytest.mark.performance
+def test_dataframe_step_performance_benchmark():
+    config = PipelineConfig(
+        name="dataframe_perf",
+        steps=[
+            StepConfig(
+                name="add_one",
+                import_path="tests.unit.domain.pipelines.test_core.AddOneStep",
+            )
+        ],
+    )
+    pipeline = Pipeline(steps=[AddOneStep()], config=config)
+    dataset = pd.DataFrame([{"value": value} for value in range(2000)])
+
+    # Warmup to account for psutil import/memory introspection.
+    pipeline.run(dataset)
+
+    best_duration = _measure_runtime(lambda: pipeline.run(dataset))
+    assert best_duration < 0.1, f"DataFrame step exceeded 100ms budget ({best_duration:.4f}s)"
+
+
+@pytest.mark.performance
+def test_row_step_performance_benchmark():
+    config = PipelineConfig(
+        name="row_perf",
+        steps=[
+            StepConfig(
+                name="row_passthrough",
+                import_path="tests.unit.domain.pipelines.test_core.RowPassThroughStep",
+            )
+        ],
+    )
+    pipeline = Pipeline(steps=[RowPassThroughStep()], config=config)
+    dataset = pd.DataFrame([{"value": value} for value in range(400)])
+
+    pipeline.run(dataset)
+
+    best_duration = _measure_runtime(lambda: pipeline.run(dataset))
+    per_row = best_duration / len(dataset)
+    assert per_row < 0.001, f"Row step overhead {per_row:.6f}s exceeded 1ms target"
+
+
 AC_TEST_MATRIX = {
     "AC1": [
         "tests.unit.domain.pipelines.test_core.test_pipeline_contracts_dataclasses",
         "tests.unit.domain.pipelines.test_core.test_pipeline_context_metadata_propagated",
+        "tests.unit.domain.pipelines.test_core.test_pipeline_continues_when_stop_on_error_disabled",
+        "tests.unit.domain.pipelines.test_core.test_error_rows_capture_row_context",
     ],
     "AC2": [
         "tests.unit.domain.pipelines.test_core.test_dataframe_and_row_steps_execute_in_order",
     ],
     "AC3": [
         "tests.unit.domain.pipelines.test_core.test_dataframe_and_row_steps_execute_in_order",
+        "tests.unit.domain.pipelines.test_core.test_optional_step_skip_emits_warning_and_continues",
     ],
     "AC4": [
         "tests.unit.domain.pipelines.test_core.test_pipeline_fail_fast_includes_step_index",
+        "tests.unit.domain.pipelines.test_core.test_dataframe_step_performance_benchmark",
     ],
     "AC5": [
         "tests.unit.domain.pipelines.test_core.test_pipeline_logging_events",
         "tests.unit.domain.pipelines.test_core.test_pipeline_metrics_capture_row_counts",
+        "tests.unit.domain.pipelines.test_core.test_row_step_performance_benchmark",
     ],
     "AC6": [
         "tests.unit.domain.pipelines.test_core.test_reference_pipeline_chaining",
@@ -290,3 +474,158 @@ def test_pipeline_task_matrix_ac8():
             missing[ac] = unresolved
 
     assert not missing, f"Traceability gaps detected: {missing}"
+
+
+# ============================================================================
+# Story 1.10 Advanced Retry Logic Tests (AC #5, AC #6)
+# ============================================================================
+
+
+class RetryableErrorStep(DataFrameStep):
+    """Step that raises retryable errors a specified number of times before succeeding."""
+
+    def __init__(self, error_type: str, fail_count: int = 2):
+        self._name = "retryable_error_step"
+        self.error_type = error_type
+        self.fail_count = fail_count
+        self.attempt_count = 0
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def execute(self, dataframe: pd.DataFrame, context: PipelineContext) -> pd.DataFrame:
+        self.attempt_count += 1
+        if self.attempt_count <= self.fail_count:
+            if self.error_type == "database":
+                import psycopg2
+                raise psycopg2.OperationalError("connection lost")
+            elif self.error_type == "network":
+                raise ConnectionResetError("network connection reset")
+            elif self.error_type == "http_500":
+                from requests import HTTPError, Response
+                resp = Response()
+                resp.status_code = 500
+                raise HTTPError(response=resp)
+            elif self.error_type == "http_429":
+                from requests import HTTPError, Response
+                resp = Response()
+                resp.status_code = 429
+                raise HTTPError(response=resp)
+            elif self.error_type == "http_404":
+                from requests import HTTPError, Response
+                resp = Response()
+                resp.status_code = 404
+                raise HTTPError(response=resp)
+        return dataframe
+
+
+@pytest.mark.unit
+def test_retry_with_database_error():
+    """Test database errors retry up to 5 times (database tier)."""
+    config = PipelineConfig(
+        name="database_retry_test",
+        steps=[
+            StepConfig(
+                name="retryable_error_step",
+                import_path="tests.unit.domain.pipelines.test_core.RetryableErrorStep",
+            )
+        ],
+    )
+    step = RetryableErrorStep(error_type="database", fail_count=4)
+    pipeline = Pipeline(steps=[step], config=config)
+    data = pd.DataFrame([{"value": 1}])
+
+    result = pipeline.run(data)
+
+    assert result.success
+    assert step.attempt_count == 5  # 4 failures + 1 success
+
+
+@pytest.mark.unit
+def test_retry_with_network_error():
+    """Test network errors retry up to 3 times (network tier)."""
+    config = PipelineConfig(
+        name="network_retry_test",
+        steps=[
+            StepConfig(
+                name="retryable_error_step",
+                import_path="tests.unit.domain.pipelines.test_core.RetryableErrorStep",
+            )
+        ],
+    )
+    step = RetryableErrorStep(error_type="network", fail_count=2)
+    pipeline = Pipeline(steps=[step], config=config)
+    data = pd.DataFrame([{"value": 1}])
+
+    result = pipeline.run(data)
+
+    assert result.success
+    assert step.attempt_count == 3  # 2 failures + 1 success
+
+
+@pytest.mark.unit
+def test_retry_with_http_500():
+    """Test HTTP 500 errors retry up to 2 times (http_500_502_504 tier)."""
+    config = PipelineConfig(
+        name="http_500_retry_test",
+        steps=[
+            StepConfig(
+                name="retryable_error_step",
+                import_path="tests.unit.domain.pipelines.test_core.RetryableErrorStep",
+            )
+        ],
+    )
+    step = RetryableErrorStep(error_type="http_500", fail_count=1)
+    pipeline = Pipeline(steps=[step], config=config)
+    data = pd.DataFrame([{"value": 1}])
+
+    result = pipeline.run(data)
+
+    assert result.success
+    assert step.attempt_count == 2  # 1 failure + 1 success
+
+
+@pytest.mark.unit
+def test_retry_with_http_429():
+    """Test HTTP 429 errors retry up to 3 times (http_429_503 tier)."""
+    config = PipelineConfig(
+        name="http_429_retry_test",
+        steps=[
+            StepConfig(
+                name="retryable_error_step",
+                import_path="tests.unit.domain.pipelines.test_core.RetryableErrorStep",
+            )
+        ],
+    )
+    step = RetryableErrorStep(error_type="http_429", fail_count=2)
+    pipeline = Pipeline(steps=[step], config=config)
+    data = pd.DataFrame([{"value": 1}])
+
+    result = pipeline.run(data)
+
+    assert result.success
+    assert step.attempt_count == 3  # 2 failures + 1 success
+
+
+@pytest.mark.unit
+def test_no_retry_with_http_404():
+    """Test HTTP 404 (permanent error) does NOT retry."""
+    config = PipelineConfig(
+        name="http_404_no_retry_test",
+        steps=[
+            StepConfig(
+                name="retryable_error_step",
+                import_path="tests.unit.domain.pipelines.test_core.RetryableErrorStep",
+            )
+        ],
+    )
+    step = RetryableErrorStep(error_type="http_404", fail_count=1)
+    pipeline = Pipeline(steps=[step], config=config)
+    data = pd.DataFrame([{"value": 1}])
+
+    with pytest.raises(PipelineStepError) as exc_info:
+        pipeline.run(data)
+
+    assert step.attempt_count == 1  # No retries for permanent error
+    assert "Step execution failed" in str(exc_info.value)

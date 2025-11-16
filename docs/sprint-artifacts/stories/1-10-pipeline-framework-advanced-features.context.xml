@@ -1,0 +1,362 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>10</storyId>
+    <title>Pipeline Framework Advanced Features</title>
+    <status>ready-for-review</status>
+    <generatedAt>2025-11-15</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/1-10-pipeline-framework-advanced-features.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a data engineer</asA>
+    <iWant>advanced pipeline capabilities for complex scenarios</iWant>
+    <soThat>I can handle optional enrichment, error collection, and retries without rewriting the framework</soThat>
+    <tasks>
+- [ ] **Task 1: Add PipelineConfig dataclass for advanced options** (AC: 1, 3, 5)
+  - [ ] Subtask 1.1: Create PipelineConfig dataclass in domain/pipelines/core.py with fields: stop_on_error (bool, default True), max_retries (int, default 3), retry_backoff_base (float, default 1.0).
+  - [ ] Subtask 1.2: Add retryable_exceptions tuple to PipelineConfig listing transient errors: database (psycopg2.OperationalError, psycopg2.InterfaceError), network (requests.Timeout, requests.ConnectionError, ConnectionResetError, BrokenPipeError, TimeoutError), add retryable_http_status_codes tuple (429, 500, 502, 503, 504), add retry_limits dict with tier-specific limits (database=5, network=3, http_429_503=3, http_500_502_504=2).
+  - [ ] Subtask 1.3: Keep Pipeline.__init__(steps, config) signature unchanged (both parameters required), enhance PipelineConfig with optional advanced fields (max_retries, retry_backoff_base, retryable_exceptions, retry_limits) with backward-compatible defaults, existing code using PipelineConfig without advanced fields continues working unchanged.
+  - [ ] Subtask 1.4: Verify Story 1.9 Dagster validate_op works with enhanced PipelineConfig, fix incorrect Pipeline(name=..., config={...}) usage to Pipeline(steps=[...], config=PipelineConfig(...)), ensure Dagster integration unaffected by Story 1.10 changes.
+
+- [ ] **Task 2: Implement error handling modes** (AC: 1)
+  - [ ] Subtask 2.1: Add error collection list to Pipeline execution context, initialize empty list before step execution.
+  - [ ] Subtask 2.2: Modify step execution loop: if stop_on_error=True raise exception immediately, if False append error to collection and continue with next row.
+  - [ ] Subtask 2.3: Return PipelineResult dataclass with valid_rows list, error_rows list (each with {row, error_message, step_name, timestamp}), total_errors count.
+  - [ ] Subtask 2.4: Add unit test: pipeline with 10 rows where 3 fail validation, assert valid_rows=7 and error_rows=3 with correct error details.
+
+- [ ] **Task 3: Implement step immutability strategy** (AC: 2)
+  - [ ] Subtask 3.1: Add immutability utility functions: shallow_copy_dataframe(df) using df.copy(), deep_copy_dict(d) using copy.deepcopy().
+  - [ ] Subtask 3.2: Update step execution: detect input type (DataFrame vs dict), apply appropriate copy strategy before passing to step.
+  - [ ] Subtask 3.3: Add immutability test: step modifies input DataFrame, assert original DataFrame unchanged, verify shallow copy performance (<5ms for 1000 rows).
+
+- [ ] **Task 4: Implement optional steps support** (AC: 3)
+  - [ ] Subtask 4.1: Create StepSkipped exception/result class with reason field (e.g., "External service unavailable").
+  - [ ] Subtask 4.2: Modify step execution: catch StepSkipped, log warning with step name + reason, continue to next step without marking as error.
+  - [ ] Subtask 4.3: Add unit test: pipeline with 3 steps where step 2 returns StepSkipped, assert steps 1 and 3 execute successfully and pipeline completes.
+
+- [ ] **Task 5: Implement per-step metrics collection** (AC: 4)
+  - [ ] Subtask 5.1: Create StepMetrics dataclass with fields: step_name, duration_ms, input_row_count, output_row_count, memory_delta_bytes, timestamp.
+  - [ ] Subtask 5.2: Add metrics collection to step execution: record start time/memory, end time/memory, calculate deltas, store in StepMetrics.
+  - [ ] Subtask 5.3: Log metrics using Story 1.3 get_logger() after each step: context.log_info(event="pipeline.step.complete", metrics=StepMetrics.dict()).
+  - [ ] Subtask 5.4: Add metrics to PipelineResult: include List[StepMetrics] for all executed steps, calculate total_duration_ms across all steps.
+
+- [ ] **Task 6: Implement retry logic with whitelist** (AC: 5)
+  - [ ] Subtask 6.1: Add retry decorator/function: retry_on_transient_error(func, max_retries, backoff_base, retryable_exceptions).
+  - [ ] Subtask 6.2: Implement exponential backoff: sleep_time = backoff_base * (2 ** attempt_number), cap max sleep at 60 seconds.
+  - [ ] Subtask 6.3: Wrap step execution in retry logic: only retry if exception type in config.retryable_exceptions, raise immediately for non-transient errors.
+  - [ ] Subtask 6.4: Add unit test: step raises psycopg2.OperationalError twice then succeeds, assert pipeline retries and completes successfully.
+  - [ ] Subtask 6.5: Add unit test: step raises ValueError (non-transient), assert pipeline does NOT retry and fails immediately.
+  - [ ] Subtask 6.6: Implement is_retryable_error() helper function: check HTTPError response.status_code against retryable_http_status_codes (429/500/502/503/504), return (is_retryable: bool, tier_name: str) for tier-specific retry limits.
+  - [ ] Subtask 6.7: Implement tiered retry limits: database errors retry up to 5 times, network errors up to 3 times, HTTP 429/503 up to 3 times, HTTP 500/502/504 up to 2 times, track retry tier in StepMetrics for observability.
+  - [ ] Subtask 6.8: Add unit test: step raises requests.ConnectionError, assert pipeline retries up to 3 times with network tier, verify exponential backoff delays.
+  - [ ] Subtask 6.9: Add unit test: step raises HTTPError with status 500, assert pipeline retries up to 2 times with http_500_502_504 tier, verify success on final retry.
+  - [ ] Subtask 6.10: Add unit test: step raises HTTPError with status 404, assert pipeline does NOT retry (permanent client error), fails immediately with clear error message.
+
+- [ ] **Task 7: Implement retry observability** (AC: 6)
+  - [ ] Subtask 7.1: Log each retry attempt: context.log_warning(event="pipeline.step.retry", step_name, attempt="2/3", error_type="NetworkTimeout", backoff_delay_sec=4.0).
+  - [ ] Subtask 7.2: Log retry success: context.log_info(event="pipeline.step.retry_success", message="Step 'enrich_data' succeeded on retry 2/3 after NetworkTimeout").
+  - [ ] Subtask 7.3: Log retry exhaustion: context.log_error(event="pipeline.step.retry_failed", message="Step 'enrich_data' failed after 3/3 retries", last_error).
+
+- [ ] **Task 8: Maintain backward compatibility with Story 1.5** (All ACs)
+  - [ ] Subtask 8.1: Ensure existing Pipeline usage works without changes: Pipeline(steps=[...], config=PipelineConfig(name='...', steps=[...])) continues working with new advanced fields using defaults (max_retries=3, stop_on_error=True), verify signature unchanged and all Story 1.5 tests pass.
+  - [ ] Subtask 8.2: Run all Story 1.5 unit tests to verify no regressions, assert 100% pass rate.
+  - [ ] Subtask 8.3: Verify Epic 4 domain pipelines (Stories 4.3, 4.5) still execute successfully with no code changes required.
+
+- [ ] **Task 9: Integration testing with Epic 4 pipelines** (All ACs)
+  - [ ] Subtask 9.1: Test annuity pipeline with stop_on_error=False mode, verify error collection returns partial results.
+  - [ ] Subtask 9.2: Test optional enrichment step in domain pipeline, introduce service unavailable error, verify pipeline skips step and continues.
+  - [ ] Subtask 9.3: Test retry logic with database connection timeout, verify pipeline retries with backoff and succeeds.
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+1. **Error Handling Modes** – Pipeline supports stop_on_error=True (fail fast, default) or False (collect errors, continue processing), when False mode enabled pipeline completes successfully and returns valid rows + error rows with failure reasons.
+
+2. **Step Immutability** – Pipeline uses shallow copy df.copy() for DataFrames (performance), deep copy copy.deepcopy() for nested dict structures (safety), ensures no accidental mutation of intermediate state.
+
+3. **Optional Steps Support** – TransformStep can return StepSkipped result to bypass step execution without error, pipeline logs warning and continues with remaining steps when optional step skipped.
+
+4. **Per-Step Metrics** – Pipeline collects duration (milliseconds), input row count, output row count, memory usage delta for each step, metrics logged to Story 1.3 structured logger for observability.
+
+5. **Retry Logic (Tiered Whitelist Approach)** – Pipeline retries ONLY on transient errors with tiered retry limits: database errors (5 retries: psycopg2.OperationalError, psycopg2.InterfaceError), network errors (3 retries: requests.Timeout, requests.ConnectionError, ConnectionResetError, BrokenPipeError, TimeoutError), HTTP errors (status-dependent: 429/503=3 retries, 500/502/504=2 retries), does NOT retry on data errors (ValueError, KeyError, IntegrityError), uses exponential backoff with max sleep 60 seconds.
+
+6. **Retry Observability** – Each retry attempt logged with step name, attempt number (e.g., "2/3"), error type, backoff delay in seconds, success message shows "Step 'enrich_data' succeeded on retry 2/3 after NetworkTimeout".
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <!-- PRD References -->
+      <artifact>
+        <path>docs/PRD.md</path>
+        <title>WorkDataHub - Product Requirements Document</title>
+        <section>FR-3.1: Pipeline Framework Execution</section>
+        <snippet>Execute transformation steps in sequence using shared pipeline framework. Each step receives input row + context, returns transformed row + metadata. Error handling configured per pipeline: stop_on_error=True (fail fast) or False (collect errors). Execution metrics collected: duration per step, total pipeline time, error counts.</snippet>
+      </artifact>
+
+      <artifact>
+        <path>docs/PRD.md</path>
+        <title>WorkDataHub - Product Requirements Document</title>
+        <section>NFR-2.2: Fault Tolerance</section>
+        <snippet>Pipeline failures are recoverable; system resumes from failure point. Domain isolation: failure in domain A doesn't affect domain B. Idempotent operations: re-running same input produces identical output. Clear error messages identify exact failure point (file, row, column). Manual re-run possible for specific domain without re-processing all domains.</snippet>
+      </artifact>
+
+      <!-- Architecture References -->
+      <artifact>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Scale Adaptive Architecture</title>
+        <section>Decision #3: Hybrid Pipeline Step Protocol</section>
+        <snippet>Support both DataFrame-level and Row-level steps with clear protocols. DataFrame Steps for bulk operations (vectorized), Row Transform Steps for validation & enrichment. Recommended pipeline order: DataFrame steps first (fast bulk), Row steps in middle (validation, enrichment), DataFrame steps last (final projection, database load).</snippet>
+      </artifact>
+
+      <artifact>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Scale Adaptive Architecture</title>
+        <section>Implementation Patterns - Pattern 2: Error Handling Standard</section>
+        <snippet>For all transformation steps: Standard error handling pattern with warnings/errors lists, try-catch blocks with structured error context (ErrorContext: error_type, operation, domain, row_number, field, input_data, original_error), return StepResult with errors on exception.</snippet>
+      </artifact>
+
+      <!-- Epic 1 Story 1.10 -->
+      <artifact>
+        <path>docs/epics.md</path>
+        <title>WorkDataHub - Epic Breakdown</title>
+        <section>Epic 1: Foundation & Core Infrastructure - Story 1.10</section>
+        <snippet>As a data engineer, I want advanced pipeline capabilities for complex scenarios, so that I can handle optional enrichment, error collection, and retries without rewriting the framework. Given I have the simple pipeline from Story 1.5 working AND at least 2 domain pipelines tested (Epic 4 Stories 4.3 + 4.5).</snippet>
+      </artifact>
+    </docs>
+
+    <code>
+      <!-- Existing Pipeline Implementation -->
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/core.py</path>
+        <kind>module</kind>
+        <symbol>Pipeline</symbol>
+        <lines>40-313</lines>
+        <reason>Existing simple Pipeline class from Story 1.5 that needs enhancement with advanced features (error modes, retries, metrics, optional steps). Current implementation supports DataFrame and Row steps, basic error handling, and metrics collection.</reason>
+      </artifact>
+
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/config.py</path>
+        <kind>module</kind>
+        <symbol>PipelineConfig</symbol>
+        <lines>68-119</lines>
+        <reason>Existing PipelineConfig dataclass with name, steps, stop_on_error fields. Needs enhancement with advanced retry configuration (max_retries, retry_backoff_base, retryable_exceptions, retry_limits) while maintaining backward compatibility.</reason>
+      </artifact>
+
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/types.py</path>
+        <kind>module</kind>
+        <symbol>TransformStep, DataFrameStep, RowTransformStep, StepResult, StepMetrics, PipelineResult, PipelineContext</symbol>
+        <lines>1-142</lines>
+        <reason>Core type definitions for pipeline framework. StepMetrics already exists (lines 61-73) with name, duration_ms, rows_processed fields - needs enhancement with memory_delta_bytes. StepResult exists for row-level transformations. Need to add StepSkipped exception class for optional steps.</reason>
+      </artifact>
+
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/exceptions.py</path>
+        <kind>module</kind>
+        <symbol>PipelineStepError</symbol>
+        <lines>1-50</lines>
+        <reason>Existing pipeline exception classes. Need to add StepSkipped exception for optional steps support (AC #3).</reason>
+      </artifact>
+
+      <artifact>
+        <path>tests/unit/domain/pipelines/test_core.py</path>
+        <kind>test</kind>
+        <symbol>test suite</symbol>
+        <lines>all</lines>
+        <reason>Existing unit tests for Story 1.5 simple pipeline. Must verify all existing tests pass after enhancements (Task 8.2). Will add new tests for error modes, immutability, optional steps, metrics, retry logic (Tasks 2.4, 3.3, 4.3, 6.4-6.10).</reason>
+      </artifact>
+
+      <artifact>
+        <path>src/work_data_hub/utils/logging.py</path>
+        <kind>module</kind>
+        <symbol>get_logger</symbol>
+        <lines>all</lines>
+        <reason>Story 1.3 structured logging framework using structlog. Retry observability and metrics logging (AC #4, #6) will use this logger with structured events (pipeline.step.retry, pipeline.step.retry_success, pipeline.step.complete).</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <python>
+        <package name="pandas" version="latest" usage="DataFrame operations in Pipeline.run(), shallow copy for immutability (df.copy())" />
+        <package name="pydantic" version=">=2.11.7" usage="PipelineConfig enhancement with field validators, backward-compatible defaults" />
+        <package name="structlog" version="latest" usage="Structured logging for retry observability (AC #6) and metrics (AC #4)" />
+        <package name="psycopg2-binary" version="latest" usage="Database exceptions in retry whitelist (psycopg2.OperationalError, psycopg2.InterfaceError)" />
+        <package name="requests" version="required for HTTP retry" usage="Network exceptions in retry whitelist (requests.Timeout, requests.ConnectionError), HTTPError for status code retry logic" />
+      </python>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+- **CRITICAL Backward Compatibility**: Maintain Story 1.5 Pipeline.__init__(steps, config) signature unchanged to preserve backward compatibility. All advanced features added via optional PipelineConfig fields with safe defaults. Do NOT make config parameter optional (would break existing Story 1.9 Dagster usage and any other callers).
+
+- **PipelineConfig Enhancement Pattern**: Purely additive approach - existing required fields (name, steps, stop_on_error) unchanged, new optional fields (max_retries=3, retry_backoff_base=1.0, retryable_exceptions, retryable_http_status_codes, retry_limits dict) have safe defaults. Prevents parameter explosion in Pipeline.__init__(), supports tiered retry strategy, 100% backward compatible.
+
+- **Retry Classification Critical**: Tiered approach with error-specific limits (database=5, network=3, HTTP status-dependent). Transient errors retry-able, data errors NOT retry-able (prevents infinite loops). is_retryable_error() helper validates HTTPError status codes.
+
+- **Immutability Strategy**: Balance performance vs safety - shallow copy for DataFrames is cheap, deep copy for nested structures ensures safety. Type-aware copying strategy based on input type.
+
+- **Clean Architecture Compliance**: All enhancements in domain/pipelines/core.py, no dependencies on io/ or orchestration/ layers (Story 1.6 enforcement).
+
+- **Structured Logging Integration**: All retries logged to Story 1.3 structured logger for observability (event="pipeline.step.retry"). Metrics logged after each step completion.
+
+- **Story 1.9 Dagster Compatibility**: Verify validate_op works with enhanced PipelineConfig. Fix incorrect Pipeline(name=..., config={...}) usage to Pipeline(steps=[...], config=PipelineConfig(...)). Ensure Dagster integration unaffected.
+  </constraints>
+
+  <interfaces>
+    <!-- Enhanced PipelineConfig Interface -->
+    <interface>
+      <name>PipelineConfig (Enhanced)</name>
+      <kind>Pydantic model</kind>
+      <signature>
+class PipelineConfig(BaseModel):
+    name: str  # Existing field
+    steps: List[StepConfig]  # Existing field
+    stop_on_error: bool = True  # Existing field
+
+    # NEW advanced fields (all optional with defaults)
+    max_retries: int = 3
+    retry_backoff_base: float = 1.0
+    retryable_exceptions: tuple = DEFAULT_RETRYABLE_EXCEPTIONS
+    retryable_http_status_codes: tuple = (429, 500, 502, 503, 504)
+    retry_limits: dict = {"database": 5, "network": 3, "http_429_503": 3, "http_500_502_504": 2}
+      </signature>
+      <path>src/work_data_hub/domain/pipelines/config.py</path>
+    </interface>
+
+    <!-- StepSkipped Exception -->
+    <interface>
+      <name>StepSkipped</name>
+      <kind>Exception class</kind>
+      <signature>
+class StepSkipped(Exception):
+    """Raised by optional steps to bypass execution without error."""
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(f"Step skipped: {reason}")
+      </signature>
+      <path>src/work_data_hub/domain/pipelines/exceptions.py</path>
+    </interface>
+
+    <!-- Enhanced StepMetrics -->
+    <interface>
+      <name>StepMetrics (Enhanced)</name>
+      <kind>dataclass</kind>
+      <signature>
+@dataclass
+class StepMetrics:
+    name: str
+    duration_ms: int
+    rows_processed: int = 0
+    memory_delta_bytes: int = 0  # NEW field
+    timestamp: datetime = field(default_factory=datetime.now)  # NEW field
+      </signature>
+      <path>src/work_data_hub/domain/pipelines/types.py</path>
+    </interface>
+
+    <!-- Enhanced PipelineResult -->
+    <interface>
+      <name>PipelineResult (Enhanced)</name>
+      <kind>dataclass</kind>
+      <signature>
+@dataclass
+class PipelineResult:
+    success: bool
+    output_data: pd.DataFrame
+    warnings: List[str] = field(default_factory=list)
+    errors: List[str] = field(default_factory=list)
+    error_rows: List[Dict] = field(default_factory=list)  # NEW field for AC #1
+    metrics: PipelineMetrics = field(default_factory=PipelineMetrics)
+    context: Optional[PipelineContext] = None
+      </signature>
+      <path>src/work_data_hub/domain/pipelines/types.py</path>
+    </interface>
+
+    <!-- Retry Helper Function -->
+    <interface>
+      <name>is_retryable_error</name>
+      <kind>function</kind>
+      <signature>
+def is_retryable_error(
+    exception: Exception,
+    retryable_exceptions: tuple,
+    retryable_http_status_codes: tuple
+) -> Tuple[bool, Optional[str]]:
+    """
+    Determine if error is retryable and return tier name.
+
+    Returns:
+        (is_retryable: bool, tier_name: Optional[str])
+        tier_name in ["database", "network", "http_429_503", "http_500_502_504"]
+    """
+      </signature>
+      <path>src/work_data_hub/domain/pipelines/core.py</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+Testing framework: pytest with markers (unit, integration, postgres, e2e_suite). Type checking: mypy strict mode (100% type coverage NFR). Linting: ruff. Code coverage: >80% for domain/ logic, 100% for critical paths. Test organization: tests/unit/domain/pipelines/ for unit tests, tests/integration/ for integration tests. All Story 1.5 tests must pass after enhancements to verify backward compatibility.
+    </standards>
+
+    <locations>
+tests/unit/domain/pipelines/ - Unit tests for pipeline framework
+tests/integration/ - Integration tests with fixtures
+    </locations>
+
+    <ideas>
+      <!-- Error Handling Mode Tests (AC #1) -->
+      <test id="AC1" criteria="1">
+        <description>Test pipeline with stop_on_error=False: 10 rows with 3 validation failures should return 7 valid rows + 3 error rows with detailed error messages</description>
+        <approach>Create test pipeline with Pydantic validation step, inject 3 rows with missing required fields, assert PipelineResult.output_data has 7 rows and PipelineResult.error_rows has 3 entries with error messages</approach>
+      </test>
+
+      <!-- Immutability Tests (AC #2) -->
+      <test id="AC2" criteria="2">
+        <description>Test DataFrame immutability: step modifies input DataFrame, original should remain unchanged</description>
+        <approach>Create test step that mutates input df (adds column), assert original df passed to pipeline has no new column after execution. Benchmark shallow copy performance (<5ms for 1000 rows)</approach>
+      </test>
+
+      <!-- Optional Steps Tests (AC #3) -->
+      <test id="AC3" criteria="3">
+        <description>Test optional step skip: 3-step pipeline where step 2 raises StepSkipped, steps 1 and 3 should execute successfully</description>
+        <approach>Create pipeline with 3 DataFrame steps, middle step raises StepSkipped("Service unavailable"), assert pipeline completes with success=True and warning logged</approach>
+      </test>
+
+      <!-- Metrics Collection Tests (AC #4) -->
+      <test id="AC4" criteria="4">
+        <description>Test per-step metrics: verify StepMetrics captured for each step with duration, row counts, memory delta</description>
+        <approach>Run test pipeline with 3 steps, assert PipelineResult.metrics.step_details has 3 StepMetrics entries, each with duration_ms > 0, rows_processed = input count, memory_delta_bytes tracked</approach>
+      </test>
+
+      <!-- Retry Logic Tests (AC #5) -->
+      <test id="AC5a" criteria="5">
+        <description>Test transient error retry: step raises psycopg2.OperationalError twice then succeeds, pipeline should retry and complete</description>
+        <approach>Mock step that raises OperationalError on attempts 1-2, returns success on attempt 3. Assert pipeline completes successfully with retry logs showing "2/3" attempts</approach>
+      </test>
+
+      <test id="AC5b" criteria="5">
+        <description>Test non-retryable error: step raises ValueError (data error), pipeline should NOT retry and fail immediately</description>
+        <approach>Mock step that raises ValueError, assert pipeline fails on first attempt without retries, error message shows data validation failure</approach>
+      </test>
+
+      <test id="AC5c" criteria="5">
+        <description>Test HTTP status code retry tiers: 500 status retries 2 times (http_500_502_504 tier), 429 retries 3 times (http_429_503 tier)</description>
+        <approach>Mock step raising HTTPError with status=500, assert retry count = 2. Separate test with status=429, assert retry count = 3. Test status=404 (permanent error), assert NO retries</approach>
+      </test>
+
+      <!-- Retry Observability Tests (AC #6) -->
+      <test id="AC6" criteria="6">
+        <description>Test retry logging: each attempt logged with step name, attempt number, error type, backoff delay</description>
+        <approach>Capture structlog output during retried execution, assert log entries contain event="pipeline.step.retry", step_name, attempt="2/3", error_type="NetworkTimeout", backoff_delay_sec > 0</approach>
+      </test>
+
+      <!-- Backward Compatibility Tests (Task 8) -->
+      <test id="BC1" criteria="all">
+        <description>Test Story 1.5 regression: run all existing unit tests from test_core.py, assert 100% pass rate</description>
+        <approach>Execute pytest tests/unit/domain/pipelines/test_core.py, verify all tests pass without modifications, no new failures introduced by advanced features</approach>
+      </test>
+    </ideas>
+  </tests>
+</story-context>
