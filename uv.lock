@@ -1215,6 +1215,22 @@ wheels = [
 ]
 
 [[package]]
+name = "pandera"
+version = "0.26.1"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
+dependencies = [
+    { name = "packaging" },
+    { name = "pydantic" },
+    { name = "typeguard" },
+    { name = "typing-extensions" },
+    { name = "typing-inspect" },
+]
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/ff/0b/bb312b98a92b00ff48e869e2769ce5ca6c7bc4ec793a429d450dc3c9bba2/pandera-0.26.1.tar.gz", hash = "sha256:81a55a6429770d31b3bf4c3e8e1096a38296bd3009f9eca5780fad3c3c17fd82" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/db/3b/91622e08086a6be44d2c0f34947d94c5282b53d217003d3ba390ee2d174b/pandera-0.26.1-py3-none-any.whl", hash = "sha256:1ff5b70556ce2f85c6b27e8fbe835a1761972f4d05f6548b4686b0db26ecb73b" },
+]
+
+[[package]]
 name = "pathspec"
 version = "0.12.1"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
@@ -2082,6 +2098,18 @@ wheels = [
 ]
 
 [[package]]
+name = "typeguard"
+version = "4.4.4"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/c7/68/71c1a15b5f65f40e91b65da23b8224dad41349894535a97f63a52e462196/typeguard-4.4.4.tar.gz", hash = "sha256:3a7fd2dffb705d4d0efaed4306a704c89b9dee850b688f060a8b1615a79e5f74" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/1b/a9/e3aee762739c1d7528da1c3e06d518503f8b6c439c35549b53735ba52ead/typeguard-4.4.4-py3-none-any.whl", hash = "sha256:b5f562281b6bfa1f5492470464730ef001646128b180769880468bd84b68b09e" },
+]
+
+[[package]]
 name = "types-psutil"
 version = "7.0.0.20251115"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
@@ -2145,6 +2173,19 @@ source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
 sdist = { url = "https://mirrors.aliyun.com/pypi/packages/72/94/1a15dd82efb362ac84269196e94cf00f187f7ed21c242792a923cdb1c61f/typing_extensions-4.15.0.tar.gz", hash = "sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466" }
 wheels = [
     { url = "https://mirrors.aliyun.com/pypi/packages/18/67/36e9267722cc04a6b9f15c7f3441c2363321a3ea07da7ae0c0707beb2a9c/typing_extensions-4.15.0-py3-none-any.whl", hash = "sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548" },
+]
+
+[[package]]
+name = "typing-inspect"
+version = "0.9.0"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
+dependencies = [
+    { name = "mypy-extensions" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/dc/74/1789779d91f1961fa9438e9a8710cdae6bd138c80d7303996933d117264a/typing_inspect-0.9.0.tar.gz", hash = "sha256:b23fc42ff6f6ef6954e4852c1fb512cdd18dbea03134f91f856a95ccc9461f78" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/65/f3/107a22063bf27bdccf2024833d3445f4eea42b2e598abfbd46f6a63b6cb0/typing_inspect-0.9.0-py3-none-any.whl", hash = "sha256:9ee6fc59062311ef8547596ab6b955e1b8aa46242d854bfc78f4f6b0eff35f9f" },
 ]
 
 [[package]]
@@ -2451,6 +2492,7 @@ dependencies = [
     { name = "opencv-python-headless" },
     { name = "openpyxl" },
     { name = "pandas" },
+    { name = "pandera" },
     { name = "playwright" },
     { name = "playwright-stealth" },
     { name = "psutil" },
@@ -2499,6 +2541,7 @@ requires-dist = [
     { name = "opencv-python-headless", specifier = ">=4.10.0.84" },
     { name = "openpyxl" },
     { name = "pandas" },
+    { name = "pandera", specifier = ">=0.18.0,<1.0" },
     { name = "playwright", specifier = ">=1.55.0" },
     { name = "playwright-stealth", specifier = ">=2.0.0" },
     { name = "psutil", specifier = ">=7.0.0" },

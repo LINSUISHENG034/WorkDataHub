@@ -1,0 +1,331 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2</storyId>
+    <title>Pandera Schemas for DataFrame Validation (Bronze/Gold Layers)</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-17</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/2-2-pandera-schemas-for-dataframe-validation-bronze-gold-layers.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>pandera DataFrameSchemas that validate entire DataFrames at layer boundaries</iWant>
+    <soThat>schema violations are caught before data moves between Bronze/Silver/Gold layers</soThat>
+    <tasks>
+      <task id="1" status="pending">
+        <title>Implement BronzeAnnuitySchema (Structural Validation)</title>
+        <ac_refs>AC1</ac_refs>
+        <subtasks>
+          <subtask id="1.1">Create domain/annuity_performance/schemas.py with pandera imports</subtask>
+          <subtask id="1.2">Define BronzeAnnuitySchema with expected columns and basic types</subtask>
+          <subtask id="1.3">Configure coerce=True for type conversion, strict=False to allow extra Excel columns</subtask>
+          <subtask id="1.4">Add DataFrame-level checks: no empty DataFrame, no completely null columns</subtask>
+          <subtask id="1.5">Test with sample Excel data (missing columns, wrong types, null columns)</subtask>
+        </subtasks>
+      </task>
+      <task id="2" status="pending">
+        <title>Implement GoldAnnuitySchema (Database Integrity)</title>
+        <ac_refs>AC2</ac_refs>
+        <subtasks>
+          <subtask id="2.1">Define GoldAnnuitySchema with strict required types (nullable=False)</subtask>
+          <subtask id="2.2">Add composite PK uniqueness check: unique=['月度', '计划代码', 'company_id']</subtask>
+          <subtask id="2.3">Add business rule constraints: checks=pa.Check.ge(0) for asset fields</subtask>
+          <subtask id="2.4">Configure strict=True to reject unexpected columns (database projection)</subtask>
+          <subtask id="2.5">Test with Silver DataFrame (duplicate PKs, null values, extra columns)</subtask>
+        </subtasks>
+      </task>
+      <task id="3" status="pending">
+        <title>Implement Schema Coercion and Error Handling</title>
+        <ac_refs>AC3</ac_refs>
+        <subtasks>
+          <subtask id="3.1">Configure Bronze schema coercion: string → float, int → datetime</subtask>
+          <subtask id="3.2">Integrate Story 2.4 date parser with pandera custom checks (if needed)</subtask>
+          <subtask id="3.3">Handle mixed null representations (None, NaN, empty string)</subtask>
+          <subtask id="3.4">Test coercion edge cases: scientific notation, currency symbols via Story 2.3 cleansing</subtask>
+          <subtask id="3.5">Add error threshold check: fail fast if >10% of rows fail coercion</subtask>
+        </subtasks>
+      </task>
+      <task id="4" status="pending">
+        <title>Integrate with Pipeline Framework (Decorator Pattern)</title>
+        <ac_refs>AC4</ac_refs>
+        <subtasks>
+          <subtask id="4.1">Create BronzeValidationStep implementing Epic 1 Story 1.5 TransformStep protocol</subtask>
+          <subtask id="4.2">Create GoldValidationStep for database-ready validation</subtask>
+          <subtask id="4.3">Use @pa.check_io decorator on step execute methods (or manual validate calls)</subtask>
+          <subtask id="4.4">Integrate with Epic 1 Story 1.3 structured logging for validation metrics</subtask>
+          <subtask id="4.5">Return validated DataFrame and error list for Epic 2 Story 2.5 CSV export</subtask>
+        </subtasks>
+      </task>
+      <task id="5" status="pending">
+        <title>Add Unit Tests</title>
+        <ac_refs>AC1, AC2, AC3, AC4, AC5</ac_refs>
+        <subtasks>
+          <subtask id="5.1">Test BronzeAnnuitySchema validates expected columns, coerces types, rejects invalid data</subtask>
+          <subtask id="5.2">Test GoldAnnuitySchema enforces composite PK uniqueness, not-null constraints</subtask>
+          <subtask id="5.3">Test schema coercion handles mixed types, nulls, empty strings</subtask>
+          <subtask id="5.4">Test error messages include column names, row indices, clear guidance</subtask>
+          <subtask id="5.5">Test decorator integration with pipeline steps (@pa.check_io)</subtask>
+          <subtask id="5.6">Mark tests with @pytest.mark.unit per Story 1.11 testing framework</subtask>
+        </subtasks>
+      </task>
+      <task id="6" status="pending">
+        <title>Add Performance Tests (MANDATORY)</title>
+        <ac_refs>AC6</ac_refs>
+        <subtasks>
+          <subtask id="6.1">Create tests/integration/test_story_2_2_performance.py per Epic 2 performance criteria</subtask>
+          <subtask id="6.2">Test with 10,000-row fixture (reuse Story 2.1 fixture or create new one)</subtask>
+          <subtask id="6.3">Measure Bronze validation throughput and validate ≥5000 rows/s</subtask>
+          <subtask id="6.4">Measure Gold validation throughput and validate ≥3000 rows/s (uniqueness check is expensive)</subtask>
+          <subtask id="6.5">Measure validation overhead and validate &lt;20% of total pipeline time</subtask>
+          <subtask id="6.6">Update tests/.performance_baseline.json with pandera schema validation baselines</subtask>
+        </subtasks>
+      </task>
+      <task id="7" status="pending">
+        <title>Documentation and Integration</title>
+        <ac_refs>All</ac_refs>
+        <subtasks>
+          <subtask id="7.1">Add docstrings to schemas explaining Bronze/Gold validation responsibilities</subtask>
+          <subtask id="7.2">Document schema field mapping: Excel columns → Bronze → Pydantic (Story 2.1) → Gold → Database</subtask>
+          <subtask id="7.3">Add usage examples in schema docstrings (decorator pattern, manual validation)</subtask>
+          <subtask id="7.4">Update story file with Completion Notes, File List, and Change Log</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1" priority="must">
+      <title>Bronze Schema Validates Raw Excel Structure</title>
+      <description>BronzeAnnuitySchema validates raw annuity DataFrame structure from Epic 3 file discovery, verifying expected columns, coercing numeric/date types, and ensuring at least 1 data row present.</description>
+      <verification>
+        - Test with valid Excel: validation passes, returns DataFrame with coerced types
+        - Test with missing required column: raises SchemaError with column comparison
+        - Test with non-date values in >10% of 月度 rows: raises SchemaError with row numbers
+        - Test with >10% non-numeric values: raises SchemaError indicating systemic data issue
+      </verification>
+    </criterion>
+    <criterion id="AC2" priority="must">
+      <title>Gold Schema Validates Database Integrity</title>
+      <description>GoldAnnuitySchema validates Silver DataFrame for database readiness: composite PK uniqueness (月度, 计划代码, company_id), not-null constraints, column projection matching database schema, business rule constraints (asset values ≥0).</description>
+      <verification>
+        - Test with 1000 unique composite keys: validation passes, returns 1000 rows
+        - Test with duplicate composite PKs: raises SchemaError with duplicate combinations
+        - Test with null required fields: raises SchemaError with null row count
+        - Test with extra columns: Gold projection removes extras, logs removed columns
+      </verification>
+    </criterion>
+    <criterion id="AC3" priority="must">
+      <title>Schema Coercion and Type Safety</title>
+      <description>Bronze schema with coerce=True handles mixed types from Excel: string numbers → float, integer dates → datetime, mixed null representations → NaN, preserving data integrity without silent loss.</description>
+      <verification>
+        - Test successful coercion: returns coerced DataFrame with consistent types for Pydantic validation
+        - Test failed coercion: raises SchemaError with row indices and column names
+        - Test empty DataFrame: raises SchemaError indicating empty data
+        - Verify log coercion warnings if configured
+      </verification>
+    </criterion>
+    <criterion id="AC4" priority="must">
+      <title>Decorator Integration with Pipeline Framework</title>
+      <description>Pandera @pa.check_io decorator integrates with Epic 1 Story 1.5 TransformStep protocol, validating input with Bronze schema and output with Gold schema, propagating SchemaError automatically, logging via structured logging.</description>
+      <verification>
+        - Test decorated pipeline step: pandera validates input before execution, output after completion
+        - Test validation failure: step execution skipped, error propagated to pipeline error handler
+        - Test integration with Epic 2 Story 2.5: failed rows exported to CSV with violation details
+      </verification>
+    </criterion>
+    <criterion id="AC5" priority="should">
+      <title>Clear Error Messages with Actionable Guidance</title>
+      <description>SchemaError messages include which columns/rows failed, which checks violated, specific failure values, and actionable guidance for fixing data sources.</description>
+      <verification>
+        - Test Bronze missing columns error: lists expected vs. actual columns
+        - Test Gold duplicate PKs error: shows sample duplicate rows with key values
+        - Test structured logging: includes error_type, validation_layer, failed_column, row_count, sample_failures
+      </verification>
+    </criterion>
+    <criterion id="AC6" priority="must">
+      <title>Performance Compliance (MANDATORY - Epic 2 Performance AC)</title>
+      <description>Pandera validation meets Epic 2 performance requirements: ≥1000 rows/s throughput (target 5000+ rows/s for Bronze, 3000+ for Gold), validation overhead &lt;20% of pipeline time, baseline recorded in tests/.performance_baseline.json.</description>
+      <verification>
+        - Test with 10,000-row fixture: Bronze achieves 5000+ rows/s, Gold achieves 3000+ rows/s
+        - Test validation overhead: measures &lt;20% of total pipeline execution time
+        - If throughput &lt;1000 rows/s: story BLOCKED, must optimize (vectorize, cache schemas, reduce redundant operations)
+      </verification>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-2.md</path>
+        <title>Epic 2 Technical Specification: Multi-Layer Data Quality Framework</title>
+        <section>Pandera Schemas (Story 2.2)</section>
+        <snippet>BronzeAnnuitySchema validates raw Excel structure (expected columns, basic types) with coerce=True and strict=False. GoldAnnuitySchema validates database-ready data (composite PK uniqueness on [月度, 计划代码, company_id], not-null constraints, business rules) with strict=True.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-2.md</path>
+        <title>Epic 2 Technical Specification</title>
+        <section>Integration with Epic 1 Pipeline Framework</section>
+        <snippet>Validation steps implement TransformStep protocol from Story 1.5. BronzeValidationStep and GoldValidationStep receive DataFrame, apply pandera schema, return (validated_df, errors). Use PipelineContext to track execution metadata.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epic-2-performance-acceptance-criteria.md</path>
+        <title>Epic 2 Performance Acceptance Criteria (MANDATORY)</title>
+        <section>Story 2.2: Pandera DataFrame Schema Validation</section>
+        <snippet>AC-PERF-1: Pandera validation ≥1000 rows/s (expected 5000+ rows/s for DataFrame operations). AC-PERF-2: Validation overhead &lt;20%. Test with 10,000-row fixture. If throughput &lt;1000 rows/s, investigate schema complexity, type coercion overhead, or index operations.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Scale Adaptive Architecture</title>
+        <section>Decision #3: Hybrid Pipeline Step Protocol</section>
+        <snippet>Supports both DataFrame-level and Row-level steps. DataFrameStep.execute(df, context) transforms entire DataFrame with vectorized operations. Pipeline framework from Story 1.5 orchestrates validation steps.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture-boundaries.md</path>
+        <title>Clean Architecture Boundaries (Story 1.6)</title>
+        <section>Layer Responsibilities - Domain Layer</section>
+        <snippet>Domain layer (domain/) contains pure business logic, TransformStep protocols, Pipeline executor, validation utilities. No knowledge of files, databases, or Dagster. Validation steps inject I/O services via dependency injection pattern.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture-boundaries.md</path>
+        <title>Clean Architecture Boundaries</title>
+        <section>Medallion Alignment</section>
+        <snippet>Bronze: I/O layer (work_data_hub.io) handles discovery, file normalization. Silver: Domain layer (work_data_hub.domain) hosts transformations, pipeline orchestration. Gold: Split between domain (projections) and orchestration (scheduling).</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/models.py</path>
+        <kind>domain</kind>
+        <symbol>AnnuityPerformanceIn, AnnuityPerformanceOut</symbol>
+        <lines>Full file</lines>
+        <reason>Pydantic models from Story 2.1. Bronze schema validates DataFrames before Pydantic row validation. Gold schema validates DataFrames after Pydantic transformation. Integration point: Bronze schema output → Pydantic In → Pydantic Out → Gold schema input.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/models.py</path>
+        <kind>domain</kind>
+        <symbol>parse_yyyymm_or_chinese, clean_company_name_inline, clean_comma_separated_number</symbol>
+        <lines>Inline placeholder functions</lines>
+        <reason>Inline placeholders from Story 2.1 can be referenced for pandera custom checks if needed (e.g., date parsing check, string cleaning check). Will be replaced by Story 2.3/2.4.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/pipeline_steps.py</path>
+        <kind>domain</kind>
+        <symbol>ValidateInputRowsStep, ValidateOutputRowsStep</symbol>
+        <lines>Full file</lines>
+        <reason>Existing Pydantic validation steps from Story 2.1. This story will add BronzeValidationStep and GoldValidationStep for DataFrame-level validation using pandera. Different concern: DataFrame schema vs. row-level business rules.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/types.py</path>
+        <kind>domain</kind>
+        <symbol>TransformStep</symbol>
+        <lines>121-127</lines>
+        <reason>Protocol from Story 1.5 that BronzeValidationStep and GoldValidationStep must implement. Defines .name property and .execute(df, context) method signature for pipeline integration.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/core.py</path>
+        <kind>domain</kind>
+        <symbol>Pipeline, PipelineContext</symbol>
+        <lines>Full file</lines>
+        <reason>Pipeline executor from Story 1.5. Validation steps will be orchestrated via Pipeline.add_step(). PipelineContext tracks execution metadata (data_source, run_context).</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <python>
+        <package name="pandera" version="&gt;=0.18.0,&lt;1.0" purpose="DataFrame schema validation and coercion" />
+        <package name="pydantic" version="&gt;=2.5.0,&lt;3.0" purpose="Row-level validation (Story 2.1 integration)" />
+        <package name="pandas" version="&gt;=2.1.0" purpose="DataFrame operations (from Epic 1)" />
+        <package name="pytest" version="latest" purpose="Unit and performance testing" />
+      </python>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <architecture>
+      <constraint>Clean Architecture enforcement (Story 1.6): schemas.py lives in domain/annuity_performance/, NO imports from io/ or orchestration/ layers</constraint>
+      <constraint>Medallion alignment: Bronze schema validates I/O layer concern (raw Excel structure), Gold schema validates domain concern (database integrity)</constraint>
+      <constraint>Dependency injection: Validation steps receive DataFrame via pipeline framework, never directly access files or database</constraint>
+    </architecture>
+    <performance>
+      <constraint>MANDATORY AC-PERF-1: Pandera validation ≥1000 rows/s (target 5000+ rows/s for Bronze, 3000+ rows/s for Gold)</constraint>
+      <constraint>MANDATORY AC-PERF-2: Validation overhead &lt;20% of total pipeline execution time</constraint>
+      <constraint>Story BLOCKED if throughput &lt;1000 rows/s - must optimize before review (vectorize checks, reduce redundant operations, cache schemas)</constraint>
+      <constraint>Update tests/.performance_baseline.json with pandera validation baselines after testing</constraint>
+    </performance>
+    <integration>
+      <constraint>Bronze schema output must match Pydantic AnnuityPerformanceIn expectations (coerced types: datetime, float, string)</constraint>
+      <constraint>Gold schema input must match Pydantic AnnuityPerformanceOut output (required fields: company_id, all non-negative amounts)</constraint>
+      <constraint>Composite PK uniqueness check in Gold schema: [月度, 计划代码, company_id] - expensive O(n) operation, monitor performance closely</constraint>
+      <constraint>Error threshold: fail fast if &gt;10% of rows fail validation (likely systemic issue per Epic 2 tech spec)</constraint>
+    </integration>
+    <testing>
+      <constraint>Unit test coverage target: ≥90% for domain layer (Epic 1 retrospective learning)</constraint>
+      <constraint>Performance tests MUST use 10,000-row fixture minimum (not 5-row samples per Epic 1 retrospective)</constraint>
+      <constraint>Use @pytest.mark.unit and @pytest.mark.integration markers per Story 1.11 testing framework</constraint>
+      <constraint>Separate test classes per AC (TestAC1_BronzeSchema, TestAC2_GoldSchema, etc.)</constraint>
+    </testing>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>TransformStep Protocol</name>
+      <kind>Protocol (typing.Protocol)</kind>
+      <signature>@property def name(self) -&gt; str; def execute(self, df: pd.DataFrame, context: PipelineContext) -&gt; pd.DataFrame</signature>
+      <path>src/work_data_hub/domain/pipelines/types.py:121-127</path>
+      <usage>BronzeValidationStep and GoldValidationStep must implement this protocol for Epic 1 Story 1.5 pipeline framework integration</usage>
+    </interface>
+    <interface>
+      <name>BronzeAnnuitySchema</name>
+      <kind>pandera.DataFrameSchema</kind>
+      <signature>pa.DataFrameSchema(columns={...}, strict=False, coerce=True, checks=[...])</signature>
+      <path>src/work_data_hub/domain/annuity_performance/schemas.py (NEW)</path>
+      <usage>Validates raw Excel DataFrame: expected columns ['月度', '计划代码', '客户名称', '期初资产规模', '期末资产规模', '投资收益', '年化收益率'], coerce types (str→float, str→datetime), verify ≥1 data row, no completely null columns</usage>
+    </interface>
+    <interface>
+      <name>GoldAnnuitySchema</name>
+      <kind>pandera.DataFrameSchema</kind>
+      <signature>pa.DataFrameSchema(columns={...}, strict=True, unique=['月度', '计划代码', 'company_id'])</signature>
+      <path>src/work_data_hub/domain/annuity_performance/schemas.py (NEW)</path>
+      <usage>Validates database-ready DataFrame: composite PK uniqueness, not-null constraints (all required fields), business rule constraints (期末资产规模≥0, 期初资产规模≥0), strict column projection (only allowed columns)</usage>
+    </interface>
+    <interface>
+      <name>PipelineContext</name>
+      <kind>Dataclass</kind>
+      <signature>PipelineContext(data_source: str, run_context: Dict[str, Any])</signature>
+      <path>src/work_data_hub/domain/pipelines/types.py</path>
+      <usage>Passed to validation step .execute() method to track execution metadata (data source, run context for logging)</usage>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Epic 1 Story 1.11 testing framework: Use @pytest.mark.unit for fast unit tests, @pytest.mark.integration for slower integration tests. Unit tests run in &lt;30s (enforced by CI timing check). Coverage validated per module (domain/ ≥90%). Performance tests run in &lt;3min (integration test stage). Reuse test fixtures from tests/fixtures/ when possible. Programmatic fixture generation preferred over static CSV files (Story 2.1 pattern).</standards>
+    <locations>
+      <location>tests/unit/domain/annuity_performance/test_schemas.py - Unit tests for BronzeAnnuitySchema and GoldAnnuitySchema validation logic</location>
+      <location>tests/performance/test_story_2_2_performance.py - Performance tests with 10,000-row fixture, validate AC-PERF-1 and AC-PERF-2</location>
+      <location>tests/fixtures/performance/annuity_performance_10k.csv - Reuse Story 2.1 fixture or create new programmatic generator</location>
+      <location>tests/.performance_baseline.json - Update with pandera schema validation baselines after performance testing</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Test BronzeAnnuitySchema with valid Excel: all expected columns present, types coerced correctly (str→float, str→datetime)</idea>
+      <idea ac="AC1">Test BronzeAnnuitySchema with missing required column '期末资产规模': raises SchemaError with column comparison (expected vs. actual)</idea>
+      <idea ac="AC1">Test BronzeAnnuitySchema with &gt;10% non-date values in '月度' column: raises SchemaError with row numbers and failure rate</idea>
+      <idea ac="AC1">Test BronzeAnnuitySchema with &gt;10% non-numeric values: raises SchemaError indicating systemic data issue</idea>
+      <idea ac="AC2">Test GoldAnnuitySchema with 1000 unique composite keys: validation passes, returns 1000 rows ready for database</idea>
+      <idea ac="AC2">Test GoldAnnuitySchema with duplicate composite PKs: raises SchemaError with duplicate combinations [(月度, 计划代码, company_id), ...]</idea>
+      <idea ac="AC2">Test GoldAnnuitySchema with null required field 'company_id': raises SchemaError with null row count</idea>
+      <idea ac="AC2">Test GoldAnnuitySchema with extra columns: Gold projection removes extras, logs removed column names</idea>
+      <idea ac="AC3">Test schema coercion: string "1234.56" → float 1234.56, integer 202501 → datetime(2025, 1, 1)</idea>
+      <idea ac="AC3">Test mixed null representations: None, NaN, empty string → pandas NaN (null)</idea>
+      <idea ac="AC3">Test coercion failure: "invalid" cannot coerce to float → raises SchemaError with row indices and column names</idea>
+      <idea ac="AC3">Test empty DataFrame: raises SchemaError "DataFrame cannot be empty - check source data or filters"</idea>
+      <idea ac="AC4">Test BronzeValidationStep implements TransformStep protocol: has .name property, .execute(df, context) method</idea>
+      <idea ac="AC4">Test @pa.check_io decorator integration: validates input with Bronze schema, output with Gold schema, raises SchemaError on failure</idea>
+      <idea ac="AC4">Test pipeline integration: BronzeValidationStep → Pydantic validation (Story 2.1) → GoldValidationStep end-to-end flow</idea>
+      <idea ac="AC5">Test error messages include actionable guidance: "Fix Excel file at path X, rows 15-20, column '月度' contains non-date values"</idea>
+      <idea ac="AC5">Test structured logging integration (Epic 1 Story 1.3): log includes error_type="SchemaError", validation_layer="bronze|gold", failed_column, row_count, sample_failures</idea>
+      <idea ac="AC6">Test Bronze validation with 10,000-row fixture: achieves ≥5000 rows/s throughput (50-100ms total duration)</idea>
+      <idea ac="AC6">Test Gold validation with 10,000-row fixture: achieves ≥3000 rows/s throughput (uniqueness check is expensive, 100-200ms expected)</idea>
+      <idea ac="AC6">Test validation overhead in simulated pipeline: validation time &lt;20% of total pipeline execution time (I/O + validation)</idea>
+      <idea ac="AC6">If throughput &lt;1000 rows/s: profile with cProfile, optimize (vectorize checks, cache schemas, reduce redundant operations), re-test until passing</idea>
+    </ideas>
+  </tests>
+</story-context>

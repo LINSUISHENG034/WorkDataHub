@@ -8,6 +8,7 @@ dependencies = [
     "dagster",
     "dagster-webserver",
     "pandas",
+    "pandera>=0.18.0,<1.0",
     "pydantic>=2.11.7",
     "structlog",
     "psycopg2-binary",
