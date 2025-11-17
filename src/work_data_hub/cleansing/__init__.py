@@ -40,7 +40,14 @@ from .integrations.pydantic_adapter import (
     decimal_fields_cleaner,
     simple_field_validator,
 )
-from .registry import CleansingRegistry, CleansingRule, RuleCategory, registry, rule
+from .registry import (
+    CleansingRegistry,
+    CleansingRule,
+    RuleCategory,
+    get_cleansing_registry,
+    registry,
+    rule,
+)
 from .rules.numeric_rules import (
     annuity_decimal_cleaner,
     comprehensive_decimal_cleaning,
@@ -50,6 +57,7 @@ from .rules.numeric_rules import (
     standardize_null_values,
     trustee_decimal_cleaner,
 )
+from .rules.string_rules import normalize_company_name, trim_whitespace
 
 # 版本信息
 __version__ = "1.1.0"
@@ -63,6 +71,7 @@ __all__ = [
     "RuleCategory",
     "CleansingRule",
     "CleansingRegistry",
+    "get_cleansing_registry",
     # Pydantic 集成
     "decimal_fields_cleaner",
     "simple_field_validator",
@@ -72,6 +81,8 @@ __all__ = [
     "handle_percentage_conversion",
     "standardize_null_values",
     "decimal_quantization",
+    "trim_whitespace",
+    "normalize_company_name",
     # 预配置清洗器
     "annuity_decimal_cleaner",
     "trustee_decimal_cleaner",

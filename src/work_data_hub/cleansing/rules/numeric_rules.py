@@ -41,7 +41,7 @@ CURRENCY_SYMBOLS = {"¥", "$", "￥", "€", "£", "₽"}
     category=RuleCategory.STRING,
     description="移除货币符号和格式化字符",
 )
-def remove_currency_symbols(value: str) -> str:
+def remove_currency_symbols(value: Any) -> Any:
     """
     移除货币符号和常见格式化字符
 
@@ -49,18 +49,42 @@ def remove_currency_symbols(value: str) -> str:
         value: 包含货币符号的字符串
 
     Returns:
-        清理后的字符串
+        清理后的字符串或原值
     """
+    if value is None:
+        return None
+
     if not isinstance(value, str):
         return value
 
-    # 移除货币符号
     cleaned = value.strip()
     for symbol in CURRENCY_SYMBOLS:
         cleaned = cleaned.replace(symbol, "")
 
-    # 移除千分位分隔符和空格
-    cleaned = cleaned.replace(",", "").replace(" ", "")
+    return cleaned
+
+
+@rule(
+    name="clean_comma_separated_number",
+    category=RuleCategory.NUMERIC,
+    description="移除千位分隔符/空格并处理占位符",
+)
+def clean_comma_separated_number(value: Any) -> Any:
+    """
+    清理带有千位分隔符或占位符的数值字符串。
+    """
+    if value is None:
+        return None
+
+    if not isinstance(value, str):
+        return value
+
+    cleaned = value.strip().replace(",", "").replace(" ", "")
+    cleaned = cleaned.replace("\u3000", "")  # 全角空格
+
+    lower_candidate = cleaned.lower()
+    if cleaned in NULL_PLACEHOLDERS or lower_candidate in NULL_PLACEHOLDERS:
+        return None
 
     return cleaned
 

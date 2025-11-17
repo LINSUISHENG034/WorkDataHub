@@ -1,0 +1,46 @@
+# Cleansing registry domain rules
+# Story 2.3 provides per-domain rule chains for registry discovery
+# Fields omitted from a domain return an empty list, while unknown domains
+# fall back to the top-level default_rules sequence.
+
+default_rules:
+  - trim_whitespace
+
+domains:
+  annuity_performance:
+    客户名称:
+      - trim_whitespace
+      - normalize_company_name
+    计划代码:
+      - trim_whitespace
+    company_id:
+      - trim_whitespace
+    期初资产规模:
+      - remove_currency_symbols
+      - clean_comma_separated_number
+    期末资产规模:
+      - remove_currency_symbols
+      - clean_comma_separated_number
+    供款:
+      - remove_currency_symbols
+      - clean_comma_separated_number
+    流失_含待遇支付:
+      - remove_currency_symbols
+      - clean_comma_separated_number
+    流失:
+      - remove_currency_symbols
+      - clean_comma_separated_number
+    待遇支付:
+      - remove_currency_symbols
+      - clean_comma_separated_number
+    投资收益:
+      - remove_currency_symbols
+      - clean_comma_separated_number
+    年化收益率:
+      - remove_currency_symbols
+      - clean_comma_separated_number
+      - handle_percentage_conversion
+    当期收益率:
+      - remove_currency_symbols
+      - clean_comma_separated_number
+      - handle_percentage_conversion

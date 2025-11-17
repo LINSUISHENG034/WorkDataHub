@@ -25,16 +25,48 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    ValidationInfo,
     field_validator,
     model_validator,
 )
 
+from src.work_data_hub.cleansing import get_cleansing_registry
+
 logger = logging.getLogger(__name__)
 
+CLEANSING_DOMAIN = "annuity_performance"
+CLEANSING_REGISTRY = get_cleansing_registry()
+DEFAULT_COMPANY_RULES = ["trim_whitespace", "normalize_company_name"]
+DEFAULT_NUMERIC_RULES: List[Any] = [
+    "standardize_null_values",
+    "remove_currency_symbols",
+    "clean_comma_separated_number",
+    {"name": "handle_percentage_conversion"},
+]
 
-# ===== Inline Placeholder Functions for Story 2.3 and 2.4 =====
-# These will be replaced by proper cleansing registry and date parser
-# when those stories are completed
+
+def apply_domain_rules(
+    value: Any,
+    field_name: str,
+    fallback_rules: Optional[List[Any]] = None,
+) -> Any:
+    """Helper to resolve per-domain rule chains with fallback logic."""
+    rules = CLEANSING_REGISTRY.get_domain_rules(CLEANSING_DOMAIN, field_name)
+    if not rules:
+        rules = fallback_rules or []
+
+    if not rules:
+        return value
+
+    return CLEANSING_REGISTRY.apply_rules(
+        value,
+        rules,
+        field_name=field_name,
+    )
+
+
+# ===== Inline Placeholder Functions for Story 2.4 =====
+# Date parser remains inline until Story 2.4 replaces it
 
 def parse_yyyymm_or_chinese(value: Any) -> date:
     """
@@ -128,97 +160,6 @@ def parse_yyyymm_or_chinese(value: Any) -> date:
         )
 
 
-def clean_company_name_inline(value: str) -> str:
-    """
-    PLACEHOLDER for Story 2.3: Cleansing Registry Framework
-
-    Basic company name normalization.
-    Will be replaced by cleansing/registry.py when Story 2.3 completes.
-
-    Rules:
-    - Trim whitespace
-    - Normalize full-width spaces to half-width
-    - Remove quotes and brackets
-    - Collapse multiple spaces
-
-    Args:
-        value: Raw company name from Excel
-
-    Returns:
-        Normalized company name
-    """
-    if not isinstance(value, str):
-        return value
-
-    # Trim whitespace
-    value = value.strip()
-
-    # Replace full-width spaces with half-width
-    value = value.replace('　', ' ')
-
-    # Remove quotes and brackets
-    value = value.strip('「」『』""')
-
-    # Collapse multiple spaces
-    value = ' '.join(value.split())
-
-    return value
-
-
-def clean_comma_separated_number(value: Any) -> Optional[float]:
-    """
-    PLACEHOLDER for Story 2.3: Cleansing Registry - Numeric Rules
-
-    Clean comma-separated numbers from Excel.
-    Handles formats like "1,234.56", "¥1,234", "$1,234", "5.5%"
-    Also handles placeholders: "N/A", "无", "-", "null", ""
-
-    Args:
-        value: Numeric value (can be str, int, float, or None)
-
-    Returns:
-        Cleaned float value or None
-    """
-    if value is None:
-        return None
-
-    if isinstance(value, (int, float)):
-        return float(value)
-
-    if isinstance(value, str):
-        # Trim whitespace
-        value = value.strip()
-
-        # Handle empty or placeholder values
-        if not value or value.lower() in ['n/a', 'na', 'null', '-', '无', '暂无', '待定']:
-            return None
-
-        # Handle percentage (e.g., "5.5%" → 0.055)
-        if '%' in value:
-            try:
-                # Remove % and convert to decimal form
-                numeric_part = value.replace('%', '').strip()
-                # Remove commas and currency symbols
-                numeric_part = numeric_part.replace('¥', '').replace('$', '').replace(',', '')
-                return float(numeric_part) / 100.0
-            except ValueError:
-                raise ValueError(
-                    f"Cannot convert percentage '{value}' to number. "
-                    f"Expected format: '5.5%' or '12.34%'"
-                )
-
-        # Remove currency symbols and commas
-        cleaned = value.replace('¥', '').replace('$', '').replace(',', '').strip()
-        if not cleaned:
-            return None
-        try:
-            return float(cleaned)
-        except ValueError:
-            raise ValueError(
-                f"Cannot convert '{value}' to number. "
-                f"Expected format: '1234.56' or '1,234.56' or '¥1,234' or '5.5%'"
-            )
-
     # Try converting other types
     try:
         return float(value)
@@ -300,6 +241,9 @@ class AnnuityPerformanceIn(BaseModel):
     当期收益率: Optional[Union[Decimal, float, int, str]] = Field(
         None, description="Current period return rate (当期收益率)"
     )
+    年化收益率: Optional[Union[Decimal, float, int, str]] = Field(
+        None, description="Annualized return rate (年化收益率)"
+    )
 
     # Organizational fields
     机构代码: Optional[str] = Field(None, description="Institution code (机构代码)")
@@ -355,19 +299,46 @@ class AnnuityPerformanceIn(BaseModel):
         "待遇支付",
         "投资收益",
         "当期收益率",
+        "年化收益率",
         mode="before",
     )
     @classmethod
-    def clean_numeric_fields(cls, v):
+    def clean_numeric_fields(cls, v, info: ValidationInfo):
         """
         Clean numeric fields from Excel with comma-separated numbers.
 
         AC1: Handle messy Excel data like "1,234.56", "¥1,234", "5.5%", placeholders
-        Uses inline placeholder until Story 2.3 completes.
         """
         if v is None:
             return v
-        return clean_comma_separated_number(v)
+
+        field_name = info.field_name or "numeric_field"
+        try:
+            cleaned = apply_domain_rules(
+                v,
+                field_name,
+                fallback_rules=DEFAULT_NUMERIC_RULES,
+            )
+        except ValueError as exc:
+            raise ValueError(
+                f"Field '{field_name}': Cannot clean numeric value '{v}'. Error: {exc}"
+            ) from exc
+
+        if cleaned is None:
+            return None
+
+        if isinstance(cleaned, Decimal):
+            return float(cleaned)
+
+        if isinstance(cleaned, (int, float)):
+            return float(cleaned)
+
+        try:
+            return float(cleaned)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Field '{field_name}': Cannot convert '{v}' to number. Expected numeric format."
+            ) from exc
 
     @field_validator("月度", mode="before")
     @classmethod
@@ -539,12 +510,9 @@ class AnnuityPerformanceOut(BaseModel):
 
     @field_validator('客户名称', mode='before')
     @classmethod
-    def clean_customer_name(cls, v):
+    def clean_customer_name(cls, v, info: ValidationInfo):
         """
-        AC3: Clean company names using inline placeholder for Story 2.3
-
-        Basic normalization: trim whitespace, remove quotes, normalize spacing.
-        Will integrate with cleansing/registry.py when Story 2.3 completes.
+        AC3: Clean company names using CleansingRegistry rules.
 
         Raises:
             ValueError: If cleaning fails
@@ -552,7 +520,12 @@ class AnnuityPerformanceOut(BaseModel):
         if v is None:
             return v
         try:
-            return clean_company_name_inline(v)
+            field_name = info.field_name or "客户名称"
+            return apply_domain_rules(
+                v,
+                field_name,
+                fallback_rules=DEFAULT_COMPANY_RULES,
+            )
         except Exception as e:
             raise ValueError(
                 f"Field '客户名称': Cannot clean company name '{v}'. Error: {e}"
@@ -586,16 +559,30 @@ class AnnuityPerformanceOut(BaseModel):
         mode="before",
     )
     @classmethod
-    def clean_decimal_fields_output(cls, v):
+    def clean_decimal_fields_output(cls, v, info: ValidationInfo):
         """
         AC2: Clean decimal fields for strict output validation.
 
-        Uses inline placeholder until Story 2.3 cleansing module completes.
-        Handles comma-separated numbers, currency symbols, and percentage formats.
+        Uses the CleansingRegistry to standardize numeric inputs before conversion.
         """
         if v is None:
             return v
-        return clean_comma_separated_number(v)
+        field_name = info.field_name or "numeric_field"
+        try:
+            normalized = apply_domain_rules(
+                v,
+                field_name,
+                fallback_rules=DEFAULT_NUMERIC_RULES,
+            )
+            return CLEANSING_REGISTRY.apply_rule(
+                normalized,
+                "comprehensive_decimal_cleaning",
+                field_name=field_name,
+            )
+        except ValueError as exc:
+            raise ValueError(
+                f"Field '{field_name}': Cannot clean numeric value '{v}'. Error: {exc}"
+            ) from exc
 
     @model_validator(mode="after")
     def validate_business_rules(self) -> "AnnuityPerformanceOut":

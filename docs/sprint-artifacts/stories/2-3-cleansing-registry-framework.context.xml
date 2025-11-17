@@ -1,0 +1,395 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>3</storyId>
+    <title>Cleansing Registry Framework</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-17</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/2-3-cleansing-registry-framework.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a data engineer</asA>
+    <iWant>a centralized registry of reusable cleansing rules</iWant>
+    <soThat>value-level transformations are standardized across all domains without code duplication</soThat>
+    <tasks>
+- [ ] **Task 1: Implement CleansingRegistry Core** (AC: 1)
+  - [ ] Subtask 1.1: Create `cleansing/registry.py` with `CleansingRegistry` class
+  - [ ] Subtask 1.2: Implement rule registration: `register(name, func)` with duplicate detection
+  - [ ] Subtask 1.3: Implement single rule application: `apply_rule(value, rule_name)` with error handling
+  - [ ] Subtask 1.4: Implement rule composition: `apply_rules(value, rule_names)` sequential application
+  - [ ] Subtask 1.5: Implement singleton pattern: `get_cleansing_registry()` returns cached instance
+  - [ ] Subtask 1.6: Add domain configuration support: `get_domain_rules(domain, field)` with YAML loader
+
+- [ ] **Task 2: Implement Built-in String Rules** (AC: 2)
+  - [ ] Subtask 2.1: Create `cleansing/rules/string_rules.py` module
+  - [ ] Subtask 2.2: Implement `trim_whitespace(value)` with type checking (handle None, non-strings)
+  - [ ] Subtask 2.3: Implement `normalize_company_name(value)` with full-width/special char handling
+  - [ ] Subtask 2.4: Register built-in string rules on module import
+  - [ ] Subtask 2.5: Add comprehensive unit tests for string rules (edge cases: None, empty, special chars)
+
+- [ ] **Task 3: Implement Built-in Numeric Rules** (AC: 2)
+  - [ ] Subtask 3.1: Create `cleansing/rules/numeric_rules.py` module
+  - [ ] Subtask 3.2: Implement `remove_currency_symbols(value)` for ¥, $, comma
+  - [ ] Subtask 3.3: Implement `clean_comma_separated_number(value)` to remove thousand separators
+  - [ ] Subtask 3.4: Register built-in numeric rules on module import
+  - [ ] Subtask 3.5: Add unit tests for numeric rules (currency symbols, thousand separators, edge cases)
+
+- [ ] **Task 4: Create YAML Configuration System** (AC: 3)
+  - [ ] Subtask 4.1: Create `cleansing/config/cleansing_rules.yml` with annuity_performance domain
+  - [ ] Subtask 4.2: Implement YAML loader in `cleansing/registry.py` (use PyYAML or stdlib)
+  - [ ] Subtask 4.3: Implement `get_domain_rules(domain, field)` to lookup rules from config
+  - [ ] Subtask 4.4: Add default rules fallback when domain/field not configured
+  - [ ] Subtask 4.5: Add configuration validation: ensure referenced rules exist in registry
+
+- [ ] **Task 5: Integrate with Pydantic Models (Story 2.1)** (AC: 4)
+  - [ ] Subtask 5.1: Update `domain/annuity_performance/models.py` to import `get_cleansing_registry()`
+  - [ ] Subtask 5.2: Replace `clean_company_name_inline()` with registry call in `@field_validator`
+  - [ ] Subtask 5.3: Replace `clean_comma_separated_number()` with registry call
+  - [ ] Subtask 5.4: Test Pydantic model validation with cleansing rules (integration test)
+  - [ ] Subtask 5.5: Remove inline placeholder functions from models.py (technical debt cleanup)
+
+- [ ] **Task 6: Add Unit Tests** (AC: 1-5)
+  - [ ] Subtask 6.1: Test `CleansingRegistry` rule registration, retrieval, error handling
+  - [ ] Subtask 6.2: Test rule composition: multiple rules apply in correct order
+  - [ ] Subtask 6.3: Test YAML configuration loading and domain rule lookup
+  - [ ] Subtask 6.4: Test Pydantic integration: cleansing rules execute during validation
+  - [ ] Subtask 6.5: Test edge cases: None values, empty strings, non-string inputs
+  - [ ] Subtask 6.6: Mark tests with `@pytest.mark.unit` per Story 1.11 testing framework
+
+- [ ] **Task 7: Add Performance Tests (MANDATORY)** (AC: 6)
+  - [ ] Subtask 7.1: Create `tests/integration/test_story_2_3_performance.py` per Epic 2 performance criteria
+  - [ ] Subtask 7.2: Test with 10,000-row fixture (reuse Story 2.1 fixture)
+  - [ ] Subtask 7.3: Measure cleansing throughput and validate ≥1000 rows/s (target 1500+ rows/s)
+  - [ ] Subtask 7.4: Measure cleansing overhead in full pipeline and validate <20%
+  - [ ] Subtask 7.5: Update `tests/.performance_baseline.json` with cleansing rule baselines
+  - [ ] Subtask 7.6: Profile hot paths if performance below target (optimize regex, vectorize operations)
+
+- [ ] **Task 8: Documentation and Integration**
+  - [ ] Subtask 8.1: Add docstrings to `CleansingRegistry` class and public methods
+  - [ ] Subtask 8.2: Document built-in rules with examples in module docstrings
+  - [ ] Subtask 8.3: Add usage examples: standalone registry, Pydantic integration, configuration
+  - [ ] Subtask 8.4: Update story file with Completion Notes, File List, and Change Log
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+### AC1: CleansingRegistry Core Implementation
+
+**Given** I have Pydantic models from Story 2.1 and Pandera schemas from Story 2.2
+**When** I implement `CleansingRegistry` in `cleansing/registry.py`
+**Then** it should provide:
+- Rule registration: `registry.register(name: str, func: CleansingRule) -> None`
+- Single rule application: `registry.apply_rule(value: Any, rule_name: str) -> Any`
+- Multiple rule composition: `registry.apply_rules(value: Any, rule_names: List[str]) -> Any`
+- Domain configuration support: `registry.get_domain_rules(domain: str, field: str) -> List[str]`
+- Singleton instance: `get_cleansing_registry() -> CleansingRegistry` for global access
+
+**And** When I register a cleansing rule
+**Then** It should be callable via rule name throughout the application
+
+**And** When I apply multiple rules in sequence
+**Then** Rules execute in order: `apply_rules(value, ['trim', 'normalize'])` applies trim first, then normalize to trim output
+
+**And** When unknown rule is requested
+**Then** Raise `ValueError`: "Cleansing rule 'unknown_rule' not registered. Available rules: [list]"
+
+### AC2: Built-in Cleansing Rules
+
+**Given** I have the CleansingRegistry framework
+**When** I implement built-in rules in `cleansing/rules/`
+**Then** I should have functional rules for:
+
+**String Rules** (`cleansing/rules/string_rules.py`):
+- `trim_whitespace(value: str) -> str`: Remove leading/trailing whitespace
+  - Example: `"  公司有限  "` → `"公司有限"`
+- `normalize_company_name(value: str) -> str`: Standardize company names
+  - Remove special characters: `「」『』""`
+  - Replace full-width spaces with half-width: `'　'` → `' '`
+  - Collapse multiple spaces: `"公司  有限"` → `"公司 有限"`
+  - Example: `"「公司　有限」"` → `"公司 有限"`
+
+**Numeric Rules** (`cleansing/rules/numeric_rules.py`):
+- `remove_currency_symbols(value: str) -> str`: Remove currency symbols for parsing
+  - Remove: `¥`, `$`, `,` (comma)
+  - Example: `"¥1,234.56"` → `"1234.56"`
+- `clean_comma_separated_number(value: str) -> str`: Remove thousand separators
+  - Example: `"1,234,567.89"` → `"1234567.89"`
+
+**And** When I apply `trim_whitespace` to `"  test  "`
+**Then** Returns `"test"`
+
+**And** When I apply `normalize_company_name` to `"「公司　有限」"`
+**Then** Returns `"公司 有限"` (normalized spacing and no decorative brackets)
+
+**And** When I apply `remove_currency_symbols` to `"¥1,234.56"`
+**Then** Returns `"1234.56"`
+
+**And** When rule receives non-string input (e.g., `None`, `123`)
+**Then** Rule handles gracefully: return value unchanged or handle appropriately per rule
+
+### AC3: YAML Configuration for Per-Domain Rules
+
+**Given** I have built-in rules registered
+**When** I create `cleansing/config/cleansing_rules.yml`
+**Then** configuration should support domain-specific rule mappings
+
+**And** When I load configuration with `ConfigLoader`
+**Then** `registry.get_domain_rules('annuity_performance', '客户名称')` returns `['trim_whitespace', 'normalize_company_name']`
+
+**And** When field not configured for domain
+**Then** `registry.get_domain_rules('annuity_performance', 'unknown_field')` returns `[]` (empty list, no default rules)
+
+**And** When domain not in configuration
+**Then** `registry.get_domain_rules('unknown_domain', 'field')` returns default rules
+
+### AC4: Integration with Pydantic Validators
+
+**Given** I have CleansingRegistry with rules configured
+**When** I use registry in Pydantic `@field_validator`
+**Then** rules should apply automatically during model validation
+
+**And** When Pydantic model validates input with `客户名称 = "「  公司　有限  」"`
+**Then** Cleansing rules execute before validation, output is `"公司 有限"`
+
+**And** When cleansing rule raises exception
+**Then** Pydantic validation fails with clear error: `"Cleansing rule 'normalize_company_name' failed for field '客户名称': [error details]"`
+
+**And** When I update `AnnuityPerformanceOut` model from Story 2.1
+**Then** Replace inline placeholders (`clean_company_name_inline`, `clean_comma_separated_number`) with registry calls
+
+### AC5: Integration with Pandera Custom Checks (Optional)
+
+**Given** I have CleansingRegistry and Pandera schemas from Story 2.2
+**When** I create custom Pandera checks using cleansing rules
+**Then** rules can apply to entire DataFrame columns
+
+**And** When Pandera schema includes cleansing check
+**Then** Entire column is cleaned before Bronze validation
+
+**Note**: This AC is optional - primary integration is via Pydantic validators (AC4).
+
+### AC6: Performance Compliance (MANDATORY - Epic 2 Performance AC)
+
+**Given** I have implemented CleansingRegistry with built-in rules
+**When** I run performance tests per `docs/epic-2-performance-acceptance-criteria.md`
+**Then** cleansing must meet:
+- **AC-PERF-1**: Cleansing processes ≥1000 rows/second (vectorized string operations)
+- **AC-PERF-2**: Cleansing overhead <20% of total pipeline execution time
+- **AC-PERF-3**: Baseline recorded in `tests/.performance_baseline.json`
+
+**And** When performance tests run with 10,000-row fixture
+**Then** Target throughput: 1500+ rows/s for rule application (string operations are fast)
+
+**And** When throughput falls below 1000 rows/s
+**Then** Story is BLOCKED - must optimize before review (vectorize operations, reduce redundant calls, cache compiled regex)
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>§2.3.1 Data Quality Requirements</section>
+        <snippet>Standardize data cleansing rules across all domain pipelines. Built-in cleansing rules (trim whitespace, normalize company names, remove currency symbols) applied via centralized registry with YAML configuration for per-domain customization.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-2.md</path>
+        <title>Epic 2 Technical Specification</title>
+        <section>Story 2.3: Cleansing Registry Implementation</section>
+        <snippet>CleansingRegistry singleton with rule registration, composition, and domain-specific configuration. Integrates with Pydantic field validators from Story 2.1 via get_cleansing_registry(). YAML config maps domain+field to rule chains (e.g., 客户名称 → ['trim_whitespace', 'normalize_company_name']).</snippet>
+      </doc>
+      <doc>
+        <path>docs/epic-2-performance-acceptance-criteria.md</path>
+        <title>Epic 2 Performance Acceptance Criteria</title>
+        <section>Story 2.3: Custom Cleansing Rules Performance</section>
+        <snippet>MANDATORY AC-PERF-1: Cleansing throughput ≥1000 rows/s. AC-PERF-2: Overhead &lt;20% of pipeline time. Target: 1500+ rows/s. Optimization: vectorized string operations (df['field'].str.replace), compiled regex patterns, avoid row-by-row apply().</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Domain Layer - Validation and Cleansing</section>
+        <snippet>Cleansing registry belongs in domain layer (src/work_data_hub/domain/cleansing) as pure business logic. No I/O dependencies. Receives data through injected adapters, applies transformations, returns cleansed values.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture-boundaries.md</path>
+        <title>Clean Architecture Boundaries</title>
+        <section>Layer Responsibilities - Domain</section>
+        <snippet>Domain layer: Pure business logic, no knowledge of files/databases. Allowed dependencies: stdlib, pandas, pydantic, Story 1.5 pipeline modules. TID251 ruff rule blocks domain imports from io/orchestration layers.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Epic 2 - Story 2.3: Cleansing Registry Framework</section>
+        <snippet>Implement CleansingRegistry with rule registration/composition, built-in string/numeric rules, YAML configuration, Pydantic integration. Replace inline placeholders in Story 2.1 models (clean_company_name_inline → registry.apply_rules). Performance: vectorize operations, cache regex.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/work_data_hub/cleansing/registry.py</path>
+        <kind>registry</kind>
+        <symbol>CleansingRegistry</symbol>
+        <lines>42-97</lines>
+        <reason>PARTIAL IMPLEMENTATION - Has basic registration and lookup, missing apply_rule, apply_rules, get_domain_rules for AC1/AC3</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/cleansing/rules/numeric_rules.py</path>
+        <kind>rules</kind>
+        <symbol>remove_currency_symbols, comprehensive_decimal_cleaning</symbol>
+        <lines>39-66, 203-266</lines>
+        <reason>Existing numeric rules using @rule decorator. AC2 requires adding clean_comma_separated_number rule</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/cleansing/integrations/pydantic_adapter.py</path>
+        <kind>integration</kind>
+        <symbol>decimal_fields_cleaner, simple_field_validator</symbol>
+        <lines>21-71, 74-105</lines>
+        <reason>Basic Pydantic integration, hardcoded to comprehensive_decimal_cleaning. AC4 requires generic rule application</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/models.py</path>
+        <kind>models</kind>
+        <symbol>clean_company_name_inline, clean_comma_separated_number</symbol>
+        <lines>130-164</lines>
+        <reason>PLACEHOLDERS marked for Story 2.3 replacement. AC4 requires replacing with registry.apply_rules() calls</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/pipeline_steps.py</path>
+        <kind>pipeline-step</kind>
+        <symbol>CustomerNameCleansingStep</symbol>
+        <lines>444-486</lines>
+        <reason>Current implementation uses clean_company_name function. Reference for integration pattern with TransformStep</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/types.py</path>
+        <kind>protocol</kind>
+        <symbol>TransformStep</symbol>
+        <lines>121-127</lines>
+        <reason>Story 1.5 pipeline protocol. Cleansing steps can implement this for pipeline integration</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <python>
+        <runtime>
+          <package name="pydantic" version=">=2.11.7" reason="Field validators for cleansing integration (AC4)" />
+          <package name="PyYAML" version="latest" reason="YAML configuration loader for domain-specific rules (AC3)" />
+          <package name="pandas" version="latest" reason="Vectorized string operations for performance optimization (AC6)" />
+          <package name="pandera" version=">=0.18.0,&lt;1.0" reason="Optional integration with Story 2.2 Pandera schemas (AC5)" />
+        </runtime>
+        <dev>
+          <package name="pytest" version="latest" reason="Unit testing framework with @pytest.mark.unit (AC6)" />
+          <package name="pytest-cov" version="latest" reason="Coverage reporting for tests" />
+          <package name="ruff" version=">=0.12.12" reason="TID251 architecture boundary enforcement (domain layer purity)" />
+          <package name="mypy" version=">=1.17.1" reason="Type checking for strict typing compliance" />
+        </dev>
+      </python>
+      <frameworks>
+        <framework name="Story 1.5 Pipeline Framework" reason="TransformStep protocol for pipeline integration" />
+        <framework name="Story 2.1 Pydantic Models" reason="Integration target: replace placeholder validators with registry calls" />
+        <framework name="Story 2.2 Pandera Schemas" reason="Optional integration for DataFrame-level cleansing (AC5)" />
+      </frameworks>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Domain layer purity: cleansing/registry.py MUST NOT import from io/ or orchestration/ layers (TID251 ruff rule)</constraint>
+    <constraint>Performance MANDATORY: AC-PERF-1 throughput ≥1000 rows/s, AC-PERF-2 overhead &lt;20%, target 1500+ rows/s</constraint>
+    <constraint>Vectorization required: Use pandas .str operations, not row-by-row apply(). Cache compiled regex patterns</constraint>
+    <constraint>Singleton pattern: get_cleansing_registry() returns cached instance, not new registry per call</constraint>
+    <constraint>Backward compatibility: Replacing placeholders in models.py must not break Story 2.1 tests</constraint>
+    <constraint>Testing framework: Use @pytest.mark.unit from Story 1.11, performance tests required per epic-2-performance-acceptance-criteria.md</constraint>
+    <constraint>YAML config location: cleansing/config/cleansing_rules.yml (create if missing)</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>CleansingRegistry.apply_rule</name>
+      <kind>method</kind>
+      <signature>def apply_rule(self, value: Any, rule_name: str) -> Any</signature>
+      <path>src/work_data_hub/cleansing/registry.py</path>
+    </interface>
+    <interface>
+      <name>CleansingRegistry.apply_rules</name>
+      <kind>method</kind>
+      <signature>def apply_rules(self, value: Any, rule_names: List[str]) -> Any</signature>
+      <path>src/work_data_hub/cleansing/registry.py</path>
+    </interface>
+    <interface>
+      <name>CleansingRegistry.get_domain_rules</name>
+      <kind>method</kind>
+      <signature>def get_domain_rules(self, domain: str, field: str) -> List[str]</signature>
+      <path>src/work_data_hub/cleansing/registry.py</path>
+    </interface>
+    <interface>
+      <name>get_cleansing_registry</name>
+      <kind>function</kind>
+      <signature>def get_cleansing_registry() -> CleansingRegistry</signature>
+      <path>src/work_data_hub/cleansing/registry.py</path>
+    </interface>
+    <interface>
+      <name>AnnuityPerformanceOut field validators</name>
+      <kind>pydantic-integration</kind>
+      <signature>@field_validator('客户名称', mode='before') using registry.apply_rules()</signature>
+      <path>src/work_data_hub/domain/annuity_performance/models.py</path>
+    </interface>
+    <interface>
+      <name>String cleansing rules</name>
+      <kind>registered-rules</kind>
+      <signature>@rule(name='trim_whitespace'), @rule(name='normalize_company_name')</signature>
+      <path>src/work_data_hub/cleansing/rules/string_rules.py</path>
+    </interface>
+    <interface>
+      <name>YAML configuration schema</name>
+      <kind>config-file</kind>
+      <signature>annuity_performance: { 客户名称: [trim_whitespace, normalize_company_name] }</signature>
+      <path>src/work_data_hub/cleansing/config/cleansing_rules.yml</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+Testing framework: pytest with markers (@pytest.mark.unit, @pytest.mark.performance per Story 1.11). Unit tests for registry API (apply_rule, apply_rules, get_domain_rules), built-in rules (string/numeric), YAML config loader, Pydantic integration. Performance tests MANDATORY per epic-2-performance-acceptance-criteria.md: 10,000-row fixture, measure throughput (≥1000 rows/s, target 1500+), overhead (&lt;20%), record baseline in tests/.performance_baseline.json. Existing baseline: Story 2.1 achieved 59,409-83,937 rows/s (59-84x above requirement). Integration tests verify Pydantic model integration (models.py validators use registry instead of placeholders). Type checking: strict mypy compliance.
+    </standards>
+    <locations>
+      <location>tests/unit/test_cleansing_framework.py - Existing cleansing tests (registry, numeric rules, Pydantic integration)</location>
+      <location>tests/unit/cleansing/ - NEW: Create for Story 2.3 unit tests (registry core, string rules, YAML config)</location>
+      <location>tests/integration/test_story_2_3_pydantic_integration.py - NEW: Pydantic field validator integration tests</location>
+      <location>tests/performance/test_story_2_3_performance.py - NEW: MANDATORY performance tests (AC6)</location>
+      <location>tests/fixtures/performance/annuity_performance_10k.csv - Reuse Story 2.1 fixture for performance tests</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">
+        Test CleansingRegistry.apply_rule: single rule execution, error on unknown rule (ValueError with available rules list).
+        Test CleansingRegistry.apply_rules: sequential composition, verify order (trim → normalize), error propagation.
+        Test get_cleansing_registry: singleton pattern (same instance returned), thread safety.
+      </idea>
+      <idea ac="AC2">
+        Test trim_whitespace: leading/trailing whitespace, full-width spaces, None/non-string inputs.
+        Test normalize_company_name: remove quotes/brackets (「」『』""), full-width to half-width spaces, collapse multiple spaces.
+        Test remove_currency_symbols: ¥$,€£ removal, thousand separator removal.
+        Test clean_comma_separated_number: NEW rule for AC2, removes commas from "1,234,567.89" → "1234567.89".
+      </idea>
+      <idea ac="AC3">
+        Test YAML config loading: parse cleansing_rules.yml, domain+field lookup (annuity_performance.客户名称 → [trim_whitespace, normalize_company_name]).
+        Test get_domain_rules: existing config returns rule list, missing field returns [], missing domain returns default rules.
+        Test config validation: referenced rules exist in registry (raise error if unknown rule in config).
+      </idea>
+      <idea ac="AC4">
+        Test Pydantic integration: AnnuityPerformanceOut validators use registry.apply_rules instead of placeholders.
+        Test cleansing in validation flow: input "「  公司　有限  」" → output "公司 有限" after trim+normalize.
+        Test error handling: cleansing rule exception → Pydantic ValidationError with clear message.
+        Test backward compatibility: Story 2.1 tests still pass after replacing placeholders.
+      </idea>
+      <idea ac="AC5">
+        Optional Pandera integration: custom check using cleansing registry, DataFrame column-level cleansing.
+        Not priority - focus on Pydantic integration (AC4) first.
+      </idea>
+      <idea ac="AC6">
+        MANDATORY performance tests: 10,000-row fixture, measure cleansing throughput (target 1500+ rows/s).
+        Test with Pydantic validation pipeline: measure overhead (&lt;20% of total time).
+        Profile hot paths if &lt;1000 rows/s: vectorize operations, cache compiled regex.
+        Update .performance_baseline.json: add cleansing_registry_throughput, cleansing_overhead baselines.
+        Compare to Story 2.1 baseline (59,409 rows/s): cleansing should not significantly degrade performance.
+      </idea>
+    </ideas>
+  </tests>
+</story-context>

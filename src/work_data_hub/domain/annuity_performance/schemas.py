@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, Iterable, List, Sequence, Tuple
+from decimal import Decimal
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import pandas as pd
 import pandera as pa
@@ -11,7 +12,7 @@ from pandera.errors import SchemaError, SchemaErrors
 
 from work_data_hub.utils.date_parser import parse_chinese_date
 
-from .models import clean_comma_separated_number
+from src.work_data_hub.cleansing import get_cleansing_registry
 
 BRONZE_REQUIRED_COLUMNS: Sequence[str] = (
     "月度",
@@ -52,6 +53,15 @@ GOLD_REQUIRED_COLUMNS: Sequence[str] = (
 )
 
 GOLD_COMPOSITE_KEY: Sequence[str] = ("月度", "计划代码", "company_id")
+
+CLEANSING_DOMAIN = "annuity_performance"
+CLEANSING_REGISTRY = get_cleansing_registry()
+SCHEMA_NUMERIC_RULES: List[Any] = [
+    "standardize_null_values",
+    "remove_currency_symbols",
+    "clean_comma_separated_number",
+    {"name": "handle_percentage_conversion"},
+]
 
 
 BronzeAnnuitySchema = pa.DataFrameSchema(
@@ -337,6 +347,35 @@ def _track_invalid_ratio(
         )
 
 
+def _clean_numeric_for_schema(value: Any, field_name: str) -> Optional[float]:
+    """Shared cleansing helper that mirrors Pydantic validators."""
+    rules = CLEANSING_REGISTRY.get_domain_rules(CLEANSING_DOMAIN, field_name)
+    if not rules:
+        rules = SCHEMA_NUMERIC_RULES
+
+    cleaned = CLEANSING_REGISTRY.apply_rules(
+        value,
+        rules,
+        field_name=field_name,
+    )
+
+    if cleaned is None:
+        return None
+
+    if isinstance(cleaned, Decimal):
+        return float(cleaned)
+
+    if isinstance(cleaned, (int, float)):
+        return float(cleaned)
+
+    try:
+        return float(cleaned)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"Cannot convert value '{value}' in column '{field_name}' to number"
+        ) from exc
+
+
 def _coerce_numeric_columns(
     dataframe: pd.DataFrame,
 ) -> Dict[str, List[int]]:
@@ -349,7 +388,7 @@ def _coerce_numeric_columns(
         column_invalid_indices: List[int] = []
         for idx, value in series.items():
             try:
-                cleaned = clean_comma_separated_number(value)
+                cleaned = _clean_numeric_for_schema(value, column)
             except ValueError:
                 cleaned = None
                 column_invalid_indices.append(idx)
