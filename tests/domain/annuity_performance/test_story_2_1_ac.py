@@ -14,12 +14,11 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
+from src.work_data_hub.cleansing import get_cleansing_registry
 from src.work_data_hub.domain.annuity_performance.models import (
     AnnuityPerformanceIn,
     AnnuityPerformanceOut,
     parse_yyyymm_or_chinese,
-    clean_company_name_inline,
-    clean_comma_separated_number,
 )
 
 
@@ -168,7 +167,7 @@ class TestAC2_StrictValidationModel:
 
 
 class TestAC3_CustomValidators:
-    """AC3: Custom validators integrate with inline placeholders for Story 2.3/2.4"""
+    """AC3: Custom validators integrate with cleansing registry + date parser"""
 
     def test_date_parsing_validator(self):
         """AC3: @field_validator('月度') parses Chinese date formats"""
@@ -206,22 +205,35 @@ class TestAC3_CustomValidators:
         # Should trim and normalize spaces
         assert model.客户名称 == "测试公司 名称"
 
-    def test_inline_placeholder_functions_exist(self):
-        """AC3: Inline placeholder functions work correctly"""
+    def test_cleansing_registry_rules_available(self):
+        """AC3: Cleansing registry exposes reusable rule chains"""
+        registry = get_cleansing_registry()
+
         # Test parse_yyyymm_or_chinese
         assert parse_yyyymm_or_chinese(202501) == date(2025, 1, 1)
         assert parse_yyyymm_or_chinese("2025年1月") == date(2025, 1, 1)
         assert parse_yyyymm_or_chinese("2025-01") == date(2025, 1, 1)
 
-        # Test clean_company_name_inline
-        assert clean_company_name_inline("  测试　ABC  ") == "测试 ABC"
-        assert clean_company_name_inline("「测试」") == "测试"
+        # Test CleansingRegistry string rules
+        assert registry.apply_rules(
+            "  测试　ABC  ",
+            ["trim_whitespace", "normalize_company_name"],
+        ) == "测试 ABC"
+        assert registry.apply_rules(
+            "「测试」",
+            ["trim_whitespace", "normalize_company_name"],
+        ) == "测试"
 
-        # Test clean_comma_separated_number
-        assert clean_comma_separated_number("1,234.56") == 1234.56
-        assert clean_comma_separated_number("¥1,234") == 1234.0
-        assert clean_comma_separated_number("5.5%") == 0.055
-        assert clean_comma_separated_number("N/A") is None
+        numeric_rules = [
+            "standardize_null_values",
+            "remove_currency_symbols",
+            "clean_comma_separated_number",
+            {"name": "handle_percentage_conversion"},
+        ]
+        assert float(registry.apply_rules("1,234.56", numeric_rules)) == 1234.56
+        assert float(registry.apply_rules("¥1,234", numeric_rules)) == 1234.0
+        assert registry.apply_rules("N/A", numeric_rules) is None
+        assert registry.apply_rules("5.5%", numeric_rules) == pytest.approx(0.055)
 
 
 class TestAC4_ErrorMessages:
@@ -264,7 +276,11 @@ class TestAC4_ErrorMessages:
 
         error_msg = str(exc_info.value)
         # Should explain expected format
-        assert "Cannot convert" in error_msg or "Expected format" in error_msg
+        assert (
+            "Cannot convert" in error_msg
+            or "Expected format" in error_msg
+            or "Cannot clean numeric value" in error_msg
+        )
 
     def test_error_message_for_business_rule(self):
         """AC4: Business rule violations have clear error messages"""
