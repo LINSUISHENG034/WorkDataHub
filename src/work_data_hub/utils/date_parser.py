@@ -7,114 +7,92 @@ Chinese date formats commonly found in Excel files and business data.
 
 import logging
 import re
-from datetime import date
-from typing import Optional, Union
+from datetime import date, datetime
+from typing import Callable, Optional, Pattern, Tuple, Union
 
 logger = logging.getLogger(__name__)
+
+SUPPORTED_FORMATS = (
+    "YYYYMM, YYYYMMDD, YYYY年MM月, YYYY年MM月DD日, "
+    "YYYY-MM, YYYY-MM-DD, YY年MM月 (2-digit year)"
+)
+
+DateParser = Callable[[str, Optional[re.Match[str]]], date]
+
+
+def _normalize_fullwidth_digits(value: str) -> str:
+    """Convert full-width digits (０-９) to half-width equivalents."""
+    translation_table = str.maketrans("０１２３４５６７８９", "0123456789")
+    return value.translate(translation_table)
+
+
+def _validate_date_range(parsed: date, min_year: int = 2000, max_year: int = 2030) -> date:
+    """Ensure parsed date falls within allowed range."""
+    if not (min_year <= parsed.year <= max_year):
+        raise ValueError(
+            f"Date {parsed.year}-{parsed.month:02d} outside valid range {min_year}-{max_year}"
+        )
+    return parsed
+
+
+def _format_supported_error(value: Union[str, int, date, datetime, None]) -> str:
+    return f"Cannot parse '{value}' as date. Supported formats: {SUPPORTED_FORMATS}"
+
+
+def parse_yyyymm_or_chinese(value: Union[str, int, date, datetime, None]) -> date:
+    """
+    Parse various Chinese and ISO date formats into a Python ``date``.
+
+    Supported inputs:
+    - Integer/strings such as ``202501`` or ``20250115``
+    - Chinese formats: ``2025年1月`` or ``2025年1月1日`` (full-width digits allowed)
+    - ISO formats: ``2025-01`` (defaults to first day) or ``2025-01-01``
+    - Date/datetime objects (validated passthrough)
+    """
+    if value is None:
+        raise ValueError(_format_supported_error(value))
+
+    if isinstance(value, datetime):
+        return _validate_date_range(value.date())
+
+    if isinstance(value, date):
+        return _validate_date_range(value)
+
+    raw = str(value).strip()
+    if not raw:
+        raise ValueError(_format_supported_error(value))
+
+    normalized = _normalize_fullwidth_digits(raw)
+
+    for pattern, parser in _DATE_PATTERNS:
+        match = pattern.match(normalized)
+        if not match:
+            continue
+        try:
+            parsed = parser(normalized, match)
+            return _validate_date_range(parsed)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+        except Exception as exc:  # pragma: no cover - defensive
+            raise ValueError(_format_supported_error(value)) from exc
+
+    raise ValueError(_format_supported_error(value))
 
 
 def parse_chinese_date(value: Union[str, int, date, None]) -> Optional[date]:
     """
-    Parse various Chinese date formats into a standardized date object.
+    Backwards-compatible wrapper returning ``None`` for un-parseable values.
 
-    Handles common formats found in Chinese Excel files:
-    - Integer format: 202411 → date(2024, 11, 1)
-    - Chinese format: "2024年11月" → date(2024, 11, 1)
-    - Two-digit years: "24年11月" → date(2024, 11, 1)
-    - Standard formats: "2024-11-01", "2024/11/01"
-    - Already date objects are returned as-is
-
-    Args:
-        value: Date value to parse (str, int, date, or None)
-
-    Returns:
-        Parsed date object or None if parsing fails/value is None
-
-    Raises:
-        ValueError: If the input format is recognized but contains invalid date values
-
-    Example:
-        >>> parse_chinese_date(202411)
-        datetime.date(2024, 11, 1)
-        >>> parse_chinese_date("2024年11月")
-        datetime.date(2024, 11, 1)
-        >>> parse_chinese_date("24年11月")
-        datetime.date(2024, 11, 1)
+    Existing code that previously expected ``None`` on invalid inputs can keep
+    using this helper, while newer code should prefer ``parse_yyyymm_or_chinese``.
     """
     if value is None:
         return None
-
-    if isinstance(value, date):
-        return value
-
-    # Convert to string for pattern matching
-    str_value = str(value).strip()
-    if not str_value:
-        return None
-
     try:
-        # Pattern 1: Integer format like 202411 (YYYYMM)
-        if isinstance(value, int) or str_value.isdigit():
-            int_value = int(str_value)
-            if 200000 <= int_value <= 999999:  # Valid YYYYMM range
-                year = int_value // 100
-                month = int_value % 100
-                if 1 <= month <= 12:
-                    return date(year, month, 1)
-                else:
-                    raise ValueError(f"Invalid month in integer date: {month}")
-
-        # Pattern 2: Chinese format like "2024年11月" or "24年11月"
-        chinese_pattern = r"^(\d{2,4})年(\d{1,2})月?$"
-        match = re.match(chinese_pattern, str_value)
-        if match:
-            year_str, month_str = match.groups()
-            year = int(year_str)
-            month = int(month_str)
-
-            # Handle 2-digit years (assume 20xx)
-            if year < 100:
-                year += 2000
-
-            if 1 <= month <= 12:
-                return date(year, month, 1)
-            else:
-                raise ValueError(f"Invalid month in Chinese date: {month}")
-
-        # Pattern 3: Standard date formats
-        # Try common separators: -, /, .
-        for separator in ["-", "/", "."]:
-            parts = str_value.split(separator)
-            if len(parts) == 3:
-                try:
-                    # Assume YYYY-MM-DD format
-                    year, month, day = map(int, parts)
-                    if year < 100:  # Handle 2-digit years
-                        year += 2000
-                    return date(year, month, day)
-                except (ValueError, TypeError):
-                    continue
-
-        # Pattern 4: YYYY-MM format (assume day 1)
-        for separator in ["-", "/", "."]:
-            parts = str_value.split(separator)
-            if len(parts) == 2:
-                try:
-                    year, month = map(int, parts)
-                    if year < 100:  # Handle 2-digit years
-                        year += 2000
-                    if 1 <= month <= 12:
-                        return date(year, month, 1)
-                except (ValueError, TypeError):
-                    continue
-
-        # If no patterns match, log and return None
-        logger.debug(f"Unable to parse date format: {repr(str_value)}")
+        return parse_yyyymm_or_chinese(value)
+    except ValueError:
+        logger.debug("Unable to parse date value %r", value)
         return None
-
-    except (ValueError, TypeError) as e:
-        logger.warning(f"Date parsing failed for value {repr(value)}: {e}")
-        raise ValueError(f"Invalid date value: {value}") from e
 
 
 def extract_year_month_from_date(
@@ -178,3 +156,55 @@ def normalize_date_for_database(value: Union[str, int, date, None]) -> Optional[
     if parsed_date:
         return parsed_date.isoformat()
     return None
+
+
+def _parse_digits(value: str, fmt: str) -> date:
+    """Parse digit-based strings via datetime.strptime."""
+    return datetime.strptime(value, fmt).date()
+
+
+def _parse_year_month_day(match: re.Match[str]) -> date:
+    year = int(match.group(1))
+    month = int(match.group(2))
+    day = int(match.group(3))
+    return date(year, month, day)
+
+
+def _parse_year_month(match: re.Match[str]) -> date:
+    year = int(match.group(1))
+    month = int(match.group(2))
+    return date(year, month, 1)
+
+
+def _parse_two_digit_year_month(match: re.Match[str]) -> date:
+    year = int(match.group(1))
+    month = int(match.group(2))
+    if year < 50:
+        year += 2000
+    else:
+        year += 1900
+    return date(year, month, 1)
+
+
+def _parse_two_digit_year_month_day(match: re.Match[str]) -> date:
+    year = int(match.group(1))
+    month = int(match.group(2))
+    day = int(match.group(3))
+    if year < 50:
+        year += 2000
+    else:
+        year += 1900
+    return date(year, month, day)
+
+
+_DATE_PATTERNS: list[Tuple[Pattern[str], DateParser]] = [
+    (re.compile(r"^\d{8}$"), lambda value, _: _parse_digits(value, "%Y%m%d")),
+    (re.compile(r"^\d{6}$"), lambda value, _: _parse_digits(f"{value}01", "%Y%m%d")),
+    (re.compile(r"^\d{4}-\d{2}-\d{2}$"), lambda value, _: _parse_digits(value, "%Y-%m-%d")),
+    (re.compile(r"^\d{4}-\d{2}$"), lambda value, _: _parse_digits(f"{value}-01", "%Y-%m-%d")),
+    (re.compile(r"^(\d{4})年(\d{1,2})月(\d{1,2})日$"), lambda _, match: _parse_year_month_day(match)),
+    (re.compile(r"^(\d{4})年(\d{1,2})月(\d{1,2})$"), lambda _, match: _parse_year_month_day(match)),
+    (re.compile(r"^(\d{4})年(\d{1,2})月$"), lambda _, match: _parse_year_month(match)),
+    (re.compile(r"^(\d{2})年(\d{1,2})月(\d{1,2})日$"), lambda _, match: _parse_two_digit_year_month_day(match)),
+    (re.compile(r"^(\d{2})年(\d{1,2})月$"), lambda _, match: _parse_two_digit_year_month(match)),
+]

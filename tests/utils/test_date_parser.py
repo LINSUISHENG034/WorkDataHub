@@ -7,9 +7,11 @@ from datetime import date
 
 from src.work_data_hub.utils.date_parser import (
     parse_chinese_date,
+    parse_yyyymm_or_chinese,
     extract_year_month_from_date,
     format_date_as_chinese,
     normalize_date_for_database,
+    _normalize_fullwidth_digits,
 )
 
 
@@ -101,12 +103,8 @@ class TestParseChineseDate:
         assert parse_chinese_date("2024年") is None  # Missing month
         assert parse_chinese_date("11月") is None  # Missing year
         assert parse_chinese_date("2024-11-15-extra") is None
-
-    def test_invalid_date_values(self):
-        """Test invalid date values that don't match patterns return None."""
-        # These don't match recognized patterns, so they return None
-        assert parse_chinese_date("2024-02-30") is None  # Invalid day (pattern doesn't validate)
-        assert parse_chinese_date("2024/13/01") is None  # Invalid month (pattern doesn't validate)
+        assert parse_chinese_date("2024-02-30") is None  # Invalid day returns None via wrapper
+        assert parse_chinese_date("2024/13/01") is None  # Invalid month returns None via wrapper
 
 
 class TestExtractYearMonth:
@@ -190,3 +188,40 @@ class TestRealWorldScenarios:
                 assert result == expected or result.replace(day=1) == expected
             else:
                 assert parse_chinese_date(value) is None
+
+
+class TestParseYYYYMMOrChinese:
+    """Strict parser that raises ValueError on invalid inputs."""
+
+    def test_supported_formats(self):
+        assert parse_yyyymm_or_chinese(202501) == date(2025, 1, 1)
+        assert parse_yyyymm_or_chinese(20250115) == date(2025, 1, 15)
+        assert parse_yyyymm_or_chinese("2025年1月") == date(2025, 1, 1)
+        assert parse_yyyymm_or_chinese("２０２５年０１月") == date(2025, 1, 1)  # full-width digits
+        assert parse_yyyymm_or_chinese("2025-01") == date(2025, 1, 1)
+        assert parse_yyyymm_or_chinese("2025-01-15") == date(2025, 1, 15)
+        assert parse_yyyymm_or_chinese("25年1月") == date(2025, 1, 1)
+
+    def test_two_digit_year_range_enforced(self):
+        # 49 → 2049 (within range)
+        assert parse_yyyymm_or_chinese("49年12月") == date(2049, 12, 1)
+        # 50+ maps to 19xx and should violate range
+        with pytest.raises(ValueError):
+            parse_yyyymm_or_chinese("50年1月")
+        with pytest.raises(ValueError):
+            parse_yyyymm_or_chinese("99年12月")
+
+    def test_range_validation(self):
+        with pytest.raises(ValueError):
+            parse_yyyymm_or_chinese(199001)  # out of range
+        with pytest.raises(ValueError):
+            parse_yyyymm_or_chinese("2035年1月")  # out of range
+
+    def test_invalid_format_raises(self):
+        with pytest.raises(ValueError):
+            parse_yyyymm_or_chinese("not-a-date")
+        with pytest.raises(ValueError):
+            parse_yyyymm_or_chinese("")
+
+    def test_fullwidth_digit_normalization(self):
+        assert _normalize_fullwidth_digits("０１２３４５６７８９") == "0123456789"

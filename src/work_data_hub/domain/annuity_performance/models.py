@@ -13,7 +13,6 @@ Story 2.1 Enhancements:
 """
 
 import logging
-import re
 from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, List, Optional, Union
@@ -31,6 +30,7 @@ from pydantic import (
 )
 
 from src.work_data_hub.cleansing import get_cleansing_registry
+from work_data_hub.utils.date_parser import parse_yyyymm_or_chinese
 
 logger = logging.getLogger(__name__)
 
@@ -64,112 +64,6 @@ def apply_domain_rules(
         field_name=field_name,
     )
 
-
-# ===== Inline Placeholder Functions for Story 2.4 =====
-# Date parser remains inline until Story 2.4 replaces it
-
-def parse_yyyymm_or_chinese(value: Any) -> date:
-    """
-    PLACEHOLDER for Story 2.4: Chinese Date Parsing Utilities
-
-    Parse various Chinese date formats to Python date object.
-    Will be replaced by utils/date_parser.py when Story 2.4 completes.
-
-    Supported formats:
-    - Integer: 202501 → date(2025, 1, 1)
-    - String: "2025年1月" → date(2025, 1, 1)
-    - String: "2025-01" → date(2025, 1, 1)
-    - Date: date(2025, 1, 1) → date(2025, 1, 1) (passthrough)
-
-    Args:
-        value: Input date in various formats
-
-    Returns:
-        Parsed date object
-
-    Raises:
-        ValueError: If value cannot be parsed or is outside valid range (2000-2030)
-    """
-    # Passthrough for date objects
-    if isinstance(value, date):
-        if not (2000 <= value.year <= 2030):
-            raise ValueError(
-                f"Date {value.year}-{value.month:02d} outside valid range 2000-2030"
-            )
-        return value
-
-    if isinstance(value, datetime):
-        result = value.date()
-        if not (2000 <= result.year <= 2030):
-            raise ValueError(
-                f"Date {result.year}-{result.month:02d} outside valid range 2000-2030"
-            )
-        return result
-
-    # Convert to string
-    s = str(value).strip()
-
-    # Normalize full-width digits (０-９ → 0-9)
-    trans = str.maketrans('０１２３４５６７８９', '0123456789')
-    s = s.translate(trans)
-
-    # Try parsing in priority order
-    try:
-        # YYYYMMDD (8 digits)
-        if re.match(r'^\d{8}$', s):
-            result = datetime.strptime(s, '%Y%m%d').date()
-        # YYYYMM (6 digits) → first day of month
-        elif re.match(r'^\d{6}$', s):
-            result = datetime.strptime(s + '01', '%Y%m%d').date()
-        # YYYY-MM-DD
-        elif re.match(r'^\d{4}-\d{2}-\d{2}$', s):
-            result = datetime.strptime(s, '%Y-%m-%d').date()
-        # YYYY-MM → first day of month
-        elif re.match(r'^\d{4}-\d{2}$', s):
-            result = datetime.strptime(s + '-01', '%Y-%m-%d').date()
-        # YYYY年MM月DD日
-        elif re.match(r'^\d{4}年\d{1,2}月\d{1,2}日$', s):
-            result = datetime.strptime(s, '%Y年%m月%d日').date()
-        # YYYY年MM月 → first day of month
-        elif re.match(r'^\d{4}年\d{1,2}月$', s):
-            result = datetime.strptime(s + '1日', '%Y年%m月%d日').date()
-        # YY年MM月 (2-digit year) → first day of month
-        elif re.match(r'^\d{2}年\d{1,2}月$', s):
-            result = datetime.strptime(s + '1日', '%y年%m月%d日').date()
-        else:
-            raise ValueError(
-                f"Cannot parse '{value}' as date. Supported formats: "
-                f"YYYYMM, YYYYMMDD, YYYY年MM月, YYYY年MM月DD日, YYYY-MM, YYYY-MM-DD, YY年MM月"
-            )
-
-        # Validate range
-        if not (2000 <= result.year <= 2030):
-            raise ValueError(
-                f"Date {result.year}-{result.month:02d} outside valid range 2000-2030"
-            )
-
-        return result
-
-    except ValueError:
-        raise
-    except Exception as e:
-        raise ValueError(
-            f"Cannot parse '{value}' as date. Supported formats: "
-            f"YYYYMM, YYYYMMDD, YYYY年MM月, YYYY年MM月DD日, YYYY-MM, YYYY-MM-DD, YY年MM月. "
-            f"Error: {e}"
-        )
-
-
-    # Try converting other types
-    try:
-        return float(value)
-    except (ValueError, TypeError):
-        raise ValueError(
-            f"Cannot convert '{value}' to number. Type: {type(value).__name__}"
-        )
-
-
-# ===== End Placeholder Functions =====
 
 
 class AnnuityPerformanceIn(BaseModel):
@@ -486,10 +380,7 @@ class AnnuityPerformanceOut(BaseModel):
     @classmethod
     def parse_date_field(cls, v):
         """
-        AC3: Parse dates using inline placeholder for Story 2.4
-
-        Parse various Chinese date formats to Python date object.
-        Will integrate with utils/date_parser.py when Story 2.4 completes.
+        AC3: Parse dates using the shared date parser utility.
 
         Examples:
             202501 → date(2025, 1, 1)
