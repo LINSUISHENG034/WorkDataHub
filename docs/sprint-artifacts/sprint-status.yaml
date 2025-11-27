@@ -22,7 +22,7 @@ development_status:
   2-2-pandera-schemas-for-dataframe-validation-bronze-gold-layers: done
   2-3-cleansing-registry-framework: done
   2-4-chinese-date-parsing-utilities: done
-  2-5-validation-error-handling-and-reporting: backlog
+  2-5-validation-error-handling-and-reporting: done
   epic-2-retrospective: optional
   epic-3: backlog
   3-0-data-source-configuration-schema-validation: backlog

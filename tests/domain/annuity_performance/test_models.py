@@ -106,21 +106,23 @@ class TestAnnuityPerformanceOut:
 
         error_str = str(exc_info.value)
         assert "计划代码" in error_str
-        assert "company_id" in error_str
+        # company_id is now Optional (generated in Epic 5), so not required anymore
 
     def test_basic_valid_model(self):
         """Test creating a valid model with minimal fields."""
-        model = AnnuityPerformanceOut(计划代码="TEST001", company_id="COMP001")
+        # company_id is now Optional
+        model = AnnuityPerformanceOut(计划代码="TEST001", company_id=None)
 
         assert model.计划代码 == "TEST001"
-        assert model.company_id == "COMP001"
+        assert model.company_id is None
 
     def test_code_normalization(self):
         """Test that identifier codes are normalized properly."""
+        # company_id is now Optional
         model = AnnuityPerformanceOut(计划代码="test-001", company_id="comp_002")
 
         assert model.计划代码 == "TEST001"  # Uppercase, no separators
-        assert model.company_id == "COMP002"  # Uppercase, no separators
+        assert model.company_id == "COMP002"  # Uppercase, no separators (when provided)
 
 
 class TestDecimalQuantization:

@@ -1,0 +1,404 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>5</storyId>
+    <title>Validation Error Handling and Reporting</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>E:\Projects\WorkDataHub\docs\sprint-artifacts\stories\2-5-validation-error-handling-and-reporting.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>comprehensive error handling that exports failed rows with actionable feedback</iWant>
+    <soThat>data quality issues can be fixed at the source without debugging pipeline code</soThat>
+    <tasks>
+- Task 1: Implement ValidationErrorReporter class (AC: error collection and export)
+  - Subtask 1.1: Create `utils/error_reporter.py` module
+  - Subtask 1.2: Implement error collection: `collect_error(row_idx, field, error_type, message, value)`
+  - Subtask 1.3: Implement error aggregation and summary statistics
+  - Subtask 1.4: Implement CSV export with metadata header
+  - Subtask 1.5: Implement threshold checking (10% error rate)
+
+- Task 2: Integrate error reporter with validation steps (AC: collect errors from all layers)
+  - Subtask 2.1: Add error reporter to PipelineContext (Story 1.5 integration)
+  - Subtask 2.2: Wrap Bronze validation (Story 2.2) with error collection
+  - Subtask 2.3: Wrap Pydantic validation (Story 2.1) with error collection
+  - Subtask 2.4: Wrap Gold validation (Story 2.2) with error collection
+
+- Task 3: Implement partial success handling (AC: continue with valid rows)
+  - Subtask 3.1: Configure pipeline to continue on validation errors (Story 1.10 integration)
+  - Subtask 3.2: Filter out failed rows, continue pipeline with valid rows
+  - Subtask 3.3: Log partial success metrics (X valid, Y failed)
+
+- Task 4: Implement error CSV export format (AC: CSV with error details)
+  - Subtask 4.1: Define CSV schema: row_index, field_name, error_type, error_message, original_value
+  - Subtask 4.2: Add metadata header (validation summary stats)
+  - Subtask 4.3: Handle special characters and CSV escaping
+  - Subtask 4.4: Configure output location (logs/ directory)
+
+- Task 5: Add structured logging for validation metrics (AC: error summary logged)
+  - Subtask 5.1: Log validation start (total rows, domain)
+  - Subtask 5.2: Log validation end (success/failure, row counts, duration)
+  - Subtask 5.3: Log error summary (failed rows, error rate, threshold status)
+  - Subtask 5.4: Use Story 1.3 structured logging format
+
+- Task 6: Write comprehensive unit tests (AC: error handling tested)
+  - Subtask 6.1: Test error collection for each validation layer
+  - Subtask 6.2: Test CSV export format and content
+  - Subtask 6.3: Test threshold enforcement (≥10% error rate)
+  - Subtask 6.4: Test partial success handling
+  - Subtask 6.5: Test edge cases (0 errors, 100% errors, special characters)
+
+- Task 7: Write integration tests (AC: end-to-end error flow)
+  - Subtask 7.1: Test Bronze validation errors → CSV export
+  - Subtask 7.2: Test Pydantic validation errors → CSV export
+  - Subtask 7.3: Test mixed validation errors (Bronze + Pydantic)
+  - Subtask 7.4: Test error CSV includes correct row indices
+
+- Task 8: Performance validation (AC: Epic 2 performance requirements)
+  - Subtask 8.1: Verify error collection overhead <5%
+  - Subtask 8.2: Verify CSV export time <1s for 1000 errors
+  - Subtask 8.3: Ensure error handling doesn't violate AC-PERF-2 (<20% overhead)
+</tasks>
+  </story>
+
+  <acceptanceCriteria>
+**Given** I have validation framework from Stories 2.1-2.4
+**When** pipeline encounters validation failures
+**Then** I should have:
+- Failed rows exported to CSV: `logs/failed_rows_annuity_YYYYMMDD_HHMMSS.csv`
+- CSV columns: original row data + `error_type`, `error_field`, `error_message`
+- Error summary logged: "Validation failed: 15 rows failed Bronze schema, 23 rows failed Pydantic validation"
+- Partial success handling: pipeline can continue with valid rows if configured (Epic 1 Story 1.10)
+- Error threshold: if >10% of rows fail, stop pipeline (likely systemic data issue)
+
+**And** When 15 rows fail Bronze schema validation (missing required columns)
+**Then** CSV export shows:
+  ```csv
+  月度,计划代码,error_type,error_field,error_message
+  202501,ABC123,SchemaError,期末资产规模,Column missing in source data
+  ```
+
+**And** When 5 out of 100 rows fail Pydantic validation
+**Then** Pipeline continues with 95 valid rows and exports 5 failed rows to CSV
+
+**And** When >10% of rows fail validation
+**Then** Pipeline stops immediately with error: "Validation failure rate 15% exceeds threshold 10%, likely systemic issue"
+
+**And** When all validations pass
+**Then** No error CSV is created, logs show: "Validation success: 100 rows processed, 0 failures"
+</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <!-- Epic 2 Technical Specification -->
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-2.md</path>
+        <title>Epic Technical Specification: Multi-Layer Data Quality Framework</title>
+        <section>§175-244 - ValidationErrorReporter Class Design</section>
+        <snippet>Complete technical design for error reporter class including collect_error, export_to_csv, check_threshold methods. Includes CSV format spec and integration patterns with Pandera/Pydantic validation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-2.md</path>
+        <title>Epic Technical Specification: Multi-Layer Data Quality Framework</title>
+        <section>§365-510 - Validation Error Reporter API</section>
+        <snippet>Full API specification including ValidationError dataclass, ValidationSummary dataclass, error collection patterns, CSV export format with metadata header.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-2.md</path>
+        <title>Epic Technical Specification: Multi-Layer Data Quality Framework</title>
+        <section>§570-605 - Error Handling Flow Diagram</section>
+        <snippet>Workflow showing validation → error collection → threshold check (10%) → fail fast vs. continue → CSV export pattern.</snippet>
+      </doc>
+
+      <!-- Architecture Decision #4: Hybrid Error Context Standards -->
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Scale Adaptive Architecture</title>
+        <section>Decision #4: Hybrid Error Context Standards §391-480</section>
+        <snippet>Defines required error context fields: error_type, operation, domain, row_number, field, input_data. Error message format: [ERROR_TYPE] Base message | Domain: X | Row: N | Field: Y</snippet>
+      </doc>
+
+      <!-- Architecture Decision #8: structlog with Sanitization -->
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Scale Adaptive Architecture</title>
+        <section>Decision #8: structlog with Sanitization §735-827</section>
+        <snippet>Structured logging requirements: JSON format, context binding, sanitization rules. Never log tokens/passwords/salt. Safe to log: company IDs, file paths, row counts, durations.</snippet>
+      </doc>
+
+      <!-- Performance Acceptance Criteria -->
+      <doc>
+        <path>docs/architecture-patterns/epic-2-performance-acceptance-criteria.md</path>
+        <title>Epic 2 Performance Acceptance Criteria</title>
+        <section>AC-PERF-1: Validation Throughput §20-61</section>
+        <snippet>MANDATORY: ≥1000 rows/second on standard hardware. Test with 10,000-row fixtures. Failure blocks story completion.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture-patterns/epic-2-performance-acceptance-criteria.md</path>
+        <title>Epic 2 Performance Acceptance Criteria</title>
+        <section>AC-PERF-2: Validation Overhead Budget §63-104</section>
+        <snippet>MANDATORY: Validation overhead <20% of total pipeline time. Acceptable: 10-15%, Warning: 15-20%, Failure: >20%.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture-patterns/epic-2-performance-acceptance-criteria.md</path>
+        <title>Epic 2 Performance Acceptance Criteria</title>
+        <section>Story 2.5 Requirements §199-209</section>
+        <snippet>Error collection overhead <5% (on top of validation time), CSV export <2s for 10k rows, message formatting ≥5000 messages/s.</snippet>
+      </doc>
+
+      <!-- Clean Architecture Boundaries -->
+      <doc>
+        <path>docs/architecture-boundaries.md</path>
+        <title>Clean Architecture Boundaries</title>
+        <section>Layer responsibilities §20-26</section>
+        <snippet>Error reporter lives in utils/ layer (shared utilities). No I/O dependencies in error collection (pure function transformations). CSV export is I/O but encapsulated.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <!-- Pipeline Framework (Story 1.5) -->
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/core.py</path>
+        <kind>framework</kind>
+        <symbol>Pipeline</symbol>
+        <lines>entire file</lines>
+        <reason>Pipeline executor that orchestrates validation steps. Error reporter will integrate with PipelineContext for error collection across steps.</reason>
+      </artifact>
+
+      <!-- Pydantic Models (Story 2.1) -->
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/models.py</path>
+        <kind>domain_model</kind>
+        <symbol>AnnuityPerformanceOut</symbol>
+        <lines>class definition</lines>
+        <reason>Pydantic validation generates ValidationError exceptions. Error reporter must parse these to extract field names, error types, and messages.</reason>
+      </artifact>
+
+      <!-- Pandera Schemas (Story 2.2) -->
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/schemas.py</path>
+        <kind>validation_schema</kind>
+        <symbol>validate_bronze_dataframe, validate_gold_dataframe</symbol>
+        <lines>function definitions</lines>
+        <reason>Pandera validation generates SchemaError exceptions. Error reporter must parse failure_cases to extract row indices, columns, and violations.</reason>
+      </artifact>
+
+      <!-- Date Parser (Story 2.4) -->
+      <artifact>
+        <path>src/work_data_hub/utils/date_parser.py</path>
+        <kind>utility</kind>
+        <symbol>parse_yyyymm_or_chinese</symbol>
+        <lines>function definition</lines>
+        <reason>Date parsing errors (ValueError) will be captured by error reporter. Shows pattern for clear error messages listing supported formats.</reason>
+      </artifact>
+
+      <!-- Structured Logging (Story 1.3) -->
+      <artifact>
+        <path>src/work_data_hub/utils/logging.py</path>
+        <kind>utility</kind>
+        <symbol>get_logger, sanitize_for_logging</symbol>
+        <lines>function definitions</lines>
+        <reason>Error reporter will use structlog for validation metrics (total_rows, failed_rows, error_rate, duration). Sanitization pattern to follow for CSV export.</reason>
+      </artifact>
+
+      <!-- Configuration Settings -->
+      <artifact>
+        <path>src/work_data_hub/config/settings.py</path>
+        <kind>configuration</kind>
+        <symbol>Settings</symbol>
+        <lines>class definition</lines>
+        <reason>May add FAILED_ROWS_PATH config for CSV export location. Shows pattern for environment-based configuration.</reason>
+      </artifact>
+
+      <!-- Existing Test Patterns -->
+      <artifact>
+        <path>tests/performance/test_story_2_4_performance.py</path>
+        <kind>test</kind>
+        <symbol>TestAC_PERF_DateParser</symbol>
+        <lines>entire file</lines>
+        <reason>Performance testing pattern established in Story 2.4 (10,000-row fixtures, throughput measurement). Template for Story 2.5 performance tests.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <python>
+        <package name="pydantic" version=">=2.11.7">Row-level validation, generates ValidationError with field-level error details</package>
+        <package name="pandera" version=">=0.18.0,<1.0">DataFrame schema validation, generates SchemaError with failure_cases</package>
+        <package name="pandas" version="latest">DataFrame operations for filtering failed rows, CSV export</package>
+        <package name="structlog" version="latest">Structured logging for validation metrics and error summaries</package>
+      </python>
+      <testing>
+        <package name="pytest" version="latest">Test framework, markers: unit, integration, performance</package>
+        <package name="pytest-cov" version="latest">Code coverage measurement, target ≥85% for utils layer</package>
+      </testing>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <architectural>
+      <constraint>Error reporter must live in src/work_data_hub/utils/ layer (shared utilities)</constraint>
+      <constraint>No I/O dependencies in error collection logic (pure function transformations)</constraint>
+      <constraint>CSV export encapsulated in error reporter (I/O operation but convenience method)</constraint>
+      <constraint>Cannot import from work_data_hub.io or work_data_hub.orchestration (Story 1.6 Clean Architecture)</constraint>
+      <constraint>Use dependency injection for file paths, logger (avoid global state)</constraint>
+    </architectural>
+    <performance>
+      <constraint>AC-PERF-1: Error collection overhead <5% (measured on top of validation time)</constraint>
+      <constraint>AC-PERF-2: CSV export must complete <2 seconds for 10,000 rows</constraint>
+      <constraint>Error message formatting throughput ≥5000 messages/second</constraint>
+      <constraint>Threshold checking must be O(1) complexity (use set for failed row indices)</constraint>
+    </performance>
+    <error_context>
+      <constraint>All errors must include: error_type, operation, domain, row_number, field, input_data (from Decision #4)</constraint>
+      <constraint>Error message format: [ERROR_TYPE] Base message | Domain: X | Row: N | Field: Y</constraint>
+      <constraint>Sanitize input_data before CSV export (no PII beyond company names, no secrets)</constraint>
+      <constraint>Truncate long values (>100 chars) to prevent CSV bloat</constraint>
+      <constraint>Remove newlines/tabs from error messages for CSV safety</constraint>
+    </error_context>
+    <testing>
+      <constraint>Must use 10,000-row fixtures for performance tests (not 5-row samples)</constraint>
+      <constraint>Test fixtures location: tests/fixtures/performance/annuity_performance_10k.csv</constraint>
+      <constraint>Unit tests: ≥85% coverage for utils/error_reporter.py</constraint>
+      <constraint>Integration tests: End-to-end Bronze→Silver→Gold error flow</constraint>
+    </testing>
+    <logging>
+      <constraint>Use structlog for all validation metrics (Story 1.3 pattern)</constraint>
+      <constraint>Log validation summary: total_rows, failed_rows, error_rate, duration</constraint>
+      <constraint>NEVER log: tokens, passwords, salt (WDH_ALIAS_SALT)</constraint>
+      <constraint>Safe to log: company IDs (including temporary IDs), file paths, row counts</constraint>
+    </logging>
+  </constraints>
+
+  <interfaces>
+    <validation>
+      <interface>
+        <name>Pydantic ValidationError</name>
+        <kind>exception</kind>
+        <signature>pydantic.ValidationError with .errors() method returning List[dict]</signature>
+        <path>pydantic library</path>
+        <usage>Catch ValidationError from Pydantic model validation, extract field name, error type, message from .errors() list</usage>
+      </interface>
+      <interface>
+        <name>Pandera SchemaError</name>
+        <kind>exception</kind>
+        <signature>pandera.errors.SchemaError with .failure_cases attribute (DataFrame)</signature>
+        <path>pandera library</path>
+        <usage>Catch SchemaError from Pandera validation, parse failure_cases to extract row indices, columns, check violations</usage>
+      </interface>
+    </validation>
+    <pipeline>
+      <interface>
+        <name>PipelineContext</name>
+        <kind>dataclass</kind>
+        <signature>PipelineContext(domain: str, execution_id: str, reporter: ValidationErrorReporter)</signature>
+        <path>src/work_data_hub/domain/pipelines/types.py</path>
+        <usage>Pipeline context holds error reporter instance, injected into validation steps for error collection</usage>
+      </interface>
+      <interface>
+        <name>Pipeline.run()</name>
+        <kind>method</kind>
+        <signature>Pipeline.run(df: pd.DataFrame, context: PipelineContext) -> pd.DataFrame</signature>
+        <path>src/work_data_hub/domain/pipelines/core.py</path>
+        <usage>Pipeline executor runs validation steps sequentially, reporter collects errors across all steps</usage>
+      </interface>
+    </pipeline>
+    <logging>
+      <interface>
+        <name>get_logger()</name>
+        <kind>function</kind>
+        <signature>get_logger(name: str = __name__) -> BoundLogger</signature>
+        <path>src/work_data_hub/utils/logging.py</path>
+        <usage>Get structlog logger for validation metrics logging. Use logger.bind(domain=, execution_id=) for context.</usage>
+      </interface>
+      <interface>
+        <name>sanitize_for_logging()</name>
+        <kind>function</kind>
+        <signature>sanitize_for_logging(data: Any) -> Any</signature>
+        <path>src/work_data_hub/utils/logging.py</path>
+        <usage>Sanitize sensitive data before logging. Pattern to follow for CSV export value sanitization.</usage>
+      </interface>
+    </logging>
+  </interfaces>
+  <tests>
+    <standards>
+      **Testing Framework:** pytest with markers (unit, integration, performance)
+
+      **Coverage Target:** ≥85% for utils/error_reporter.py (Epic 2 standard for utilities)
+
+      **Performance Requirements (AC-PERF):**
+      - Error collection overhead <5% (on top of validation time)
+      - CSV export <2 seconds for 10,000 rows
+      - Error message formatting ≥5000 messages/second
+
+      **Test Fixtures:**
+      - Location: tests/fixtures/performance/annuity_performance_10k.csv
+      - Data volume: 10,000 rows minimum (not 5-row samples)
+      - Data distribution: 90% valid rows, 10% with validation errors
+
+      **Test Structure Pattern (from Story 2.4):**
+      - Unit tests: tests/unit/utils/test_error_reporter.py
+      - Integration tests: tests/integration/test_epic_2_error_handling.py
+      - Performance tests: tests/performance/test_story_2_5_performance.py
+
+      **Pytest Markers:**
+      @pytest.mark.unit - Fast unit tests (no I/O, <1s total)
+      @pytest.mark.integration - Integration tests with fixtures (<10s)
+      @pytest.mark.performance - Performance/benchmark tests (slow, CI only)
+    </standards>
+
+    <locations>
+      **Unit Tests:**
+      - tests/unit/utils/test_error_reporter.py (new file)
+
+      **Integration Tests:**
+      - tests/integration/test_epic_2_error_handling.py (new file)
+
+      **Performance Tests:**
+      - tests/performance/test_story_2_5_performance.py (new file)
+
+      **Test Fixtures:**
+      - tests/fixtures/performance/annuity_performance_10k.csv (exists, from Story 2.4)
+      - tests/fixtures/performance/annuity_with_errors.csv (new, for error scenarios)
+
+      **Test Helpers (existing patterns):**
+      - tests/conftest.py (pytest configuration and shared fixtures)
+      - tests/performance/ directory pattern from Story 2.1-2.4
+    </locations>
+
+    <ideas>
+      **Unit Test Ideas (AC: error collection and aggregation):**
+      - AC-1.1: Test collect_single_error() - single error collected with all fields
+      - AC-1.2: Test collect_multiple_errors_same_row() - multiple errors per row tracked (2 errors, 1 failed row)
+      - AC-1.3: Test get_summary_statistics() - correct error rate calculation (5 failed / 100 total = 5%)
+      - AC-1.4: Test threshold_check_under_threshold() - 9% error rate passes (no exception)
+      - AC-1.5: Test threshold_check_exceeds_threshold() - 15% error rate raises ValidationThresholdExceeded
+      - AC-1.6: Test csv_export_format() - CSV has metadata header with total_rows, failed_rows, error_rate
+      - AC-1.7: Test sanitize_long_values() - values >100 chars truncated to 97+"..."
+      - AC-1.8: Test sanitize_special_characters() - newlines and tabs removed for CSV safety
+
+      **Integration Test Ideas (AC: end-to-end error flow):**
+      - AC-2.1: Test bronze_validation_errors_exported() - Pandera SchemaError → CSV with row indices
+      - AC-2.2: Test pydantic_validation_errors_exported() - Pydantic ValidationError → CSV with field names
+      - AC-2.3: Test mixed_validation_errors() - Both SchemaError and ValidationError in same CSV
+      - AC-2.4: Test error_csv_includes_correct_row_indices() - Row numbers match DataFrame indices
+      - AC-2.5: Test partial_success_handling() - 5 errors out of 100 rows, pipeline continues with 95 valid rows
+
+      **Performance Test Ideas (AC: error collection overhead):**
+      - AC-3.1: Test error_collection_overhead() - Validation WITH reporter vs. WITHOUT, overhead <5%
+      - AC-3.2: Test csv_export_performance() - Export 1000 errors in <1 second
+      - AC-3.3: Test large_error_volume() - 10,000 errors collected, memory usage reasonable (<100MB)
+      - AC-3.4: Test threshold_check_performance() - O(1) complexity, <1ms for 10k rows
+
+      **Edge Case Test Ideas:**
+      - AC-4.1: Test zero_errors() - No CSV created when all rows valid
+      - AC-4.2: Test all_rows_fail() - 100% error rate, CSV includes all rows
+      - AC-4.3: Test empty_dataframe() - 0 rows processed, no errors
+      - AC-4.4: Test unicode_error_messages() - Chinese company names in error CSV (客户名称)
+      - AC-4.5: Test csv_export_creates_directory() - logs/ directory created if doesn't exist
+    </ideas>
+  </tests>
+</story-context>
+

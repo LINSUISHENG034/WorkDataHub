@@ -1141,6 +1141,48 @@ This section captures action items identified during code reviews of Epic 2 stor
 
 **Review Notes:** Core implementation is excellent - all 7 ACs verified complete, strong test coverage, clean architecture compliance. All action items addressed, ready for final review/approval.
 
+### Story 2.5: Validation Error Handling and Reporting (Review: 2025-11-27)
+
+**Review Outcome:** ⚠️ **CHANGES REQUESTED** (Awaiting Fix)
+
+**Review Summary:**
+Core implementation is **excellent** and production-ready - ValidationErrorReporter class has outstanding performance (125-333x above AC-PERF requirements), perfect code quality, and comprehensive documentation. However, integration tests (7/8) are failing due to incomplete test fixtures that don't match Pydantic model schema.
+
+**Test Results:**
+- ✅ Unit Tests: 20/20 PASSED (100%)
+- ✅ Performance Tests: 7/7 PASSED (100%)
+- ⚠️ Integration Tests: 1/8 PASSED (12.5%)
+
+**Follow-up Actions:**
+
+1. **🔴 [HIGH - BLOCKING]** Fix integration test fixtures
+   - **File:** `tests/integration/test_epic_2_error_handling.py`
+   - **Issue:** Missing required Pydantic fields (company_id, 业务类型, 计划类型, 组合类型, 组合代码, 组合名称, 机构代码, 机构名称, 产品线代码, 年金账户号, 年金账户名, 流失, 待遇支付)
+   - **Fix:** Add complete test data matching Story 2.1 Pydantic model schema
+   - **Verification:** All 8 integration tests should pass
+
+2. **🟡 [MEDIUM - BLOCKING]** Adjust Bronze validation test data
+   - **File:** `tests/integration/test_epic_2_error_handling.py`
+   - **Issue:** Test data has 66% invalid dates, exceeds Bronze validator 50% threshold
+   - **Fix:** Use ≤50% invalid data in test fixtures OR test Bronze threshold separately
+   - **Verification:** Bronze validation tests pass without threshold error
+
+3. **🟢 [LOW - RECOMMENDED]** Create test data factory helper
+   - **File:** `tests/fixtures/test_data_factory.py` (new)
+   - **Purpose:** Generate complete, valid AnnuityPerformance test records
+   - **Benefit:** Reduces test fixture duplication and maintenance burden
+   - **Usage:** `factory.create_valid_annuity_row()`, `factory.create_invalid_annuity_row(field='月度')`
+
+**Review Notes:** Core implementation quality is exemplary - this is production-ready code with excellent architecture, type safety, documentation, and security. The only blocker is test refactoring (estimated 1-2 hours). Once integration tests pass, this story should be immediately approved.
+
+**Strengths Identified:**
+- ValidationErrorReporter performance: 625,083 errors/s (125x above requirement)
+- CSV export performance: <0.5s for 1000 errors (333x faster than requirement)
+- Memory efficiency: <10MB for 10K errors
+- Security: Proper sanitization, CSV injection prevention, no PII leakage
+- Architecture: Clean dependency injection, correct layer placement
+- Documentation: Comprehensive docstrings with usage examples
+
 ---
 
 **Document Status**: Draft - Ready for Technical Review

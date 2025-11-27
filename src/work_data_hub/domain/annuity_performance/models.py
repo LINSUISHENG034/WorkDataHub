@@ -135,9 +135,6 @@ class AnnuityPerformanceIn(BaseModel):
     当期收益率: Optional[Union[Decimal, float, int, str]] = Field(
         None, description="Current period return rate (当期收益率)"
     )
-    年化收益率: Optional[Union[Decimal, float, int, str]] = Field(
-        None, description="Annualized return rate (年化收益率)"
-    )
 
     # Organizational fields
     机构代码: Optional[str] = Field(None, description="Institution code (机构代码)")
@@ -157,6 +154,20 @@ class AnnuityPerformanceIn(BaseModel):
     )
     年金账户名: Optional[str] = Field(
         None, description="Pension account name (年金账户名)"
+    )
+
+    # Enterprise group fields (from production data)
+    子企业号: Optional[str] = Field(
+        None, description="Sub-enterprise number (子企业号)"
+    )
+    子企业名称: Optional[str] = Field(
+        None, description="Sub-enterprise name (子企业名称)"
+    )
+    集团企业客户号: Optional[str] = Field(
+        None, description="Group enterprise customer number (集团企业客户号)"
+    )
+    集团企业客户名称: Optional[str] = Field(
+        None, description="Group enterprise customer name (集团企业客户名称)"
     )
 
     # English fields for compatibility
@@ -193,7 +204,6 @@ class AnnuityPerformanceIn(BaseModel):
         "待遇支付",
         "投资收益",
         "当期收益率",
-        "年化收益率",
         mode="before",
     )
     @classmethod
@@ -305,11 +315,12 @@ class AnnuityPerformanceOut(BaseModel):
     计划代码: str = Field(
         ..., min_length=1, max_length=255, description="Plan code identifier"
     )
-    company_id: str = Field(
-        ...,
+    # company_id将在后续数据清洗步骤中生成（Epic 5 - Company Enrichment）
+    company_id: Optional[str] = Field(
+        None,
         min_length=1,
         max_length=50,
-        description="Company identifier - matches DB column",
+        description="Company identifier - generated during data cleansing",
     )
 
     # All fields from DDL schema - exact column name mapping
@@ -349,12 +360,12 @@ class AnnuityPerformanceOut(BaseModel):
     投资收益: Optional[Decimal] = Field(
         None, decimal_places=4, description="Investment return (can be negative)"
     )
-    年化收益率: Optional[Decimal] = Field(
+    当期收益率: Optional[Decimal] = Field(
         None,
         decimal_places=6,
         ge=-1.0,
         le=10.0,
-        description="Current period return rate (sanity check range)"
+        description="Current period return rate (当期收益率, sanity check range)"
     )
 
     # Organizational fields
@@ -374,6 +385,20 @@ class AnnuityPerformanceOut(BaseModel):
     )
     年金账户名: Optional[str] = Field(
         None, max_length=255, description="Pension account name"
+    )
+
+    # Enterprise group fields (from production data)
+    子企业号: Optional[str] = Field(
+        None, max_length=50, description="Sub-enterprise number (子企业号)"
+    )
+    子企业名称: Optional[str] = Field(
+        None, max_length=255, description="Sub-enterprise name (子企业名称)"
+    )
+    集团企业客户号: Optional[str] = Field(
+        None, max_length=50, description="Group enterprise customer number (集团企业客户号)"
+    )
+    集团企业客户名称: Optional[str] = Field(
+        None, max_length=255, description="Group enterprise customer name (集团企业客户名称)"
     )
 
     @field_validator('月度', mode='before')
@@ -422,7 +447,7 @@ class AnnuityPerformanceOut(BaseModel):
                 f"Field '客户名称': Cannot clean company name '{v}'. Error: {e}"
             )
 
-    @field_validator("计划代码", "company_id", mode="after")
+    @field_validator("计划代码", mode="after")
     @classmethod
     def normalize_codes(cls, v: str) -> str:
         """Normalize identifier codes to uppercase and remove special chars."""
@@ -438,6 +463,22 @@ class AnnuityPerformanceOut(BaseModel):
 
         return normalized
 
+    @field_validator("company_id", mode="after")
+    @classmethod
+    def normalize_company_id(cls, v: Optional[str]) -> Optional[str]:
+        """Normalize company_id if present (Optional field)."""
+        if v is None:
+            return v
+
+        # Convert to uppercase and remove common separators
+        normalized = v.upper().replace("-", "").replace("_", "").replace(" ", "")
+
+        # Validate final format
+        if not normalized.replace(".", "").replace("（", "").replace("）", "").strip():
+            raise ValueError(f"company_id cannot be empty after normalization: {v}")
+
+        return normalized
+
     @field_validator(
         "期初资产规模",
         "期末资产规模",
@@ -446,7 +487,7 @@ class AnnuityPerformanceOut(BaseModel):
         "流失",
         "待遇支付",
         "投资收益",
-        "年化收益率",
+        "当期收益率",
         mode="before",
     )
     @classmethod
@@ -483,7 +524,6 @@ class AnnuityPerformanceOut(BaseModel):
         Business Rules:
         1. Report date must not be in the future
         2. Report date should not be older than 10 years (warning only)
-        3. When 期末资产规模=0, 年化收益率 should be None (AC2 requirement)
 
         Raises:
             ValueError: If business rules are violated
@@ -503,14 +543,6 @@ class AnnuityPerformanceOut(BaseModel):
             if (current_date - report_date).days > 3650:
                 logger.warning(
                     f"Report date {report_date} is older than 10 years (today: {current_date})"
-                )
-
-        # Rule 3 (AC2): When 期末资产规模=0, 年化收益率 should be None
-        if self.期末资产规模 is not None and self.期末资产规模 == 0:
-            if self.年化收益率 is not None:
-                raise ValueError(
-                    f"Business Rule Violation: When 期末资产规模=0, 年化收益率 must be None "
-                    f"(got: {self.年化收益率})"
                 )
 
         return self

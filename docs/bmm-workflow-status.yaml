@@ -30,7 +30,7 @@ workflow_path: "method-brownfield.yaml"
 
 workflow_status:
   # Phase 0: Discovery (Optional)
-  research: docs/research-deep-prompt-2025-11-08.md
+  research: docs/initial/research-deep-prompt-2025-11-08.md
 
   # Phase 1: Planning
   prd: docs/PRD.md
@@ -39,8 +39,8 @@ workflow_status:
 
   # Phase 2: Solutioning
   create-architecture: docs/architecture.md
-  validate-architecture: docs/validation-report-architecture-2025-11-09.md
-  solutioning-gate-check: docs/implementation-readiness-report-2025-11-09.md
+  validate-architecture: docs/initial/validation-report-architecture-2025-11-09.md
+  solutioning-gate-check: docs/initial/implementation-readiness-report-2025-11-09.md
 
   # Phase 3: Implementation
   sprint-planning: required

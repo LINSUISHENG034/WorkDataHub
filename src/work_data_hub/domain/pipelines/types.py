@@ -10,10 +10,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Mapping, MutableMapping, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, MutableMapping, Optional
 
 import pandas as pd
 from typing_extensions import Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from work_data_hub.utils.error_reporter import ValidationErrorReporter
 
 # Type alias for data rows flowing through pipeline steps
 Row = Dict[str, Any]
@@ -30,6 +33,8 @@ class PipelineContext:
         timestamp: UTC timestamp when the run started
         config: Serialized pipeline configuration for reference in steps
         metadata: Mutable map for steps to stash scratchpad data
+        reporter: Optional ValidationErrorReporter for collecting validation errors
+                  (Story 2.5 integration)
     """
 
     pipeline_name: str
@@ -37,6 +42,7 @@ class PipelineContext:
     timestamp: datetime
     config: Mapping[str, Any]
     metadata: MutableMapping[str, Any] = field(default_factory=dict)
+    reporter: Optional[ValidationErrorReporter] = None
 
 
 @dataclass
