@@ -1,0 +1,297 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>4</storyId>
+    <title>Chinese Date Parsing Utilities</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-17</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/2-4-chinese-date-parsing-utilities.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>robust utilities for parsing various Chinese date formats</iWant>
+    <soThat>inconsistent date formats from Excel sources are handled uniformly</soThat>
+    <tasks>
+- Task 1: Implement core date parsing function (AC: all formats)
+  - Subtask 1.1: Create `utils/date_parser.py` module
+  - Subtask 1.2: Implement passthrough for date/datetime objects
+  - Subtask 1.3: Implement integer YYYYMM format parsing (202501)
+  - Subtask 1.4: Implement Chinese format parsing (2025年1月, 25年1月)
+  - Subtask 1.5: Implement ISO format parsing (2025-01, 2025-01-01)
+- Task 2: Add full-width digit normalization (AC: format support)
+  - Subtask 2.1: Implement `_normalize_fullwidth_digits()` helper
+  - Subtask 2.2: Apply normalization before parsing
+  - Subtask 2.3: Test with full-width numbers (０-９)
+- Task 3: Implement date range validation (AC: 2000-2030 range)
+  - Subtask 3.1: Implement `_validate_date_range()` helper
+  - Subtask 3.2: Apply validation to all parsed dates
+  - Subtask 3.3: Raise clear errors for out-of-range dates
+- Task 4: Add comprehensive unit tests (AC: all formats + edge cases)
+  - Subtask 4.1: Test all supported formats
+  - Subtask 4.2: Test edge cases (2-digit years, boundaries)
+  - Subtask 4.3: Test error cases (invalid formats, out-of-range)
+  - Subtask 4.4: Test full-width digit handling
+- Task 5: Integrate with Pydantic validators (AC: integration)
+  - Subtask 5.1: Create example `@field_validator` integration
+  - Subtask 5.2: Document usage patterns
+  - Subtask 5.3: Test integration with annuity models (Story 2.1)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+**Given** I have cleansing framework from Story 2.3
+**When** I implement date parsing in `utils/date_parser.py`
+**Then** I should have:
+- `parse_yyyymm_or_chinese(value)` function supporting multiple formats:
+  - Integer: `202501` → `date(2025, 1, 1)`
+  - String: `"2025年1月"` → `date(2025, 1, 1)`
+  - String: `"2025-01"` → `date(2025, 1, 1)`
+  - Date object: `date(2025, 1, 1)` → `date(2025, 1, 1)` (passthrough)
+  - 2-digit year: `"25年1月"` → `date(2025, 1, 1)` (assumes 20xx for <50, 19xx for >=50)
+- Validation: rejects dates outside reasonable range (2000-2030)
+- Clear errors: `ValueError("Cannot parse '不是日期' as date, supported formats: YYYYMM, YYYY年MM月, YYYY-MM")`
+
+**And** When parsing `202501`
+**Then** Returns `date(2025, 1, 1)`
+
+**And** When parsing `"2025年1月"`
+**Then** Returns `date(2025, 1, 1)`
+
+**And** When parsing invalid date `"invalid"`
+**Then** Raises `ValueError` with supported formats listed
+
+**And** When parsing date outside range (1990)
+**Then** Raises `ValueError("Date 1990-01 outside valid range 2000-2030")`
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document - FR-3.4 Chinese Date Parsing</title>
+        <section>FR-3.4: Chinese Date Parsing</section>
+        <snippet>Parse various Chinese date formats uniformly. Supports: 2025年1月, 202501, 2025-01, 25年1月, date objects. Uses utils/date_parser.py unified parsing logic. Handles 2-digit years (25 → 2025 for &lt;50, 19xx for ≥50). Validation rejects dates outside reasonable range (2000-2030). Clear errors with actionable messages.</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document - Data Quality Requirements</title>
+        <section>Data Quality Requirements (§484-563)</section>
+        <snippet>Multi-layered defense: Bronze (structural validation), Silver (transformation quality with Pydantic), Gold (database integrity with Pandera). Date fields must be parseable at Bronze layer. Business rules enforced at Silver with clear error messages showing file path, row numbers, and validation rules violated.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture - Decision #5: Explicit Chinese Date Format Priority</title>
+        <section>Decision #5: Explicit Chinese Date Format Priority</section>
+        <snippet>Explicit format priority list with full-width normalization and range validation (2000-2030). No fallback to dateutil to avoid surprises. Supported formats in order: date/datetime objects (passthrough), YYYYMMDD (8 digits), YYYYMM (6 digits), YYYY-MM-DD, YYYY-MM, YYYY年MM月DD日, YYYY年MM月, YY年MM月. Implementation uses regex for Chinese format parsing. Handles full-width and half-width numbers. Returns first day of month for YYYYMM formats.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture - NFR-3.2: Test Coverage</title>
+        <section>NFR-3.2: Test Coverage Requirements</section>
+        <snippet>Target coverage: &gt;80% for utils (shared utilities). Test types needed: Unit tests for all format parsing, Edge case tests (boundaries, invalid inputs), Integration tests with Pydantic validators. Domain services should have &gt;90% coverage, utils &gt;80%, critical paths 100%.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epics - Story 2.4 Complete Definition</title>
+        <section>Epic 2 Story 2.4: Chinese Date Parsing Utilities</section>
+        <snippet>Prerequisites: Story 2.3 (cleansing framework). Technical Notes: Use regex for Chinese format parsing. Handle full-width and half-width numbers. Return first day of month for YYYYMM formats. Integration with Pydantic via @field_validator decorator. Add comprehensive unit tests for all formats and edge cases. Epic 2 Performance criteria: ≥1000 rows/s throughput, &lt;20% validation overhead.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epic-2-performance-acceptance-criteria.md</path>
+        <title>Epic 2 Performance Acceptance Criteria</title>
+        <section>AC-PERF-1: Validation Throughput</section>
+        <snippet>MANDATORY: Pydantic/Pandera validation must process ≥1000 rows/second on standard hardware. Test with 10,000-row fixtures minimum. Use tests/fixtures/performance/ for realistic test data. Measure throughput with time.time() before/after. If throughput &lt;1000 rows/s, story BLOCKED until optimized.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <existing>
+        <file path="src/work_data_hub/utils/date_parser.py">
+          <status>Exists (70-80% complete)</status>
+          <summary>Core date parsing implemented with parse_chinese_date(), extract_year_month_from_date(), format_date_as_chinese(), normalize_date_for_database() functions.</summary>
+          <functions>
+            - parse_chinese_date(value) - Main parsing function, supports: integer YYYYMM, Chinese format, 2-digit years, ISO formats, date passthrough
+            - extract_year_month_from_date(value) - Extracts (year, month) tuple
+            - format_date_as_chinese(date_obj) - Formats date as "YYYY年MM月"
+            - normalize_date_for_database(value) - Converts to ISO format string
+          </functions>
+          <gaps>
+            - Missing: _normalize_fullwidth_digits() helper (AC Subtask 2.1)
+            - Missing: _validate_date_range() helper for 2000-2030 range check (AC Subtask 3.1-3.3)
+            - Missing: Clear error messages listing supported formats (AC: "Cannot parse 'invalid' as date, supported formats: YYYYMM, YYYY年MM月, YYYY-MM")
+          </gaps>
+        </file>
+        <file path="tests/utils/test_date_parser.py">
+          <status>Exists (comprehensive, 193 lines)</status>
+          <summary>Complete test suite with 4 test classes covering all parsing scenarios, edge cases, and real-world examples.</summary>
+          <coverage>
+            - TestParseChineseDate: Main parsing function tests (all formats, error cases)
+            - TestExtractYearMonth: Extraction function tests
+            - TestFormatDateAsChinese: Formatting tests
+            - TestNormalizeDateForDatabase: Normalization tests
+            - TestRealWorldScenarios: Integration tests with Excel data
+          </coverage>
+          <gaps>
+            - Missing: Tests for full-width digit handling (０-９)
+            - Missing: Tests for date range validation (2000-2030)
+            - Missing: Performance test with 10k-row fixture (Epic 2 AC-PERF-1)
+          </gaps>
+        </file>
+        <file path="src/work_data_hub/cleansing/registry.py">
+          <status>Complete (Story 2.3 dependency)</status>
+          <summary>Cleansing registry framework with rule registration, discovery, and Pydantic integration adapter.</summary>
+          <integration>Story 2.4 can register date parsing as a cleansing rule via @rule decorator</integration>
+        </file>
+        <file path="src/work_data_hub/domain/annuity_performance/models.py">
+          <status>Integrated (Story 2.1)</status>
+          <summary>AnnuityPerformanceIn Pydantic model with @field_validator("月度") using date parser</summary>
+          <validator>
+            - preprocess_report_date (lines 342-361): Converts Excel integer dates (202411) to strings for parsing
+            - Demonstrates Pydantic integration pattern required by AC Subtask 5.1-5.2
+          </validator>
+        </file>
+      </existing>
+    </code>
+    <dependencies>
+      <prerequisite story="2.3" status="complete">
+        <name>Cleansing Registry Framework</name>
+        <artifacts>
+          - src/work_data_hub/cleansing/registry.py
+          - CleansingRegistry class with @rule decorator
+          - Pydantic adapter in cleansing/integrations/pydantic_adapter.py
+        </artifacts>
+        <integration>Date parsing can be registered as cleansing rule for reusability</integration>
+      </prerequisite>
+      <prerequisite epic="1" status="complete">
+        <name>Foundation Infrastructure</name>
+        <artifacts>
+          - Story 1.3: Structured logging (utils/logging.py)
+          - Story 1.4: Configuration management (config/settings.py)
+          - Story 1.6: Clean Architecture boundaries
+        </artifacts>
+        <constraint>Date parser must be pure function in utils/ layer with no I/O dependencies</constraint>
+      </prerequisite>
+      <consumer story="2.1" status="complete">
+        <name>Pydantic Models for Row-Level Validation</name>
+        <integration>AnnuityPerformanceIn model uses date parser in @field_validator("月度")</integration>
+        <location>src/work_data_hub/domain/annuity_performance/models.py:342-361</location>
+      </consumer>
+      <consumer story="2.2" status="complete">
+        <name>Pandera Schemas for DataFrame Validation</name>
+        <integration>Bronze layer schemas use date coercion with custom parser</integration>
+      </consumer>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <performance>
+      <threshold name="AC-PERF-1" mandatory="true">Validation throughput ≥1000 rows/second</threshold>
+      <threshold name="AC-PERF-2" mandatory="true">Validation overhead &lt;20% of total pipeline time</threshold>
+      <test-requirement>Performance test with 10,000-row fixture (tests/fixtures/performance/annuity_performance_10k.csv)</test-requirement>
+    </performance>
+    <architecture>
+      <layer>utils/ (domain-agnostic shared utilities)</layer>
+      <dependencies>No I/O dependencies, pure functions only (stdlib + pandas/pydantic)</dependencies>
+      <pattern>Clean Architecture: utils layer accessible to domain, I/O, and orchestration</pattern>
+    </architecture>
+    <business-rules>
+      <date-range>Valid dates: 2000-01-01 to 2030-12-31 (AC Subtask 3.1-3.3)</date-range>
+      <format-priority>Explicit priority: date object → YYYYMM integer → Chinese format → ISO format</format-priority>
+      <error-handling>Clear errors with supported formats listed (AC: ValueError with message template)</error-handling>
+    </business-rules>
+    <compatibility>
+      <python-version>3.10+ (project standard)</python-version>
+      <excel-formats>Handle both full-width (０-９) and half-width (0-9) digits (AC Subtask 2.1-2.3)</excel-formats>
+    </compatibility>
+  </constraints>
+  <interfaces>
+    <public-api>
+      <function name="parse_yyyymm_or_chinese">
+        <signature>parse_yyyymm_or_chinese(value: Union[str, int, date, None]) -> date</signature>
+        <note>AC specifies this name, but current implementation uses parse_chinese_date(). Consider aliasing or renaming for AC compliance.</note>
+      </function>
+      <function name="parse_chinese_date" status="exists">
+        <signature>parse_chinese_date(value: Union[str, int, date, None]) -> Optional[date]</signature>
+        <description>Main parsing function, handles all formats</description>
+      </function>
+      <function name="extract_year_month_from_date" status="exists">
+        <signature>extract_year_month_from_date(value) -> tuple[Optional[int], Optional[int]]</signature>
+      </function>
+      <function name="format_date_as_chinese" status="exists">
+        <signature>format_date_as_chinese(date_obj: date) -> str</signature>
+      </function>
+      <function name="normalize_date_for_database" status="exists">
+        <signature>normalize_date_for_database(value) -> Optional[str]</signature>
+      </function>
+    </public-api>
+    <pydantic-integration>
+      <pattern>Use as @field_validator decorator mode='before'</pattern>
+      <example>
+        @field_validator('月度', mode='before')
+        def parse_date(cls, v):
+            return parse_yyyymm_or_chinese(v)
+      </example>
+      <reference>src/work_data_hub/domain/annuity_performance/models.py:342-361</reference>
+    </pydantic-integration>
+    <cleansing-registry-integration>
+      <pattern>Register as cleansing rule for cross-domain reuse</pattern>
+      <example>
+        from cleansing.registry import rule, RuleCategory
+
+        @rule("parse_chinese_date", RuleCategory.DATE, "Parse Chinese date formats")
+        def parse_chinese_date_rule(value):
+            return parse_chinese_date(value)
+      </example>
+    </cleansing-registry-integration>
+  </interfaces>
+  <tests>
+    <standards>
+      <coverage target="80%">NFR-3.2: Test coverage &gt;80% for utils layer (shared utilities)</coverage>
+      <types>
+        - Unit tests: All format parsing scenarios
+        - Edge case tests: Boundaries, invalid inputs, error handling
+        - Integration tests: Pydantic validator integration
+        - Performance tests: 10k-row throughput measurement
+      </types>
+    </standards>
+    <locations>
+      <existing>
+        <file path="tests/utils/test_date_parser.py" status="comprehensive (193 lines)">
+          - TestParseChineseDate: Main parsing function (all formats, errors)
+          - TestExtractYearMonth: Extraction helpers
+          - TestFormatDateAsChinese: Formatting utilities
+          - TestNormalizeDateForDatabase: Database normalization
+          - TestRealWorldScenarios: Excel data integration tests
+        </file>
+      </existing>
+      <missing>
+        <file path="tests/utils/test_date_parser_fullwidth.py" required="true">
+          - Test full-width digit handling (０-９ conversion to 0-9)
+          - AC Subtask 2.1-2.3: Full-width normalization
+        </file>
+        <file path="tests/utils/test_date_parser_range_validation.py" required="true">
+          - Test date range validation (2000-2030)
+          - AC Subtask 3.1-3.3: Range checks and error messages
+          - Test boundary dates: 2000-01-01 (valid), 1999-12-31 (invalid), 2030-12-31 (valid), 2031-01-01 (invalid)
+        </file>
+        <file path="tests/integration/test_date_parser_performance.py" required="true">
+          - Epic 2 AC-PERF-1: Throughput ≥1000 rows/s
+          - AC-PERF-2: Overhead &lt;20%
+          - Use tests/fixtures/performance/annuity_performance_10k.csv
+        </file>
+        <file path="tests/fixtures/performance/annuity_performance_10k.csv" required="true">
+          - 10,000-row test fixture for performance validation
+          - Epic 2 Performance Acceptance Criteria requirement
+        </file>
+      </missing>
+    </locations>
+    <ideas>
+      <test-scenario priority="high">Full-width digit normalization edge cases: Mixed half-width/full-width in single value, Unicode variations</test-scenario>
+      <test-scenario priority="high">Date range validation errors: Verify exact error message format matches AC template</test-scenario>
+      <test-scenario priority="medium">Performance regression tracking: Record baseline in .performance_baseline.json (AC-PERF-3)</test-scenario>
+      <test-scenario priority="medium">Integration with cleansing registry: Test date parser as registered rule with apply_rules()</test-scenario>
+      <test-scenario priority="low">Fuzzing: Generate random input strings to find edge cases</test-scenario>
+    </ideas>
+  </tests>
+</story-context>

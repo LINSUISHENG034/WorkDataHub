@@ -21,7 +21,7 @@ development_status:
   2-1-pydantic-models-for-row-level-validation-silver-layer: done
   2-2-pandera-schemas-for-dataframe-validation-bronze-gold-layers: done
   2-3-cleansing-registry-framework: done
-  2-4-chinese-date-parsing-utilities: backlog
+  2-4-chinese-date-parsing-utilities: done
   2-5-validation-error-handling-and-reporting: backlog
   epic-2-retrospective: optional
   epic-3: backlog
