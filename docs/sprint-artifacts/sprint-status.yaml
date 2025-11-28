@@ -66,7 +66,7 @@ development_status:
   3-1-version-aware-folder-scanner: done
   3-2-pattern-based-file-matcher: done
   3-3-multi-sheet-excel-reader: done
-  3-4-column-name-normalization: backlog
+  3-4-column-name-normalization: done
   3-5-file-discovery-integration: backlog
   epic-3-retrospective: optional
 

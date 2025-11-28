@@ -1,0 +1,426 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>4</storyId>
+    <title>Column Name Normalization</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>E:\Projects\WorkDataHub\docs\sprint-artifacts\stories\3-4-column-name-normalization.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>automatic normalization of column names from Excel sources</iWant>
+    <soThat>inconsistent spacing, special characters, and encoding issues don't break pipelines</soThat>
+    <tasks>
+      <task id="1" acs="1-6">
+        <title>Implement column name normalization utility</title>
+        <subtasks>
+          <subtask>Create src/work_data_hub/utils/column_normalizer.py with normalize_column_names() function</subtask>
+          <subtask>Handle non-string types: convert to str before normalization (None → 'Unnamed_N', numeric → str, bool → str)</subtask>
+          <subtask>Implement normalization steps in exact order: strip → replace full-width → replace newlines/tabs → remove ALL whitespace</subtask>
+          <subtask>Handle empty column names with Unnamed_N pattern</subtask>
+          <subtask>Handle duplicates with _N suffix pattern</subtask>
+          <subtask>Add comprehensive docstring documenting all normalization rules</subtask>
+        </subtasks>
+      </task>
+      <task id="2" acs="1-6">
+        <title>Create unit tests with edge cases</title>
+        <subtasks>
+          <subtask>Test basic whitespace normalization (AC1)</subtask>
+          <subtask>Test full-width space replacement (AC2)</subtask>
+          <subtask>Test newline/tab handling - ALL whitespace removed (AC3)</subtask>
+          <subtask>Test empty column name placeholders (AC4)</subtask>
+          <subtask>Test duplicate handling with suffixes (AC5)</subtask>
+          <subtask>Test non-string type handling: None, numeric, boolean (AC6)</subtask>
+          <subtask>Test mixed edge cases (whitespace + full-width + duplicates)</subtask>
+          <subtask>Test Chinese character preservation</subtask>
+          <subtask>Test numeric column names</subtask>
+          <subtask>Test emoji in column names (edge case documentation)</subtask>
+          <subtask>Achieve >90% code coverage</subtask>
+        </subtasks>
+      </task>
+      <task id="3">
+        <title>Add integration with Excel reader (Story 3.3)</title>
+        <subtasks>
+          <subtask>Modify src/work_data_hub/io/readers/excel_reader.py: ExcelReader.read_sheet() method</subtask>
+          <subtask>Update ExcelReadResult dataclass: add columns_renamed: Dict[str, str] field</subtask>
+          <subtask>Add normalize_columns parameter (default=True) to maintain opt-out capability</subtask>
+          <subtask>Apply normalization automatically before returning DataFrame when normalize_columns=True</subtask>
+          <subtask>Verify backward compatibility: existing tests in tests/integration/io/readers/test_excel_reader.py still pass</subtask>
+          <subtask>Log warnings for empty names and duplicates with original column info</subtask>
+        </subtasks>
+      </task>
+      <task id="4">
+        <title>Add structured logging for normalization operations (Epic 1 Story 1.3)</title>
+        <subtasks>
+          <subtask>Log warning when empty column names generated with column indices</subtask>
+          <subtask>Log warning when duplicate suffixes added with original column names</subtask>
+          <subtask>Log info with normalization summary: {columns_normalized: int, empty_placeholders: int, duplicates_resolved: int}</subtask>
+          <subtask>Include normalization metrics in DataDiscoveryResult.duration_ms breakdown</subtask>
+        </subtasks>
+      </task>
+      <task id="5">
+        <title>Performance testing and optimization</title>
+        <subtasks>
+          <subtask>Ensure normalization completes in &lt;100ms for 100 columns (NFR requirement, measured on CI environment)</subtask>
+          <subtask>Add performance test measuring normalization time with assertion threshold</subtask>
+          <subtask>Optimize string operations (use single-pass regex where possible)</subtask>
+          <subtask>Benchmark with realistic column counts (23 columns from real data - target &lt;1ms)</subtask>
+          <subtask>Document performance degradation strategy if threshold not met</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">
+      <title>Basic Whitespace Normalization</title>
+      <given>I load Excel with column names: ['月度  ', '  计划代码', '客户名称\n', '期末资产规模']</given>
+      <when>I apply column normalization</when>
+      <then>Normalized names should be: ['月度', '计划代码', '客户名称', '期末资产规模']</then>
+    </criterion>
+    <criterion id="AC2">
+      <title>Full-Width Space Replacement</title>
+      <given>column names have full-width spaces '客户　名称' (full-width space U+3000)</given>
+      <when>I apply normalization</when>
+      <then>Replace with half-width and trim: '客户名称'</then>
+    </criterion>
+    <criterion id="AC3">
+      <title>Newline and Tab Handling</title>
+      <given>column has newlines or tabs: '客户\n名称', '计划\t代码'</given>
+      <when>I apply normalization</when>
+      <then>Remove ALL whitespace characters including spaces, newlines, tabs: '客户名称', '计划代码'</then>
+      <note>Based on Dev Notes line 134: re.sub(r'\s+', '', name) removes all whitespace</note>
+    </criterion>
+    <criterion id="AC4">
+      <title>Empty Column Name Handling</title>
+      <given>column is completely empty or whitespace-only: '', '   ', '\n'</given>
+      <when>I apply normalization</when>
+      <then>Generate placeholder name: 'Unnamed_1', 'Unnamed_2', etc., and log warning with column index</then>
+    </criterion>
+    <criterion id="AC5">
+      <title>Duplicate Column Names After Normalization</title>
+      <given>duplicate column names exist after normalization: ['月度', '月度  ', '  月度']</given>
+      <when>I apply normalization</when>
+      <then>Append numeric suffix: ['月度', '月度_1', '月度_2'] and log warning with original names</then>
+    </criterion>
+    <criterion id="AC6">
+      <title>Non-String Column Type Handling</title>
+      <given>column names include non-string types: [None, 123, '月度', True]</given>
+      <when>I apply normalization</when>
+      <then>Convert to string first, then apply normalization: [None→'Unnamed_1', 123→'123', '月度'→'月度', True→'True']</then>
+      <note>None values treated as empty strings and get Unnamed_N placeholder</note>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc type="architecture_decision" ref="docs/architecture.md">
+        <title>Decision #7: Comprehensive Naming Conventions</title>
+        <location>lines 655-732</location>
+        <relevance>Defines standards for Chinese field names in Pydantic models and column normalization requirements</relevance>
+        <key_points>
+          <point>Use original Chinese from Excel sources (no transliteration)</point>
+          <point>Python 3.10+ supports Unicode identifiers</point>
+          <point>Column normalizer preserves Chinese names while normalizing whitespace</point>
+          <point>Database mapping: Chinese Pydantic fields → English snake_case columns</point>
+        </key_points>
+      </doc>
+      <doc type="tech_spec" ref="docs/sprint-artifacts/tech-spec-epic-3.md">
+        <title>Epic 3 Tech-Spec: Story 3.4 Design</title>
+        <location>lines 659-678 (design), lines 1112-1124 (AC)</location>
+        <relevance>Complete specification for column normalization utility including edge cases and acceptance criteria</relevance>
+        <key_points>
+          <point>Normalization steps: strip → replace full-width → replace newlines/tabs → remove ALL whitespace</point>
+          <point>Handle empty names with Unnamed_N pattern</point>
+          <point>Handle duplicates with _N suffix pattern</point>
+          <point>Pure function (no side effects) in utils layer</point>
+        </key_points>
+      </doc>
+      <doc type="brownfield_context" ref="docs/brownfield-architecture.md">
+        <title>Existing column_normalizer.py</title>
+        <location>lines 149 (utils section)</location>
+        <relevance>Module already exists in codebase - enhancement needed, not new creation</relevance>
+        <key_points>
+          <point>Located at src/work_data_hub/utils/column_normalizer.py</point>
+          <point>Part of structural helpers consumed across domains</point>
+          <point>Currently used by cleansing and pipelines</point>
+        </key_points>
+      </doc>
+      <doc type="real_data_validation" ref="docs/sprint-artifacts/tech-spec-epic-3.md">
+        <title>Action Item #2: Real Data Analysis (202411)</title>
+        <location>lines 292-322 (validated samples)</location>
+        <relevance>Real-world column names from production data with actual edge cases</relevance>
+        <key_points>
+          <point>23 columns total with Chinese names: 月度, 计划代码, 客户名称, etc.</point>
+          <point>Some columns have frequent NaN values: 组合类型, 子企业号, 集团企业客户号</point>
+          <point>UTF-8 encoding for all Chinese characters confirmed</point>
+          <point>Scientific notation in numeric fields (e.g., 6.237423e+09)</point>
+        </key_points>
+      </doc>
+      <doc type="layer_boundaries" ref="docs/architecture-boundaries.md">
+        <title>Clean Architecture Boundaries (Story 1.6)</title>
+        <location>lines 20-40</location>
+        <relevance>Defines where column_normalizer belongs (utils layer) and usage constraints</relevance>
+        <key_points>
+          <point>Utils layer: Pure functions, no infrastructure dependencies</point>
+          <point>Can be imported by domain and I/O layers</point>
+          <point>Must remain stateless and side-effect-free</point>
+        </key_points>
+      </doc>
+    </docs>
+    <code>
+      <existing_module path="src/work_data_hub/utils/column_normalizer.py">
+        <description>Existing column normalization utility - requires enhancement to meet Epic 3 requirements</description>
+        <current_capabilities>
+          <capability>Basic whitespace trimming</capability>
+          <capability>Chinese character preservation</capability>
+        </current_capabilities>
+        <required_enhancements>
+          <enhancement>Full-width space replacement (U+3000 → regular space)</enhancement>
+          <enhancement>Newline and tab handling (remove ALL whitespace per AC3 correction)</enhancement>
+          <enhancement>Empty column name handling (Unnamed_N pattern)</enhancement>
+          <enhancement>Duplicate column name handling (_N suffix pattern)</enhancement>
+          <enhancement>Non-string type handling (None, numeric, boolean conversion)</enhancement>
+        </required_enhancements>
+      </existing_module>
+      <related_module path="src/work_data_hub/io/readers/excel_reader.py">
+        <description>Excel reader that will consume normalized column names (Story 3.3)</description>
+        <integration_point>Call normalize_column_names() before returning DataFrame</integration_point>
+        <reference>Task 3: Add integration with Excel reader</reference>
+      </related_module>
+      <test_location path="tests/unit/utils/test_column_normalizer.py">
+        <description>Unit tests for column normalization logic</description>
+        <required_coverage>
+          <case>AC1: Basic whitespace normalization</case>
+          <case>AC2: Full-width space replacement</case>
+          <case>AC3: Newline/tab handling (ALL whitespace removed)</case>
+          <case>AC4: Empty column name placeholders</case>
+          <case>AC5: Duplicate handling with suffixes</case>
+          <case>AC6: Non-string type handling (NEW from critique)</case>
+          <case>Mixed edge cases: whitespace + full-width + duplicates</case>
+          <case>Chinese character preservation</case>
+          <case>Emoji in column names (edge case documentation)</case>
+        </required_coverage>
+        <target_coverage>&gt;90% code coverage</target_coverage>
+      </test_location>
+    </code>
+    <dependencies>
+      <dependency type="stdlib" name="re">
+        <purpose>Regular expressions for whitespace removal and pattern matching</purpose>
+        <usage>re.sub(r'\s+', '', name) for removing ALL whitespace (corrected logic from AC3)</usage>
+      </dependency>
+      <dependency type="stdlib" name="typing">
+        <purpose>Type hints for function signatures</purpose>
+        <usage>List[str], Optional[str] type annotations</usage>
+      </dependency>
+      <dependency type="internal" name="Epic 2 Bronze/Gold schemas">
+        <purpose>Column name validation after normalization</purpose>
+        <usage>Normalized columns must pass pandera schema validation in Epic 2</usage>
+        <note>Epic 3 only normalizes - Epic 2 validates field presence</note>
+      </dependency>
+      <dependency type="internal" name="Story 3.3 Excel Reader">
+        <purpose>Integration point - Excel reader calls normalizer</purpose>
+        <usage>ExcelReader.read_sheet() applies normalization automatically before returning DataFrame</usage>
+        <reference>Task 3 subtasks</reference>
+      </dependency>
+      <dependency type="configuration" name="normalize_columns parameter">
+        <purpose>Allow opt-out of normalization if needed</purpose>
+        <default>True (enabled by default)</default>
+        <usage>ExcelReader.read_sheet(..., normalize_columns=True)</usage>
+      </dependency>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <architectural_constraint type="clean_architecture" source="docs/architecture-boundaries.md">
+      <rule>Column normalizer MUST reside in utils/ layer (not domain/ or io/)</rule>
+      <rule>Must be a pure function with NO side effects</rule>
+      <rule>No dependencies on pandas, database, or infrastructure libraries</rule>
+      <rule>Can only import from stdlib (re, typing)</rule>
+      <rationale>Utils layer enforces separation between business logic and infrastructure</rationale>
+    </architectural_constraint>
+    <performance_constraint type="nfr" source="docs/sprint-artifacts/tech-spec-epic-3.md">
+      <requirement>Normalization must complete in &lt;100ms for 100 columns</requirement>
+      <requirement>Realistic benchmark: 23 columns (real data) should complete in &lt;1ms</requirement>
+      <measurement>Add performance test with assertion threshold</measurement>
+      <environment>Measured on CI environment hardware</environment>
+      <degradation_strategy>Document performance issues if threshold not met (Task 5)</degradation_strategy>
+    </performance_constraint>
+    <compatibility_constraint type="encoding" source="Action Item #2">
+      <requirement>Must support UTF-8 encoding for Chinese characters</requirement>
+      <requirement>Must handle full-width Unicode characters (U+3000)</requirement>
+      <requirement>Must preserve emoji and special Unicode symbols (edge case)</requirement>
+      <validation>Real 202411 data confirms UTF-8 encoding in production</validation>
+    </compatibility_constraint>
+    <backward_compatibility type="integration" source="Task 3">
+      <requirement>Existing tests in tests/integration/io/readers/test_excel_reader.py must still pass</requirement>
+      <requirement>normalize_columns parameter default=True maintains opt-out capability</requirement>
+      <requirement>Column renaming must not break downstream Epic 2 validation</requirement>
+    </backward_compatibility>
+    <error_handling_constraint type="resilience">
+      <rule>Normalization NEVER fails - always returns valid column names</rule>
+      <rule>Empty/None columns get Unnamed_N placeholder (not error)</rule>
+      <rule>Duplicates get _N suffix (not error)</rule>
+      <rule>Non-string types converted to string then normalized</rule>
+      <rationale>Epic 2 validation layer handles field presence errors - Epic 3 focuses on normalization</rationale>
+    </error_handling_constraint>
+  </constraints>
+  <interfaces>
+    <function_signature>
+      <name>normalize_column_names</name>
+      <location>src/work_data_hub/utils/column_normalizer.py</location>
+      <signature>
+def normalize_column_names(columns: List[Any]) -> List[str]:
+    """
+    Normalize column names handling whitespace, encoding, duplicates.
+
+    Args:
+        columns: List of column names (any type: str, None, int, etc.)
+
+    Returns:
+        List of normalized column name strings
+
+    Normalization steps (in order):
+    1. Convert non-string types to string (None → '', numeric → str)
+    2. Strip leading/trailing whitespace
+    3. Replace full-width spaces (U+3000) with regular space
+    4. Replace newlines/tabs with regular space
+    5. Remove ALL whitespace characters (re.sub(r'\s+', '', name))
+    6. Handle empty names: generate 'Unnamed_1', 'Unnamed_2', etc.
+    7. Handle duplicates: append '_1', '_2' suffix
+
+    Examples:
+        >>> normalize_column_names(['月度  ', '  计划代码', '客户名称\n'])
+        ['月度', '计划代码', '客户名称']
+
+        >>> normalize_column_names(['客户　名称'])  # Full-width space U+3000
+        ['客户名称']
+
+        >>> normalize_column_names([None, 123, '月度'])
+        ['Unnamed_1', '123', '月度']
+    """
+      </signature>
+      <type_annotations>
+        <input>List[Any] - accepts any column type from pandas DataFrame</input>
+        <output>List[str] - always returns string list</output>
+      </type_annotations>
+    </function_signature>
+    <integration_interface>
+      <caller>ExcelReader.read_sheet()</caller>
+      <location>src/work_data_hub/io/readers/excel_reader.py</location>
+      <usage>
+# Inside ExcelReader.read_sheet()
+if normalize_columns:  # default=True
+    from work_data_hub.utils.column_normalizer import normalize_column_names
+    df.columns = normalize_column_names(df.columns.tolist())
+    # Store original → normalized mapping
+    columns_renamed = dict(zip(original_columns, df.columns))
+      </usage>
+      <return_enhancement>
+# ExcelReadResult dataclass update (Task 3)
+@dataclass
+class ExcelReadResult:
+    df: pd.DataFrame
+    sheet_name: str
+    row_count: int
+    columns_renamed: Dict[str, str]  # NEW: original → normalized mapping
+      </return_enhancement>
+    </integration_interface>
+    <logging_interface>
+      <event>normalization.completed</event>
+      <structured_log>
+{
+  "event": "normalization.completed",
+  "columns_normalized": 23,
+  "empty_placeholders_generated": 0,
+  "duplicates_resolved": 2,
+  "duration_ms": 0.5
+}
+      </structured_log>
+      <warnings>
+        <warning type="empty_columns">Log when Unnamed_N generated with column indices</warning>
+        <warning type="duplicates">Log when _N suffix added with original column names</warning>
+      </warnings>
+    </logging_interface>
+  </interfaces>
+  <tests>
+    <standards>
+      <standard>Target coverage: &gt;90% for normalize_column_names() function</standard>
+      <standard>All 6 acceptance criteria (AC1-AC6) must have corresponding test cases</standard>
+      <standard>Edge cases from real 202411 data must be included</standard>
+      <standard>Performance test asserting &lt;100ms for 100 columns, &lt;1ms for 23 columns</standard>
+    </standards>
+    <locations>
+      <unit_tests>tests/unit/utils/test_column_normalizer.py</unit_tests>
+      <integration_tests>tests/integration/io/readers/test_excel_reader.py (Task 3 validation)</integration_tests>
+      <performance_tests>tests/unit/utils/test_column_normalizer.py::test_normalization_performance</performance_tests>
+    </locations>
+    <ideas>
+      <test_case id="TC1" ac="AC1">
+        <name>test_basic_whitespace_normalization</name>
+        <input>['月度  ', '  计划代码', '客户名称\n', '期末资产规模']</input>
+        <expected>['月度', '计划代码', '客户名称', '期末资产规模']</expected>
+      </test_case>
+      <test_case id="TC2" ac="AC2">
+        <name>test_fullwidth_space_replacement</name>
+        <input>['客户　名称']  # U+3000 full-width space</input>
+        <expected>['客户名称']</expected>
+      </test_case>
+      <test_case id="TC3" ac="AC3">
+        <name>test_newline_tab_handling_removes_all_whitespace</name>
+        <input>['客户\n名称', '计划\t代码', '期 末 资 产']</input>
+        <expected>['客户名称', '计划代码', '期末资产']</expected>
+        <note>AC3 corrected: remove ALL whitespace, not just collapse</note>
+      </test_case>
+      <test_case id="TC4" ac="AC4">
+        <name>test_empty_column_name_placeholders</name>
+        <input>['', '   ', '\n', '月度']</input>
+        <expected>['Unnamed_1', 'Unnamed_2', 'Unnamed_3', '月度']</expected>
+      </test_case>
+      <test_case id="TC5" ac="AC5">
+        <name>test_duplicate_handling_with_suffix</name>
+        <input>['月度', '月度  ', '  月度']</input>
+        <expected>['月度', '月度_1', '月度_2']</expected>
+      </test_case>
+      <test_case id="TC6" ac="AC6">
+        <name>test_nonstring_type_handling</name>
+        <input>[None, 123, '月度', True, 3.14]</input>
+        <expected>['Unnamed_1', '123', '月度', 'True', '3.14']</expected>
+        <note>NEW from critique: None → Unnamed_N, others → str conversion</note>
+      </test_case>
+      <test_case id="TC7" ac="mixed">
+        <name>test_mixed_edge_cases</name>
+        <input>['月度  ', '客户　名称', '', '月度\n', 123]</input>
+        <expected>['月度', '客户名称', 'Unnamed_1', '月度_1', '123']</expected>
+        <note>Combines whitespace + full-width + empty + duplicate + non-string</note>
+      </test_case>
+      <test_case id="TC8" ac="preservation">
+        <name>test_chinese_character_preservation</name>
+        <input>['月度', '计划代码', '客户名称', '期末资产规模', '当期收益率']</input>
+        <expected>['月度', '计划代码', '客户名称', '期末资产规模', '当期收益率']</expected>
+        <note>Real 202411 column names - no changes expected</note>
+      </test_case>
+      <test_case id="TC9" ac="edge_case">
+        <name>test_emoji_in_column_names</name>
+        <input>['客户名称 😀', '月度 🎉']</input>
+        <expected>['客户名称😀', '月度🎉']</expected>
+        <note>Emoji preserved after whitespace removal (edge case documentation)</note>
+      </test_case>
+      <test_case id="TC10" ac="performance">
+        <name>test_normalization_performance_100_columns</name>
+        <input>Generate 100 columns with mixed edge cases</input>
+        <assertion>Duration &lt; 100ms</assertion>
+        <note>NFR requirement from Task 5</note>
+      </test_case>
+      <test_case id="TC11" ac="performance">
+        <name>test_normalization_performance_realistic_23_columns</name>
+        <input>Use real 202411 column names (23 columns)</input>
+        <assertion>Duration &lt; 1ms</assertion>
+        <note>Realistic benchmark from Action Item #2</note>
+      </test_case>
+    </ideas>
+  </tests>
+</story-context>

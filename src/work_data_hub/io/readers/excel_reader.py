@@ -9,6 +9,7 @@ all imports pointed inward (domain ← io ← orchestration).
 
 import logging
 import re
+import time
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime
@@ -18,7 +19,10 @@ from typing import Any, Dict, List, Optional, Union
 import pandas as pd
 
 from work_data_hub.io.connectors.exceptions import DiscoveryError
-from work_data_hub.utils.column_normalizer import normalize_columns
+from work_data_hub.utils.column_normalizer import (
+    normalize_column_names,
+    normalize_columns,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +34,9 @@ class ExcelReadResult:
     sheet_name: str            # Actual sheet name loaded
     row_count: int             # Number of data rows
     column_count: int          # Number of columns
+    columns_renamed: Dict[str, str]  # Original -> normalized mapping (may be empty)
+    normalization_duration_ms: Optional[int]  # Time spent normalizing column headers
+    duration_breakdown: Optional[Dict[str, int]]  # Detailed timing (read_ms, normalization_ms)
     file_path: Path            # Source file path
     read_at: datetime          # Timestamp of read operation
 
@@ -277,7 +284,8 @@ class ExcelReader:
         self,
         file_path: Path,
         sheet_name: Union[str, int],
-        skip_empty_rows: bool = True
+        skip_empty_rows: bool = True,
+        normalize_columns: bool = True,
     ) -> ExcelReadResult:
         """
         Read a specific sheet from an Excel file.
@@ -286,6 +294,7 @@ class ExcelReader:
             file_path: Path to Excel file (.xlsx or .xlsm)
             sheet_name: Sheet name (str) or 0-based index (int)
             skip_empty_rows: If True, drop rows where all values are NaN
+            normalize_columns: Apply column name normalization (default: True)
 
         Returns:
             ExcelReadResult with DataFrame and metadata
@@ -344,25 +353,56 @@ class ExcelReader:
             # Forward-fill merged cells so merged ranges share the first value
             df = df.ffill()
 
+            # Apply column normalization if enabled
+            columns_renamed: Dict[str, str] = {}
+            normalization_duration_ms: Optional[int] = None
+            raw_columns: List[str] = ["" if c is None else str(c) for c in df.columns]
+
+            if normalize_columns:
+                norm_start = time.perf_counter()
+                cleaned_columns: List[str] = []
+                for col_str in raw_columns:
+                    col_str = col_str.strip()
+                    col_str = col_str.replace("\n", " ").replace("\t", " ")
+                    if re.match(r"^Unnamed:\s*\d+", col_str):
+                        col_str = ""
+                    cleaned_columns.append(col_str)
+
+                normalized_columns = normalize_column_names(cleaned_columns)
+                columns_renamed = dict(zip(raw_columns, normalized_columns))
+                df.columns = normalized_columns
+                normalization_duration_ms = int(
+                    (time.perf_counter() - norm_start) * 1000
+                )
+            else:
+                df.columns = raw_columns
+
             duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+            duration_breakdown: Dict[str, int] = {"read_ms": duration_ms}
+            if normalization_duration_ms is not None:
+                duration_breakdown["normalization_ms"] = normalization_duration_ms
 
             result = ExcelReadResult(
                 df=df,
                 sheet_name=actual_sheet_name,
                 row_count=len(df),
                 column_count=len(df.columns),
+                columns_renamed=columns_renamed,
+                normalization_duration_ms=normalization_duration_ms,
+                duration_breakdown=duration_breakdown,
                 file_path=file_path,
                 read_at=start_time
             )
 
             logger.info(
-                "excel_reading.completed file_path=%s sheet_name=%s row_count=%s column_count=%s duration_ms=%s empty_rows_skipped=%s",
+                "excel_reading.completed file_path=%s sheet_name=%s row_count=%s column_count=%s duration_ms=%s empty_rows_skipped=%s normalization_ms=%s",
                 file_path,
                 actual_sheet_name,
                 result.row_count,
                 result.column_count,
                 duration_ms,
                 empty_count,
+                normalization_duration_ms,
             )
 
             return result

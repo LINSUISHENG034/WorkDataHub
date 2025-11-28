@@ -106,6 +106,23 @@ def merged_cells_excel_file(tmp_path):
     return excel_path
 
 
+@pytest.fixture
+def whitespace_columns_excel_file(tmp_path):
+    """Create Excel file with messy column names (whitespace, full-width, duplicates)."""
+    data = {
+        "月度  ": ["202411"],
+        "  计划代码": ["PLAN001"],
+        "客户　名称": ["客户A"],  # full-width space
+        "客户 名称": ["客户A"],   # duplicate after whitespace removal
+        "": ["空列"],             # empty column header
+    }
+
+    excel_path = tmp_path / "test_whitespace_columns.xlsx"
+    df = pd.DataFrame(data)
+    df.to_excel(excel_path, index=False, engine="openpyxl")
+    return excel_path
+
+
 class TestExcelReadSheetMethod:
     """Test ExcelReader.read_sheet() method."""
 
@@ -260,3 +277,48 @@ class TestExcelReadSheetMethod:
 
         assert exc_info.value.failed_stage == "excel_reading"
         assert "Excel file not found" in str(exc_info.value.message)
+
+    @pytest.mark.unit
+    def test_read_sheet_column_normalization_mapping(self, whitespace_columns_excel_file):
+        """Verify column normalization mapping and duplicate handling."""
+        reader = ExcelReader()
+        result = reader.read_sheet(whitespace_columns_excel_file, sheet_name=0)
+
+        assert result.columns_renamed == {
+            "月度  ": "月度",
+            "  计划代码": "计划代码",
+            "客户　名称": "客户名称",
+            "客户 名称": "客户名称_1",
+            "Unnamed: 4": "Unnamed_1",
+        }
+        assert list(result.df.columns) == [
+            "月度",
+            "计划代码",
+            "客户名称",
+            "客户名称_1",
+            "Unnamed_1",
+        ]
+        assert result.normalization_duration_ms is not None
+        assert result.duration_breakdown is not None
+        assert result.duration_breakdown.get("normalization_ms") == result.normalization_duration_ms
+
+    @pytest.mark.unit
+    def test_read_sheet_disable_normalization(self, whitespace_columns_excel_file):
+        """Normalization can be turned off when caller opts out."""
+        reader = ExcelReader()
+        result = reader.read_sheet(
+            whitespace_columns_excel_file, sheet_name=0, normalize_columns=False
+        )
+
+        # Columns remain as originally authored (pandas preserves ordering/whitespace)
+        assert result.columns_renamed == {}
+        assert list(result.df.columns) == [
+            "月度  ",
+            "  计划代码",
+            "客户　名称",
+            "客户 名称",
+            "Unnamed: 4",
+        ]
+        assert result.normalization_duration_ms is None
+        assert result.duration_breakdown is not None
+        assert "normalization_ms" not in result.duration_breakdown
