@@ -68,10 +68,10 @@ development_status:
   3-3-multi-sheet-excel-reader: done
   3-4-column-name-normalization: done
   3-5-file-discovery-integration: done
-  epic-3-retrospective: optional
+  epic-3-retrospective: completed
 
   # Epic 4: Annuity Performance Domain Migration (MVP)
-  epic-4: backlog
+  epic-4: contexted
   4-1-annuity-domain-data-models-pydantic: backlog
   4-2-annuity-bronze-layer-validation-schema: backlog
   4-3-annuity-transformation-pipeline-bronze-silver: backlog
