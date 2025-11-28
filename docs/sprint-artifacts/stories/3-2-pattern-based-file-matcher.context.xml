@@ -1,0 +1,142 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>2</storyId>
+    <title>Pattern-Based File Matcher</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/3-2-pattern-based-file-matcher.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>flexible file matching using glob patterns with include/exclude rules</iWant>
+    <soThat>files are found despite naming variations and temp files are automatically filtered out</soThat>
+    <tasks>- Task 1: Implement FilePatternMatcher core logic (AC: include/exclude pattern matching)
+  - Subtask 1.1: Create `io/connectors/file_pattern_matcher.py` module
+  - Subtask 1.2: Implement `match_files()` method with glob pattern support
+  - Subtask 1.3: Add include pattern logic (OR logic across patterns)
+  - Subtask 1.4: Add exclude pattern logic (AND NOT logic)
+  - Subtask 1.5: Handle Unicode/Chinese characters in patterns and paths
+
+- Task 2: Implement validation and error handling (AC: exactly 1 file requirement)
+  - Subtask 2.1: Create `FileMatchResult` dataclass with metadata
+  - Subtask 2.2: Add validation for exactly 1 remaining file after filtering
+  - Subtask 2.3: Raise DiscoveryError with structured context for no matches
+  - Subtask 2.4: Raise DiscoveryError with candidate list for ambiguous matches
+  - Subtask 2.5: Include full file paths in error messages
+
+- Task 3: Add Unicode and cross-platform support (AC: Chinese characters)
+  - Subtask 3.1: Test UTF-8 pattern matching on Windows and Linux
+  - Subtask 3.2: Handle full-width and half-width characters in patterns
+  - Subtask 3.3: Validate path encoding consistency across platforms
+  - Subtask 3.4: Add platform-specific error handling for file system limitations
+
+- Task 4: Implement structured logging (AC: match process logged)
+  - Subtask 4.1: Log file scanning start with path and patterns
+  - Subtask 4.2: Log candidate files discovered (before filtering)
+  - Subtask 4.3: Log filtered results with exclude pattern matches
+  - Subtask 4.4: Log final selected file with metadata
+  - Subtask 4.5: Use Epic 1 Story 1.3 structured logging (JSON format)
+
+- Task 5: Add comprehensive unit tests (AC: all patterns and edge cases tested)
+  - Subtask 5.1: Test include pattern matching with multiple patterns
+  - Subtask 5.2: Test exclude pattern filtering (temp files, replies)
+  - Subtask 5.3: Test Unicode Chinese characters in patterns and filenames
+  - Subtask 5.4: Test error cases (no matches, ambiguous matches)
+  - Subtask 5.5: Test edge cases (empty directories, special characters)
+
+- Task 6: Write integration tests with real folder structures (AC: end-to-end matching)
+  - Subtask 6.1: Create temporary folder with realistic Excel files
+  - Subtask 6.2: Test matching with temp files and exclude patterns
+  - Subtask 6.3: Test ambiguous match scenarios with multiple candidates
+  - Subtask 6.4: Test Chinese characters in real file names
+  - Subtask 6.5: Test performance: file matching <1 second for typical folder
+
+- Task 7: Update documentation (AC: FilePatternMatcher documented)
+  - Subtask 7.1: Document FilePatternMatcher API in docstrings
+  - Subtask 7.2: Add pattern matching section to README.md
+  - Subtask 7.3: Document supported glob patterns and Unicode handling
+  - Subtask 7.4: Add troubleshooting guide for pattern matching issues
+  - Subtask 7.5: Reference Epic 3 Tech Spec and Decision #1</tasks>
+  </story>
+
+  <acceptanceCriteria>**Given** I configure file patterns in `config/data_sources.yml`:
+```yaml
+annuity_performance:
+  file_patterns:
+    - "*年金*.xlsx"
+    - "*规模明细*.xlsx"
+  exclude_patterns:
+    - "~$*"  # Excel temp files
+    - "*回复*"  # Email reply files
+```
+
+**When** I scan folder with files: `年金数据2025.xlsx`, `~$年金数据2025.xlsx`, `规模明细回复.xlsx`
+**Then** Matcher should:
+- Find files matching include patterns: `["年金数据2025.xlsx"]`
+- Exclude temp files and replies
+- Return exactly 1 matching file
+- Log: "File matching: 3 candidates, 1 match after filtering"
+
+**And** When no files match patterns
+**Then** Raise error: "No files found matching patterns ['*年金*.xlsx', '*规模明细*.xlsx'] in path /reference/monthly/202501/..."
+
+**And** When multiple files match after filtering
+**Then** Raise error with candidate list: "Ambiguous match: Found 2 files ['年金数据V1.xlsx', '年金数据V2.xlsx'], refine patterns or use version detection"
+
+**And** When pattern uses Chinese characters
+**Then** Matcher correctly handles UTF-8 encoding and finds matches</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/sprint-artifacts/tech-spec-epic-3.md" title="Epic Technical Specification: Intelligent File Discovery & Version Detection" section="Objectives and Scope" snippet="Epic 3 implements an intelligent file discovery system that automatically detects latest data version (V1, V2, V3) across all domains and matches files using configurable glob patterns. This epic eliminates manual 'which file should I process?' decision every month."/>
+      <doc path="docs/sprint-artifacts/tech-spec-epic-3.md" title="Epic Technical Specification: Intelligent File Discovery & Version Detection" section="System Architecture Alignment" snippet="Decision #1: File-Pattern-Aware Version Detection - Scopes version detection to specific file patterns per domain, enabling partial corrections without forcing all domains to same version."/>
+      <doc path="docs/architecture.md" title="WorkDataHub Scale Adaptive Architecture" section="Architecture Decisions" snippet="Decision #1: File-Pattern-Aware Version Detection - Intelligent version selection scoped per domain. Decision #4: Hybrid Error Context Standards - Structured exceptions with required context fields."/>
+      <doc path="docs/sprint-artifacts/stories/3-1-version-aware-folder-scanner.md" title="Story 3.1: Version-Aware Folder Scanner" section="Implementation Guidance" snippet="FilePatternMatcher Class with match_files() method, DiscoveryError pattern with failed_stage marker, structured logging integration."/>
+    </docs>
+    <code>
+      <artifact path="src/work_data_hub/io/connectors/version_scanner.py" kind="controller" symbol="VersionScanner" lines="45-95" reason="Previous Story 3.1 provides version detection foundation with DiscoveryError pattern and structured logging"/>
+      <artifact path="src/work_data_hub/io/connectors/exceptions.py" kind="utility" symbol="DiscoveryError" lines="1-45" reason="Existing structured exception pattern for consistent error handling across Epic 3"/>
+      <artifact path="src/work_data_hub/utils/logging.py" kind="utility" symbol="structured logging" lines="1-50" reason="Epic 1 Story 1.3 structured logging for consistent JSON format events"/>
+    </code>
+    <dependencies>
+      <ecosystem name="python" packages="pandas, pathlib, pydantic, fnmatch, unicodedata"/>
+      <ecosystem name="openpyxl" packages="openpyxl" purpose="Excel file reading with UTF-8 support"/>
+      <ecosystem name="dagster" packages="dagster" purpose="Pipeline orchestration framework for Epic 3 integration"/>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint name="Architecture Alignment" type="clean-architecture">FilePatternMatcher must be implemented in I/O layer (src/work_data_hub/io/connectors/) with no domain dependencies. Use DiscoveryError pattern with failed_stage='file_matching' for consistent error handling across Epic 3.</constraint>
+    <constraint name="Error Handling Standards" type="structured">All errors must raise DiscoveryError with domain='annuity_performance', failed_stage='file_matching', and actionable messages. Follow Epic 2 lessons: two-round code review, comprehensive edge case testing.</constraint>
+    <constraint name="Unicode Support" type="requirement">Must handle Chinese characters in filenames and patterns using unicodedata.normalize('NFC') and UTF-8 encoding consistently across Windows and Linux platforms.</constraint>
+    <constraint name="Performance Requirements" type="nfr">File matching must complete within 1 second for typical folder (NFR from tech-spec). Use pathlib.Path.glob() for optimal performance.</constraint>
+    <constraint name="Integration Points" type="handoff">Story 3.2 must integrate with Story 3.1 VersionScanner output (VersionedPath.selected_path) and prepare for Story 3.5 FileDiscoveryService orchestration.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="FilePatternMatcher.match_files" kind="method" signature="def match_files(search_path: Path, include_patterns: List[str], exclude_patterns: Optional[List[str]] = None) -> FileMatchResult" path="src/work_data_hub/io/connectors/file_pattern_matcher.py" purpose="Public API for pattern matching"/>
+    <interface name="DiscoveryError" kind="exception" signature="class DiscoveryError(Exception, domain, failed_stage, original_error, message)" path="src/work_data_hub/io/connectors/exceptions.py" purpose="Structured error handling for file discovery failures"/>
+    <interface name="FileMatchResult" kind="dataclass" signature="@dataclass class FileMatchResult(matched_file: Path, patterns_used: List[str], exclude_patterns: List[str], candidates_found: List[Path], excluded_files: List[Path], match_count: int, selected_at: datetime)" path="src/work_data_hub/io/connectors/file_pattern_matcher.py" purpose="Structured result metadata for file matching operations"/>
+  </interfaces>
+
+  <tests>
+    <standards>Follow Epic 1 Story 1.3 structured logging (JSON format) with fields: search_path, include_patterns, exclude_patterns, candidates_count, selected_file, match_count. Use pytest with realistic fixtures based on Action Item #2 findings. Performance requirement: file matching <1 second. Two-round code review expected based on Epic 2 patterns (34.6% test failure rate prevented).</standards>
+    <locations>
+      <location path="tests/unit/io/connectors/test_file_pattern_matcher.py" type="unit" description="Unit tests for FilePatternMatcher with include/exclude patterns and Unicode handling"/>
+      <location path="tests/integration/io/test_file_pattern_matching.py" type="integration" description="End-to-end file matching with realistic folder structures and Chinese characters"/>
+    </locations>
+    <ideas>
+      <test name="include_patterns_find_matching_files" acceptanceCriteria="AC: Include patterns find matching files" description="Test multiple include patterns with OR logic"/>
+      <test name="exclude_patterns_filter_temp_files" acceptanceCriteria="AC: Exclude patterns filter out temp files" description="Test exclude patterns with ~$* and *回复* patterns"/>
+      <test name="exactly_one_file_required" acceptanceCriteria="AC: Exactly 1 file must remain after filtering" description="Test validation for 0 and >1 file matches with DiscoveryError"/>
+      <test name="chinese_characters_in_patterns" acceptanceCriteria="AC: Chinese characters handled correctly" description="Test UTF-8 pattern matching with Chinese filenames and patterns"/>
+      <test name="unicode_normalization" acceptanceCriteria="AC: Unicode normalization works correctly" description="Test full-width character handling and NFC normalization"/>
+      <test name="performance_requirement" acceptanceCriteria="AC: File matching completes within 1 second" description="Test performance with 100 files in typical folder"/>
+      <test name="ambiguous_match_scenarios" acceptanceCriteria="AC: Ambiguous match scenarios with multiple candidates" description="Test error handling when multiple files match patterns"/>
+      <test name="edge_cases" acceptanceCriteria="AC: Edge cases (empty directories, special characters)" description="Test empty directories, special characters, platform-specific issues"/>
+    </ideas>
+  </tests>
+</story-context>
