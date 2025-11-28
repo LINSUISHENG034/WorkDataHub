@@ -62,7 +62,7 @@ development_status:
 
   # Epic 3: Intelligent File Discovery & Version Detection
   epic-3: contexted
-  3-0-data-source-configuration-schema-validation: backlog
+  3-0-data-source-configuration-schema-validation: done
   3-1-version-aware-folder-scanner: backlog
   3-2-pattern-based-file-matcher: backlog
   3-3-multi-sheet-excel-reader: backlog

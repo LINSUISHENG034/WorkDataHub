@@ -1,0 +1,63 @@
+# WorkDataHub Data Source Configuration
+# Epic 3: Intelligent File Discovery & Version Detection
+# Schema Version: 1.0
+#
+# This file defines file discovery patterns for all data domains using the
+# new Epic 3 architecture with version-aware folder scanning.
+#
+# Configuration Structure:
+# - base_path: Path template with {YYYYMM}, {YYYY}, {MM} placeholders
+# - file_patterns: Glob patterns to match files (e.g., "*年金终稿*.xlsx")
+# - exclude_patterns: Patterns to exclude (temp files, emails, etc.)
+# - sheet_name: Excel sheet name (string) or 0-based index (int)
+# - version_strategy: How to select version folder (highest_number, latest_modified, manual)
+# - fallback: Behavior when version detection is ambiguous (error, use_latest_modified)
+
+# Schema version for backward compatibility
+schema_version: "1.0"
+
+domains:
+  # Annuity Performance Domain
+  # ✅ VALIDATED with real 202411 data (Epic 3 Tech Spec Action Item #2)
+  # Path structure: reference/monthly/202411/收集数据/数据采集/V1/*.xlsx
+  annuity_performance:
+    # Base path with template variable {YYYYMM} (e.g., 202501)
+    # Corrected from 业务收集 to 数据采集 based on real data validation
+    base_path: "reference/monthly/{YYYYMM}/收集数据/数据采集"
+
+    # File patterns to match (glob syntax)
+    # Pattern validated: matches exactly 1 file in V1 directory
+    # Example: 24年11月年金终稿数据.xlsx
+    file_patterns:
+      - "*年金终稿*.xlsx"
+
+    # Patterns to exclude (temp files, emails, etc.)
+    exclude_patterns:
+      - "~$*"         # Excel temp files
+      - "*回复*"      # Email reply files
+      - "*.eml"       # Email message files
+
+    # Excel sheet name to load
+    sheet_name: "规模明细"
+
+    # Version selection strategy:
+    # - highest_number: Select V3 > V2 > V1 (default)
+    # - latest_modified: Select most recently modified folder
+    # - manual: Require explicit --version CLI flag
+    version_strategy: "highest_number"
+
+    # Fallback behavior when version detection ambiguous:
+    # - error: Raise error and halt (default, safest)
+    # - use_latest_modified: Fall back to timestamp-based selection
+    fallback: "error"
+
+  # Future domains (Epic 9) can be added here:
+  # universal_insurance:
+  #   base_path: "reference/monthly/{YYYYMM}/收集数据/业务收集"
+  #   file_patterns:
+  #     - "*万能险*.xlsx"
+  #   exclude_patterns:
+  #     - "~$*"
+  #   sheet_name: "明细数据"
+  #   version_strategy: "highest_number"
+  #   fallback: "error"

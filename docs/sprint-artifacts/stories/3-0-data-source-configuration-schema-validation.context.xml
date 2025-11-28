@@ -1,0 +1,260 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>0</storyId>
+    <title>Data Source Configuration Schema Validation</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/3-0-data-source-configuration-schema-validation.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a data engineer</asA>
+    <iWant>Pydantic validation of the data_sources.yml configuration structure</iWant>
+    <soThat>configuration errors are caught at startup before any pipeline runs, preventing cryptic runtime failures</soThat>
+    <tasks>
+      <task id="1" status="pending">
+        <title>Create Pydantic configuration schema models</title>
+        <subtasks>
+          <subtask id="1.1">Create config/schemas.py module</subtask>
+          <subtask id="1.2">Implement DomainConfig Pydantic model with all required fields</subtask>
+          <subtask id="1.3">Implement DataSourceConfig model as container for all domains</subtask>
+          <subtask id="1.4">Add enum validation for version_strategy and fallback fields</subtask>
+          <subtask id="1.5">Add field validators with clear error messages</subtask>
+          <subtask id="1.6">Add template variable whitelist validation (security: prevent injection attacks)</subtask>
+        </subtasks>
+      </task>
+      <task id="2" status="pending">
+        <title>Integrate schema validation into settings</title>
+        <subtasks>
+          <subtask id="2.1">Load data_sources.yml in config/settings.py</subtask>
+          <subtask id="2.2">Validate loaded YAML using Pydantic models</subtask>
+          <subtask id="2.3">Fail fast on validation errors (prevent application startup)</subtask>
+          <subtask id="2.4">Add structured logging for validation success/failure</subtask>
+        </subtasks>
+      </task>
+      <task id="3" status="pending">
+        <title>Create YAML configuration file</title>
+        <subtasks>
+          <subtask id="3.1">Create config/data_sources.yml with annuity_performance domain</subtask>
+          <subtask id="3.2">Document all configuration fields with comments</subtask>
+          <subtask id="3.3">Add template variable examples ({YYYYMM}, {YYYY}, {MM})</subtask>
+          <subtask id="3.4">Validate YAML syntax and structure</subtask>
+        </subtasks>
+      </task>
+      <task id="4" status="pending">
+        <title>Write comprehensive unit tests</title>
+        <subtasks>
+          <subtask id="4.1">Test valid configuration passes validation</subtask>
+          <subtask id="4.2">Test missing required field raises ValidationError</subtask>
+          <subtask id="4.3">Test invalid enum value raises ValidationError</subtask>
+          <subtask id="4.4">Test invalid field type (e.g., string instead of list)</subtask>
+          <subtask id="4.5">Test template variables allowed in paths</subtask>
+          <subtask id="4.6">Test empty domains dict raises error</subtask>
+          <subtask id="4.7">Test Chinese characters in file_patterns (Unicode handling edge case)</subtask>
+          <subtask id="4.8">Test Windows MAX_PATH (260 char) limit handling</subtask>
+          <subtask id="4.9">Test special characters in sheet_name (quotes, slashes, edge cases)</subtask>
+          <subtask id="4.10">Test invalid template variables rejected (security: whitelist enforcement)</subtask>
+        </subtasks>
+      </task>
+      <task id="5" status="pending">
+        <title>Write integration tests</title>
+        <subtasks>
+          <subtask id="5.1">Test settings initialization with valid config file</subtask>
+          <subtask id="5.2">Test settings initialization fails with invalid config</subtask>
+          <subtask id="5.3">Test structured logging outputs correct messages</subtask>
+          <subtask id="5.4">Test configuration accessible via settings singleton</subtask>
+          <subtask id="5.5">Test end-to-end config → file discovery integration (prevents runtime errors)</subtask>
+        </subtasks>
+      </task>
+      <task id="6" status="pending">
+        <title>Update documentation</title>
+        <subtasks>
+          <subtask id="6.1">Document configuration schema in README.md</subtask>
+          <subtask id="6.2">Add configuration examples for common patterns</subtask>
+          <subtask id="6.3">Document error messages and troubleshooting</subtask>
+          <subtask id="6.4">Add configuration validation to developer guide</subtask>
+          <subtask id="6.5">Document configuration migration strategy (schema_version field usage)</subtask>
+          <subtask id="6.6">Document security considerations (template vars, path traversal prevention)</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-1">
+      <given>I have config/data_sources.yml with domain configurations</given>
+      <when>application starts and loads configuration</when>
+      <then>
+        System should:
+        - Validate entire YAML structure using Pydantic DataSourceConfig model
+        - Verify required fields per domain: base_path, file_patterns, sheet_name
+        - Validate field types: file_patterns is list of strings, version_strategy is enum
+        - Check enum values: version_strategy in ['highest_number', 'latest_modified', 'manual']
+        - Raise clear error on missing/invalid fields before any file operations
+      </then>
+    </criterion>
+    <criterion id="AC-2">
+      <when>configuration has missing required field (e.g., sheet_name)</when>
+      <then>Raise ValidationError at startup: "Domain 'annuity_performance' missing required field 'sheet_name'"</then>
+    </criterion>
+    <criterion id="AC-3">
+      <when>configuration has invalid version strategy</when>
+      <then>Raise ValidationError: "Invalid version_strategy 'newest', must be one of: ['highest_number', 'latest_modified', 'manual']"</then>
+    </criterion>
+    <criterion id="AC-4">
+      <when>configuration is valid</when>
+      <then>Log success: "Configuration validated: 6 domains configured"</then>
+    </criterion>
+    <criterion id="AC-5">
+      <when>template variables in paths (e.g., {YYYYMM})</when>
+      <then>Validation allows placeholders, validates structure not resolved values</then>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-3.md</path>
+        <title>Epic Technical Specification: Intelligent File Discovery & Version Detection</title>
+        <section>Configuration Schema Validation (Story 3.0)</section>
+        <snippet>Story 3.0 implements Pydantic validation of data_sources.yml structure. Validates domain configs: base_path, file_patterns, sheet_name, version_strategy. Prevents runtime errors from malformed config.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-3.md</path>
+        <title>Epic 3 Tech Spec</title>
+        <section>Data Source Validation & Real Data Analysis</section>
+        <snippet>Action Item #2 completed with real 202411 data analysis. Path corrected from 业务收集 to 数据采集. Pattern validated: *年金终稿*.xlsx matches exactly 1 file.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-3.md</path>
+        <title>Epic 3 Tech Spec</title>
+        <section>Acceptance Criteria - Story 3.0</section>
+        <snippet>AC1: Valid data_sources.yml validated with Pydantic. AC2: Missing required field raises ValidationError. AC3: Invalid enum value raises ValidationError with actionable message.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Scale Adaptive Architecture</title>
+        <section>Decision #7: Comprehensive Naming Conventions</section>
+        <snippet>Configuration files use snake_case.yml naming. Pydantic fields use original Chinese from Excel sources. Database columns use lowercase_snake_case English.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Technology Stack - Data Validation</section>
+        <snippet>Pydantic 2.11.7+ for row-level validation with type safety and performance. Validates configuration at startup, fails fast on validation errors.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Decision #8: structlog with Sanitization</section>
+        <snippet>All configuration validation events logged with structlog. Success: domain_count, duration. Failure: error details, validation message, config_file path.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/work_data_hub/config/schema.py</path>
+        <kind>module</kind>
+        <symbol>DomainConfig, DataSourcesConfig</symbol>
+        <lines>19-61</lines>
+        <reason>EXISTING SCHEMA - requires refactoring. Current structure uses 'pattern','select','sheet' but Story 3.0 needs 'base_path','file_patterns','sheet_name','version_strategy' per Epic 3 tech spec</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/config/settings.py</path>
+        <kind>module</kind>
+        <symbol>Settings class</symbol>
+        <lines>77-303</lines>
+        <reason>Configuration framework from Epic 1 Story 1.4. Has data_sources_config field (line 145). Story 3.0 integrates with this existing settings pattern.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/config/data_sources.yml</path>
+        <kind>config</kind>
+        <symbol>N/A</symbol>
+        <lines>1-165</lines>
+        <reason>EXISTING CONFIG - requires refactoring. Current format differs from Epic 3 design. Need to migrate from pattern-based to base_path+file_patterns structure.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/config/mapping_loader.py</path>
+        <kind>module</kind>
+        <symbol>mapping loader utilities</symbol>
+        <lines>N/A</lines>
+        <reason>Existing YAML loading utilities. May need updates to support new schema structure with validation.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <python>
+        <package name="pydantic" version="2.11.7+">Row-level validation, type safety, field validators</package>
+        <package name="pyyaml" version="latest">YAML file loading and parsing</package>
+        <package name="pathlib" version="stdlib">Path operations and validation</package>
+      </python>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">Clean Architecture: Configuration lives in config/ layer, validated at startup before any business logic</constraint>
+    <constraint type="architecture">Epic 3 dependency: All file discovery stories (3.1-3.5) depend on validated configuration from Story 3.0</constraint>
+    <constraint type="naming">Configuration files use snake_case.yml per Architecture Decision #7</constraint>
+    <constraint type="validation">Fail-fast philosophy: validation errors must prevent application startup, not runtime failures</constraint>
+    <constraint type="security">Path traversal prevention: base_path cannot contain '..' per security requirements</constraint>
+    <constraint type="security">Template variable whitelist: Only {YYYYMM}, {YYYY}, {MM} allowed to prevent injection attacks</constraint>
+    <constraint type="compatibility">Brownfield refactor: Must migrate existing schema.py and data_sources.yml to new Epic 3 structure</constraint>
+    <constraint type="logging">Use structlog (Decision #8) for all configuration validation events with domain_count, validation status</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>DataSourceConfig model</name>
+      <kind>Pydantic schema</kind>
+      <signature>class DataSourceConfig(BaseModel): schema_version: str, domains: Dict[str, DomainConfig]</signature>
+      <path>src/work_data_hub/config/schema.py</path>
+    </interface>
+    <interface>
+      <name>DomainConfig model</name>
+      <kind>Pydantic schema</kind>
+      <signature>class DomainConfig(BaseModel): base_path: str, file_patterns: List[str], exclude_patterns: List[str], sheet_name: str|int, version_strategy: Literal, fallback: Literal</signature>
+      <path>src/work_data_hub/config/schema.py</path>
+    </interface>
+    <interface>
+      <name>Settings integration</name>
+      <kind>Configuration loading</kind>
+      <signature>Settings class loads and validates data_sources.yml via _load_data_sources() method, stores as self.data_sources</signature>
+      <path>src/work_data_hub/config/settings.py</path>
+    </interface>
+    <interface>
+      <name>Field validators</name>
+      <kind>Pydantic validators</kind>
+      <signature>@field_validator for base_path (path traversal check, template variable whitelist), file_patterns (min 1 pattern), domains (min 1 domain)</signature>
+      <path>src/work_data_hub/config/schema.py</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Testing framework: pytest with custom markers (unit, integration, parity).
+      Target coverage: ≥80% for config module.
+      Pydantic validation pattern: Test valid configs pass, missing fields raise ValidationError with clear messages.
+      Real data validation: Configuration tested with actual 202411 data structure from Action Item #2.
+      Epic 2 lesson: Create realistic test fixtures, not idealized "perfect" data.
+    </standards>
+    <locations>
+      - tests/unit/config/test_schema.py (unit tests for Pydantic models)
+      - tests/integration/config/test_settings_integration.py (integration tests for Settings class loading)
+    </locations>
+    <ideas>
+      <idea ac_id="AC-1">Test valid annuity_performance config with all fields passes validation without errors</idea>
+      <idea ac_id="AC-2">Test config missing sheet_name raises ValidationError with message containing "sheet_name" and "Field required"</idea>
+      <idea ac_id="AC-3">Test invalid version_strategy='newest' raises ValidationError listing valid enum values</idea>
+      <idea ac_id="AC-1">Test config with template variables {YYYYMM}, {YYYY}, {MM} in base_path validates successfully</idea>
+      <idea ac_id="AC-1">Test config with empty file_patterns list raises ValidationError</idea>
+      <idea ac_id="AC-1">Test config with empty domains dict raises ValidationError</idea>
+      <idea ac_id="AC-2">Test base_path containing '..' raises ValidationError with directory traversal message</idea>
+      <idea ac_id="AC-5">Test invalid template variable {FOO} in base_path raises ValidationError with whitelist enforcement</idea>
+      <idea ac_id="AC-1">Test Chinese characters in file_patterns (Unicode handling edge case)</idea>
+      <idea ac_id="AC-1">Test Windows MAX_PATH limit handling in base_path validation</idea>
+      <idea ac_id="AC-1">Test special characters in sheet_name (quotes, slashes, edge cases)</idea>
+      <idea ac_id="AC-4">Test Settings initialization with valid config file logs success with domain_count</idea>
+      <idea ac_id="AC-2">Test Settings initialization fails with invalid config, logs error with validation details</idea>
+      <idea ac_id="AC-1">Test get_settings() singleton returns same instance on multiple calls</idea>
+      <idea ac_id="AC-1">Integration test: config → FileDiscoveryService integration prevents runtime errors</idea>
+    </ideas>
+  </tests>
+</story-context>

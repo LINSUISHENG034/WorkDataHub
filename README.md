@@ -334,7 +334,73 @@ WorkDataHub uses centralized configuration management powered by Pydantic Settin
    DB_POOL_SIZE=20
    ```
 
-### Using Configuration in Code
+### Data Sources Configuration (Epic 3)
+
+WorkDataHub Epic 3 implements intelligent file discovery with version-aware configuration through `config/data_sources.yml`. This configuration defines how data files are discovered, matched, and loaded across different domains and data versions.
+
+#### Configuration Structure
+
+```yaml
+# Epic 3: Intelligent File Discovery & Version Detection
+# Schema Version: 1.0
+
+schema_version: "1.0"
+
+domains:
+  # Annuity Performance Domain (validated with real 202411 data)
+  annuity_performance:
+    # Base path with template variables
+    base_path: "reference/monthly/{YYYYMM}/收集数据/数据采集"
+    # File patterns to match (glob syntax)
+    file_patterns:
+      - "*年金终稿*.xlsx"
+    # Patterns to exclude (temp files, emails, etc.)
+    exclude_patterns:
+      - "~$*"         # Excel temp files
+      - "*回复*"      # Email reply files
+      - "*.eml"       # Email message files
+    # Excel sheet name to load
+    sheet_name: "规模明细"
+    # Version selection strategy
+    version_strategy: "highest_number"
+    # Fallback behavior when version detection ambiguous
+    fallback: "error"
+
+  # Future domains can be added here:
+  # universal_insurance:
+  #   base_path: "reference/monthly/{YYYYMM}/收集数据/业务收集"
+  #   file_patterns: ["*万能险*.xlsx"]
+  #   sheet_name: "明细数据"
+```
+
+#### Configuration Fields
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `schema_version` | string | No | "1.0" | Configuration schema version for backward compatibility |
+| `base_path` | string | Yes | - | Path template with `{YYYYMM}`, `{YYYY}`, `{MM}` placeholders |
+| `file_patterns` | list[string] | Yes | - | Glob patterns to match files (at least 1 required) |
+| `exclude_patterns` | list[string] | No | [] | Glob patterns to exclude (temp files, emails) |
+| `sheet_name` | string|int | Yes | - | Excel sheet name (string) or 0-based index (int) |
+| `version_strategy` | enum | No | "highest_number" | Strategy: "highest_number", "latest_modified", "manual" |
+| `fallback` | enum | No | "error" | Fallback: "error", "use_latest_modified" |
+
+#### Version Strategy Options
+
+- **`highest_number`** (default): Select V3 > V2 > V1 (numeric version folders)
+- **`latest_modified`**: Select most recently modified folder
+- **`manual`**: Require explicit `--version=V1` CLI flag
+
+#### Template Variables
+
+Allowed template variables in `base_path`:
+- `{YYYYMM}`: Full year and month (e.g., 202501)
+- `{YYYY}`: Full year (e.g., 2025)
+- `{MM}`: Month (e.g., 01)
+
+**Security**: Only whitelisted variables allowed to prevent injection attacks.
+
+#### Using Configuration in Code
 
 ```python
 # Import the pre-instantiated singleton

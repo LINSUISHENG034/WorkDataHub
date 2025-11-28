@@ -4,15 +4,23 @@ Configuration management for WorkDataHub.
 This module provides environment-based configuration using Pydantic BaseSettings,
 allowing for flexible deployment across development, testing, and production
 environments while maintaining secure credential management.
+
+Story 3.0: Integrated Epic 3 data source configuration validation at startup.
 """
 
 import os
+import structlog
+import yaml
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Optional
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from .schema import DataSourceConfigV2, DataSourcesValidationError
+
+logger = structlog.get_logger(__name__)
 
 # Determine project root for resolving .env by default
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -145,7 +153,19 @@ class Settings(BaseSettings):
 
     data_sources_config: str = Field(
         default="./src/work_data_hub/config/data_sources.yml",
-        description="Path to data sources configuration file",
+        description="Path to legacy data sources configuration file",
+    )
+
+    # Epic 3 Story 3.0: New data source configuration
+    data_sources_config_v2: str = Field(
+        default="./config/data_sources.yml",
+        description="Path to Epic 3 data sources configuration file",
+    )
+
+    # Loaded and validated Epic 3 data source configuration
+    data_sources: Optional[DataSourceConfigV2] = Field(
+        default=None,
+        description="Validated Epic 3 data source configuration (loaded at startup)",
     )
 
     # Performance settings
@@ -291,6 +311,76 @@ class Settings(BaseSettings):
                 f"DATABASE_URL must start with 'postgresql://', "
                 f"got: {db_url_preview}..."
             )
+
+        return self
+
+    @model_validator(mode="after")
+    def load_and_validate_data_sources(self) -> "Settings":
+        """
+        Load and validate Epic 3 data sources configuration at startup.
+
+        Story 3.0: Fail-fast validation - configuration errors prevent application startup.
+
+        Returns:
+            The validated Settings instance with loaded data_sources
+
+        Raises:
+            DataSourcesValidationError: If configuration file is missing or invalid
+        """
+        config_path = Path(self.data_sources_config_v2)
+
+        # Check if config file exists
+        if not config_path.exists():
+            error_msg = (
+                f"Epic 3 data sources configuration file not found: {config_path}. "
+                "Create config/data_sources.yml with domain configurations."
+            )
+            logger.error(
+                "configuration.file_not_found",
+                config_path=str(config_path),
+                error=error_msg,
+            )
+            raise DataSourcesValidationError(error_msg)
+
+        # Load YAML file
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                raw_config = yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            error_msg = f"Invalid YAML in configuration file: {e}"
+            logger.error(
+                "configuration.yaml_parse_error",
+                config_path=str(config_path),
+                error=str(e),
+            )
+            raise DataSourcesValidationError(error_msg)
+        except Exception as e:
+            error_msg = f"Failed to load configuration file: {e}"
+            logger.error(
+                "configuration.load_error",
+                config_path=str(config_path),
+                error=str(e),
+            )
+            raise DataSourcesValidationError(error_msg)
+
+        # Validate using Pydantic schema
+        try:
+            self.data_sources = DataSourceConfigV2(**raw_config)
+            logger.info(
+                "configuration.validated",
+                schema_version=self.data_sources.schema_version,
+                domain_count=len(self.data_sources.domains),
+                domains=list(self.data_sources.domains.keys()),
+                config_path=str(config_path),
+            )
+        except Exception as e:
+            error_msg = f"Configuration validation failed: {e}"
+            logger.error(
+                "configuration.validation_failed",
+                config_path=str(config_path),
+                error=str(e),
+            )
+            raise DataSourcesValidationError(error_msg)
 
         return self
 
