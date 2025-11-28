@@ -1,0 +1,289 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>1</storyId>
+    <title>Version-Aware Folder Scanner</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/3-1-version-aware-folder-scanner.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a data engineer</asA>
+    <iWant>automatic detection of versioned folders (V1, V2, V3) with configurable precedence rules</iWant>
+    <soThat>the system always processes the latest data version without manual selection</soThat>
+    <tasks>
+      <task id="1" title="Implement VersionScanner core detection logic">
+        <subtask id="1.1">Create io/connectors/version_scanner.py module</subtask>
+        <subtask id="1.2">Implement detect_version() method with base_path scanning</subtask>
+        <subtask id="1.3">Add regex pattern matching for V\d+ folders</subtask>
+        <subtask id="1.4">Implement highest_number strategy (V3 > V2 > V1 numeric sort)</subtask>
+        <subtask id="1.5">Implement latest_modified strategy (timestamp-based selection)</subtask>
+        <subtask id="1.6">Add fallback logic when no version folders found</subtask>
+      </task>
+      <task id="2" title="Implement VersionedPath result model">
+        <subtask id="2.1">Create VersionedPath dataclass with path, version, strategy_used fields</subtask>
+        <subtask id="2.2">Add validation ensuring version path exists and is readable</subtask>
+        <subtask id="2.3">Include metadata: selected_at timestamp, rejected_versions list</subtask>
+      </task>
+      <task id="3" title="Add file-pattern-aware version detection">
+        <subtask id="3.1">Accept file_patterns parameter in detect_version()</subtask>
+        <subtask id="3.2">Check each version folder for matching files before selection</subtask>
+        <subtask id="3.3">Skip version folders with no matching files (Decision #1)</subtask>
+        <subtask id="3.4">Log skipped versions</subtask>
+      </task>
+      <task id="4" title="Implement manual override strategy">
+        <subtask id="4.1">Add version_override parameter to detect_version()</subtask>
+        <subtask id="4.2">Validate override version exists before using</subtask>
+        <subtask id="4.3">Short-circuit automatic detection when override specified</subtask>
+        <subtask id="4.4">Log manual override with justification</subtask>
+      </task>
+      <task id="5" title="Add ambiguity detection and error handling">
+        <subtask id="5.1">Detect ambiguous cases (V1, V2 modified same timestamp)</subtask>
+        <subtask id="5.2">Raise DiscoveryError with failed_stage='version_detection'</subtask>
+        <subtask id="5.3">Include actionable guidance in error message</subtask>
+        <subtask id="5.4">Test fallback strategy configuration</subtask>
+      </task>
+      <task id="6" title="Write comprehensive unit tests">
+        <subtask id="6.1">Test highest_number strategy with V1, V2, V3 folders</subtask>
+        <subtask id="6.2">Test latest_modified strategy with different timestamps</subtask>
+        <subtask id="6.3">Test manual override with valid and invalid versions</subtask>
+        <subtask id="6.4">Test fallback to base path when no V folders exist</subtask>
+        <subtask id="6.5">Test ambiguous version detection and error raising</subtask>
+        <subtask id="6.6">Test file-pattern-aware detection</subtask>
+        <subtask id="6.7">Test edge cases: V10 > V9, V1a rejected, symbolic links, empty folders</subtask>
+        <subtask id="6.8">Test Unicode in folder names (Chinese characters in paths)</subtask>
+        <subtask id="6.9">Test Windows vs Linux path handling</subtask>
+      </task>
+      <task id="7" title="Write integration tests with real folder structures">
+        <subtask id="7.1">Create temporary folder structures mimicking real 202411 data</subtask>
+        <subtask id="7.2">Test detection with 数据采集/V1 structure (single version)</subtask>
+        <subtask id="7.3">Test detection with 战区收集/V1/V2/V3 structure (multi-version)</subtask>
+        <subtask id="7.4">Test detection with 组合排名 structure (no versions, fallback)</subtask>
+        <subtask id="7.5">Test performance: version detection <2 seconds</subtask>
+      </task>
+      <task id="8" title="Add structured logging for observability">
+        <subtask id="8.1">Log version detection start with base_path and strategy</subtask>
+        <subtask id="8.2">Log discovered version folders with timestamps</subtask>
+        <subtask id="8.3">Log selection decision with justification</subtask>
+        <subtask id="8.4">Log skipped folders</subtask>
+        <subtask id="8.5">Use Epic 1 Story 1.3 structured logging (JSON format)</subtask>
+      </task>
+      <task id="9" title="Update documentation">
+        <subtask id="9.1">Document VersionScanner API in docstrings</subtask>
+        <subtask id="9.2">Add version detection section to README.md</subtask>
+        <subtask id="9.3">Document all strategies with examples</subtask>
+        <subtask id="9.4">Add troubleshooting guide for ambiguous versions</subtask>
+        <subtask id="9.5">Reference Decision #1</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">
+      <given>I have monthly data in reference/monthly/202501/收集数据/数据采集/</given>
+      <when>both V1 and V2 folders exist</when>
+      <then>
+        <expectation>Scanner should detect all version folders matching pattern V\d+</expectation>
+        <expectation>Select highest version number (V2 > V1)</expectation>
+        <expectation>Return selected version path with justification logged</expectation>
+        <expectation>Log: "Version detection: Found [V1, V2], selected V2 (highest_number strategy)"</expectation>
+      </then>
+    </criterion>
+    <criterion id="AC2">
+      <when>only non-versioned files exist (no V folders)</when>
+      <then>
+        <expectation>Scanner should fallback to base path</expectation>
+        <expectation>Log: "No version folders found, using base path"</expectation>
+      </then>
+    </criterion>
+    <criterion id="AC3">
+      <when>version strategy configured as latest_modified</when>
+      <then>
+        <expectation>Scanner compares modification timestamps</expectation>
+        <expectation>Selects most recently modified folder</expectation>
+      </then>
+    </criterion>
+    <criterion id="AC4">
+      <when>version detection is ambiguous (e.g., V1 and V2 modified same day)</when>
+      <then>
+        <expectation>Scanner raises error with actionable message</expectation>
+        <expectation>Error message: "Ambiguous versions: V1 and V2 both modified on 2025-01-05, configure precedence rule or specify --version manually"</expectation>
+      </then>
+    </criterion>
+    <criterion id="AC5">
+      <when>CLI override --version=V1 provided</when>
+      <then>
+        <expectation>Scanner uses V1 regardless of automatic detection</expectation>
+        <expectation>Log: "Manual override: using V1 as specified"</expectation>
+      </then>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-3.md</path>
+        <title>Epic 3 Technical Specification: Intelligent File Discovery &amp; Version Detection</title>
+        <section>Story 3.1: Version-Aware Folder Scanner (lines 541-575)</section>
+        <snippet>Version Scanner scans for versioned folders (V1, V2, V3), selects version based on strategy (highest_number, latest_modified, manual), handles fallbacks when no versions found. File-pattern-aware filtering (Decision #1) ensures version selection scoped to specific file patterns per domain.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-3.md</path>
+        <title>Data Source Validation &amp; Real Data Analysis</title>
+        <section>Real 202411 Data Validation (lines 236-323)</section>
+        <snippet>Real data confirmed: 数据采集/V1/ contains annuity file, 战区收集/ has V1-V3 multi-version scenario, 组合排名 has no version folders (fallback). Validated file pattern: *年金终稿*.xlsx matches exactly 1 file. Critical corrections applied from real data analysis.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision #1: File-Pattern-Aware Version Detection</title>
+        <section>Decision #1 (lines 74-154)</section>
+        <snippet>Version detection scoped to domain-specific file patterns, not folder-level. Algorithm: scan V* folders, iterate versions highest to lowest, select first version where matching file exists per domain. Enables partial corrections (Annuity V2, Business Collection V1) without forcing all domains to same version.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision #4: Hybrid Error Context Standards</title>
+        <section>Decision #4 (lines 392-398)</section>
+        <snippet>Use exceptions with required structured context fields. DiscoveryError includes: domain (string), failed_stage (literal: config_validation, version_detection, file_matching, excel_reading, normalization), original_error (Exception), message (actionable description).</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-3.md</path>
+        <title>PRD Alignment - Version Detection System</title>
+        <section>FR-1.1 Acceptance Criteria (lines 66-76)</section>
+        <snippet>FR-1.1-AC2: Detects V1, V2 and selects highest (highest_number strategy). FR-1.1-AC3: Falls back to non-versioned files when no V folders. FR-1.1-AC5: Manual override via CLI --version=V1 (version_override parameter). All acceptance criteria mapped to Story 3.1.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/epic-2-retrospective-2025-11-27.md</path>
+        <title>Epic 2 Retrospective - Action Item #2 Impact</title>
+        <section>Real Data Validation Requirement</section>
+        <snippet>Action Item #2 required real data validation before Epic 3. Prevents 87.5% integration test failure rate. Tech-spec enhanced with Data Source Validation section, Layer-Specific Field Requirements, Test Data Realism Guidelines, Two-Round Code Review Strategy.</snippet>
+      </doc>
+      <doc>
+        <path>docs/supplement/02_version_detection_logic.md</path>
+        <title>Version Detection Logic Specification</title>
+        <section>Algorithm and Edge Cases</section>
+        <snippet>Detailed specification for version detection algorithm, handling V1-V99 numeric comparison, ambiguous timestamp detection, manual override validation, fallback strategies, Chinese character path support, cross-platform compatibility.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/work_data_hub/io/connectors/file_connector.py</path>
+        <kind>module</kind>
+        <symbol>DataSourceConnectorError</symbol>
+        <lines>28-31</lines>
+        <reason>Existing error class that may need to be extended or replaced with DiscoveryError (Decision #4). Current implementation is simple Exception subclass without structured context fields.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/utils/types.py</path>
+        <kind>module</kind>
+        <symbol>DiscoveredFile</symbol>
+        <lines>12-33</lines>
+        <reason>Existing dataclass for discovered files. Story 3.1 will create VersionedPath dataclass following similar pattern - domain, path, metadata structure.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/utils/logging.py</path>
+        <kind>module</kind>
+        <symbol>get_logger</symbol>
+        <lines>N/A</lines>
+        <reason>Structured logging framework (Epic 1 Story 1.3). VersionScanner will use this for version detection event logging in JSON format per AC requirements.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/config/settings.py</path>
+        <kind>module</kind>
+        <symbol>Settings</symbol>
+        <lines>1-50</lines>
+        <reason>Pydantic settings framework with DataSourceConfigV2 integration (Story 3.0). Version scanner will receive configuration from validated settings instance.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/config/schema.py</path>
+        <kind>module</kind>
+        <symbol>DataSourceConfigV2</symbol>
+        <lines>N/A</lines>
+        <reason>Story 3.0 configuration schema. Provides version_strategy field that VersionScanner will use to determine selection strategy (highest_number, latest_modified, manual).</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <python>
+        <package name="pathlib" version="stdlib">Path operations for cross-platform compatibility</package>
+        <package name="re" version="stdlib">Regex pattern matching for V\d+ folder detection</package>
+        <package name="datetime" version="stdlib">Timestamp handling for selected_at and modification time comparison</package>
+        <package name="structlog" version="latest">Structured JSON logging (Epic 1 Story 1.3 integration)</package>
+        <package name="pydantic" version="2.11.7+">Dataclass with validation for VersionedPath result model</package>
+      </python>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <architecture>
+      <constraint>Clean Architecture: VersionScanner in I/O layer (io/connectors/), no domain dependencies</constraint>
+      <constraint>File-Pattern-Aware Detection (Decision #1): Version selection scoped to file patterns, not folder-level</constraint>
+      <constraint>DiscoveryError with stage markers (Decision #4): failed_stage='version_detection' for all errors in this story</constraint>
+    </architecture>
+    <implementation>
+      <constraint>Use Epic 1 Story 1.3 structured logging: logger.info() with JSON format, context fields</constraint>
+      <constraint>Pydantic v2 dataclasses for VersionedPath result model (following Story 3.0 pattern)</constraint>
+      <constraint>Security-first design: Validate version folder paths, prevent path traversal</constraint>
+      <constraint>Fail-fast philosophy: Ambiguous versions halt immediately with actionable error message</constraint>
+      <constraint>Cross-platform compatibility: Test Windows vs Linux path handling</constraint>
+    </implementation>
+    <testing>
+      <constraint>Comprehensive unit tests: All strategies tested (highest_number, latest_modified, manual)</constraint>
+      <constraint>Edge case coverage: V10 > V9, Unicode paths, empty folders, symbolic links</constraint>
+      <constraint>Real data validation: Test with actual folder structures from 202411 data (Action Item #2)</constraint>
+      <constraint>Performance requirement: Version detection <2 seconds (NFR from tech spec)</constraint>
+      <constraint>Integration tests: 数据采集/V1, 战区收集/V1-V3, 组合排名 scenarios</constraint>
+    </testing>
+    <documentation>
+      <constraint>Docstrings for all public methods with Args, Returns, Raises sections</constraint>
+      <constraint>README.md version detection section with all strategies documented</constraint>
+      <constraint>Reference Decision #1 in code comments for file-pattern-aware logic</constraint>
+      <constraint>Troubleshooting guide for ambiguous version errors</constraint>
+    </documentation>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>VersionScanner.detect_version</name>
+      <kind>function signature</kind>
+      <signature>def detect_version(self, base_path: Path, file_patterns: List[str], strategy: VersionStrategy = 'highest_number', version_override: Optional[str] = None) -> VersionedPath</signature>
+      <path>src/work_data_hub/io/connectors/version_scanner.py</path>
+    </interface>
+    <interface>
+      <name>VersionedPath (result model)</name>
+      <kind>dataclass</kind>
+      <signature>@dataclass class VersionedPath: path: Path, version: str, strategy_used: str, selected_at: datetime, rejected_versions: List[str]</signature>
+      <path>src/work_data_hub/io/connectors/version_scanner.py</path>
+    </interface>
+    <interface>
+      <name>DiscoveryError (exception)</name>
+      <kind>class interface</kind>
+      <signature>class DiscoveryError(Exception): def __init__(self, domain: str, failed_stage: Literal['version_detection', ...], original_error: Exception, message: str)</signature>
+      <path>src/work_data_hub/io/connectors/exceptions.py</path>
+    </interface>
+    <interface>
+      <name>get_logger (from Epic 1)</name>
+      <kind>function</kind>
+      <signature>def get_logger(name: str) -> Logger</signature>
+      <path>src/work_data_hub/utils/logging.py</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Testing framework: pytest with custom markers (pytest-postgresql for integration tests). Follow Epic 3 test data realism guidelines: use realistic folder structures based on 202411 real data analysis (Action Item #2). Unit tests focus on isolated strategy logic (highest_number, latest_modified, manual override), integration tests use tmp_path fixtures mimicking real 数据采集/V1, 战区收集/V1-V3 structures. Performance target: version detection <2 seconds. Code coverage target: >80% for version_scanner.py module.</standards>
+    <locations>
+      <location>tests/unit/io/connectors/test_version_scanner.py</location>
+      <location>tests/integration/io/test_version_detection.py</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Test highest_number strategy with V1, V2 folders: create tmp_path/V1 and tmp_path/V2 with matching files, assert V2 selected, log message contains "selected V2 (highest_number strategy)"</idea>
+      <idea ac="AC2">Test fallback to base path when no V folders: empty base_path directory, assert result.version == "base", result.path == base_path</idea>
+      <idea ac="AC3">Test latest_modified strategy: create V1 and V2 with different timestamps (time.sleep between mkdir calls), assert V2 selected (newer)</idea>
+      <idea ac="AC4">Test ambiguous version detection: set V1 and V2 to same modification time using os.utime(), expect DiscoveryError with failed_stage='version_detection' and actionable message</idea>
+      <idea ac="AC5">Test manual override: create V1 and V2, pass version_override="V1", assert V1 selected regardless of strategy, log message contains "Manual override: using V1"</idea>
+      <idea ac="All">Test file-pattern-aware detection (Decision #1): V2 exists but empty, V1 has matching file, assert V1 selected, rejected_versions includes "V2 (no matching files)"</idea>
+      <idea ac="All">Test V10 > V9 numeric comparison (not alphabetic): create V1, V2, V9, V10 folders, assert V10 selected with highest_number</idea>
+      <idea ac="All">Test Chinese character paths: base path with 收集数据/数据采集, V1 folder with 年金数据.xlsx file, assert proper handling</idea>
+      <idea ac="All">Test invalid manual override: pass version_override="V99" (doesn't exist), expect DiscoveryError</idea>
+      <idea ac="All">Integration test with real 202411 structure: 数据采集/V1 (single version), 战区收集/V1/V2/V3 (multi-version), 组合排名 (no versions fallback)</idea>
+    </ideas>
+  </tests>
+</story-context>

@@ -1338,6 +1338,73 @@ def process_annuity_performance(month: str):
 - Benefit: Prevents production defects, catches architectural issues early
 - ROI: Proven valuable in Epic 2 (87.5% test failure rate caught and fixed)
 
+---
+
+## Post-Review Follow-ups
+
+This section tracks action items identified during code reviews for Epic 3 stories.
+
+### Story 3.1: Version-Aware Folder Scanner
+
+**Review Date:** 2025-11-28
+**Reviewer:** Link
+**Outcome:** BLOCKED
+**Status:** Awaiting fixes
+
+**Critical Issues (8 items):**
+
+1. **[HIGH]** Add missing import `from datetime import datetime` in test file
+   - File: tests/unit/io/connectors/test_version_scanner.py:1
+   - Impact: NameError in test_versionedpath_contains_all_required_fields
+   - Story: 3.1
+
+2. **[HIGH]** Fix invalid directory touch() operations in tests
+   - Files: tests/unit/io/connectors/test_version_scanner.py lines 110, 273-292
+   - Impact: TypeError - cannot call touch() on directory paths
+   - Story: 3.1
+
+3. **[HIGH]** Fix timestamp race conditions in latest_modified tests
+   - Files: tests/unit:56-76, tests/integration:41-74
+   - Impact: Ambiguity detection triggers unexpectedly, 2 tests fail
+   - Fix: Touch files BEFORE creating version directories OR increase sleep >1s
+   - Story: 3.1
+
+4. **[HIGH]** Implement complete rejected_versions metadata
+   - File: src/work_data_hub/io/connectors/version_scanner.py:149-152
+   - Impact: AC #1 requirement not fully met - missing filtered versions with reasons
+   - Fix: Include ALL scanned versions with filter reasons
+   - Story: 3.1
+
+5. **[MEDIUM]** Add platform detection for Windows-incompatible tests
+   - Files: tests/unit:320-346, tests/integration:184-207
+   - Impact: 2 tests fail on Windows (chmod, leading/trailing space paths)
+   - Fix: Skip on Windows or use platform-specific handling
+   - Story: 3.1
+
+6. **[MEDIUM]** Remove or adjust test_invalid_strategy_raises_error
+   - File: tests/unit/io/connectors/test_version_scanner.py:212-228
+   - Impact: Type system already prevents invalid strategies at compile time
+   - Fix: Remove test or adjust to test runtime validation path
+   - Story: 3.1
+
+7. **[HIGH]** Correct Change Log false statement
+   - File: docs/sprint-artifacts/stories/3-1-version-aware-folder-scanner.md:702
+   - Impact: States "All tests passing" but 9/26 tests failing (34.6% failure rate)
+   - Fix: Update to reflect actual test status
+   - Story: 3.1
+
+8. **[CRITICAL]** Fix ALL 9 failing tests before story approval
+   - Test Status: 17/26 PASSED, 9/26 FAILED (34.6% failure rate)
+   - Breakdown: 6 unit tests failing, 3 integration tests failing
+   - Blocker: Story cannot be approved until 100% tests passing
+   - Story: 3.1
+
+**Advisory Items:**
+
+- Consider extracting timestamp tolerance (1 second) as configuration parameter for future flexibility
+- VERSION_PATTERN could support V0 if needed (currently rejects per spec)
+- Performance requirement (<2 seconds) verified passing with 50 versions
+
 **Stories Likely Requiring Two Rounds (based on Epic 2 patterns):**
 - Story 3.3: Excel Reader (integration complexity)
 - Story 3.5: File Discovery Integration (end-to-end orchestration)
