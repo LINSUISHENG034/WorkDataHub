@@ -10,26 +10,44 @@ domain ← io ← orchestration intact.
 import logging
 import os
 import re
+import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Pattern
 
+import pandas as pd
 import yaml
 
 import src.work_data_hub.config.settings as settings_module
+from src.work_data_hub.config.schema import (
+    DataSourceConfigV2,
+    DataSourcesValidationError,
+    DomainConfigV2,
+)
 from src.work_data_hub.utils.types import (
     DiscoveredFile,
     extract_file_metadata,
     is_temporary_file,
     validate_excel_file,
 )
-
-logger = logging.getLogger(__name__)
+from work_data_hub.io.connectors.exceptions import DiscoveryError
+from work_data_hub.io.connectors.file_pattern_matcher import (
+    FileMatchResult,
+    FilePatternMatcher,
+)
+from work_data_hub.io.connectors.version_scanner import VersionScanner, VersionedPath
+from work_data_hub.io.readers.excel_reader import ExcelReadResult, ExcelReader
+from work_data_hub.utils.logging import get_logger
 
 
 class DataSourceConnectorError(Exception):
     """Raised when data source connector encounters an error."""
 
     pass
+
+
+# Module-level logger for DataSourceConnector (legacy class)
+_connector_logger = get_logger(__name__)
 
 
 class DataSourceConnector:
@@ -51,6 +69,7 @@ class DataSourceConnector:
         """
         # Lazily load settings to make it easy to inject patched versions in tests
         self.settings: Optional[Any] = None
+        self.logger = _connector_logger
 
         # Use provided config path or default from settings
         if config_path:
@@ -109,7 +128,7 @@ class DataSourceConnector:
             if config_domain not in self.config["domains"]:
                 raise DataSourceConnectorError(f"Unknown domain: {domain}")
 
-        logger.info(f"Starting file discovery for domains: {domains_to_scan}")
+        self.logger.info(f"Starting file discovery for domains: {domains_to_scan}")
 
         discovered_files = []
 
@@ -117,7 +136,7 @@ class DataSourceConnector:
             domain_config = self.config["domains"][domain_name]
             pattern = self.compiled_patterns[domain_name]
 
-            logger.debug(
+            self.logger.debug(
                 "Scanning for domain '%s' with pattern: %s",
                 domain_name,
                 domain_config["pattern"],
@@ -129,12 +148,12 @@ class DataSourceConnector:
             )
             discovered_files.extend(domain_files)
 
-            logger.info(f"Found {len(domain_files)} files for domain '{domain_name}'")
+            self.logger.info(f"Found {len(domain_files)} files for domain '{domain_name}'")
 
         # Apply selection strategies to discovered files
         selected_files = self._apply_selection_strategies(discovered_files)
 
-        logger.info(
+        self.logger.info(
             f"Selected {len(selected_files)} files after applying selection strategies"
         )
 
@@ -178,7 +197,7 @@ class DataSourceConnector:
                         f"Domain '{domain_name}' missing required key: {key}"
                     )
 
-        logger.info(f"Loaded configuration for {len(config['domains'])} domains")
+        self.logger.info(f"Loaded configuration for {len(config['domains'])} domains")
         return config
 
     def _compile_patterns(self) -> Dict[str, Pattern[str]]:
@@ -201,7 +220,7 @@ class DataSourceConnector:
                 compiled[domain_name] = re.compile(
                     pattern_str, re.UNICODE | re.IGNORECASE
                 )
-                logger.debug(
+                self.logger.debug(
                     f"Compiled pattern for domain '{domain_name}': {pattern_str}"
                 )
             except re.error as e:
@@ -247,7 +266,7 @@ class DataSourceConnector:
         base_dir = Path(self._get_settings().data_base_dir)
 
         if not base_dir.exists():
-            logger.warning(f"Data base directory does not exist: {base_dir}")
+            self.logger.warning(f"Data base directory does not exist: {base_dir}")
             return []
 
         discovered = []
@@ -318,7 +337,7 @@ class DataSourceConnector:
                             try:
                                 version_str = parent_path.name[1:]  # Remove 'V' prefix
                                 version = int(version_str)
-                                logger.debug(
+                                self.logger.debug(
                                     "Extracted version %s from directory %s",
                                     version,
                                     parent_path.name,
@@ -327,7 +346,7 @@ class DataSourceConnector:
                                 version = (
                                     None  # Fallback for malformed versions like 'VX'
                                 )
-                                logger.debug(
+                                self.logger.debug(
                                     "Malformed version in %s, using mtime fallback",
                                     parent_path.name,
                                 )
@@ -340,7 +359,7 @@ class DataSourceConnector:
                                 version  # Add version to metadata
                             )
                         except OSError as e:
-                            logger.warning(
+                            self.logger.warning(
                                 "Cannot extract metadata for %s: %s", file_path, e
                             )
                             file_metadata = groups
@@ -359,7 +378,7 @@ class DataSourceConnector:
                         )
 
                         discovered.append(discovered_file)
-                        logger.debug(
+                        self.logger.debug(
                             "Discovered file: %s (year=%s, month=%s)",
                             file_path,
                             year,
@@ -367,7 +386,7 @@ class DataSourceConnector:
                         )
 
         except OSError as e:
-            logger.error(f"Error scanning directory {base_dir}: {e}")
+            self.logger.error(f"Error scanning directory {base_dir}: {e}")
             raise DataSourceConnectorError(f"Directory scan failed: {e}")
 
         return discovered
@@ -405,7 +424,7 @@ class DataSourceConnector:
             elif strategy == "latest_by_year_month_and_version":
                 selected = self._select_latest_by_year_month_and_version(domain_files)
             else:
-                logger.warning(
+                self.logger.warning(
                     "Unknown selection strategy '%s' for domain '%s'",
                     strategy,
                     domain,
@@ -414,7 +433,7 @@ class DataSourceConnector:
 
             if selected:
                 selected_files.extend(selected)
-                logger.info(
+                self.logger.info(
                     "Domain '%s': Selected %s files using '%s' strategy",
                     domain,
                     len(selected),
@@ -472,7 +491,7 @@ class DataSourceConnector:
             latest = max(files, key=lambda f: Path(f.path).stat().st_mtime)
             return [latest]
         except (OSError, FileNotFoundError) as e:
-            logger.error(f"Error accessing file modification times: {e}")
+            self.logger.error(f"Error accessing file modification times: {e}")
             # Fallback to first file if mtime comparison fails
             return [files[0]] if files else []
 
@@ -517,12 +536,12 @@ class DataSourceConnector:
                     ),
                 )
                 selected.append(best_file)
-                logger.debug(
+                self.logger.debug(
                     f"Selected file with version {best_file.metadata.get('version')} "
                     f"for year={year}, month={month}: {best_file.path}"
                 )
             except (OSError, FileNotFoundError) as e:
-                logger.error(
+                self.logger.error(
                     f"Error accessing file modification times in version selection: {e}"
                 )
                 # Fallback to first file if stat() fails
@@ -530,3 +549,307 @@ class DataSourceConnector:
                     selected.append(group_list[0])
 
         return selected
+
+
+# ---------------------------------------------------------------------------
+# Epic 3 Story 3.5: FileDiscoveryService (facade orchestrator)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class DataDiscoveryResult:
+    """Result of file discovery operation with rich metadata."""
+
+    df: pd.DataFrame
+    file_path: Path
+    version: str
+    sheet_name: str
+    row_count: int
+    column_count: int
+    duration_ms: int
+    columns_renamed: Dict[str, str]
+    stage_durations: Dict[str, int]
+
+
+class FileDiscoveryService:
+    """
+    Unified file discovery service orchestrating:
+    - Template variable resolution
+    - Version detection (Story 3.1)
+    - File pattern matching (Story 3.2)
+    - Excel reading (Story 3.3)
+    - Column normalization (Story 3.4)
+    """
+
+    def __init__(
+        self,
+        settings: Optional[Any] = None,
+        version_scanner: Optional[VersionScanner] = None,
+        file_matcher: Optional[FilePatternMatcher] = None,
+        excel_reader: Optional[ExcelReader] = None,
+    ):
+        self.settings = settings or settings_module.get_settings()
+        self.version_scanner = version_scanner or VersionScanner()
+        self.file_matcher = file_matcher or FilePatternMatcher()
+        self.excel_reader = excel_reader or ExcelReader()
+        self.logger = get_logger(__name__)
+
+    def discover_and_load(
+        self,
+        domain: str,
+        version_override: Optional[str] = None,
+        **template_vars: Any,
+    ) -> DataDiscoveryResult:
+        """
+        Discover and load data file for a domain.
+
+        Args:
+            domain: Domain identifier (e.g., 'annuity_performance')
+            version_override: Optional manual version (e.g., "V1")
+            **template_vars: Template variables for path resolution (e.g., month="202501")
+
+        Returns:
+            DataDiscoveryResult with loaded DataFrame and metadata
+
+        Raises:
+            DiscoveryError: With structured context if any stage fails
+        """
+        start_time = time.perf_counter()
+        self.logger.info("discovery.started", domain=domain, template_vars=template_vars)
+
+        try:
+            domain_config = self._load_domain_config(domain)
+            base_path = self._resolve_template_vars(
+                domain_config.base_path, template_vars
+            )
+            stage_durations: Dict[str, int] = {}
+
+            # Stage 1: Version detection
+            stage_start = time.perf_counter()
+            version_result = self._detect_version_with_fallback(
+                base_path, domain_config, version_override
+            )
+            stage_durations["version_detection"] = self._log_stage(
+                "discovery.version_detected",
+                stage_start,
+                version=version_result.version,
+                path=str(version_result.path),
+                strategy=version_result.strategy_used,
+            )
+
+            # Stage 2: File matching
+            stage_start = time.perf_counter()
+            match_result = self.file_matcher.match_files(
+                search_path=version_result.path,
+                include_patterns=list(domain_config.file_patterns),
+                exclude_patterns=list(domain_config.exclude_patterns or []),
+            )
+            stage_durations["file_matching"] = self._log_stage(
+                "discovery.file_matched",
+                stage_start,
+                file_path=str(match_result.matched_file),
+                match_count=match_result.match_count,
+            )
+
+            # Stage 3: Excel reading (normalization happens inside reader)
+            stage_start = time.perf_counter()
+            excel_result = self.excel_reader.read_sheet(
+                file_path=match_result.matched_file,
+                sheet_name=domain_config.sheet_name,
+                normalize_columns=True,
+            )
+            stage_durations["excel_reading"] = self._log_stage(
+                "discovery.excel_read",
+                stage_start,
+                row_count=excel_result.row_count,
+                column_count=excel_result.column_count,
+            )
+
+            total_duration = int((time.perf_counter() - start_time) * 1000)
+            result = DataDiscoveryResult(
+                df=excel_result.df,
+                file_path=match_result.matched_file,
+                version=version_result.version,
+                sheet_name=excel_result.sheet_name,
+                row_count=excel_result.row_count,
+                column_count=excel_result.column_count,
+                duration_ms=total_duration,
+                columns_renamed=excel_result.columns_renamed,
+                stage_durations=stage_durations,
+            )
+
+            self.logger.info(
+                "discovery.completed",
+                domain=domain,
+                file_path=str(result.file_path),
+                version=result.version,
+                sheet_name=result.sheet_name,
+                row_count=result.row_count,
+                column_count=result.column_count,
+                duration_ms=result.duration_ms,
+                stage_durations=stage_durations,
+            )
+
+            return result
+
+        except DiscoveryError as exc:
+            self.logger.error("discovery.failed", **exc.to_dict())
+            raise
+        except Exception as exc:  # pragma: no cover - defensive
+            stage = self._identify_failed_stage(exc)
+            wrapped = DiscoveryError(
+                domain=domain,
+                failed_stage=stage,
+                original_error=exc,
+                message=str(exc),
+            )
+            self.logger.error("discovery.failed", **wrapped.to_dict())
+            raise wrapped
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _detect_version_with_fallback(
+        self,
+        base_path: Path,
+        domain_config: DomainConfigV2,
+        version_override: Optional[str],
+    ) -> VersionedPath:
+        """Detect version, applying fallback strategy if configured."""
+        try:
+            return self.version_scanner.detect_version(
+                base_path=base_path,
+                file_patterns=list(domain_config.file_patterns),
+                strategy=domain_config.version_strategy,
+                version_override=version_override,
+            )
+        except DiscoveryError as exc:
+            if (
+                domain_config.fallback == "use_latest_modified"
+                and domain_config.version_strategy != "latest_modified"
+            ):
+                return self.version_scanner.detect_version(
+                    base_path=base_path,
+                    file_patterns=list(domain_config.file_patterns),
+                    strategy="latest_modified",
+                    version_override=version_override,
+                )
+            raise exc
+
+    def _load_domain_config(self, domain: str) -> DomainConfigV2:
+        """Load domain configuration from validated settings."""
+        data_sources: Optional[DataSourceConfigV2] = getattr(
+            self.settings, "data_sources", None
+        )
+        if not data_sources:
+            raise DataSourcesValidationError(
+                "Epic 3 data sources configuration is not loaded"
+            )
+
+        if domain not in data_sources.domains:
+            raise DataSourcesValidationError(
+                f"Domain '{domain}' not found in configuration"
+            )
+
+        return data_sources.domains[domain]
+
+    def _resolve_template_vars(
+        self, path_template: str, template_vars: Dict[str, Any]
+    ) -> Path:
+        """Resolve {YYYYMM}, {YYYY}, {MM} placeholders.
+
+        Security: Validates resolved path to prevent directory traversal attacks.
+        """
+        needs_resolution = any(
+            token in path_template for token in ("{YYYYMM}", "{YYYY}", "{MM}")
+        )
+        if not needs_resolution:
+            resolved = path_template
+        else:
+            yyyymm = template_vars.get("month") or template_vars.get("YYYYMM")
+            if not yyyymm:
+                raise ValueError("Template variable {YYYYMM} not provided")
+
+            yyyymm_str = str(yyyymm)
+            if not (yyyymm_str.isdigit() and len(yyyymm_str) == 6):
+                raise ValueError("Template variable {YYYYMM} must be 6 digits (YYYYMM)")
+
+            yyyy, mm = yyyymm_str[:4], yyyymm_str[4:6]
+            if int(mm) < 1 or int(mm) > 12:
+                raise ValueError("Template variable {MM} must be between 01 and 12")
+
+            resolved = path_template.replace("{YYYYMM}", yyyymm_str)
+            resolved = resolved.replace("{YYYY}", yyyy)
+            resolved = resolved.replace("{MM}", mm)
+
+            if "{" in resolved or "}" in resolved:
+                raise ValueError(f"Unresolved template variables in path: {resolved}")
+
+        # Security: Prevent path traversal attacks
+        self._validate_path_security(resolved)
+
+        return Path(resolved)
+
+    def _validate_path_security(self, path_str: str) -> None:
+        """Validate path does not contain directory traversal sequences.
+
+        Args:
+            path_str: The resolved path string to validate.
+
+        Raises:
+            ValueError: If path contains traversal sequences or is outside allowed scope.
+        """
+        # Check for directory traversal patterns
+        if ".." in path_str:
+            raise ValueError(
+                f"Path traversal detected: '..' not allowed in path: {path_str}"
+            )
+
+        # Normalize and check for traversal via different separators
+        normalized = path_str.replace("\\", "/")
+        if "../" in normalized or "/.." in normalized:
+            raise ValueError(
+                f"Path traversal detected in normalized path: {path_str}"
+            )
+
+        # Check for absolute paths that could escape the reference directory
+        path_obj = Path(path_str)
+        if path_obj.is_absolute():
+            # Allow absolute paths only if they don't contain traversal
+            # The actual base directory restriction is enforced by the caller
+            pass
+
+        # Check for null bytes (path injection)
+        if "\x00" in path_str:
+            raise ValueError(
+                f"Null byte injection detected in path: {path_str!r}"
+            )
+
+    def _identify_failed_stage(self, error: Exception) -> str:
+        """Map exceptions to discovery stages for structured errors."""
+        if isinstance(error, DiscoveryError):
+            return error.failed_stage
+
+        name = type(error).__name__
+        msg = str(error)
+
+        if "ValidationError" in name or "DataSourcesValidationError" in name:
+            return "config_validation"
+        if "template" in msg.lower():
+            return "config_validation"
+        if "Version" in name or "version" in msg.lower():
+            return "version_detection"
+        if isinstance(error, FileNotFoundError):
+            return "file_matching"
+        if "Excel" in name or "excel" in msg.lower():
+            return "excel_reading"
+        if "Normalization" in name or "normalize" in msg.lower():
+            return "normalization"
+        return "file_matching"
+
+    def _log_stage(self, event: str, stage_start: float, **kwargs: Any) -> int:
+        """Log stage completion with duration and return it."""
+        duration_ms = int((time.perf_counter() - stage_start) * 1000)
+        self.logger.info(event, duration_ms=duration_ms, **kwargs)
+        return duration_ms

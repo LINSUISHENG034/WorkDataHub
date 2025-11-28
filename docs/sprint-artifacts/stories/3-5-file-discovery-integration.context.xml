@@ -1,0 +1,1144 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>5</storyId>
+    <title>File Discovery Integration</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>E:\Projects\WorkDataHub\docs\sprint-artifacts\stories\3-5-file-discovery-integration.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>a unified file discovery interface combining version detection, pattern matching, and Excel reading</iWant>
+    <soThat>any domain can discover and load files with a single configuration entry</soThat>
+    <tasks>
+      <task id="1" acs="1-6">
+        <title>Implement FileDiscoveryService facade class</title>
+        <subtasks>
+          <subtask>Create src/work_data_hub/io/connectors/file_connector.py::FileDiscoveryService class</subtask>
+          <subtask>Implement discover_and_load(domain: str, **template_vars) main method</subtask>
+          <subtask>Orchestrate version scanner (Story 3.1), pattern matcher (Story 3.2), Excel reader (Story 3.3), normalizer (Story 3.4)</subtask>
+          <subtask>Add template variable resolution: {YYYYMM}, {YYYY}, {MM} from parameters or config</subtask>
+          <subtask>Return DataDiscoveryResult dataclass with rich metadata (df, file_path, version, sheet_name, row_count, column_count, duration_ms, columns_renamed)</subtask>
+          <subtask>Add comprehensive docstring with usage examples</subtask>
+          <subtask>Implement _resolve_template_vars() private method for placeholder substitution</subtask>
+          <subtask>Implement _identify_failed_stage() private method for error context extraction</subtask>
+          <subtask>Implement _load_domain_config() private method leveraging Story 3.0 validated schema</subtask>
+        </subtasks>
+      </task>
+      <task id="2" acs="4,6">
+        <title>Implement DiscoveryError exception class</title>
+        <subtasks>
+          <subtask>Create src/work_data_hub/io/connectors/exceptions.py module</subtask>
+          <subtask>Define DiscoveryStage enum: config_validation | version_detection | file_matching | excel_reading | normalization</subtask>
+          <subtask>Implement DiscoveryError exception with fields: domain, failed_stage, original_error, message</subtask>
+          <subtask>Add __str__ method for clear error messages showing domain and stage context</subtask>
+          <subtask>Add to_dict() method for structured logging integration</subtask>
+          <subtask>Add helper method to extract stage context from any sub-component error type</subtask>
+        </subtasks>
+      </task>
+      <task id="3" acs="3,6">
+        <title>Add structured logging with metrics</title>
+        <subtasks>
+          <subtask>Log discovery start with event="discovery.started", domain, template_vars</subtask>
+          <subtask>Log each stage completion with duration: version_detection, file_matching, excel_reading, normalization</subtask>
+          <subtask>Log discovery success with event="discovery.completed" and full metrics JSON (AC3 format)</subtask>
+          <subtask>Log discovery failure with event="discovery.failed", stage context, and original error</subtask>
+          <subtask>Include duration breakdown per stage in final metrics</subtask>
+          <subtask>Use Epic 1 Story 1.3 structured logger with contextual extras</subtask>
+        </subtasks>
+      </task>
+      <task id="4" acs="1-6">
+        <title>Create unit tests for FileDiscoveryService</title>
+        <subtasks>
+          <subtask>Create tests/unit/io/connectors/test_file_discovery_service.py</subtask>
+          <subtask>Test template variable resolution (AC1): {YYYYMM}, {YYYY}, {MM} placeholders</subtask>
+          <subtask>Test end-to-end happy path (AC2): mock all components, verify orchestration order</subtask>
+          <subtask>Test structured result format (AC3): verify all DataDiscoveryResult fields present</subtask>
+          <subtask>Test error handling per stage (AC4, AC6): each component failure wrapped correctly with stage identification</subtask>
+          <subtask>Test multi-domain independence (AC5): mock multiple domain configs, verify isolation</subtask>
+          <subtask>Mock all sub-components: VersionScanner, FilePatternMatcher, ExcelReader (no real file I/O)</subtask>
+          <subtask>Achieve >85% code coverage target</subtask>
+          <subtask>Test edge cases: missing template vars, invalid domain, empty config</subtask>
+        </subtasks>
+      </task>
+      <task id="5" acs="2,3,5">
+        <title>Create integration tests with real files</title>
+        <subtasks>
+          <subtask>Create tests/integration/io/test_file_discovery_integration.py</subtask>
+          <subtask>Create fixture Excel files in tests/fixtures/monthly_data/ with versioned folders (V1, V2) and multiple domains</subtask>
+          <subtask>Test full discovery pipeline with realistic file structure (AC2)</subtask>
+          <subtask>Test multiple domains processed independently (AC5): verify isolation on error</subtask>
+          <subtask>Verify Excel DataFrame loaded correctly with expected row/column counts</subtask>
+          <subtask>Verify columns normalized automatically (Story 3.4 integration)</subtask>
+          <subtask>Verify metrics logged with correct values matching actual file characteristics</subtask>
+          <subtask>Test error recovery: invalid Excel, missing sheet, corrupted file, etc.</subtask>
+          <subtask>Test cross-platform path handling (Windows backslashes vs Linux forward slashes)</subtask>
+        </subtasks>
+      </task>
+      <task id="6">
+        <title>Add performance monitoring and optimization</title>
+        <subtasks>
+          <subtask>Measure total discovery time end-to-end with time.time() tracking</subtask>
+          <subtask>Measure time per stage: version_detection, file_matching, excel_reading, normalization</subtask>
+          <subtask>Target: <2 seconds for typical domain discovery (NFR requirement)</subtask>
+          <subtask>Add performance test with threshold assertion: assert duration_ms < 2000</subtask>
+          <subtask>Document performance bottlenecks if threshold not met (e.g., large Excel files)</subtask>
+          <subtask>Include performance metrics in structured logging for monitoring</subtask>
+        </subtasks>
+      </task>
+      <task id="7">
+        <title>Update FileDiscoveryService configuration integration (Story 3.0)</title>
+        <subtasks>
+          <subtask>Load domain config from config/data_sources.yml using validated schema (Story 3.0)</subtask>
+          <subtask>Validate config before discovery (leverage Pydantic DomainConfig validation)</subtask>
+          <subtask>Handle missing domain config with clear error: "Domain 'xyz' not found in config"</subtask>
+          <subtask>Handle invalid config with clear error showing validation failures</subtask>
+          <subtask>Support default values for optional config fields (version_strategy, fallback)</subtask>
+          <subtask>Add unit test for config validation error handling</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">
+      <title>Template Variable Resolution</title>
+      <given>I configure domain in config/data_sources.yml with base_path: "reference/monthly/{YYYYMM}/收集数据/业务收集"</given>
+      <when>I call discover_and_load(domain='annuity_performance', month='202501')</when>
+      <then>System should:
+- Resolve {YYYYMM} placeholder to 202501
+- Return file path containing reference/monthly/202501/收集数据/业务收集
+- Support {YYYY} → 2025, {MM} → 01 extraction from month parameter</then>
+    </criterion>
+    <criterion id="AC2">
+      <title>End-to-End Discovery Pipeline</title>
+      <given>domain configured with all components (base_path, file_patterns, exclude_patterns, sheet_name, version_strategy)</given>
+      <when>I call discover_and_load(domain='annuity_performance', month='202501')</when>
+      <then>System should execute in exact order:
+1. Resolve template variables (Story 3.0 config)
+2. Scan for version folders (Story 3.1 VersionScanner)
+3. Match files using patterns (Story 3.2 FilePatternMatcher)
+4. Load specified Excel sheet (Story 3.3 ExcelReader)
+5. Normalize column names (Story 3.4 - automatic in Excel reader)
+6. Return DataDiscoveryResult with: df, file_path, version, sheet_name, row_count, column_count, duration_ms, columns_renamed</then>
+    </criterion>
+    <criterion id="AC3">
+      <title>Structured Result with Metrics</title>
+      <given>successful discovery completes</given>
+      <when>processing completes</when>
+      <then>Log structured summary with exact format:
+{
+  "event": "discovery.completed",
+  "domain": "annuity_performance",
+  "file_path": "reference/monthly/202501/收集数据/业务收集/V2/年金数据.xlsx",
+  "version": "V2",
+  "sheet_name": "规模明细",
+  "row_count": 1250,
+  "column_count": 15,
+  "duration_ms": 850
+}</then>
+    </criterion>
+    <criterion id="AC4">
+      <title>Structured Error Context</title>
+      <given>any discovery step fails (version detection, file matching, Excel reading, etc.)</given>
+      <when>error occurs</when>
+      <then>Raise DiscoveryError with structured context:
+- domain: "annuity_performance"
+- failed_stage: one of [config_validation, version_detection, file_matching, excel_reading, normalization]
+- original_error: original exception object
+- message: clear description showing stage and error details
+Example: "Version detection failed: Ambiguous versions V1 and V2 both modified on 2025-01-05"</then>
+    </criterion>
+    <criterion id="AC5">
+      <title>Multi-Domain Independence</title>
+      <given>multiple domains configured (e.g., annuity_performance, trustee_performance)</given>
+      <when>discovery runs for each domain separately</when>
+      <then>Each domain discovery is independent:
+- Failure in one domain doesn't block others
+- Each domain has isolated config, file paths, error handling
+- No shared state between domain discoveries</then>
+    </criterion>
+    <criterion id="AC6">
+      <title>Error Stage Identification</title>
+      <given>error raised from sub-component (VersionScanner, FilePatternMatcher, ExcelReader)</given>
+      <when>error propagates to caller</when>
+      <then>Error context includes:
+- domain name
+- failed_stage (accurate identification based on exception type)
+- input parameters (base_path, file_patterns, etc.)
+- original exception with full stack trace preserved
+- Clear message for debugging: "{Stage} failed: {specific error details}"</then>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc type="tech_spec" ref="docs/sprint-artifacts/tech-spec-epic-3.md">
+        <title>Epic 3 Tech-Spec: Story 3.5 Integration Design</title>
+        <location>lines 1091-1171 (integration design), lines 186-208 (NFR performance)</location>
+        <relevance>Complete specification for file discovery facade orchestrating Stories 3.0-3.4</relevance>
+        <key_points>
+          <point>Facade pattern: orchestrates version scanner, pattern matcher, Excel reader, normalizer</point>
+          <point>Template variable resolution: {YYYYMM}, {YYYY}, {MM} from parameters</point>
+          <point>Structured error context with stage identification for debugging</point>
+          <point>Performance target: <2 seconds for typical domain discovery</point>
+          <point>Rich metadata returned: file path, version, metrics, duration breakdown</point>
+        </key_points>
+      </doc>
+      <doc type="architecture_decision" ref="docs/architecture.md">
+        <title>Decision #7: Comprehensive Naming Conventions</title>
+        <location>lines 655-732</location>
+        <relevance>Defines standards for Chinese field names, path handling, and encoding - critical for file discovery with Chinese paths</relevance>
+        <key_points>
+          <point>CHINESE FIELD PRESERVATION: Use original Chinese from Excel sources (no transliteration)</point>
+          <point>This normalizer preserves Chinese characters, only fixes whitespace/encoding issues</point>
+          <point>Database mapping handles Chinese → English translation separately (Epic 1 Story 1.8)</point>
+          <point>CROSS-PLATFORM PATH HANDLING: Use pathlib.Path for Windows/Linux compatibility</point>
+          <point>UTF-8 encoding for Chinese characters in file paths (explicitly handle)</point>
+          <point>Template variable resolution must preserve Chinese characters in base_path</point>
+          <point>EXAMPLE: base_path: "reference/monthly/{YYYYMM}/收集数据/业务收集" - 收集数据 and 业务收集 preserved</point>
+        </key_points>
+        <implementation_impact>
+          <impact>FileDiscoveryService must use pathlib.Path for all path operations</impact>
+          <impact>Template variable resolution (_resolve_template_vars) must handle Chinese characters correctly</impact>
+          <impact>Logging must support UTF-8 encoding for Chinese file paths in structured logs</impact>
+          <impact>Integration tests must validate Chinese character handling on both Windows and Linux</impact>
+        </implementation_impact>
+      </doc>
+      <doc type="architecture_decision" ref="docs/architecture.md">
+        <title>Decision #8: Structured Logging Standards</title>
+        <location>lines 733-810</location>
+        <relevance>Defines logging event format and structured context - applied throughout FileDiscoveryService</relevance>
+        <key_points>
+          <point>EVENT IDENTIFIERS: Use dot notation (e.g., "discovery.started", "discovery.completed")</point>
+          <point>STRUCTURED CONTEXT: Pass context in extra dict, not in message string</point>
+          <point>NO SENSITIVE DATA: Never log secrets, credentials, or PII</point>
+          <point>PERFORMANCE METRICS: Include duration_ms in all stage logs for monitoring</point>
+          <point>ERROR CONTEXT: Log structured error dict on failures with stage and original error type</point>
+          <point>EXAMPLE PATTERN: logger.info("discovery.version_detected", version=version, duration_ms=45)</point>
+        </key_points>
+        <implementation_examples>
+          <example>
+# Correct structured logging (Decision #8)
+logger.info("discovery.started", domain=domain, template_vars=template_vars)
+logger.info("discovery.version_detected", version=result.version, duration_ms=duration)
+logger.info("discovery.completed", **{
+    "domain": domain,
+    "file_path": str(result.file_path),
+    "version": result.version,
+    "duration_ms": result.duration_ms
+})
+
+# Incorrect - string interpolation (avoid)
+logger.info(f"Discovery started for {domain}")  # ❌ Don't do this
+          </example>
+        </implementation_examples>
+      </doc>
+      <doc type="layer_boundaries" ref="docs/architecture-boundaries.md">
+        <title>Clean Architecture Boundaries (Story 1.6)</title>
+        <location>lines 20-40</location>
+        <relevance>Defines FileDiscoveryService as I/O layer orchestrator with no domain logic</relevance>
+        <key_points>
+          <point>I/O layer: orchestrates infrastructure concerns (file discovery, Excel reading)</point>
+          <point>No business logic: pure orchestration of sub-components</point>
+          <point>Can call utils layer (column normalizer) and other I/O components</point>
+        </key_points>
+      </doc>
+      <doc type="previous_story" ref="docs/sprint-artifacts/stories/3-4-column-name-normalization.md">
+        <title>Story 3.4: Column Name Normalization (Completed 2025-11-28)</title>
+        <location>Entire document, especially Dev Notes, Dev Agent Record, Code Review Report</location>
+        <relevance>Critical integration point - normalizer automatically called by Excel reader; provides implementation patterns and quality standards for Story 3.5</relevance>
+        <key_points>
+          <point>NEW FILES CREATED (reference for Story 3.5 imports):
+            - src/work_data_hub/utils/column_normalizer.py - Pure normalization utility
+            - tests/unit/utils/test_column_normalizer.py - 11 tests, 100% pass rate</point>
+          <point>MODIFIED FILES (integration pattern):
+            - src/work_data_hub/io/readers/excel_reader.py - Added normalize_columns parameter (default: enabled)
+            - Returns columns_renamed mapping in ExcelReadResult: Dict[str, str]</point>
+          <point>INTEGRATION PATTERN (critical for Story 3.5):
+            - Column normalization is AUTOMATIC in ExcelReader.read_sheet() unless explicitly disabled
+            - Story 3.5 receives DataFrames with pre-normalized columns from Story 3.3 Excel reader
+            - No need to call normalize_column_names() separately in FileDiscoveryService
+            - Simply call excel_reader.read_sheet() and normalization happens transparently</point>
+          <point>CODE REVIEW INSIGHTS (quality guidance):
+            - Thread Safety: _custom_mappings global dict acceptable for single-threaded use (low priority for Story 3.5 MVP)
+            - Performance: Normalization <100ms for 100 columns, <10ms for 23 realistic columns (meets NFR)
+            - Quality Bar: Story 3.4 achieved 100% test pass rate (24/24 tests) - Story 3.5 should target similar quality
+            - Optional Enhancements: Thread safety consideration noted but not required for MVP</point>
+          <point>ARCHITECTURAL DECISIONS APPLIED (continue in Story 3.5):
+            - Decision #7: Preserve Chinese field names (no transliteration) - applies to file paths and discovery
+            - Decision #8: Structured logging with dot notation - apply in FileDiscoveryService logging
+            - Source: architecture.md, Decisions #7 and #8</point>
+          <point>KEY TAKEAWAYS FOR STORY 3.5:
+            - ✅ Column normalization is already integrated - no additional work needed
+            - ✅ Performance is optimized - normalization adds <10ms overhead
+            - ✅ Thread safety consideration noted but not required for MVP (single-threaded execution)
+            - → FileDiscoveryService receives normalized columns automatically from ExcelReader</point>
+        </key_points>
+        <implementation_guidance>
+          <guidance>When implementing FileDiscoveryService.discover_and_load(), call excel_reader.read_sheet() with normalize_columns=True (default)</guidance>
+          <guidance>Access normalized columns directly from result.df.columns - no additional processing needed</guidance>
+          <guidance>Use result.columns_renamed mapping for debugging column name issues (original → normalized)</guidance>
+          <guidance>Follow Story 3.4 testing pattern: comprehensive unit tests + integration tests + performance tests</guidance>
+          <guidance>Apply structured logging pattern from Story 3.4: logger.info("event.name", key=value, ...)</guidance>
+        </implementation_guidance>
+      </doc>
+      <doc type="previous_story" ref="docs/sprint-artifacts/stories/3-0-data-source-configuration-schema-validation.md">
+        <title>Story 3.0: Data Source Configuration Schema Validation (Completed)</title>
+        <location>Pydantic schema definition section</location>
+        <relevance>Config validation prevents runtime errors in FileDiscoveryService</relevance>
+        <key_points>
+          <point>DomainConfig Pydantic model validates: base_path, file_patterns, sheet_name, version_strategy</point>
+          <point>Config errors caught at startup before any file operations</point>
+          <point>FileDiscoveryService uses validated config - no additional validation needed</point>
+        </key_points>
+      </doc>
+    </docs>
+    <code>
+      <new_module path="src/work_data_hub/io/connectors/file_connector.py">
+        <description>Main FileDiscoveryService facade class orchestrating all discovery components</description>
+        <classes>
+          <class name="DataDiscoveryResult">
+            <type>dataclass</type>
+            <purpose>Result object containing DataFrame and discovery metadata</purpose>
+            <fields>
+              <field>df: pd.DataFrame - loaded and normalized DataFrame</field>
+              <field>file_path: Path - absolute path to discovered file</field>
+              <field>version: str - detected version (e.g., "V2")</field>
+              <field>sheet_name: str - Excel sheet name loaded</field>
+              <field>row_count: int - number of data rows</field>
+              <field>column_count: int - number of columns</field>
+              <field>duration_ms: int - total discovery time in milliseconds</field>
+              <field>columns_renamed: Dict[str, str] - original → normalized column mapping from Story 3.4</field>
+            </fields>
+          </class>
+          <class name="FileDiscoveryService">
+            <type>class</type>
+            <purpose>Unified facade for discovering and loading domain data files</purpose>
+            <methods>
+              <method>discover_and_load(domain: str, **template_vars) -> DataDiscoveryResult</method>
+              <method>_resolve_template_vars(path_template: str, template_vars: dict) -> Path</method>
+              <method>_identify_failed_stage(error: Exception) -> str</method>
+              <method>_load_domain_config(domain: str) -> DomainConfig</method>
+            </methods>
+          </class>
+        </classes>
+      </new_module>
+      <new_module path="src/work_data_hub/io/connectors/exceptions.py">
+        <description>Structured exception classes for file discovery errors</description>
+        <classes>
+          <class name="DiscoveryStage">
+            <type>str, Enum</type>
+            <purpose>Enum for discovery pipeline stages</purpose>
+            <values>
+              <value>CONFIG_VALIDATION = "config_validation"</value>
+              <value>VERSION_DETECTION = "version_detection"</value>
+              <value>FILE_MATCHING = "file_matching"</value>
+              <value>EXCEL_READING = "excel_reading"</value>
+              <value>NORMALIZATION = "normalization"</value>
+            </values>
+          </class>
+          <class name="DiscoveryError">
+            <type>Exception</type>
+            <purpose>Structured error with stage identification for debugging</purpose>
+            <methods>
+              <method>__str__() -> str - formatted error message</method>
+              <method>to_dict() -> dict - structured dict for logging</method>
+            </methods>
+          </class>
+        </classes>
+      </new_module>
+      <related_module path="src/work_data_hub/io/connectors/version_scanner.py">
+        <description>Story 3.1 VersionScanner - called by FileDiscoveryService</description>
+        <integration_point>service.version_scanner.scan(base_path, strategy)</integration_point>
+        <reference>Task 1: Orchestrate version scanner</reference>
+      </related_module>
+      <related_module path="src/work_data_hub/io/connectors/file_matcher.py">
+        <description>Story 3.2 FilePatternMatcher - called by FileDiscoveryService</description>
+        <integration_point>service.file_matcher.find_file(search_path, include_patterns, exclude_patterns)</integration_point>
+        <reference>Task 1: Orchestrate pattern matcher</reference>
+      </related_module>
+      <related_module path="src/work_data_hub/io/readers/excel_reader.py">
+        <description>Story 3.3 ExcelReader - called by FileDiscoveryService</description>
+        <integration_point>service.excel_reader.read_sheet(file_path, sheet_name, normalize_columns=True)</integration_point>
+        <reference>Task 1: Orchestrate Excel reader</reference>
+        <note>Normalization happens automatically inside ExcelReader (Story 3.4 integration)</note>
+      </related_module>
+      <test_location path="tests/unit/io/connectors/test_file_discovery_service.py">
+        <description>Unit tests for FileDiscoveryService with mocked sub-components</description>
+        <required_coverage>
+          <case>AC1: Template variable resolution ({YYYYMM}, {YYYY}, {MM})</case>
+          <case>AC2: End-to-end orchestration order verification</case>
+          <case>AC3: Structured result format validation</case>
+          <case>AC4: Error wrapping per stage</case>
+          <case>AC5: Multi-domain independence</case>
+          <case>AC6: Error context extraction accuracy</case>
+          <case>Edge cases: missing template vars, invalid domain, empty config</case>
+        </required_coverage>
+        <target_coverage>>85% code coverage</target_coverage>
+      </test_location>
+      <test_location path="tests/integration/io/test_file_discovery_integration.py">
+        <description>Integration tests with real fixture files and directory structures</description>
+        <required_coverage>
+          <case>Full discovery pipeline with versioned folders (V1, V2)</case>
+          <case>Multiple domains processed independently</case>
+          <case>Excel DataFrame loaded with correct row/column counts</case>
+          <case>Columns normalized automatically</case>
+          <case>Metrics logged accurately</case>
+          <case>Error recovery: invalid Excel, missing sheet, corrupted file</case>
+          <case>Cross-platform path handling (Windows vs Linux)</case>
+        </required_coverage>
+      </test_location>
+    </code>
+    <dependencies>
+      <dependency type="external" name="pandas">
+        <purpose>DataFrame handling for loaded Excel data</purpose>
+        <usage>Return type of DataDiscoveryResult.df field</usage>
+      </dependency>
+      <dependency type="external" name="pathlib">
+        <purpose>Cross-platform path handling</purpose>
+        <usage>Template variable resolution and file path manipulation</usage>
+      </dependency>
+      <dependency type="stdlib" name="time">
+        <purpose>Performance measurement</purpose>
+        <usage>Track duration per stage and total discovery time</usage>
+      </dependency>
+      <dependency type="internal" name="Story 3.0: Config Schema">
+        <purpose>Load validated domain configuration</purpose>
+        <usage>DomainConfig Pydantic model from config/schemas.py</usage>
+        <reference>Task 7 subtasks</reference>
+      </dependency>
+      <dependency type="internal" name="Story 3.1: VersionScanner">
+        <purpose>Detect versioned folders (V1, V2, V3)</purpose>
+        <usage>service.version_scanner.scan(base_path, strategy)</usage>
+        <reference>Task 1: Orchestration step 2</reference>
+      </dependency>
+      <dependency type="internal" name="Story 3.2: FilePatternMatcher">
+        <purpose>Match files using glob patterns with include/exclude rules</purpose>
+        <usage>service.file_matcher.find_file(search_path, include_patterns, exclude_patterns)</usage>
+        <reference>Task 1: Orchestration step 3</reference>
+      </dependency>
+      <dependency type="internal" name="Story 3.3: ExcelReader">
+        <purpose>Load Excel sheet and return DataFrame</purpose>
+        <usage>service.excel_reader.read_sheet(file_path, sheet_name, normalize_columns=True)</usage>
+        <reference>Task 1: Orchestration step 4</reference>
+      </dependency>
+      <dependency type="internal" name="Story 3.4: Column Normalizer">
+        <purpose>Normalize column names (integrated in ExcelReader)</purpose>
+        <usage>Automatic normalization via ExcelReader, no explicit call needed</usage>
+        <reference>AC2 step 5 - transparent integration</reference>
+      </dependency>
+      <dependency type="internal" name="Epic 1 Story 1.3: Structured Logger">
+        <purpose>Log discovery events with structured context</purpose>
+        <usage>get_logger(__name__) for all logging operations</usage>
+        <reference>Task 3 subtasks</reference>
+      </dependency>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <architectural_constraint type="clean_architecture" source="docs/architecture-boundaries.md">
+      <rule>FileDiscoveryService MUST reside in io/connectors/ layer (I/O orchestrator)</rule>
+      <rule>No domain logic allowed - pure orchestration of infrastructure components</rule>
+      <rule>Can depend on: utils layer, other I/O components, config layer</rule>
+      <rule>Cannot depend on: domain layer services or business logic</rule>
+      <rationale>I/O layer handles infrastructure concerns, domain layer handles business rules</rationale>
+    </architectural_constraint>
+    <performance_constraint type="nfr" source="docs/sprint-artifacts/tech-spec-epic-3.md">
+      <requirement>Total discovery time must be <2 seconds for typical domain</requirement>
+      <requirement>Time breakdown per stage must be logged for bottleneck identification</requirement>
+      <measurement>Add performance test with assertion: assert result.duration_ms < 2000</measurement>
+      <environment>Measured on CI environment hardware with realistic 202411 data</environment>
+      <degradation_strategy>Document performance issues if threshold not met, identify bottleneck stage</degradation_strategy>
+    </performance_constraint>
+    <error_handling_constraint type="resilience">
+      <rule>All sub-component errors MUST be wrapped in DiscoveryError with stage context</rule>
+      <rule>Original exception MUST be preserved in DiscoveryError.original_error</rule>
+      <rule>Stage identification MUST be accurate based on exception type/source</rule>
+      <rule>Error messages MUST be actionable: show domain, stage, and specific failure reason</rule>
+      <rationale>Structured error context enables rapid debugging across complex orchestration</rationale>
+    </error_handling_constraint>
+    <integration_constraint type="component_orchestration">
+      <rule>Orchestration order is FIXED and MUST NOT change: config → version → file → excel → normalize</rule>
+      <rule>Each stage depends on previous stage output (e.g., version path → file matching)</rule>
+      <rule>Failed stage MUST prevent subsequent stages from executing</rule>
+      <rule>Normalization happens transparently in Excel reader (Story 3.4 integration)</rule>
+      <rationale>Strict ordering ensures data integrity and clear failure points</rationale>
+    </integration_constraint>
+    <compatibility_constraint type="cross_platform" source="Action Item #2">
+      <requirement>Must support UTF-8 encoding for Chinese characters in file paths</requirement>
+      <requirement>Must use pathlib.Path for cross-platform path handling (Windows/Linux)</requirement>
+      <requirement>Must handle path separators correctly: backslash (Windows) vs forward slash (Linux)</requirement>
+      <validation>Integration tests run on both Windows and Linux in CI</validation>
+    </compatibility_constraint>
+  </constraints>
+
+  <integration_patterns>
+    <pattern id="pattern-1" title="Automatic Column Normalization Integration">
+      <description>Story 3.4 column normalization is integrated into ExcelReader - FileDiscoveryService gets pre-normalized columns automatically</description>
+      <implementation>
+        <step>1. FileDiscoveryService calls excel_reader.read_sheet(file_path, sheet_name, normalize_columns=True)</step>
+        <step>2. ExcelReader automatically calls normalize_column_names() internally before returning</step>
+        <step>3. ExcelReadResult includes both normalized DataFrame AND columns_renamed mapping</step>
+        <step>4. FileDiscoveryService passes through normalized DataFrame in DataDiscoveryResult</step>
+        <step>5. Epic 2 Bronze validation receives pre-normalized columns (no additional processing)</step>
+      </implementation>
+      <code_example>
+# Inside FileDiscoveryService.discover_and_load()
+
+# Stage 5: Excel reading (Story 3.3) with automatic normalization (Story 3.4)
+excel_result = self.excel_reader.read_sheet(
+    file_path=matched_file,
+    sheet_name=domain_config.sheet_name,
+    normalize_columns=True  # ← Story 3.4 integration (default True)
+)
+# excel_result.df already has normalized columns!
+# excel_result.columns_renamed has original → normalized mapping
+
+# Stage 6: Return result with normalized DataFrame
+result = DataDiscoveryResult(
+    df=excel_result.df,  # ← Already normalized
+    columns_renamed=excel_result.columns_renamed  # ← For debugging
+    # ... other fields
+)
+      </code_example>
+      <anti_pattern>
+# ❌ DON'T do this - normalization already happened in ExcelReader
+from work_data_hub.utils.column_normalizer import normalize_column_names
+
+excel_result = self.excel_reader.read_sheet(...)
+# Don't call normalize again:
+# excel_result.df.columns = normalize_column_names(excel_result.df.columns)  # REDUNDANT
+      </anti_pattern>
+    </pattern>
+
+    <pattern id="pattern-2" title="Template Variable Resolution with Chinese Paths">
+      <description>Resolve {YYYYMM}, {YYYY}, {MM} placeholders while preserving Chinese characters in base_path</description>
+      <implementation>
+        <step>1. Extract template variables from **kwargs (e.g., month='202501')</step>
+        <step>2. Parse YYYYMM to extract YYYY and MM components</step>
+        <step>3. Replace placeholders in base_path string using str.replace()</step>
+        <step>4. Convert to pathlib.Path for cross-platform compatibility</step>
+        <step>5. Chinese characters (收集数据, 业务收集) preserved throughout</step>
+      </implementation>
+      <code_example>
+def _resolve_template_vars(self, path_template: str, template_vars: dict) -> Path:
+    """Resolve {YYYYMM}, {YYYY}, {MM} placeholders while preserving Chinese chars."""
+
+    # Extract month parameter (e.g., '202501')
+    yyyymm = template_vars.get('month') or template_vars.get('YYYYMM')
+
+    if yyyymm:
+        yyyy = yyyymm[:4]  # '2025'
+        mm = yyyymm[4:6]   # '01'
+
+        # Replace placeholders - Chinese characters preserved!
+        path_str = path_template.replace('{YYYYMM}', yyyymm)
+        path_str = path_str.replace('{YYYY}', yyyy)
+        path_str = path_str.replace('{MM}', mm)
+        # Example: "reference/monthly/{YYYYMM}/收集数据/业务收集"
+        #       → "reference/monthly/202501/收集数据/业务收集"
+    else:
+        path_str = path_template
+
+    # Convert to Path for cross-platform handling (Decision #7)
+    return Path(path_str)
+      </code_example>
+      <validation>
+        <test>Verify Chinese characters preserved in resolved path</test>
+        <test>Test on both Windows (backslashes) and Linux (forward slashes)</test>
+        <test>Validate UTF-8 encoding for Chinese characters</test>
+      </validation>
+    </pattern>
+
+    <pattern id="pattern-3" title="Structured Error Context with Stage Identification">
+      <description>Wrap all sub-component errors in DiscoveryError with accurate stage identification for debugging</description>
+      <implementation>
+        <step>1. Wrap entire discover_and_load() in try-except block</step>
+        <step>2. On exception, call _identify_failed_stage(e) to determine stage</step>
+        <step>3. Create DiscoveryError with domain, failed_stage, original_error, message</step>
+        <step>4. Raise DiscoveryError from original exception (preserve stack trace)</step>
+        <step>5. Log structured error dict before raising</step>
+      </implementation>
+      <code_example>
+def discover_and_load(self, domain: str, **template_vars) -> DataDiscoveryResult:
+    try:
+        # ... orchestration steps ...
+
+    except Exception as e:
+        # Identify which stage failed based on exception type
+        failed_stage = self._identify_failed_stage(e)
+
+        # Log structured error (Decision #8)
+        logger.error("discovery.failed", **{
+            "domain": domain,
+            "failed_stage": failed_stage,
+            "error_type": type(e).__name__,
+            "message": str(e)
+        })
+
+        # Wrap in DiscoveryError with context (AC4, AC6)
+        raise DiscoveryError(
+            domain=domain,
+            failed_stage=failed_stage,
+            original_error=e,
+            message=f"{failed_stage.replace('_', ' ').title()} failed: {str(e)}"
+        ) from e  # ← Preserve stack trace!
+
+def _identify_failed_stage(self, error: Exception) -> str:
+    """Map exception type to discovery stage."""
+    error_type = type(error).__name__
+
+    if 'ValidationError' in error_type:
+        return 'config_validation'
+    elif 'VersionError' in error_type or 'Ambiguous' in str(error):
+        return 'version_detection'
+    elif 'FileNotFoundError' in error_type:
+        return 'file_matching'
+    elif 'ExcelError' in error_type or 'SheetNotFound' in error_type:
+        return 'excel_reading'
+    else:
+        return 'file_matching'  # Default fallback
+      </code_example>
+      <benefits>
+        <benefit>Clear debugging: know exactly which stage failed</benefit>
+        <benefit>Preserved stack trace: original exception context maintained</benefit>
+        <benefit>Structured logging: error details captured for monitoring</benefit>
+        <benefit>Actionable messages: user knows what went wrong and where</benefit>
+      </benefits>
+    </pattern>
+
+    <pattern id="pattern-4" title="Performance Measurement Per Stage">
+      <description>Track duration for each discovery stage to identify bottlenecks and ensure <2s NFR compliance</description>
+      <implementation>
+        <step>1. Record start_time = time.time() at discovery start</step>
+        <step>2. Record stage_start = time.time() before each stage</step>
+        <step>3. Calculate stage_duration_ms = int((time.time() - stage_start) * 1000)</step>
+        <step>4. Log stage completion with duration_ms in structured log</step>
+        <step>5. Calculate total_duration_ms at end and assert <2000ms in performance tests</step>
+      </implementation>
+      <code_example>
+def discover_and_load(self, domain: str, **template_vars) -> DataDiscoveryResult:
+    start_time = time.time()
+
+    try:
+        # Stage 3: Version detection
+        stage_start = time.time()
+        version_result = self.version_scanner.scan(...)
+        stage_duration = int((time.time() - stage_start) * 1000)
+        logger.info("discovery.version_detected",
+                   version=version_result.version,
+                   duration_ms=stage_duration)
+
+        # Stage 4: File matching
+        stage_start = time.time()
+        matched_file = self.file_matcher.find_file(...)
+        stage_duration = int((time.time() - stage_start) * 1000)
+        logger.info("discovery.file_matched",
+                   file_path=str(matched_file),
+                   duration_ms=stage_duration)
+
+        # ... more stages ...
+
+        # Total duration
+        total_duration_ms = int((time.time() - start_time) * 1000)
+
+        # Log success with full metrics (AC3)
+        logger.info("discovery.completed", **{
+            "domain": domain,
+            "duration_ms": total_duration_ms,  # ← Total time
+            # ... other fields
+        })
+
+        return DataDiscoveryResult(duration_ms=total_duration_ms, ...)
+      </code_example>
+      <performance_targets>
+        <target>Version detection: <100ms (filesystem scan)</target>
+        <target>File matching: <50ms (glob patterns)</target>
+        <target>Excel reading: <1000ms (pandas openpyxl)</target>
+        <target>Column normalization: <10ms (Story 3.4 requirement)</target>
+        <target>TOTAL: <2000ms (NFR requirement from tech-spec)</target>
+      </performance_targets>
+    </pattern>
+  </integration_patterns>
+
+  <best_practices>
+    <practice id="bp-1" title="Follow Story 3.4 Quality Standards">
+      <description>Story 3.4 achieved 100% test pass rate (24/24 tests) - maintain this quality bar</description>
+      <guidelines>
+        <guideline>Write comprehensive unit tests: >85% code coverage target (Task 4)</guideline>
+        <guideline>Test all 6 acceptance criteria with dedicated test cases</guideline>
+        <guideline>Mock all sub-components in unit tests (VersionScanner, FilePatternMatcher, ExcelReader)</guideline>
+        <guideline>Create integration tests with real fixture files (versioned folders, multiple domains)</guideline>
+        <guideline>Add performance tests with assertion: assert result.duration_ms < 2000</guideline>
+        <guideline>Test edge cases: missing template vars, invalid domain, empty config</guideline>
+      </guidelines>
+    </practice>
+
+    <practice id="bp-2" title="Apply Decision #8 Structured Logging Consistently">
+      <description>Use structured logging throughout FileDiscoveryService for monitoring and debugging</description>
+      <guidelines>
+        <guideline>Event names: Use dot notation ("discovery.started", "discovery.version_detected")</guideline>
+        <guideline>Context: Pass in extra dict, not in message string</guideline>
+        <guideline>Duration: Include duration_ms in all stage completion logs</guideline>
+        <guideline>Errors: Log structured error dict on failures (domain, stage, error_type)</guideline>
+        <guideline>No secrets: Never log sensitive data, credentials, or PII</guideline>
+      </guidelines>
+      <example_reference>See pattern-3 and Decision #8 examples above</example_reference>
+    </practice>
+
+    <practice id="bp-3" title="Preserve Chinese Characters Throughout Pipeline">
+      <description>Follow Decision #7 to preserve Chinese characters in file paths and column names</description>
+      <guidelines>
+        <guideline>Use pathlib.Path for all path operations (cross-platform compatibility)</guideline>
+        <guideline>Template variable resolution must preserve Chinese chars in base_path</guideline>
+        <guideline>Logging must support UTF-8 encoding for Chinese file paths</guideline>
+        <guideline>Integration tests must validate Chinese character handling on Windows and Linux</guideline>
+        <guideline>Column names: Chinese preserved by Story 3.4 normalizer (only whitespace fixed)</guideline>
+      </guidelines>
+      <example>base_path: "reference/monthly/202501/收集数据/业务收集" ← 收集数据 and 业务收集 preserved</example>
+    </practice>
+
+    <practice id="bp-4" title="Error Handling: Wrap with Context, Preserve Stack Trace">
+      <description>All sub-component errors must be wrapped in DiscoveryError with stage identification</description>
+      <guidelines>
+        <guideline>Wrap entire discover_and_load() in try-except block</guideline>
+        <guideline>Identify failed stage using _identify_failed_stage() helper</guideline>
+        <guideline>Create DiscoveryError with domain, failed_stage, original_error, message</guideline>
+        <guideline>Use "raise ... from e" syntax to preserve stack trace</guideline>
+        <guideline>Log structured error dict before raising (domain, stage, error_type)</guideline>
+      </guidelines>
+      <example_reference>See pattern-3 code example above</example_reference>
+    </practice>
+  </best_practices>
+
+  <interfaces>
+    <function_signature>
+      <name>discover_and_load</name>
+      <location>src/work_data_hub/io/connectors/file_connector.py::FileDiscoveryService</location>
+      <signature>
+def discover_and_load(
+    self,
+    domain: str,
+    **template_vars  # e.g., month='202501' → {YYYYMM}: '202501'
+) -> DataDiscoveryResult:
+    """
+    Discover and load data file for domain using unified pipeline.
+
+    Orchestrates:
+    1. Config validation (Story 3.0)
+    2. Template variable resolution
+    3. Version detection (Story 3.1)
+    4. File pattern matching (Story 3.2)
+    5. Excel reading (Story 3.3)
+    6. Column normalization (Story 3.4 - automatic)
+
+    Args:
+        domain: Domain identifier from config (e.g., 'annuity_performance')
+        **template_vars: Template variables for path resolution
+            - month: YYYYMM string (e.g., '202501')
+            - Automatically extracts: {YYYYMM}, {YYYY}, {MM}
+
+    Returns:
+        DataDiscoveryResult with:
+            - df: Normalized DataFrame ready for Epic 2 validation
+            - file_path: Absolute path to discovered file
+            - version: Detected version (e.g., "V2")
+            - sheet_name: Excel sheet loaded
+            - row_count, column_count: DataFrame dimensions
+            - duration_ms: Total discovery time
+            - columns_renamed: Original → normalized mapping
+
+    Raises:
+        DiscoveryError: With structured context if any stage fails
+            - domain: Domain that failed
+            - failed_stage: Specific pipeline stage
+            - original_error: Underlying exception
+            - message: Actionable error description
+
+    Example:
+        >>> service = FileDiscoveryService()
+        >>> result = service.discover_and_load(
+        ...     domain='annuity_performance',
+        ...     month='202501'
+        ... )
+        >>> print(f"Loaded {result.row_count} rows from {result.file_path}")
+        Loaded 1250 rows from reference/monthly/202501/.../V2/年金数据.xlsx
+    """
+      </signature>
+    </function_signature>
+    <dataclass_definition>
+      <name>DataDiscoveryResult</name>
+      <location>src/work_data_hub/io/connectors/file_connector.py</location>
+      <definition>
+@dataclass
+class DataDiscoveryResult:
+    """Result of file discovery operation with rich metadata."""
+    df: pd.DataFrame                  # Loaded and normalized DataFrame
+    file_path: Path                   # Absolute path to discovered file
+    version: str                      # Detected version (e.g., "V2")
+    sheet_name: str                   # Excel sheet name loaded
+    row_count: int                    # Number of data rows
+    column_count: int                 # Number of columns
+    duration_ms: int                  # Total discovery time in milliseconds
+    columns_renamed: Dict[str, str]   # Original → normalized column mapping (Story 3.4)
+      </definition>
+    </dataclass_definition>
+    <exception_definition>
+      <name>DiscoveryError</name>
+      <location>src/work_data_hub/io/connectors/exceptions.py</location>
+      <definition>
+class DiscoveryError(Exception):
+    """Structured error for file discovery failures with stage context."""
+
+    def __init__(
+        self,
+        domain: str,
+        failed_stage: str,  # One of DiscoveryStage enum values
+        original_error: Exception,
+        message: str
+    ):
+        self.domain = domain
+        self.failed_stage = failed_stage
+        self.original_error = original_error
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        return (
+            f"Discovery failed for domain '{self.domain}' "
+            f"at stage '{self.failed_stage}': {self.args[0]}"
+        )
+
+    def to_dict(self) -> dict:
+        """Convert to structured dict for logging."""
+        return {
+            "error_type": "DiscoveryError",
+            "domain": self.domain,
+            "failed_stage": self.failed_stage,
+            "message": str(self),
+            "original_error_type": type(self.original_error).__name__,
+            "original_error_message": str(self.original_error)
+        }
+      </definition>
+    </exception_definition>
+    <logging_interface>
+      <event>discovery.started</event>
+      <structured_log>
+{
+  "event": "discovery.started",
+  "domain": "annuity_performance",
+  "template_vars": {"month": "202501"}
+}
+      </structured_log>
+      <event>discovery.version_detected</event>
+      <structured_log>
+{
+  "event": "discovery.version_detected",
+  "version": "V2",
+  "duration_ms": 45
+}
+      </structured_log>
+      <event>discovery.file_matched</event>
+      <structured_log>
+{
+  "event": "discovery.file_matched",
+  "file_path": "reference/monthly/202501/.../V2/年金数据.xlsx",
+  "duration_ms": 12
+}
+      </structured_log>
+      <event>discovery.excel_read</event>
+      <structured_log>
+{
+  "event": "discovery.excel_read",
+  "row_count": 1250,
+  "column_count": 15,
+  "duration_ms": 780
+}
+      </structured_log>
+      <event>discovery.completed</event>
+      <structured_log>
+{
+  "event": "discovery.completed",
+  "domain": "annuity_performance",
+  "file_path": "reference/monthly/202501/.../V2/年金数据.xlsx",
+  "version": "V2",
+  "sheet_name": "规模明细",
+  "row_count": 1250,
+  "column_count": 15,
+  "duration_ms": 850
+}
+      </structured_log>
+      <event>discovery.failed</event>
+      <structured_log>
+{
+  "event": "discovery.failed",
+  "domain": "annuity_performance",
+  "failed_stage": "file_matching",
+  "error_type": "FileNotFoundError",
+  "message": "No files found matching patterns ['*年金*.xlsx']"
+}
+      </structured_log>
+    </logging_interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      <standard>Target coverage: >85% for FileDiscoveryService class</standard>
+      <standard>All 6 acceptance criteria (AC1-AC6) must have corresponding test cases</standard>
+      <standard>Mock all sub-components in unit tests (no real file I/O)</standard>
+      <standard>Integration tests use real fixture files with versioned folders</standard>
+      <standard>Performance test asserting <2 seconds for typical domain discovery</standard>
+    </standards>
+    <locations>
+      <unit_tests>tests/unit/io/connectors/test_file_discovery_service.py</unit_tests>
+      <integration_tests>tests/integration/io/test_file_discovery_integration.py</integration_tests>
+      <performance_tests>tests/unit/io/connectors/test_file_discovery_service.py::test_discovery_performance</performance_tests>
+    </locations>
+    <ideas>
+      <test_case id="TC1" ac="AC1">
+        <name>test_template_variable_resolution_yyyymm</name>
+        <input>domain='annuity_performance', month='202501'</input>
+        <expected>Resolved path contains '202501' replacing {YYYYMM}</expected>
+        <mock>Mock config with base_path containing {YYYYMM} placeholder</mock>
+      </test_case>
+      <test_case id="TC2" ac="AC1">
+        <name>test_template_variable_resolution_yyyy_mm</name>
+        <input>domain='annuity_performance', month='202501'</input>
+        <expected>Can extract {YYYY}='2025' and {MM}='01' from month parameter</expected>
+        <mock>Mock config with base_path containing {YYYY} and {MM} placeholders</mock>
+      </test_case>
+      <test_case id="TC3" ac="AC2">
+        <name>test_end_to_end_discovery_orchestration_order</name>
+        <input>domain='annuity_performance', month='202501'</input>
+        <expected>Components called in exact order: config → version → file → excel</expected>
+        <mock>Mock all components (VersionScanner, FilePatternMatcher, ExcelReader) and verify call order</mock>
+        <assertions>
+          <assertion>version_scanner.scan() called before file_matcher.find_file()</assertion>
+          <assertion>file_matcher.find_file() called before excel_reader.read_sheet()</assertion>
+          <assertion>ExcelReader returns pre-normalized columns (Story 3.4 integration)</assertion>
+        </assertions>
+      </test_case>
+      <test_case id="TC4" ac="AC3">
+        <name>test_structured_result_format</name>
+        <input>domain='annuity_performance', month='202501'</input>
+        <expected>DataDiscoveryResult contains all fields: df, file_path, version, sheet_name, row_count, column_count, duration_ms, columns_renamed</expected>
+        <mock>Mock successful discovery with known values</mock>
+        <assertions>
+          <assertion>result.df is pd.DataFrame instance</assertion>
+          <assertion>result.file_path is Path instance</assertion>
+          <assertion>result.version == "V2"</assertion>
+          <assertion>result.duration_ms > 0</assertion>
+          <assertion>result.columns_renamed is dict (from Story 3.4)</assertion>
+        </assertions>
+      </test_case>
+      <test_case id="TC5" ac="AC4">
+        <name>test_error_wrapping_version_detection_failure</name>
+        <input>domain='annuity_performance', month='202501'</input>
+        <expected>Raise DiscoveryError with failed_stage='version_detection'</expected>
+        <mock>Mock VersionScanner to raise exception</mock>
+        <assertions>
+          <assertion>DiscoveryError.domain == 'annuity_performance'</assertion>
+          <assertion>DiscoveryError.failed_stage == 'version_detection'</assertion>
+          <assertion>DiscoveryError.original_error is original exception</assertion>
+        </assertions>
+      </test_case>
+      <test_case id="TC6" ac="AC4">
+        <name>test_error_wrapping_file_matching_failure</name>
+        <input>domain='annuity_performance', month='202501'</input>
+        <expected>Raise DiscoveryError with failed_stage='file_matching'</expected>
+        <mock>Mock FilePatternMatcher to raise FileNotFoundError</mock>
+        <assertions>
+          <assertion>DiscoveryError.failed_stage == 'file_matching'</assertion>
+          <assertion>Error message includes "No files found matching patterns"</assertion>
+        </assertions>
+      </test_case>
+      <test_case id="TC7" ac="AC4">
+        <name>test_error_wrapping_excel_reading_failure</name>
+        <input>domain='annuity_performance', month='202501'</input>
+        <expected>Raise DiscoveryError with failed_stage='excel_reading'</expected>
+        <mock>Mock ExcelReader to raise exception (corrupted file, missing sheet)</mock>
+        <assertions>
+          <assertion>DiscoveryError.failed_stage == 'excel_reading'</assertion>
+          <assertion>Original exception preserved in DiscoveryError.original_error</assertion>
+        </assertions>
+      </test_case>
+      <test_case id="TC8" ac="AC5">
+        <name>test_multi_domain_independence</name>
+        <input>domains=['annuity_performance', 'trustee_performance']</input>
+        <expected>Each domain processed independently, failure in one doesn't affect other</expected>
+        <mock>Mock config with multiple domains, simulate failure in one</mock>
+        <assertions>
+          <assertion>Successful domain returns valid DataDiscoveryResult</assertion>
+          <assertion>Failed domain raises DiscoveryError without affecting others</assertion>
+        </assertions>
+      </test_case>
+      <test_case id="TC9" ac="AC6">
+        <name>test_error_stage_identification_accuracy</name>
+        <input>Various exception types from sub-components</input>
+        <expected>Correct stage identified based on exception type</expected>
+        <scenarios>
+          <scenario>ValidationError → config_validation</scenario>
+          <scenario>FileNotFoundError → file_matching</scenario>
+          <scenario>ExcelError → excel_reading</scenario>
+          <scenario>Exception with "Ambiguous" in message → version_detection</scenario>
+        </scenarios>
+      </test_case>
+      <test_case id="TC10" ac="integration">
+        <name>test_full_discovery_with_real_files (integration)</name>
+        <input>Fixture directory with versioned folders V1, V2 and Excel files</input>
+        <expected>Discover highest version (V2), load Excel, return normalized DataFrame</expected>
+        <setup>Create tests/fixtures/monthly_data/202501/收集数据/业务收集/{V1,V2}/年金数据.xlsx</setup>
+        <assertions>
+          <assertion>result.version == "V2" (highest version selected)</assertion>
+          <assertion>result.df has expected row and column counts</assertion>
+          <assertion>result.columns_renamed shows normalization applied (Story 3.4)</assertion>
+        </assertions>
+      </test_case>
+      <test_case id="TC11" ac="performance">
+        <name>test_discovery_performance_threshold</name>
+        <input>domain='annuity_performance', month='202501'</input>
+        <expected>Total discovery time < 2000ms (NFR requirement)</expected>
+        <setup>Use realistic fixture Excel file (1000 rows, 23 columns)</setup>
+        <assertions>
+          <assertion>result.duration_ms < 2000</assertion>
+          <assertion>Stage durations logged for bottleneck identification</assertion>
+        </assertions>
+      </test_case>
+      <test_case id="TC12" ac="edge_case">
+        <name>test_missing_template_variables</name>
+        <input>domain='annuity_performance', NO month parameter</input>
+        <expected>Clear error message: "Template variable {YYYYMM} not provided"</expected>
+      </test_case>
+      <test_case id="TC13" ac="edge_case">
+        <name>test_invalid_domain_name</name>
+        <input>domain='nonexistent_domain', month='202501'</input>
+        <expected>Raise DiscoveryError with failed_stage='config_validation'</expected>
+        <message>"Domain 'nonexistent_domain' not found in config"</message>
+      </test_case>
+    </ideas>
+  </tests>
+
+  <handoff_to_epic2>
+    <title>Integration with Epic 2 Bronze Validation</title>
+    <output>
+      <item>DataFrame with normalized column names (Story 3.4 integration)</item>
+      <item>Full discovery metadata: file path, version, sheet name</item>
+      <item>Columns renamed mapping for debugging column name issues</item>
+    </output>
+    <epic2_receives>
+      <item>Clean DataFrame ready for Bronze schema validation (Epic 2 Story 2.2)</item>
+      <item>No file discovery concerns - Epic 3 handles all file operations</item>
+      <item>Error-free data loading - Epic 3 catches all discovery failures</item>
+    </epic2_receives>
+    <integration_example>
+# Epic 3 (File Discovery) → Epic 2 (Bronze Validation)
+from work_data_hub.io.connectors.file_connector import FileDiscoveryService
+from work_data_hub.domain.annuity_performance.schemas import BronzeAnnuitySchema
+
+# Epic 3: Discover and load
+service = FileDiscoveryService()
+discovery_result = service.discover_and_load(
+    domain='annuity_performance',
+    month='202501'
+)
+
+# Epic 2: Validate Bronze schema
+bronze_df = BronzeAnnuitySchema.validate(discovery_result.df)  # Story 2.2
+    </integration_example>
+  </handoff_to_epic2>
+
+  <enhancement_summary>
+    <title>Context XML Enhanced Based on Story Improvements (2025-11-28)</title>
+    <description>This context XML has been enriched with detailed learnings from Story 3.4, integration patterns, and best practices based on the improved story document</description>
+
+    <enhancements>
+      <enhancement id="e-1" section="artifacts/docs/previous_story">
+        <title>Expanded Story 3.4 Documentation</title>
+        <changes>
+          <change>Added NEW FILES CREATED section with file paths for import references</change>
+          <change>Added MODIFIED FILES section explaining integration pattern</change>
+          <change>Added detailed INTEGRATION PATTERN explaining automatic column normalization</change>
+          <change>Added CODE REVIEW INSIGHTS with thread safety, performance, and quality guidance</change>
+          <change>Added ARCHITECTURAL DECISIONS APPLIED (Decisions #7 and #8)</change>
+          <change>Added KEY TAKEAWAYS FOR STORY 3.5 with actionable implementation notes</change>
+          <change>Added implementation_guidance subsection with 5 specific guidance points</change>
+        </changes>
+        <benefit>Developer gets complete context from previous story including files created, integration patterns, code review insights, and quality standards</benefit>
+      </enhancement>
+
+      <enhancement id="e-2" section="artifacts/docs/architecture_decision">
+        <title>Enhanced Architecture Decision Documentation</title>
+        <changes>
+          <change>Expanded Decision #7 with Chinese character preservation details and examples</change>
+          <change>Added implementation_impact subsection for Decision #7 (4 specific impacts)</change>
+          <change>Created separate Decision #8 section for Structured Logging Standards</change>
+          <change>Added implementation_examples subsection with correct/incorrect logging patterns</change>
+          <change>Detailed EVENT IDENTIFIERS, STRUCTURED CONTEXT, performance metrics requirements</change>
+        </changes>
+        <benefit>Developer understands exactly how to apply architectural decisions with concrete examples</benefit>
+      </enhancement>
+
+      <enhancement id="e-3" section="integration_patterns">
+        <title>Added Integration Patterns Section (NEW)</title>
+        <patterns_added>
+          <pattern>Pattern 1: Automatic Column Normalization Integration (with code example + anti-pattern)</pattern>
+          <pattern>Pattern 2: Template Variable Resolution with Chinese Paths (with validation tests)</pattern>
+          <pattern>Pattern 3: Structured Error Context with Stage Identification (with benefits list)</pattern>
+          <pattern>Pattern 4: Performance Measurement Per Stage (with performance targets)</pattern>
+        </patterns_added>
+        <code_examples>4 detailed code examples showing correct implementation patterns</code_examples>
+        <anti_patterns>1 anti-pattern example showing what NOT to do (redundant normalization)</anti_patterns>
+        <benefit>Developer has concrete implementation patterns to follow for all critical integration points</benefit>
+      </enhancement>
+
+      <enhancement id="e-4" section="best_practices">
+        <title>Added Best Practices Section (NEW)</title>
+        <practices_added>
+          <practice>BP-1: Follow Story 3.4 Quality Standards (6 guidelines for testing)</practice>
+          <practice>BP-2: Apply Decision #8 Structured Logging Consistently (5 guidelines)</practice>
+          <practice>BP-3: Preserve Chinese Characters Throughout Pipeline (5 guidelines + example)</practice>
+          <practice>BP-4: Error Handling: Wrap with Context, Preserve Stack Trace (5 guidelines)</practice>
+        </practices_added>
+        <total_guidelines>21 specific, actionable guidelines across 4 practice areas</total_guidelines>
+        <benefit>Developer has clear checklist of best practices to follow during implementation</benefit>
+      </enhancement>
+    </enhancements>
+
+    <quality_improvements>
+      <improvement>Story 3.4 quality bar (100% test pass rate) documented as target for Story 3.5</improvement>
+      <improvement>Code review insights from Story 3.4 captured for developer reference</improvement>
+      <improvement>Architectural decisions (Decisions #7, #8) explained with implementation impact</improvement>
+      <improvement>Integration patterns provide concrete code examples to avoid common mistakes</improvement>
+      <improvement>Best practices section provides actionable checklist for implementation quality</improvement>
+      <improvement>Performance targets broken down per stage (<2s total, with stage-level targets)</improvement>
+      <improvement>Chinese character preservation explained throughout (paths, columns, logging)</improvement>
+    </quality_improvements>
+
+    <total_additions>
+      <stats>
+        <stat>Previous story documentation: Expanded from 4 to 7 key points</stat>
+        <stat>Architecture decisions: Expanded from 3 to 7+ key points each</stat>
+        <stat>Integration patterns: 4 new patterns with code examples</stat>
+        <stat>Best practices: 4 new practices with 21 guidelines</stat>
+        <stat>Code examples: 6 detailed code examples added</stat>
+        <stat>Implementation guidance: 5 specific guidance points added</stat>
+      </stats>
+    </total_additions>
+
+    <ready_for_development>
+      <status>✅ Context XML now provides comprehensive implementation guidance</status>
+      <developer_benefits>
+        <benefit>Clear understanding of Story 3.4 integration pattern (automatic column normalization)</benefit>
+        <benefit>Concrete code examples for all critical patterns</benefit>
+        <benefit>Quality standards from previous story to maintain consistency</benefit>
+        <benefit>Architectural decisions explained with implementation impact</benefit>
+        <benefit>Best practices checklist for implementation quality</benefit>
+        <benefit>Anti-patterns documented to avoid common mistakes</benefit>
+        <benefit>Performance targets defined per stage for bottleneck identification</benefit>
+      </developer_benefits>
+    </ready_for_development>
+  </enhancement_summary>
+</story-context>

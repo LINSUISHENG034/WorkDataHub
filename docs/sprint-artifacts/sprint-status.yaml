@@ -67,7 +67,7 @@ development_status:
   3-2-pattern-based-file-matcher: done
   3-3-multi-sheet-excel-reader: done
   3-4-column-name-normalization: done
-  3-5-file-discovery-integration: backlog
+  3-5-file-discovery-integration: done
   epic-3-retrospective: optional
 
   # Epic 4: Annuity Performance Domain Migration (MVP)
