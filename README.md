@@ -118,6 +118,32 @@ tests/
    # At minimum, set DATABASE_URL for PostgreSQL connection
    ```
 
+### Excel Reader (Story 3.3) Quick Guide
+
+- Supported formats: `.xlsx` and `.xlsm` via `pandas` + `openpyxl`; `.xls` is not supported.
+- Usage:
+  ```python
+  from pathlib import Path
+  from work_data_hub.io.readers.excel_reader import ExcelReader
+
+  reader = ExcelReader()
+  result = reader.read_sheet(
+      Path("reference/monthly/202501/收集数据/数据采集/V1/【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx"),
+      sheet_name="规模明细",
+      skip_empty_rows=True,
+  )
+  print(result.sheet_name, result.row_count, result.column_count)
+  ```
+- Behavior highlights:
+  - Sheet selection by name or 0-based index; raises `DiscoveryError` with available sheets listed if not found.
+  - Empty-row handling: blanks/whitespace → dropped when `skip_empty_rows=True` (default).
+  - Merged cells: values forward-filled after empty-row cleanup to keep ranges consistent.
+  - Returns `ExcelReadResult` with `df`, `sheet_name`, `row_count`, `column_count`, `file_path` (Path), `read_at` (datetime).
+- Troubleshooting:
+  - **File not found / corrupted**: You’ll see `DiscoveryError(failed_stage='excel_reading')`; check path/extension or re-save the Excel file.
+  - **Missing sheet**: Ensure `sheet_name` matches exactly (case/locale); inspect `available sheets` in the error message.
+  - **Unexpected row counts**: Set `skip_empty_rows=False` to inspect raw rows, then re-enable after confirming formatting-only rows are safe to drop.
+
 4. **Verify installation:**
    ```bash
    # Run tests to verify setup

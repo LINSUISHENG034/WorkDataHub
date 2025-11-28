@@ -10,14 +10,28 @@ all imports pointed inward (domain ← io ← orchestration).
 import logging
 import re
 import zipfile
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 
+from work_data_hub.io.connectors.exceptions import DiscoveryError
 from work_data_hub.utils.column_normalizer import normalize_columns
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ExcelReadResult:
+    """Result of Excel sheet reading."""
+    df: pd.DataFrame           # Loaded DataFrame
+    sheet_name: str            # Actual sheet name loaded
+    row_count: int             # Number of data rows
+    column_count: int          # Number of columns
+    file_path: Path            # Source file path
+    read_at: datetime          # Timestamp of read operation
 
 
 class ExcelReadError(Exception):
@@ -257,6 +271,162 @@ class ExcelReader:
             cleaned_rows.append(cleaned_row)
 
         return cleaned_rows
+
+
+    def read_sheet(
+        self,
+        file_path: Path,
+        sheet_name: Union[str, int],
+        skip_empty_rows: bool = True
+    ) -> ExcelReadResult:
+        """
+        Read a specific sheet from an Excel file.
+
+        Args:
+            file_path: Path to Excel file (.xlsx or .xlsm)
+            sheet_name: Sheet name (str) or 0-based index (int)
+            skip_empty_rows: If True, drop rows where all values are NaN
+
+        Returns:
+            ExcelReadResult with DataFrame and metadata
+
+        Raises:
+            DiscoveryError: If file not found, sheet not found, or file corrupted
+        """
+        logger.info(
+            "excel_reading.started file_path=%s sheet_name=%s skip_empty_rows=%s",
+            file_path,
+            sheet_name,
+            skip_empty_rows,
+        )
+
+        start_time = datetime.now()
+
+        try:
+            # Get available sheets for error messages
+            excel_file = pd.ExcelFile(file_path, engine="openpyxl")
+            available_sheets = excel_file.sheet_names
+
+            # Resolve sheet name if index provided
+            actual_sheet_name = self._resolve_sheet_name(
+                sheet_name, available_sheets, file_path
+            )
+
+            # Read sheet
+            df = pd.read_excel(
+                file_path,
+                sheet_name=actual_sheet_name,
+                engine="openpyxl",
+                na_values=["", " ", "N/A", "NA"],
+            )
+
+            # Handle empty rows
+            empty_count = 0
+            if skip_empty_rows:
+                original_count = len(df)
+                cleaned_df = df.replace(r"^\s*$", pd.NA, regex=True)
+                df = cleaned_df.dropna(how="all")
+
+                # Drop accidental header rows that repeat column names (common in hand-crafted Excel)
+                if not df.empty and list(df.iloc[0].values) == list(df.columns):
+                    df = df.iloc[1:]
+
+                empty_count = original_count - len(df)
+
+                if empty_count > 0:
+                    logger.info(
+                        "excel_reading.empty_rows_skipped empty_rows_skipped=%s file_path=%s sheet_name=%s",
+                        empty_count,
+                        file_path,
+                        actual_sheet_name,
+                    )
+
+            # Forward-fill merged cells so merged ranges share the first value
+            df = df.ffill()
+
+            duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+
+            result = ExcelReadResult(
+                df=df,
+                sheet_name=actual_sheet_name,
+                row_count=len(df),
+                column_count=len(df.columns),
+                file_path=file_path,
+                read_at=start_time
+            )
+
+            logger.info(
+                "excel_reading.completed file_path=%s sheet_name=%s row_count=%s column_count=%s duration_ms=%s empty_rows_skipped=%s",
+                file_path,
+                actual_sheet_name,
+                result.row_count,
+                result.column_count,
+                duration_ms,
+                empty_count,
+            )
+
+            return result
+
+        except FileNotFoundError as e:
+            raise DiscoveryError(
+                domain="unknown",
+                failed_stage="excel_reading",
+                original_error=e,
+                message=f"Excel file not found: {file_path}"
+            )
+        except DiscoveryError:
+            # Propagate already-wrapped discovery errors (sheet resolution, etc.)
+            raise
+        except ValueError as e:
+            # Sheet not found
+            raise DiscoveryError(
+                domain="unknown",
+                failed_stage="excel_reading",
+                original_error=e,
+                message=(
+                    f"Sheet '{sheet_name}' not found in file {file_path.name}, "
+                    f"available sheets: {available_sheets}"
+                )
+            )
+        except Exception as e:
+            raise DiscoveryError(
+                domain="unknown",
+                failed_stage="excel_reading",
+                original_error=e,
+                message=f"Failed to read Excel file {file_path}: {str(e)}"
+            )
+
+    def _resolve_sheet_name(
+        self,
+        sheet_name: Union[str, int],
+        available_sheets: list,
+        file_path: Path
+    ) -> str:
+        """Resolve sheet name from string or index."""
+        if isinstance(sheet_name, int):
+            if sheet_name < 0 or sheet_name >= len(available_sheets):
+                raise DiscoveryError(
+                    domain="unknown",
+                    failed_stage="excel_reading",
+                    original_error=IndexError(f"Sheet index {sheet_name} out of range"),
+                    message=(
+                        f"Sheet index {sheet_name} out of range in file {file_path.name}, "
+                        f"available sheets (0-{len(available_sheets)-1}): {available_sheets}"
+                    )
+                )
+            return available_sheets[sheet_name]
+
+        if sheet_name not in available_sheets:
+            raise DiscoveryError(
+                domain="unknown",
+                failed_stage="excel_reading",
+                original_error=ValueError(f"Sheet '{sheet_name}' not found"),
+                message=(
+                    f"Sheet '{sheet_name}' not found in file {file_path.name}, "
+                    f"available sheets: {available_sheets}"
+                )
+            )
+        return sheet_name
 
 
 def read_excel_rows(

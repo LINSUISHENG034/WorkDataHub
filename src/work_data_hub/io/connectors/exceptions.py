@@ -36,4 +36,5 @@ class DiscoveryError(Exception):
         self.domain = domain
         self.failed_stage = failed_stage
         self.original_error = original_error
+        self.message = message
         super().__init__(message)

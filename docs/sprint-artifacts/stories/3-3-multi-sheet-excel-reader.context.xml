@@ -1,0 +1,443 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>3</storyId>
+    <title>Multi-Sheet Excel Reader</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/3-3-multi-sheet-excel-reader.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>targeted sheet extraction from multi-sheet Excel workbooks</iWant>
+    <soThat>I can process specific data without manual sheet copying</soThat>
+    <tasks>
+      <task id="1" acs="1,2,5,6">
+        <description>Implement ExcelReader core class</description>
+        <subtask id="1.1">Create io/readers/excel_reader.py module</subtask>
+        <subtask id="1.2">Implement ExcelReader class with read_sheet() method</subtask>
+        <subtask id="1.3">Use pandas.read_excel() with engine='openpyxl' for Unicode support</subtask>
+        <subtask id="1.4">Support sheet name (string) and index (integer) selection</subtask>
+        <subtask id="1.5">Configure na_values=['', ' ', 'N/A', 'NA'] for null handling</subtask>
+      </task>
+      <task id="2" acs="7">
+        <description>Implement ExcelReadResult dataclass</description>
+        <subtask id="2.1">Create ExcelReadResult dataclass with required fields</subtask>
+        <subtask id="2.2">Include metadata: df, sheet_name, row_count, column_count, file_path</subtask>
+        <subtask id="2.3">Add read_at timestamp for audit logging</subtask>
+      </task>
+      <task id="3" acs="3">
+        <description>Implement error handling for missing sheets</description>
+        <subtask id="3.1">Catch ValueError from pandas when sheet not found</subtask>
+        <subtask id="3.2">Query available sheets using pd.ExcelFile(file_path).sheet_names</subtask>
+        <subtask id="3.3">Raise DiscoveryError with failed_stage='excel_reading'</subtask>
+        <subtask id="3.4">Include available sheets in error message for troubleshooting</subtask>
+      </task>
+      <task id="4" acs="4">
+        <description>Implement empty row handling</description>
+        <subtask id="4.1">Add skip_empty_rows parameter (default: True)</subtask>
+        <subtask id="4.2">Detect and count empty rows after initial load</subtask>
+        <subtask id="4.3">Drop rows where all values are NaN</subtask>
+        <subtask id="4.4">Log skipped row count using Epic 1 Story 1.3 structured logging</subtask>
+      </task>
+      <task id="5" acs="4,7">
+        <description>Add structured logging</description>
+        <subtask id="5.1">Log read start with file path and sheet name</subtask>
+        <subtask id="5.2">Log read completion with row/column counts and duration</subtask>
+        <subtask id="5.3">Log empty rows skipped (if any)</subtask>
+        <subtask id="5.4">Use JSON format per Epic 1 Story 1.3 standards</subtask>
+      </task>
+      <task id="6" acs="1,2,3,4,5,6,7">
+        <description>Write comprehensive unit tests</description>
+        <subtask id="6.1">Test sheet selection by name (Chinese characters)</subtask>
+        <subtask id="6.2">Test sheet selection by index</subtask>
+        <subtask id="6.3">Test missing sheet error with available sheets list</subtask>
+        <subtask id="6.4">Test empty row skipping with count logging</subtask>
+        <subtask id="6.5">Test Chinese character preservation in column names</subtask>
+        <subtask id="6.6">Test merged cell handling (first cell value used)</subtask>
+        <subtask id="6.7">Test ExcelReadResult metadata accuracy</subtask>
+      </task>
+      <task id="7" acs="1,2,3,4,5,6,7">
+        <description>Write integration tests with real Excel files</description>
+        <subtask id="7.1">Create test fixture Excel files with multiple sheets</subtask>
+        <subtask id="7.2">Test end-to-end read with Chinese sheet names</subtask>
+        <subtask id="7.3">Test performance: &lt;5 seconds for 10MB file with 10K rows</subtask>
+        <subtask id="7.4">Test corrupted Excel file handling</subtask>
+        <subtask id="7.5">Test .xlsm (macro-enabled) file support</subtask>
+      </task>
+      <task id="8" acs="all">
+        <description>Update documentation</description>
+        <subtask id="8.1">Document ExcelReader API in docstrings</subtask>
+        <subtask id="8.2">Add Excel reading section to README.md</subtask>
+        <subtask id="8.3">Document supported Excel formats (.xlsx, .xlsm)</subtask>
+        <subtask id="8.4">Add troubleshooting guide for common Excel issues</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">
+      <given>Excel file with sheets ['Summary', '规模明细', 'Notes'] and config sheet_name: "规模明细"</given>
+      <when>I read the Excel file</when>
+      <then>Load only the '规模明细' sheet as DataFrame</then>
+    </criterion>
+    <criterion id="AC2">
+      <given>Sheet name is integer index sheet_name: 1</given>
+      <when>I read the Excel file</when>
+      <then>Load the second sheet (0-indexed)</then>
+    </criterion>
+    <criterion id="AC3">
+      <given>Specified sheet name doesn't exist</given>
+      <when>I read the Excel file</when>
+      <then>Raise DiscoveryError: "Sheet '规模明细' not found in file 年金数据2025.xlsx, available sheets: ['Summary', 'Notes']"</then>
+    </criterion>
+    <criterion id="AC4">
+      <given>Excel has empty rows with formatting but no data</given>
+      <when>I read the Excel file with skip_empty_rows=True</when>
+      <then>Skip empty rows and log: "Skipped N empty rows during load"</then>
+    </criterion>
+    <criterion id="AC5">
+      <given>Excel has Chinese characters in column names</given>
+      <when>I read the Excel file</when>
+      <then>Preserve Chinese characters in column names (UTF-8 encoding)</then>
+    </criterion>
+    <criterion id="AC6">
+      <given>Excel has merged cells</given>
+      <when>I read the Excel file</when>
+      <then>Use first cell's value for entire merged range (pandas/openpyxl default behavior)</then>
+    </criterion>
+    <criterion id="AC7">
+      <given>Successful Excel read</given>
+      <when>Read completes</when>
+      <then>Return ExcelReadResult dataclass with: df, sheet_name, row_count, column_count, file_path</then>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>WorkDataHub Product Requirements Document</title>
+        <section>FR-1.3: Multi-Sheet Excel Reading</section>
+        <snippet>Extracts specific sheets from multi-sheet Excel workbooks. Configuration specifies target sheet by name or index. Handles Chinese characters in sheet names and column headers. Errors clearly if sheet not found.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>WorkDataHub Product Requirements Document</title>
+        <section>FR-1.4: Resilient Data Loading</section>
+        <snippet>Gracefully handles common Excel data issues: skips empty rows automatically, coerces numeric strings, handles merged cells using first cell's value, normalizes column names with whitespace/special characters.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Architecture Document</title>
+        <section>Decision #7: Comprehensive Naming Conventions</section>
+        <snippet>Pydantic fields use original Chinese from Excel sources (月度, 计划代码). Python 3.10+ supports Unicode identifiers. Column normalizer preserves Chinese names. Database mapping uses explicit column projection to English names.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Architecture Document</title>
+        <section>Decision #4: Hybrid Error Context Standards</section>
+        <snippet>Structured exceptions with required context fields: error_type, operation, domain, row_number, field, input_data. Example: DiscoveryError with failed_stage marker for consistent error handling.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-3.md</path>
+        <title>Epic 3 Technical Specification</title>
+        <section>Story 3.3: ExcelReader Core Class</section>
+        <snippet>Module: io/readers/excel_reader.py. Use pandas.read_excel() with engine='openpyxl' for Unicode support. Support sheet name (string) and index (integer) selection. Configure na_values=['', ' ', 'N/A', 'NA'] for null handling. Return ExcelReadResult dataclass with df, sheet_name, row_count, column_count, file_path.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-3.md</path>
+        <title>Epic 3 Technical Specification</title>
+        <section>Real Data Validation (202411)</section>
+        <snippet>Real file: 【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx. Sheet: 规模明细 (33,269 rows, 23 columns). Chinese characters preserved in UTF-8. NaN values present in 7 columns. Numeric fields use scientific notation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-3.md</path>
+        <title>Epic 3 Technical Specification</title>
+        <section>Layer-Specific Field Requirements</section>
+        <snippet>Epic 3 focuses on file discovery and Excel reading - NO field-level validation. Bronze Layer Output: DataFrame with raw columns from Excel (as-is, column names normalized). Handoff to Epic 2: Returns normalized DataFrame for Bronze validation.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <module>
+        <path>src/work_data_hub/io/readers/excel_reader.py</path>
+        <name>ExcelReader</name>
+        <type>class</type>
+        <relevance>EXISTING implementation from Story 1.6. Returns List[Dict] instead of DataFrame. Story 3.3 needs to ADD new read_sheet() method returning ExcelReadResult dataclass while preserving existing read_rows() for backward compatibility.</relevance>
+        <interface>read_rows(file_path, sheet, header, skip_rows) -> List[Dict], get_sheet_names(file_path) -> List[str], validate_file(file_path, sheet) -> bool</interface>
+      </module>
+      <module>
+        <path>src/work_data_hub/io/connectors/exceptions.py</path>
+        <name>DiscoveryError</name>
+        <type>exception</type>
+        <relevance>Structured error context for file discovery failures (Architecture Decision #4). Story 3.3 should raise DiscoveryError with failed_stage='excel_reading' for consistency with Epic 3 error handling.</relevance>
+        <interface>DiscoveryError(domain, failed_stage, original_error, message)</interface>
+      </module>
+      <module>
+        <path>src/work_data_hub/utils/column_normalizer.py</path>
+        <name>ColumnNormalizer</name>
+        <type>class</type>
+        <relevance>Handles Chinese bracket conversion, whitespace removal, special character cleanup. Story 3.3 returns DataFrame with RAW columns (normalization happens in Story 3.4 via FileDiscoveryService).</relevance>
+        <interface>normalize_column_name(column_name) -> str, normalize_columns(columns) -> Dict[str, str]</interface>
+      </module>
+      <module>
+        <path>src/work_data_hub/io/connectors/version_scanner.py</path>
+        <name>VersionScanner</name>
+        <type>class</type>
+        <relevance>Version detection (Story 3.1). Returns VersionedPath with selected version folder. Story 3.5 passes this path to FilePatternMatcher (3.2) then to ExcelReader (3.3).</relevance>
+        <interface>detect_version(base_path, file_patterns, strategy) -> VersionedPath</interface>
+      </module>
+      <constraint>
+        <type>Integration</type>
+        <description>Story 3.3 must integrate with Story 3.5 (FileDiscoveryService) which orchestrates: 3.1 (version) -> 3.2 (file match) -> 3.3 (Excel read) -> 3.4 (normalize). ExcelReader.read_sheet() called by FileDiscoveryService after file_path resolved.</description>
+      </constraint>
+      <constraint>
+        <type>Backward Compatibility</type>
+        <description>Existing ExcelReader.read_rows() used by Story 1.6. Story 3.3 MUST NOT break this interface. Add NEW read_sheet() method alongside existing methods.</description>
+      </constraint>
+      <constraint>
+        <type>Error Handling</type>
+        <description>Use DiscoveryError (not ExcelReadError) for consistency with Epic 3. Wrap pandas exceptions with failed_stage='excel_reading' and structured context.</description>
+      </constraint>
+    </code>
+    <dependencies>
+      <library>
+        <name>pandas</name>
+        <version>latest (locked in architecture)</version>
+        <purpose>DataFrame operations, pd.read_excel() for Excel reading</purpose>
+        <notes>Architecture mandates pandas for team expertise and ecosystem maturity</notes>
+      </library>
+      <library>
+        <name>openpyxl</name>
+        <version>latest (locked in architecture)</version>
+        <purpose>Excel engine for multi-sheet .xlsx reading with Unicode support</purpose>
+        <notes>Required for Chinese character preservation. Use engine='openpyxl' in pd.read_excel()</notes>
+      </library>
+      <library>
+        <name>pydantic</name>
+        <version>>=2.11.7</version>
+        <purpose>ExcelReadResult dataclass definition</purpose>
+        <notes>Use @dataclass decorator for result model with type hints</notes>
+      </library>
+      <library>
+        <name>structlog</name>
+        <version>latest</version>
+        <purpose>Structured logging for discovery metrics (Architecture Decision #8)</purpose>
+        <notes>Log read_start, read_completion, empty_rows_skipped with JSON format</notes>
+      </library>
+      <dev-dependency>
+        <name>pytest</name>
+        <version>latest</version>
+        <purpose>Unit and integration testing</purpose>
+        <markers>@pytest.mark.unit for fast tests, @pytest.mark.integration for Excel file tests</markers>
+      </dev-dependency>
+      <dev-dependency>
+        <name>pytest-cov</name>
+        <version>>=6.2.1</version>
+        <purpose>Code coverage tracking</purpose>
+        <notes>Target >80% coverage (NFR-1027-1032)</notes>
+      </dev-dependency>
+      <dev-dependency>
+        <name>mypy</name>
+        <version>>=1.17.1</version>
+        <purpose>Type checking in strict mode</purpose>
+        <notes>100% type coverage required (NFR-1027-1032), use type hints for all public APIs</notes>
+      </dev-dependency>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>
+      <type>Architecture - Clean Architecture</type>
+      <description>ExcelReader lives in io/readers layer. Domain layer CANNOT import from io (enforced by ruff TID251). Orchestration injects reader into pipelines.</description>
+      <source>Architecture Document, pyproject.toml:57-58</source>
+    </constraint>
+    <constraint>
+      <type>Type Safety - mypy strict mode</type>
+      <description>All public methods must have complete type hints. Strict mode enforced in CI (disallow_untyped_defs=true, check_untyped_defs=true).</description>
+      <source>pyproject.toml:95-117</source>
+    </constraint>
+    <constraint>
+      <type>Error Handling - Structured Context</type>
+      <description>Use DiscoveryError (not ExcelReadError) for Epic 3 consistency. Include failed_stage='excel_reading', domain, original_error fields.</description>
+      <source>Architecture Decision #4, exceptions.py</source>
+    </constraint>
+    <constraint>
+      <type>Naming Conventions - Chinese Fields</type>
+      <description>Preserve original Chinese column names from Excel (月度, 计划代码). Python 3.10+ supports Unicode identifiers. NO transliteration.</description>
+      <source>Architecture Decision #7</source>
+    </constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>ExcelReader.read_sheet()</name>
+      <signature>read_sheet(file_path: Path, sheet_name: str | int, skip_empty_rows: bool = True) -> ExcelReadResult</signature>
+      <purpose>NEW method for Story 3.3. Load specific sheet and return DataFrame with metadata.</purpose>
+      <returns>ExcelReadResult(df: pd.DataFrame, sheet_name: str, row_count: int, column_count: int, file_path: Path, read_at: datetime)</returns>
+    </interface>
+    <interface>
+      <name>ExcelReadResult dataclass</name>
+      <fields>df: pd.DataFrame, sheet_name: str, row_count: int, column_count: int, file_path: Path, read_at: datetime</fields>
+      <purpose>Return type for read_sheet(). Provides metadata for audit logging and Epic 1 Story 1.3 structured logging.</purpose>
+    </interface>
+    <interface>
+      <name>DiscoveryError exception</name>
+      <signature>DiscoveryError(domain: str, failed_stage: Literal['excel_reading'], original_error: Exception, message: str)</signature>
+      <purpose>Wrap pandas/openpyxl exceptions with structured context for Epic 3 error handling.</purpose>
+    </interface>
+    <interface>
+      <name>Integration with FileDiscoveryService (Story 3.5)</name>
+      <flow>Story 3.5 calls ExcelReader.read_sheet(file_path, sheet_name) after version detection (3.1) and file matching (3.2). Returns DataFrame to Story 3.4 for column normalization.</flow>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      <standard>
+        <name>Test Pyramid (Epic 6)</name>
+        <description>Unit tests (fast, isolated) > Integration tests (moderate speed) > E2E tests (slow, CI only)</description>
+        <source>Architecture Document lines 1026-1088, pyproject.toml:66-78</source>
+      </standard>
+      <standard>
+        <name>Pytest Markers</name>
+        <markers>
+          - @pytest.mark.unit: Fast unit tests with no external dependencies
+          - @pytest.mark.integration: Tests with Excel file fixtures
+          - @pytest.mark.performance: Resource-intensive tests (10MB file, 10K rows)
+        </markers>
+        <source>pyproject.toml:66-78</source>
+      </standard>
+      <standard>
+        <name>Coverage Target</name>
+        <requirement>>80% code coverage enforced by CI</requirement>
+        <tool>pytest-cov with --cov-report=term-missing</tool>
+        <source>Architecture NFR-1027-1032, pyproject.toml:84</source>
+      </standard>
+      <standard>
+        <name>Type Safety</name>
+        <requirement>100% type coverage with mypy strict mode</requirement>
+        <enforcement>CI blocks on type errors, disallow_untyped_defs=true</enforcement>
+        <source>Architecture NFR-1027-1032, pyproject.toml:95-117</source>
+      </standard>
+      <standard>
+        <name>Test Data Realism (Epic 2 Retrospective)</name>
+        <requirement>Integration tests use fixtures based on real 202411 data structure</requirement>
+        <anti-pattern>Perfect test data that masks real-world issues (caused 87.5% failures in Epic 2)</anti-pattern>
+        <source>Epic 3 Tech Spec lines 359-388</source>
+      </standard>
+    </standards>
+    <locations>
+      <location>
+        <path>tests/unit/io/readers/test_excel_reader.py</path>
+        <purpose>Unit tests for ExcelReader.read_sheet() method (NEW for Story 3.3)</purpose>
+        <marker>@pytest.mark.unit</marker>
+      </location>
+      <location>
+        <path>tests/integration/io/readers/test_excel_reader_integration.py</path>
+        <purpose>Integration tests with real Excel fixtures (multi-sheet, Chinese characters, empty rows)</purpose>
+        <marker>@pytest.mark.integration</marker>
+      </location>
+      <location>
+        <path>tests/fixtures/sample_data/</path>
+        <files>
+          - 【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx (real 202411 data)
+          - Multi-sheet test fixtures with Chinese sheet names
+          - Corrupted Excel files for error handling tests
+        </files>
+      </location>
+      <location>
+        <path>tests/io/test_excel_reader.py</path>
+        <purpose>EXISTING tests for ExcelReader.read_rows() (Story 1.6). Verify backward compatibility.</purpose>
+        <note>Story 3.3 must NOT break these tests. Add NEW tests for read_sheet() method.</note>
+      </location>
+    </locations>
+    <ideas>
+      <test-case id="TC-3.3-1">
+        <name>Sheet Selection by Name (Chinese)</name>
+        <given>Excel file with sheets ['Summary', '规模明细', 'Notes']</given>
+        <when>Call read_sheet(file_path, sheet_name="规模明细")</when>
+        <then>Return DataFrame from '规模明细' sheet only, ExcelReadResult.sheet_name == "规模明细"</then>
+        <ac>AC1</ac>
+      </test-case>
+      <test-case id="TC-3.3-2">
+        <name>Sheet Selection by Index</name>
+        <given>Excel file with 3 sheets</given>
+        <when>Call read_sheet(file_path, sheet_name=1)</when>
+        <then>Return DataFrame from second sheet (0-indexed), ExcelReadResult.sheet_name == actual sheet name</then>
+        <ac>AC2</ac>
+      </test-case>
+      <test-case id="TC-3.3-3">
+        <name>Missing Sheet Error with Available Sheets</name>
+        <given>Excel file with sheets ['Summary', 'Notes']</given>
+        <when>Call read_sheet(file_path, sheet_name="规模明细")</when>
+        <then>Raise DiscoveryError with failed_stage='excel_reading', message includes available sheets list</then>
+        <ac>AC3</ac>
+      </test-case>
+      <test-case id="TC-3.3-4">
+        <name>Empty Row Skipping with Count Logging</name>
+        <given>Excel with 5 empty rows (formatting but no data)</given>
+        <when>Call read_sheet(file_path, sheet_name=0, skip_empty_rows=True)</when>
+        <then>Skip empty rows, log: "Skipped N empty rows during load", ExcelReadResult.row_count excludes empty rows</then>
+        <ac>AC4</ac>
+      </test-case>
+      <test-case id="TC-3.3-5">
+        <name>Chinese Character Preservation (Column Names)</name>
+        <given>Excel with columns ['月度', '计划代码', '客户名称']</given>
+        <when>Call read_sheet(file_path, sheet_name=0)</when>
+        <then>DataFrame columns == ['月度', '计划代码', '客户名称'] (UTF-8 preserved, no transliteration)</then>
+        <ac>AC5</ac>
+      </test-case>
+      <test-case id="TC-3.3-6">
+        <name>Merged Cell Handling</name>
+        <given>Excel with merged cells A1:A3 containing "Header"</given>
+        <when>Call read_sheet(file_path, sheet_name=0)</when>
+        <then>Use first cell's value "Header" for entire merged range (pandas/openpyxl default behavior)</then>
+        <ac>AC6</ac>
+      </test-case>
+      <test-case id="TC-3.3-7">
+        <name>ExcelReadResult Metadata Accuracy</name>
+        <given>Excel with 100 rows, 23 columns, sheet "规模明细"</given>
+        <when>Call read_sheet(file_path, sheet_name="规模明细")</when>
+        <then>ExcelReadResult: row_count=100, column_count=23, sheet_name="规模明细", file_path=Path(...), read_at=datetime</then>
+        <ac>AC7</ac>
+      </test-case>
+      <test-case id="TC-3.3-8">
+        <name>Performance Test: 10MB File, 10K Rows</name>
+        <given>Excel file 10MB with 10,000 rows</given>
+        <when>Call read_sheet(file_path, sheet_name=0)</when>
+        <then>Complete in &lt;5 seconds (NFR requirement from Epic 3 Tech Spec lines 916-923)</then>
+        <marker>@pytest.mark.performance</marker>
+      </test-case>
+      <test-case id="TC-3.3-9">
+        <name>Corrupted Excel File Handling</name>
+        <given>Corrupted .xlsx file (zipfile.BadZipFile)</given>
+        <when>Call read_sheet(file_path, sheet_name=0)</when>
+        <then>Raise DiscoveryError with failed_stage='excel_reading', original_error=BadZipFile, actionable message</then>
+        <marker>@pytest.mark.integration</marker>
+      </test-case>
+      <test-case id="TC-3.3-10">
+        <name>.xlsm (Macro-Enabled) File Support</name>
+        <given>.xlsm file with macros (macros ignored by openpyxl)</given>
+        <when>Call read_sheet(file_path, sheet_name=0)</when>
+        <then>Successfully read data (macros ignored), ExcelReadResult returned</then>
+        <ac>Q2 from Epic 3 Tech Spec</ac>
+      </test-case>
+      <test-case id="TC-3.3-11">
+        <name>Backward Compatibility: read_rows() Still Works</name>
+        <given>Excel file</given>
+        <when>Call existing ExcelReader.read_rows(file_path, sheet=0)</when>
+        <then>Returns List[Dict] as before (Story 1.6 interface unchanged)</then>
+        <note>Verify existing tests in tests/io/test_excel_reader.py still pass</note>
+      </test-case>
+      <test-case id="TC-3.3-12">
+        <name>Real Data Integration Test (202411)</name>
+        <given>Real file: tests/fixtures/sample_data/【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx</given>
+        <when>Call read_sheet(file_path, sheet_name="规模明细")</when>
+        <then>Successfully read 33,269 rows, 23 columns, Chinese characters preserved, NaN values handled</then>
+        <source>Epic 3 Tech Spec Real Data Validation lines 292-323</source>
+        <marker>@pytest.mark.integration</marker>
+      </test-case>
+    </ideas>
+  </tests>
+</story-context>
