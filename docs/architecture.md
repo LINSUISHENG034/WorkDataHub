@@ -444,6 +444,73 @@ def build_domain_pipeline(mappings: Dict[str, Any]) -> Pipeline:
 3. Export from `__init__.py`
 4. Add unit tests in `tests/unit/domain/pipelines/steps/`
 
+#### Shared Domain Types and Validation (Story 4.8)
+
+Story 4.8 extends the shared infrastructure with domain-level types and validation utilities:
+
+**Directory Structure:**
+```
+src/work_data_hub/domain/pipelines/
+├── types.py                        # Core types + shared domain types
+│   ├── PipelineContext             # Pipeline execution context
+│   ├── PipelineResult              # Pipeline framework result
+│   ├── ErrorContext                # Shared error context (Story 4.8)
+│   └── DomainPipelineResult        # Domain-level result (Story 4.8)
+├── validation/                     # Shared validation utilities (Story 4.8)
+│   ├── __init__.py                 # Public exports
+│   ├── helpers.py                  # raise_schema_error, ensure_required_columns, ensure_not_empty
+│   └── summaries.py                # ValidationSummaryBase
+└── ...
+```
+
+**Shared Domain Types:**
+
+| Type | Purpose | Location |
+|------|---------|----------|
+| `ErrorContext` | Structured error context for pipeline failures | `types.py` |
+| `DomainPipelineResult` | Result for domain-level pipeline execution (e.g., `process_annuity_performance()`) | `types.py` |
+| `ValidationSummaryBase` | Base class for validation summary dataclasses | `validation/summaries.py` |
+
+**Shared Validation Helpers:**
+
+| Helper | Purpose |
+|--------|---------|
+| `raise_schema_error()` | Raise SchemaError with consistent formatting |
+| `ensure_required_columns()` | Validate required columns are present |
+| `ensure_not_empty()` | Validate DataFrame is not empty |
+
+**Usage in Domain Modules:**
+```python
+from work_data_hub.domain.pipelines.types import ErrorContext, DomainPipelineResult
+from work_data_hub.domain.pipelines.validation import (
+    ensure_required_columns,
+    ensure_not_empty,
+    ValidationSummaryBase,
+)
+
+# Use ErrorContext for consistent error reporting
+error_ctx = ErrorContext(
+    error_type="validation_error",
+    operation="bronze_validation",
+    domain="annuity_performance",
+    stage="validation",
+    error_message="Missing required columns",
+)
+logger.error("validation.failed", extra=error_ctx.to_log_dict())
+
+# Use validation helpers in schema validation
+ensure_not_empty(schema, dataframe, "Bronze")
+ensure_required_columns(schema, dataframe, REQUIRED_COLUMNS, "Bronze")
+```
+
+**Domain Module Refactoring Pattern (Story 4.8):**
+
+Large domain modules should be split into focused sub-modules:
+- `service.py` → Core orchestration (<500 lines)
+- `discovery_helpers.py` → File discovery utilities
+- `processing_helpers.py` → Row processing and transformation
+- Re-export all symbols from `service.py` for backward compatibility
+
 ---
 
 ### Decision #4: Hybrid Error Context Standards ✅

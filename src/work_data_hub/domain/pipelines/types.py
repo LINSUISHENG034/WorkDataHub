@@ -4,12 +4,16 @@ Core data types and protocols for the pipeline execution framework.
 Story 1.5 introduces richer execution contracts that provide consistent metadata
 to every transformation step. This module defines those contracts so that
 pipeline code, sample steps, and tests can all share common structures.
+
+Story 4.8 adds shared domain types (ErrorContext, DomainPipelineResult) that can
+be reused across multiple domains (annuity_performance, Epic 9 domains, etc.).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, MutableMapping, Optional
 
 import pandas as pd
@@ -20,6 +24,116 @@ if TYPE_CHECKING:
 
 # Type alias for data rows flowing through pipeline steps
 Row = Dict[str, Any]
+
+
+# =============================================================================
+# Shared Domain Types (Story 4.8)
+# =============================================================================
+
+
+@dataclass
+class ErrorContext:
+    """
+    Structured error context for pipeline failures.
+
+    Provides consistent error information across all pipeline stages,
+    following Architecture Decision #4 (Hybrid Error Context Standards).
+
+    This class is shared across all domains (annuity_performance, Epic 9, etc.)
+    to ensure consistent error reporting and logging.
+
+    Attributes:
+        error_type: Classification of error (e.g., 'discovery', 'validation', 'transformation')
+        operation: Specific operation that failed (e.g., 'file_discovery', 'bronze_validation')
+        domain: Domain being processed (e.g., 'annuity_performance')
+        stage: Pipeline stage where error occurred (e.g., 'discovery', 'transformation', 'loading')
+        error_message: Human-readable error message (renamed from 'message' to avoid logging conflict)
+        details: Additional context-specific details
+        row_number: Optional row number for row-level errors
+        field: Optional field name for field-level errors
+    """
+
+    error_type: str
+    operation: str
+    domain: str
+    stage: str
+    error_message: str
+    details: Dict[str, Any] = field(default_factory=dict)
+    row_number: Optional[int] = None
+    field: Optional[str] = None
+
+    def to_log_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for structured logging."""
+        log_dict = {
+            "error_type": self.error_type,
+            "operation": self.operation,
+            "domain": self.domain,
+            "stage": self.stage,
+            "error_message": self.error_message,
+        }
+        if self.row_number is not None:
+            log_dict["row_number"] = self.row_number
+        if self.field:
+            log_dict["field"] = self.field
+        if self.details:
+            log_dict["details"] = self.details
+        return log_dict
+
+
+@dataclass
+class DomainPipelineResult:
+    """
+    Structured return value for domain-level pipeline execution.
+
+    This is distinct from PipelineResult (used by the pipeline framework) and
+    represents the result of a complete domain processing operation like
+    process_annuity_performance().
+
+    Attributes:
+        success: Whether the full pipeline completed without fatal errors
+        rows_loaded: Total rows inserted/updated in the warehouse
+        rows_failed: Rows dropped during validation
+        duration_ms: End-to-end duration in milliseconds
+        file_path: Source Excel path that seeded the run
+        version: Version folder (V1/V2/...) selected by discovery
+        errors: Non-fatal warnings collected during execution
+        metrics: Rich per-stage metadata for observability
+    """
+
+    success: bool
+    rows_loaded: int
+    rows_failed: int
+    duration_ms: float
+    file_path: Path
+    version: str
+    errors: List[str] = field(default_factory=list)
+    metrics: Dict[str, Any] = field(default_factory=dict)
+
+    def as_dict(self) -> Dict[str, Any]:
+        """Return JSON-serialisable representation (useful for logging/tests)."""
+        return {
+            "success": self.success,
+            "rows_loaded": self.rows_loaded,
+            "rows_failed": self.rows_failed,
+            "duration_ms": self.duration_ms,
+            "file_path": str(self.file_path),
+            "version": self.version,
+            "errors": list(self.errors),
+            "metrics": self.metrics,
+        }
+
+    def summary(self) -> str:
+        """Concise human-readable summary."""
+        return (
+            f"success={self.success} rows_loaded={self.rows_loaded} "
+            f"rows_failed={self.rows_failed} duration_ms={self.duration_ms:.2f} "
+            f"file={self.file_path} version={self.version}"
+        )
+
+
+# =============================================================================
+# Pipeline Framework Types (Story 1.5)
+# =============================================================================
 
 
 @dataclass

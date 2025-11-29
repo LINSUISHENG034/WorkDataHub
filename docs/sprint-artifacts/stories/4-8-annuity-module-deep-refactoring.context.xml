@@ -1,0 +1,284 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>4.8</storyId>
+    <title>Annuity Module Deep Refactoring - Phase 2</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-30</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/4-8-annuity-module-deep-refactoring.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>further modularization of annuity_performance code</iWant>
+    <soThat>the codebase is more maintainable and Epic 9 domains can reuse more components</soThat>
+    <tasks>
+      <task id="1" ac="4.8.1">Extract ErrorContext to domain/pipelines/types.py
+        <subtask>Move ErrorContext dataclass</subtask>
+        <subtask>Add to_log_dict() method</subtask>
+        <subtask>Update imports in service.py</subtask>
+        <subtask>Add re-export for backward compatibility</subtask>
+      </task>
+      <task id="2" ac="4.8.1">Extract PipelineResult to domain/pipelines/types.py
+        <subtask>Move PipelineResult dataclass</subtask>
+        <subtask>Add as_dict() and summary() methods</subtask>
+        <subtask>Update imports in service.py</subtask>
+        <subtask>Add re-export for backward compatibility</subtask>
+      </task>
+      <task id="3" ac="4.8.2">Create domain/pipelines/validation/ module structure
+        <subtask>Create validation/ directory</subtask>
+        <subtask>Create __init__.py with public exports</subtask>
+        <subtask>Create helpers.py for generic functions</subtask>
+        <subtask>Create summaries.py for base classes</subtask>
+      </task>
+      <task id="4" ac="4.8.2">Extract generic validation helpers
+        <subtask>Move _raise_schema_error -> raise_schema_error</subtask>
+        <subtask>Move _ensure_required_columns -> ensure_required_columns</subtask>
+        <subtask>Move _ensure_not_empty -> ensure_not_empty</subtask>
+        <subtask>Create ValidationSummaryBase class</subtask>
+        <subtask>Update imports in schemas.py</subtask>
+      </task>
+      <task id="5" ac="4.8.3">Split service.py into focused modules
+        <subtask>Create discovery_helpers.py with discovery functions</subtask>
+        <subtask>Create processing_helpers.py with processing functions</subtask>
+        <subtask>Refactor service.py to import from helpers</subtask>
+        <subtask>Verify less than 500 lines in service.py</subtask>
+      </task>
+      <task id="6" ac="4.8.3">Update all imports and verify backward compatibility
+        <subtask>Ensure all public APIs remain accessible</subtask>
+        <subtask>Add deprecation warnings if needed</subtask>
+        <subtask>Update __init__.py exports</subtask>
+      </task>
+      <task id="7" ac="4.8.4">Run full test suite and verify all tests pass
+        <subtask>Run uv run pytest tests/unit/domain/annuity_performance/</subtask>
+        <subtask>Run uv run pytest tests/unit/domain/pipelines/</subtask>
+        <subtask>Verify 0 failures, 0 errors</subtask>
+      </task>
+      <task id="8" ac="4.8.4">Update architecture.md Decision #3
+        <subtask>Add "Shared Validation Utilities" section</subtask>
+        <subtask>Document new directory structure</subtask>
+        <subtask>Add usage examples for Epic 9</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-4.8.1" title="Extract Shared Data Classes">
+      <given>ErrorContext and PipelineResult are defined in service.py</given>
+      <when>I extract them to shared module</when>
+      <then>
+        - Moved to domain/pipelines/types.py
+        - Re-exported from annuity_performance/service.py for backward compatibility
+        - Usable by Epic 9 domains without duplication
+      </then>
+    </criterion>
+    <criterion id="AC-4.8.2" title="Extract Shared Schema Validation Utilities">
+      <given>generic validation helpers exist in schemas.py</given>
+      <when>I extract them to shared module</when>
+      <then>
+        - domain/pipelines/validation/ directory created
+        - helpers.py with generic functions: ensure_required_columns(), ensure_not_empty(), raise_schema_error()
+        - summaries.py with ValidationSummaryBase class
+        - Domain-specific schemas remain in annuity_performance/schemas.py
+      </then>
+    </criterion>
+    <criterion id="AC-4.8.3" title="Refactor service.py Structure">
+      <given>service.py has 1,408 lines with 31 functions/classes</given>
+      <when>I split it into focused modules</when>
+      <then>
+        - service.py - Main orchestration entry point (less than 500 lines)
+        - discovery_helpers.py - File discovery utilities
+        - processing_helpers.py - Row processing and transformation logic
+        - Clear separation of concerns
+      </then>
+    </criterion>
+    <criterion id="AC-4.8.4" title="All Tests Pass">
+      <given>refactoring should not change behavior</given>
+      <when>I run existing tests</when>
+      <then>
+        - All 90+ tests in tests/unit/domain/annuity_performance/
+        - All 92 tests in tests/unit/domain/pipelines/steps/
+        - No functional changes - behavior identical before and after
+      </then>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Scale Adaptive Architecture</title>
+        <section>Decision #3: Hybrid Pipeline Step Protocol</section>
+        <snippet>Support both DataFrame-level and Row-level steps with clear protocols. Shared steps extracted to domain/pipelines/steps/ for reuse across domains.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Scale Adaptive Architecture</title>
+        <section>Decision #4: Hybrid Error Context Standards</section>
+        <snippet>Use exceptions with required structured context fields. ErrorContext dataclass provides consistent error information across all pipeline stages.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>WorkDataHub PRD</title>
+        <section>FR-3: Configurable Data Transformation</section>
+        <snippet>Execute transformation steps in sequence using shared pipeline framework. Consistent transformation pattern across all domains.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-change-proposal-2025-11-29-story-4-8.md</path>
+        <title>Sprint Change Proposal - Story 4.8</title>
+        <section>Approved Change</section>
+        <snippet>Story 4.7 code reduction targets not met. Phase 2 refactoring to extract shared data classes and validation utilities.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/service.py</path>
+        <kind>service</kind>
+        <symbol>ErrorContext</symbol>
+        <lines>49-92</lines>
+        <reason>Target for extraction to domain/pipelines/types.py - structured error context dataclass with to_log_dict() method</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/service.py</path>
+        <kind>service</kind>
+        <symbol>PipelineResult</symbol>
+        <lines>95-139</lines>
+        <reason>Target for extraction to domain/pipelines/types.py - pipeline result dataclass with as_dict() and summary() methods</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/schemas.py</path>
+        <kind>validation</kind>
+        <symbol>_raise_schema_error</symbol>
+        <lines>286-298</lines>
+        <reason>Target for extraction to domain/pipelines/validation/helpers.py - generic schema error helper</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/schemas.py</path>
+        <kind>validation</kind>
+        <symbol>_ensure_required_columns</symbol>
+        <lines>343-359</lines>
+        <reason>Target for extraction to domain/pipelines/validation/helpers.py - generic column validation</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/schemas.py</path>
+        <kind>validation</kind>
+        <symbol>_ensure_not_empty</symbol>
+        <lines>362-368</lines>
+        <reason>Target for extraction to domain/pipelines/validation/helpers.py - generic empty check</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/schemas.py</path>
+        <kind>validation</kind>
+        <symbol>BronzeValidationSummary</symbol>
+        <lines>267-274</lines>
+        <reason>Reference for creating ValidationSummaryBase in domain/pipelines/validation/summaries.py</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/types.py</path>
+        <kind>types</kind>
+        <symbol>PipelineResult (existing)</symbol>
+        <lines>N/A</lines>
+        <reason>Existing types module - target location for ErrorContext and service.PipelineResult (note: different from existing PipelineResult)</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/steps/__init__.py</path>
+        <kind>module</kind>
+        <symbol>shared steps exports</symbol>
+        <lines>N/A</lines>
+        <reason>Reference pattern for new validation module exports</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <python>
+        <package name="pandas" version="latest (locked)">DataFrame operations</package>
+        <package name="pandera" version=">=0.18.0,<1.0">DataFrame-level schema validation</package>
+        <package name="pydantic" version=">=2.11.7">Row-level validation, type safety</package>
+        <package name="structlog" version="latest">Structured logging</package>
+        <package name="pytest" version="dev">Testing framework</package>
+        <package name="mypy" version=">=1.17.1">Static type checking (strict mode)</package>
+        <package name="ruff" version=">=0.12.12">Linting and formatting</package>
+      </python>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="Architecture Decision #3">
+      Hybrid Pipeline Step Protocol - Support both DataFrame-level and Row-level steps with clear protocols
+    </constraint>
+    <constraint source="Architecture Decision #4">
+      Hybrid Error Context Standards - Use exceptions with required structured context fields
+    </constraint>
+    <constraint source="Story 1.6">
+      Clean Architecture Boundaries - Domain layer cannot import from io or orchestration layers
+    </constraint>
+    <constraint source="Dev Notes">
+      Backward Compatibility - Re-export moved symbols from original locations to avoid breaking imports
+    </constraint>
+    <constraint source="Dev Notes">
+      No Functional Changes - Only code organization, behavior must remain unchanged
+    </constraint>
+    <constraint source="Success Metrics">
+      service.py must be reduced to less than 500 lines (from 1,408)
+    </constraint>
+    <constraint source="Success Metrics">
+      schemas.py must be reduced to less than 400 lines (from 635)
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>ErrorContext</name>
+      <kind>dataclass</kind>
+      <signature>@dataclass class ErrorContext: error_type: str, operation: str, domain: str, stage: str, error_message: str, details: Dict[str, Any], row_number: Optional[int], field: Optional[str]; def to_log_dict(self) -> Dict[str, Any]</signature>
+      <path>src/work_data_hub/domain/annuity_performance/service.py:49-92</path>
+    </interface>
+    <interface>
+      <name>PipelineResult (service)</name>
+      <kind>dataclass</kind>
+      <signature>@dataclass class PipelineResult: success: bool, rows_loaded: int, rows_failed: int, duration_ms: float, file_path: Path, version: str, errors: List[str], metrics: Dict[str, Any]; def as_dict(self) -> Dict[str, Any]; def summary(self) -> str</signature>
+      <path>src/work_data_hub/domain/annuity_performance/service.py:95-139</path>
+    </interface>
+    <interface>
+      <name>raise_schema_error (to be created)</name>
+      <kind>function</kind>
+      <signature>def raise_schema_error(schema: pa.DataFrameSchema, data: pd.DataFrame, message: str, failure_cases: pd.DataFrame | None = None) -> SchemaError</signature>
+      <path>domain/pipelines/validation/helpers.py (new)</path>
+    </interface>
+    <interface>
+      <name>ensure_required_columns (to be created)</name>
+      <kind>function</kind>
+      <signature>def ensure_required_columns(schema: pa.DataFrameSchema, dataframe: pd.DataFrame, required: Iterable[str]) -> None</signature>
+      <path>domain/pipelines/validation/helpers.py (new)</path>
+    </interface>
+    <interface>
+      <name>ensure_not_empty (to be created)</name>
+      <kind>function</kind>
+      <signature>def ensure_not_empty(schema: pa.DataFrameSchema, dataframe: pd.DataFrame) -> None</signature>
+      <path>domain/pipelines/validation/helpers.py (new)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing follows pytest with custom markers. Unit tests use @pytest.mark.unit for fast tests with no external dependencies.
+      All tests must pass with strict mypy type checking. Coverage target is greater than 80% for domain logic.
+      Refactoring must not change behavior - all existing tests must pass without modification.
+    </standards>
+    <locations>
+      <location>tests/unit/domain/annuity_performance/</location>
+      <location>tests/unit/domain/pipelines/</location>
+      <location>tests/unit/domain/pipelines/steps/</location>
+    </locations>
+    <ideas>
+      <idea ac="4.8.1">Test ErrorContext import from both old (service.py) and new (types.py) locations</idea>
+      <idea ac="4.8.1">Test PipelineResult import from both old and new locations</idea>
+      <idea ac="4.8.1">Verify to_log_dict(), as_dict(), summary() methods work identically after move</idea>
+      <idea ac="4.8.2">Test raise_schema_error produces identical SchemaError as before</idea>
+      <idea ac="4.8.2">Test ensure_required_columns raises on missing columns</idea>
+      <idea ac="4.8.2">Test ensure_not_empty raises on empty DataFrame</idea>
+      <idea ac="4.8.3">Verify service.py public API unchanged after split</idea>
+      <idea ac="4.8.4">Run full test suite: uv run pytest tests/unit/domain/annuity_performance/ tests/unit/domain/pipelines/</idea>
+    </ideas>
+  </tests>
+</story-context>

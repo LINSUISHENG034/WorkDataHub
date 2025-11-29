@@ -1,4 +1,9 @@
-"""Pandera schemas and validation helpers for Story 2.2."""
+"""
+Pandera schemas and validation helpers for Story 2.2.
+
+Story 4.8: Generic validation helpers extracted to domain/pipelines/validation/
+for reuse across domains. Domain-specific schemas remain here.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +15,11 @@ import pandas as pd
 import pandera as pa
 from pandera.errors import SchemaError, SchemaErrors
 
+from work_data_hub.domain.pipelines.validation import (
+    ensure_not_empty as _shared_ensure_not_empty,
+    ensure_required_columns as _shared_ensure_required_columns,
+    raise_schema_error as _shared_raise_schema_error,
+)
 from work_data_hub.utils.date_parser import parse_yyyymm_or_chinese
 
 from src.work_data_hub.cleansing import get_cleansing_registry
@@ -290,13 +300,11 @@ def _raise_schema_error(
     message: str,
     failure_cases: pd.DataFrame | None = None,
 ) -> SchemaError:
-    """Helper to raise SchemaError with consistent formatting."""
-    raise SchemaError(
-        schema=schema,
-        data=data,
-        failure_cases=failure_cases,
-        message=message,
-    )
+    """Helper to raise SchemaError with consistent formatting.
+
+    Story 4.8: Delegates to shared helper in domain/pipelines/validation/.
+    """
+    _shared_raise_schema_error(schema, data, message, failure_cases)
 
 
 def _schema_name(schema: pa.DataFrameSchema) -> str:
@@ -346,27 +354,21 @@ def _ensure_required_columns(
     dataframe: pd.DataFrame,
     required: Iterable[str],
 ) -> None:
-    missing = [col for col in required if col not in dataframe.columns]
-    if missing:
-        failure_cases = pd.DataFrame({"column": missing, "failure": "missing"})
-        _raise_schema_error(
-            schema,
-            dataframe,
-            message=(
-                f"{_schema_name(schema)} validation failed: missing required columns "
-                f"{missing}, found columns: {list(dataframe.columns)}"
-            ),
-            failure_cases=failure_cases,
-        )
+    """Ensure required columns are present.
+
+    Story 4.8: Delegates to shared helper in domain/pipelines/validation/.
+    """
+    _shared_ensure_required_columns(
+        schema, dataframe, required, schema_name=_schema_name(schema)
+    )
 
 
 def _ensure_not_empty(schema: pa.DataFrameSchema, dataframe: pd.DataFrame) -> None:
-    if dataframe.empty:
-        raise SchemaError(
-            schema=schema,
-            data=dataframe,
-            message=f"{_schema_name(schema)} validation failed: DataFrame cannot be empty",
-        )
+    """Ensure DataFrame is not empty.
+
+    Story 4.8: Delegates to shared helper in domain/pipelines/validation/.
+    """
+    _shared_ensure_not_empty(schema, dataframe, schema_name=_schema_name(schema))
 
 
 def _track_invalid_ratio(

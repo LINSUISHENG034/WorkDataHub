@@ -368,7 +368,8 @@ class TestExportUnknownNamesCsv:
 
     def test_export_enabled_with_names(self, tmp_path, monkeypatch):
         """Test export enabled with names calls write_unknowns_csv."""
-        import work_data_hub.domain.annuity_performance.service as service_module
+        # Story 4.8: Mock in processing_helpers where the function is now defined
+        import work_data_hub.domain.annuity_performance.processing_helpers as helpers_module
 
         # Mock write_unknowns_csv to return a test path
         test_csv_path = str(tmp_path / "unknown_companies.csv")
@@ -376,19 +377,20 @@ class TestExportUnknownNamesCsv:
         def mock_write_unknowns_csv(names, source):
             return test_csv_path
 
-        monkeypatch.setattr(service_module, "write_unknowns_csv", mock_write_unknowns_csv)
+        monkeypatch.setattr(helpers_module, "write_unknowns_csv", mock_write_unknowns_csv)
 
         result = _export_unknown_names_csv(["Company1", "Company2"], "test_source", export_enabled=True)
         assert result == test_csv_path
 
     def test_export_failure_returns_none(self, monkeypatch):
         """Test export failure returns None instead of raising."""
-        import work_data_hub.domain.annuity_performance.service as service_module
+        # Story 4.8: Mock in processing_helpers where the function is now defined
+        import work_data_hub.domain.annuity_performance.processing_helpers as helpers_module
 
         def mock_write_unknowns_csv(names, source):
             raise IOError("Disk full")
 
-        monkeypatch.setattr(service_module, "write_unknowns_csv", mock_write_unknowns_csv)
+        monkeypatch.setattr(helpers_module, "write_unknowns_csv", mock_write_unknowns_csv)
 
         # Should not raise, should return None
         result = _export_unknown_names_csv(["Company1"], "test_source", export_enabled=True)

@@ -77,7 +77,22 @@ from .exceptions import (
 )
 
 # Type definitions for external use
-from .types import PipelineMetrics, PipelineResult, Row, StepResult
+from .types import (
+    DomainPipelineResult,
+    ErrorContext,
+    PipelineMetrics,
+    PipelineResult,
+    Row,
+    StepResult,
+)
+
+# Validation utilities (Story 4.8)
+from .validation import (
+    ValidationSummaryBase,
+    ensure_not_empty,
+    ensure_required_columns,
+    raise_schema_error,
+)
 
 # Public API - main entry points for domain services
 __all__ = [
@@ -98,6 +113,14 @@ __all__ = [
     "StepResult",
     "PipelineResult",
     "PipelineMetrics",
+    # Shared domain types (Story 4.8)
+    "ErrorContext",
+    "DomainPipelineResult",
+    # Validation utilities (Story 4.8)
+    "raise_schema_error",
+    "ensure_required_columns",
+    "ensure_not_empty",
+    "ValidationSummaryBase",
     # Exception hierarchy
     "PipelineError",
     "PipelineStepError",
