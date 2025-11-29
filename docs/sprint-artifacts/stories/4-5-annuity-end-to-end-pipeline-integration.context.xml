@@ -1,0 +1,271 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>5</storyId>
+    <title>Annuity End-to-End Pipeline Integration</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/4-5-annuity-end-to-end-pipeline-integration.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>complete Bronze → Silver → Gold pipeline with database loading for annuity domain</iWant>
+    <soThat>I can process monthly annuity data from Excel to PostgreSQL in a single execution</soThat>
+    <tasks>
+      <task id="1" title="Implement main orchestration service in domain/annuity_performance/service.py">
+        <subtask id="1.1">Create process_annuity_performance() function with month parameter</subtask>
+        <subtask id="1.2">Integrate FileDiscoveryService for file discovery (Epic 3 Story 3.5)</subtask>
+        <subtask id="1.3">Apply Bronze validation (Story 4.2 BronzeAnnuitySchema)</subtask>
+        <subtask id="1.4">Execute transformation pipeline (Story 4.3 pipeline steps)</subtask>
+        <subtask id="1.5">Apply Gold validation (Story 4.4 GoldAnnuitySchema)</subtask>
+        <subtask id="1.6">Load to database using WarehouseLoader (Epic 1 Story 1.8)</subtask>
+        <subtask id="1.7">Log execution metrics via structlog (Epic 1 Story 1.3)</subtask>
+      </task>
+      <task id="2" title="Implement PipelineResult dataclass for return values">
+        <subtask id="2.1">Define PipelineResult with fields: success, rows_loaded, rows_failed, duration_ms, file_path, version, errors, metrics</subtask>
+        <subtask id="2.2">Add helper methods for result formatting</subtask>
+      </task>
+      <task id="3" title="Create Dagster job definition in orchestration/jobs.py">
+        <subtask id="3.1">Define annuity_performance_job using @job decorator</subtask>
+        <subtask id="3.2">Create ops for each pipeline stage (discover, validate, transform, load)</subtask>
+        <subtask id="3.3">Wire ops together with dependencies</subtask>
+        <subtask id="3.4">Add op config for month parameter</subtask>
+        <subtask id="3.5">Log metrics to Dagster context</subtask>
+      </task>
+      <task id="4" title="Implement idempotent database upsert logic">
+        <subtask id="4.1">Configure WarehouseLoader with upsert mode</subtask>
+        <subtask id="4.2">Define conflict resolution: ON CONFLICT (月度, 计划代码, company_id) DO UPDATE</subtask>
+        <subtask id="4.3">Test idempotency with duplicate runs</subtask>
+      </task>
+      <task id="5" title="Implement error handling and fail-fast behavior">
+        <subtask id="5.1">Wrap each stage in try-except with structured error context</subtask>
+        <subtask id="5.2">Create stage-specific error types: DiscoveryError, ValidationError, TransformationError, DatabaseError</subtask>
+        <subtask id="5.3">Include failed stage name in error message</subtask>
+        <subtask id="5.4">Rollback database transaction on any failure</subtask>
+      </task>
+      <task id="6" title="Write integration tests for end-to-end pipeline">
+        <subtask id="6.1">Create fixture Excel file with 100 rows (95 valid, 5 invalid)</subtask>
+        <subtask id="6.2">Test successful pipeline execution (95 rows loaded)</subtask>
+        <subtask id="6.3">Test idempotent re-runs (identical database state)</subtask>
+        <subtask id="6.4">Test file discovery failure (missing file)</subtask>
+        <subtask id="6.5">Test Bronze validation failure (corrupted Excel)</subtask>
+        <subtask id="6.6">Test database connection failure (retry logic)</subtask>
+      </task>
+      <task id="7" title="Real data validation with 202412 dataset">
+        <subtask id="7.1">Run complete pipeline on 202412 data (33,615 rows)</subtask>
+        <subtask id="7.2">Verify execution time &lt;10 minutes (Epic 4 NFR requirement)</subtask>
+        <subtask id="7.3">Verify database loading successful (32K+ rows)</subtask>
+        <subtask id="7.4">Verify idempotent re-run produces identical state</subtask>
+        <subtask id="7.5">Document performance metrics and any edge cases</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1" title="Complete pipeline execution with all stages">
+      <given>I have all components from Stories 4.1-4.4 implemented</given>
+      <when>I execute end-to-end annuity pipeline for month 202501</when>
+      <then>
+        <step>1. Discover file using Epic 3 Story 3.5 FileDiscoveryService</step>
+        <step>2. Validate Bronze using Story 4.2 BronzeAnnuitySchema</step>
+        <step>3. Transform using Story 4.3 pipeline (Bronze → Silver)</step>
+        <step>4. Validate Gold using Story 4.4 GoldAnnuitySchema</step>
+        <step>5. Load to database using Epic 1 Story 1.8 WarehouseLoader</step>
+        <step>6. Log execution metrics (duration, row counts, errors)</step>
+      </then>
+    </criterion>
+    <criterion id="AC2" title="Successful database loading with audit">
+      <when>Processing succeeds for 1000 input rows with 950 valid</when>
+      <then>
+        <step>Database contains 950 rows inserted into annuity_performance_NEW table (shadow mode)</step>
+        <step>Composite PK constraint satisfied</step>
+        <step>Audit log entry with: file_path, version, row counts, duration</step>
+      </then>
+    </criterion>
+    <criterion id="AC3" title="Fail-fast error handling">
+      <when>Any stage fails (file discovery, validation, transformation, database)</when>
+      <then>Pipeline fails fast with structured error showing failed stage (Epic 3 Story 3.5 error pattern)</then>
+    </criterion>
+    <criterion id="AC4" title="Idempotent re-runs">
+      <when>I run pipeline twice with same input</when>
+      <then>Second run produces identical database state (idempotent upsert)</then>
+    </criterion>
+    <criterion id="AC5" title="Dagster orchestration">
+      <when>I execute via Dagster job</when>
+      <then>Dagster UI shows: execution graph, step-by-step logs, success/failure status</then>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <artifact>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>End-to-End Pipeline Flow (Story 4.5)</section>
+        <snippet>Complete pipeline flow from file discovery through Bronze/Silver/Gold validation to database loading. Includes 5-stage process with error handling and idempotent upsert strategy.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Dagster Job Definition (Story 4.5)</section>
+        <snippet>Dagster job orchestration pattern with ops for config loading, file discovery, pipeline processing, and metrics logging. Uses dependency injection for services.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Database Schema (Story 4.6)</section>
+        <snippet>Shadow table annuity_performance_NEW with composite PK (reporting_month, plan_code, company_id). Includes indexes and audit columns for pipeline tracking.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Architecture</title>
+        <section>Decision #3: Hybrid Pipeline Step Protocol</section>
+        <snippet>Pipeline supports both DataFrame steps (bulk operations) and Row steps (validation/enrichment). Recommended order: DataFrame → Row → DataFrame for optimal performance.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Architecture</title>
+        <section>Decision #4: Hybrid Error Context Standards</section>
+        <snippet>Structured error context with required fields: error_type, operation, domain, row_number, field. Enables actionable debugging and monitoring.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Performance Requirements</section>
+        <snippet>Target: 10,000 rows in &lt;10 minutes. Bronze validation &lt;5ms/1000 rows, Silver &lt;50ms/100 rows, Gold &lt;5ms/1000 rows, Database loading &lt;30s/10K rows.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Reliability/Availability - Idempotency</section>
+        <snippet>Re-running pipeline with same input produces identical database state. Upsert strategy: ON CONFLICT DO UPDATE. No duplicate rows due to composite PK constraint.</snippet>
+      </artifact>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/work_data_hub/io/loader/warehouse_loader.py</path>
+        <kind>service</kind>
+        <symbol>WarehouseLoader</symbol>
+        <lines>53-350</lines>
+        <reason>Database loading service with load_dataframe() method for idempotent upsert operations. Provides connection pooling, retry logic, and batch processing.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/io/connectors/file_connector.py</path>
+        <kind>service</kind>
+        <symbol>FileDiscoveryService</symbol>
+        <lines>573-854</lines>
+        <reason>File discovery service with discover_and_load() method. Handles version detection, file pattern matching, and Excel loading for annuity domain.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/schemas.py</path>
+        <kind>schema</kind>
+        <symbol>BronzeAnnuitySchema</symbol>
+        <lines>66</lines>
+        <reason>Pandera schema for Bronze layer validation. Validates raw Excel structure before transformation pipeline.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/schemas.py</path>
+        <kind>schema</kind>
+        <symbol>GoldAnnuitySchema</symbol>
+        <lines>138</lines>
+        <reason>Pandera schema for Gold layer validation. Enforces composite PK uniqueness and final business rules before database loading.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/pipeline_steps.py</path>
+        <kind>pipeline</kind>
+        <symbol>transformation steps</symbol>
+        <lines>N/A</lines>
+        <reason>Transformation pipeline steps from Story 4.3. Includes Bronze→Silver transformation with date parsing, cleansing, and enrichment.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/models.py</path>
+        <kind>model</kind>
+        <symbol>AnnuityPerformanceIn, AnnuityPerformanceOut</symbol>
+        <lines>N/A</lines>
+        <reason>Pydantic models from Story 4.1. Used for row-level validation in Silver layer transformation.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <python>
+        <package name="pandas" version="latest" usage="DataFrame operations for pipeline data flow" />
+        <package name="pydantic" version="2.11.7+" usage="Row-level validation models (AnnuityPerformanceIn/Out)" />
+        <package name="pandera" version="latest" usage="DataFrame-level schemas (Bronze/Gold validation)" />
+        <package name="psycopg2" version="latest" usage="PostgreSQL database connection and operations" />
+        <package name="dagster" version="latest" usage="Job orchestration and UI monitoring" />
+        <package name="structlog" version="latest" usage="Structured logging for execution metrics" />
+      </python>
+      <frameworks>
+        <framework name="Epic 1 Pipeline Framework" usage="Pipeline class for step execution orchestration" />
+        <framework name="Epic 3 File Discovery" usage="FileDiscoveryService for file loading" />
+        <framework name="Epic 2 Validation" usage="Multi-layer validation (pandera + Pydantic)" />
+      </frameworks>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">Clean Architecture boundaries: service.py orchestrates but doesn't implement I/O. All I/O via dependency injection (FileDiscoveryService, WarehouseLoader).</constraint>
+    <constraint type="architecture">Hybrid Pipeline Step Protocol: Use DataFrame steps for bulk operations, Row steps for validation/enrichment. Order: DataFrame → Row → DataFrame.</constraint>
+    <constraint type="error-handling">Structured error context required: error_type, operation, domain, stage. Use ErrorContext dataclass for all exceptions.</constraint>
+    <constraint type="error-handling">Fail-fast on critical errors (Bronze/Gold validation). Collect errors for Silver layer (continue if &lt;10% failure rate).</constraint>
+    <constraint type="database">Shadow table only: Write to annuity_performance_NEW (not production table). Enables parallel running with legacy system.</constraint>
+    <constraint type="database">Idempotent upsert: ON CONFLICT (月度, 计划代码, company_id) DO UPDATE. Re-running must produce identical database state.</constraint>
+    <constraint type="performance">Target: &lt;10 minutes for 10,000 rows. Bronze &lt;5ms/1K rows, Silver &lt;50ms/100 rows, Gold &lt;5ms/1K rows, Database &lt;30s/10K rows.</constraint>
+    <constraint type="testing">Integration tests required: successful execution, idempotent re-runs, error scenarios (file missing, validation failures, database errors).</constraint>
+    <constraint type="enrichment">MVP uses stub provider only. All companies receive temporary IDs (IN_*). Full enrichment deferred to Epic 5 Growth phase.</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>process_annuity_performance</name>
+      <kind>function</kind>
+      <signature>def process_annuity_performance(month: str, enrichment_service: EnterpriseInfoProvider, file_discovery: FileDiscoveryService, warehouse_loader: WarehouseLoader) -&gt; PipelineResult</signature>
+      <path>src/work_data_hub/domain/annuity_performance/service.py</path>
+      <description>Main orchestration function for end-to-end annuity pipeline. Coordinates file discovery, validation, transformation, and database loading.</description>
+    </interface>
+    <interface>
+      <name>FileDiscoveryService.discover_and_load</name>
+      <kind>method</kind>
+      <signature>def discover_and_load(self, domain: str, month: str) -&gt; DataDiscoveryResult</signature>
+      <path>src/work_data_hub/io/connectors/file_connector.py:596-706</path>
+      <description>Discovers and loads Excel file for specified domain and month. Returns DataFrame with normalized columns, file path, and version.</description>
+    </interface>
+    <interface>
+      <name>WarehouseLoader.load_dataframe</name>
+      <kind>method</kind>
+      <signature>def load_dataframe(self, df: pd.DataFrame, table_name: str, schema: str = 'public', mode: str = 'upsert', conflict_columns: List[str] = None) -&gt; LoadResult</signature>
+      <path>src/work_data_hub/io/loader/warehouse_loader.py:257-350</path>
+      <description>Loads DataFrame to PostgreSQL with idempotent upsert. Supports batch processing, retry logic, and transaction rollback on error.</description>
+    </interface>
+    <interface>
+      <name>PipelineResult</name>
+      <kind>dataclass</kind>
+      <signature>@dataclass class PipelineResult: success: bool, rows_loaded: int, rows_failed: int, duration_ms: float, file_path: Path, version: str, errors: List[str], metrics: Dict[str, Any]</signature>
+      <path>src/work_data_hub/domain/annuity_performance/service.py</path>
+      <description>Return type for process_annuity_performance(). Contains execution metrics, success status, and error details.</description>
+    </interface>
+    <interface>
+      <name>annuity_performance_job</name>
+      <kind>dagster_job</kind>
+      <signature>@job def annuity_performance_job()</signature>
+      <path>src/work_data_hub/orchestration/jobs.py</path>
+      <description>Dagster job definition for annuity pipeline. Wires together ops for config, discovery, processing, and metrics logging.</description>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Integration test coverage target: &gt;80%. Use pytest with fixtures for database and file system. Test complete pipeline flow with fixture Excel file (100 rows). Test error scenarios for each stage (discovery, validation, transformation, database). Test idempotent re-runs produce identical database state. Use pytest markers: @pytest.mark.integration, @pytest.mark.postgres. Real data validation: Run on 202412 dataset (33,615 rows) to verify performance targets and parity with previous stories.</standards>
+    <locations>tests/integration/domain/annuity_performance/test_end_to_end_pipeline.py, tests/fixtures/annuity_sample.xlsx</locations>
+    <ideas>
+      <idea ac="AC1">Test complete pipeline execution: file discovery → Bronze → Silver → Gold → Database. Verify all 6 stages complete without errors for valid input.</idea>
+      <idea ac="AC2">Test successful database loading: 950 rows inserted to annuity_performance_NEW from 1000 input rows (95 valid). Verify composite PK constraint and audit log entry.</idea>
+      <idea ac="AC3">Test fail-fast error handling: Simulate failures at each stage (file discovery, Bronze validation, Silver transformation, database connection). Verify structured error messages with stage context.</idea>
+      <idea ac="AC4">Test idempotent re-runs: Run pipeline twice with same input. Verify second run produces identical database state (same row counts, same values).</idea>
+      <idea ac="AC5">Test Dagster job execution: Verify job visible in Dagster UI, step-by-step logs displayed, success/failure status shown.</idea>
+      <idea ac="AC1">Test file discovery failure: Missing file scenario. Verify DiscoveryError with actionable message.</idea>
+      <idea ac="AC1">Test Bronze validation failure: Corrupted Excel with missing columns. Verify SchemaError with expected vs actual columns.</idea>
+      <idea ac="AC1">Test database connection failure: Simulate connection timeout. Verify retry logic (3 attempts) and final DatabaseError.</idea>
+      <idea ac="Performance">Test execution time: 10,000 rows processed in &lt;10 minutes. Measure and log duration per stage.</idea>
+      <idea ac="Real Data">Test with 202412 dataset: 33,615 rows. Verify &gt;95% success rate, execution time &lt;10 minutes, database loading successful.</idea>
+    </ideas>
+  </tests>
+</story-context>

@@ -9,17 +9,23 @@ respecting the Clean Architecture flow: domain ← io ← orchestration.
 import argparse
 import re
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import yaml
-from dagster import DagsterInstance, job
+from dagster import Config, DagsterInstance, job, op
 
 from src.work_data_hub.config.settings import get_settings
+from src.work_data_hub.domain.annuity_performance.service import (
+    PipelineResult,
+    process_annuity_performance,
+)
+from src.work_data_hub.io.connectors.file_connector import FileDiscoveryService
 from src.work_data_hub.io.loader.company_mapping_loader import (
     extract_legacy_mappings,
     generate_load_plan,
     load_company_mappings,
 )
+from src.work_data_hub.io.loader.warehouse_loader import WarehouseLoader
 
 from .ops import (
     backfill_refs_op,
@@ -113,6 +119,56 @@ def annuity_performance_job():
     load_op(gated_rows)
 
 
+class AnnuityPipelineConfig(Config):
+    """Config schema for the Story 4.5 consolidated pipeline job."""
+
+    month: str
+    sync_lookup_budget: int = 0
+    export_unknown_names: bool = True
+    use_pipeline: Optional[bool] = None
+
+
+@op
+def run_annuity_pipeline_op(
+    context,
+    config: AnnuityPipelineConfig,
+) -> Dict[str, Any]:
+    """
+    Execute process_annuity_performance end-to-end for specified month.
+
+    This op wires FileDiscoveryService and WarehouseLoader into the domain
+    service, logs metrics, and returns the serialized PipelineResult.
+    """
+
+    file_discovery = FileDiscoveryService()
+    loader: Optional[WarehouseLoader] = None
+    try:
+        loader = WarehouseLoader()
+        result = process_annuity_performance(
+            config.month,
+            file_discovery=file_discovery,
+            warehouse_loader=loader,
+            sync_lookup_budget=config.sync_lookup_budget,
+            export_unknown_names=config.export_unknown_names,
+            use_pipeline=config.use_pipeline,
+        )
+    finally:
+        if loader is not None:
+            loader.close()
+
+    _log_pipeline_metrics(context.log, result)
+    return result.as_dict()
+
+
+@job
+def annuity_performance_story45_job():
+    """
+    Story 4.5 Dagster job that executes the full annuity pipeline via one op.
+    """
+
+    run_annuity_pipeline_op()
+
+
 @job
 def import_company_mappings_job():
     """
@@ -187,6 +243,20 @@ def sample_pipeline_job():
     raw_data = read_csv_op()
     validated = validate_op(raw_data)
     load_to_db_op(validated)
+
+
+def _log_pipeline_metrics(logger, result: PipelineResult) -> None:
+    """Log concise telemetry for PipelineResult."""
+    logger.info(
+        "annuity_pipeline.completed",
+        extra={
+            "rows_loaded": result.rows_loaded,
+            "rows_failed": result.rows_failed,
+            "duration_ms": result.duration_ms,
+            "file_path": str(result.file_path),
+            "version": result.version,
+        },
+    )
 
 
 def _parse_pk_override(pk_arg: Any) -> List[str]:

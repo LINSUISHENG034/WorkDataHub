@@ -9,11 +9,17 @@ to prevent SQL column mismatch errors.
 
 import logging
 import time
+from dataclasses import dataclass, field
 from datetime import date
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+import pandas as pd
 
 if TYPE_CHECKING:
     from work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
+    from work_data_hub.io.connectors.file_connector import DataDiscoveryResult, FileDiscoveryService
+    from work_data_hub.io.loader.warehouse_loader import LoadResult, WarehouseLoader
 
 from pydantic import ValidationError
 
@@ -36,6 +42,99 @@ class AnnuityPerformanceTransformationError(Exception):
     """Raised when annuity performance data transformation fails."""
 
     pass
+
+
+@dataclass
+class ErrorContext:
+    """
+    Structured error context for pipeline failures.
+
+    Provides consistent error information across all pipeline stages,
+    following Architecture Decision #4 (Hybrid Error Context Standards).
+
+    Attributes:
+        error_type: Classification of error (e.g., 'discovery', 'validation', 'transformation')
+        operation: Specific operation that failed (e.g., 'file_discovery', 'bronze_validation')
+        domain: Domain being processed (e.g., 'annuity_performance')
+        stage: Pipeline stage where error occurred (e.g., 'discovery', 'transformation', 'loading')
+        error_message: Human-readable error message (renamed from 'message' to avoid logging conflict)
+        details: Additional context-specific details
+        row_number: Optional row number for row-level errors
+        field: Optional field name for field-level errors
+    """
+
+    error_type: str
+    operation: str
+    domain: str
+    stage: str
+    error_message: str
+    details: Dict[str, Any] = field(default_factory=dict)
+    row_number: Optional[int] = None
+    field: Optional[str] = None
+
+    def to_log_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for structured logging."""
+        log_dict = {
+            "error_type": self.error_type,
+            "operation": self.operation,
+            "domain": self.domain,
+            "stage": self.stage,
+            "error_message": self.error_message,
+        }
+        if self.row_number is not None:
+            log_dict["row_number"] = self.row_number
+        if self.field:
+            log_dict["field"] = self.field
+        if self.details:
+            log_dict["details"] = self.details
+        return log_dict
+
+
+@dataclass
+class PipelineResult:
+    """
+    Structured return value for process_annuity_performance().
+
+    Attributes:
+        success: Whether the full pipeline completed without fatal errors
+        rows_loaded: Total rows inserted/updated in the warehouse
+        rows_failed: Rows dropped during validation
+        duration_ms: End-to-end duration in milliseconds
+        file_path: Source Excel path that seeded the run
+        version: Version folder (V1/V2/...) selected by discovery
+        errors: Non-fatal warnings collected during execution
+        metrics: Rich per-stage metadata for observability
+    """
+
+    success: bool
+    rows_loaded: int
+    rows_failed: int
+    duration_ms: float
+    file_path: Path
+    version: str
+    errors: List[str] = field(default_factory=list)
+    metrics: Dict[str, Any] = field(default_factory=dict)
+
+    def as_dict(self) -> Dict[str, Any]:
+        """Return JSON-serialisable representation (useful for logging/tests)."""
+        return {
+            "success": self.success,
+            "rows_loaded": self.rows_loaded,
+            "rows_failed": self.rows_failed,
+            "duration_ms": self.duration_ms,
+            "file_path": str(self.file_path),
+            "version": self.version,
+            "errors": list(self.errors),
+            "metrics": self.metrics,
+        }
+
+    def summary(self) -> str:
+        """Concise human-readable summary."""
+        return (
+            f"success={self.success} rows_loaded={self.rows_loaded} "
+            f"rows_failed={self.rows_failed} duration_ms={self.duration_ms:.2f} "
+            f"file={self.file_path} version={self.version}"
+        )
 
 
 def get_allowed_columns() -> List[str]:
@@ -85,6 +184,189 @@ def project_columns(
     return projected_rows
 
 
+def process_annuity_performance(
+    month: str,
+    *,
+    file_discovery: "FileDiscoveryService",
+    warehouse_loader: "WarehouseLoader",
+    enrichment_service: Optional["CompanyEnrichmentService"] = None,
+    domain: str = "annuity_performance",
+    table_name: str = "annuity_performance_NEW",
+    schema: str = "public",
+    sync_lookup_budget: int = 0,
+    export_unknown_names: bool = True,
+    upsert_keys: Optional[List[str]] = None,
+    use_pipeline: Optional[bool] = True,
+) -> PipelineResult:
+    """
+    Execute the complete annuity performance pipeline for the requested month.
+
+    Flow:
+        1. Discover and load the Excel file via FileDiscoveryService
+        2. Transform + validate rows using process_with_enrichment()
+        3. Load the resulting DataFrame to PostgreSQL through WarehouseLoader
+
+    Args:
+        month: Target reporting month in YYYYMM format
+        file_discovery: Injected FileDiscoveryService (Epic 3)
+        warehouse_loader: Injected WarehouseLoader (Epic 1 Story 1.8)
+        enrichment_service: Optional enrichment dependency (Epic 5 stub)
+        domain: Domain identifier used in discovery config
+        table_name: Warehouse table (shadow table for MVP)
+        schema: Warehouse schema name
+        sync_lookup_budget: Budget passed to enrichment for sync lookups
+        export_unknown_names: Whether to export unknown companies CSV
+        upsert_keys: Override composite key list (defaults to 月度/计划代码/company_id)
+        use_pipeline: Force pipeline vs legacy path (tests can set False)
+
+    Returns:
+        PipelineResult metadata object
+
+    Raises:
+        DiscoveryError: Source file could not be located
+        AnnuityPerformanceTransformationError: Validation failed catastrophically
+        DataWarehouseLoaderError: Database load failed
+        ValueError: Invalid month parameter
+    """
+
+    normalized_month = _normalize_month(month)
+    start_time = time.perf_counter()
+    metrics: Dict[str, Any] = {
+        "parameters": {
+            "month": normalized_month,
+            "domain": domain,
+            "table": table_name,
+            "schema": schema,
+        }
+    }
+
+    logger.info(
+        "annuity.pipeline.start",
+        extra={"month": normalized_month, "domain": domain, "table": table_name},
+    )
+
+    discovery_result = _run_discovery(
+        file_discovery=file_discovery,
+        domain=domain,
+        month=normalized_month,
+    )
+    metrics["discovery"] = {
+        "row_count": discovery_result.row_count,
+        "column_count": discovery_result.column_count,
+        "duration_ms": discovery_result.duration_ms,
+        "stage_durations": discovery_result.stage_durations,
+    }
+
+    raw_rows = discovery_result.df.to_dict(orient="records")
+    processing_result = process_with_enrichment(
+        raw_rows,
+        data_source=str(discovery_result.file_path),
+        enrichment_service=enrichment_service,
+        sync_lookup_budget=sync_lookup_budget,
+        export_unknown_names=export_unknown_names,
+        use_pipeline=use_pipeline,
+    )
+
+    metrics["processing"] = {
+        "input_rows": len(raw_rows),
+        "output_rows": len(processing_result.records),
+        "processing_time_ms": processing_result.processing_time_ms,
+        "enrichment": processing_result.enrichment_stats.model_dump(),
+        "unknown_names_csv": processing_result.unknown_names_csv,
+    }
+
+    dataframe = _records_to_dataframe(processing_result.records)
+    load_result = warehouse_loader.load_dataframe(
+        dataframe,
+        table=table_name,
+        schema=schema,
+        upsert_keys=upsert_keys or ["月度", "计划代码", "company_id"],
+    )
+
+    metrics["loading"] = {
+        "rows_inserted": load_result.rows_inserted,
+        "rows_updated": load_result.rows_updated,
+        "duration_ms": load_result.duration_ms,
+        "execution_id": load_result.execution_id,
+    }
+
+    rows_failed = max(len(raw_rows) - len(processing_result.records), 0)
+    rows_loaded = load_result.rows_inserted + load_result.rows_updated
+    duration_ms = (time.perf_counter() - start_time) * 1000
+
+    logger.info(
+        "annuity.pipeline.completed",
+        extra={
+            "month": normalized_month,
+            "rows_loaded": rows_loaded,
+            "rows_failed": rows_failed,
+            "duration_ms": duration_ms,
+        },
+    )
+
+    return PipelineResult(
+        success=True,
+        rows_loaded=rows_loaded,
+        rows_failed=rows_failed,
+        duration_ms=duration_ms,
+        file_path=Path(discovery_result.file_path),
+        version=discovery_result.version,
+        metrics=metrics,
+    )
+
+
+def _run_discovery(
+    *,
+    file_discovery: "FileDiscoveryService",
+    domain: str,
+    month: str,
+) -> "DataDiscoveryResult":
+    """Wrapper for FileDiscoveryService.discover_and_load with consistent logging."""
+    try:
+        return file_discovery.discover_and_load(domain=domain, month=month)
+    except Exception as exc:
+        error_ctx = ErrorContext(
+            error_type="discovery_error",
+            operation="file_discovery",
+            domain=domain,
+            stage="discovery",
+            error_message=f"Failed to discover file for {domain} month {month}",
+            details={"month": month, "exception": str(exc)},
+        )
+        logger.error("annuity.discovery.failed", extra=error_ctx.to_log_dict())
+        raise
+
+
+def _normalize_month(month: str) -> str:
+    """Validate YYYYMM format and return zero-padded text."""
+    if month is None:
+        raise ValueError("month is required (YYYYMM)")
+
+    text = str(month).strip()
+    if len(text) != 6 or not text.isdigit():
+        raise ValueError("month must be a 6-digit string in YYYYMM format")
+
+    yyyy = int(text[:4])
+    mm = int(text[4:])
+    if yyyy < 2000 or yyyy > 2100:
+        raise ValueError("month year component must be between 2000 and 2100")
+    if mm < 1 or mm > 12:
+        raise ValueError("month component must be between 01 and 12")
+    return text
+
+
+def _records_to_dataframe(records: List[AnnuityPerformanceOut]) -> pd.DataFrame:
+    """Convert processed Pydantic models into a pandas DataFrame for loading."""
+    if not records:
+        return pd.DataFrame()
+
+    serialized = [
+        record.model_dump(mode="json", by_alias=True, exclude_none=True)
+        for record in records
+    ]
+    return pd.DataFrame(serialized)
+
+
 def process(
     rows: List[Dict[str, Any]],
     data_source: str = "unknown",
@@ -116,6 +398,286 @@ def process(
         rows, data_source, enrichment_service, sync_lookup_budget, export_unknown_names
     )
     return result.records
+
+
+def _determine_pipeline_mode(use_pipeline: Optional[bool]) -> bool:
+    """
+    Determine whether to use pipeline or legacy transformation path.
+
+    Respects configuration hierarchy: CLI override > setting > default (False).
+
+    Args:
+        use_pipeline: Optional CLI override for pipeline mode
+
+    Returns:
+        True if pipeline mode should be used, False for legacy mode
+    """
+    if use_pipeline is not None:
+        return use_pipeline
+
+    try:
+        settings = get_settings()
+        return getattr(settings, "annuity_pipeline_enabled", False)
+    except Exception:
+        logger.warning(
+            "Could not load settings, defaulting to legacy transformation path"
+        )
+        return False
+
+
+def _process_rows_via_pipeline(
+    rows: List[Dict[str, Any]],
+    data_source: str,
+    enrichment_service: Optional["CompanyEnrichmentService"],
+    sync_lookup_budget: int,
+    stats: EnrichmentStats,
+    unknown_names: List[str],
+) -> tuple[List[AnnuityPerformanceOut], List[str]]:
+    """
+    Process rows using the pipeline framework.
+
+    Args:
+        rows: Raw Excel rows to process
+        data_source: Source identifier
+        enrichment_service: Optional enrichment service
+        sync_lookup_budget: Budget for sync lookups
+        stats: Enrichment statistics tracker
+        unknown_names: List to collect unknown company names
+
+    Returns:
+        Tuple of (processed_records, processing_errors)
+    """
+    from .pipeline_steps import (
+        build_annuity_pipeline,
+        load_mappings_from_json_fixture,
+    )
+
+    # Load mappings for pipeline construction
+    try:
+        fixture_path = "tests/fixtures/sample_legacy_mappings.json"
+        mappings = load_mappings_from_json_fixture(fixture_path)
+        pipeline = build_annuity_pipeline(mappings)
+        logger.debug("Built pipeline with mapping fixture")
+    except Exception as mapping_error:
+        logger.warning(
+            f"Could not load mapping fixture: {mapping_error}, using empty mappings"
+        )
+        pipeline = build_annuity_pipeline()
+
+    processed_records = []
+    processing_errors = []
+
+    for row_index, raw_row in enumerate(rows):
+        try:
+            result = pipeline.execute(raw_row)
+
+            if not result.errors:
+                try:
+                    processed_record = _pipeline_row_to_model(
+                        result.row, data_source, row_index
+                    )
+
+                    if processed_record:
+                        if enrichment_service:
+                            processed_record = _apply_enrichment_integration(
+                                processed_record,
+                                raw_row,
+                                enrichment_service,
+                                sync_lookup_budget,
+                                stats,
+                                unknown_names,
+                                row_index,
+                            )
+                        processed_records.append(processed_record)
+                    else:
+                        logger.debug(
+                            f"Row {row_index} filtered out during pipeline transformation"
+                        )
+                        processing_errors.append(
+                            f"Row {row_index}: filtered out due to missing required fields"
+                        )
+
+                except ValidationError as e:
+                    error_msg = f"Pipeline validation failed for row {row_index}: {e}"
+                    logger.error(error_msg)
+                    processing_errors.append(error_msg)
+            else:
+                error_msg = f"Pipeline transformation failed for row {row_index}: {result.errors}"
+                logger.error(error_msg)
+                processing_errors.append(error_msg)
+
+        except Exception as e:
+            error_msg = f"Unexpected pipeline error for row {row_index}: {e}"
+            logger.error(error_msg)
+            processing_errors.append(error_msg)
+
+    return processed_records, processing_errors
+
+
+def _process_rows_via_legacy(
+    rows: List[Dict[str, Any]],
+    data_source: str,
+    enrichment_service: Optional["CompanyEnrichmentService"],
+    sync_lookup_budget: int,
+    stats: EnrichmentStats,
+    unknown_names: List[str],
+) -> tuple[List[AnnuityPerformanceOut], List[str]]:
+    """
+    Process rows using the legacy transformation path.
+
+    Args:
+        rows: Raw Excel rows to process
+        data_source: Source identifier
+        enrichment_service: Optional enrichment service
+        sync_lookup_budget: Budget for sync lookups
+        stats: Enrichment statistics tracker
+        unknown_names: List to collect unknown company names
+
+    Returns:
+        Tuple of (processed_records, processing_errors)
+    """
+    processed_records = []
+    processing_errors = []
+
+    for row_index, raw_row in enumerate(rows):
+        try:
+            processed_record = _transform_single_row(raw_row, data_source, row_index)
+
+            if processed_record:
+                if enrichment_service:
+                    try:
+                        enrichment_result = enrichment_service.resolve_company_id(
+                            plan_code=raw_row.get("计划代码"),
+                            customer_name=raw_row.get("客户名称"),
+                            account_name=raw_row.get("年金账户名"),
+                            sync_lookup_budget=sync_lookup_budget,
+                        )
+
+                        if enrichment_result.company_id:
+                            processed_record.company_id = enrichment_result.company_id
+
+                        stats.record(enrichment_result.status, enrichment_result.source)
+
+                        if not enrichment_result.company_id and raw_row.get("客户名称"):
+                            customer_name = raw_row.get("客户名称")
+                            if customer_name is not None:
+                                unknown_names.append(str(customer_name))
+
+                    except Exception as e:
+                        logger.warning(f"Enrichment failed for row {row_index}: {e}")
+                        stats.failed += 1
+
+                processed_records.append(processed_record)
+            else:
+                logger.debug(f"Row {row_index} was filtered out during transformation")
+                processing_errors.append(
+                    f"Row {row_index}: filtered out due to missing required fields"
+                )
+
+        except ValidationError as e:
+            error_msg = f"Validation failed for row {row_index}: {e}"
+            logger.error(error_msg)
+            processing_errors.append(error_msg)
+
+        except Exception as e:
+            error_msg = f"Unexpected error processing row {row_index}: {e}"
+            logger.error(error_msg)
+            processing_errors.append(error_msg)
+
+    return processed_records, processing_errors
+
+
+def _validate_processing_results(
+    processed_records: List[AnnuityPerformanceOut],
+    processing_errors: List[str],
+    total_rows: int,
+) -> None:
+    """
+    Validate processing results and raise error if too many failures.
+
+    Args:
+        processed_records: Successfully processed records
+        processing_errors: List of error messages
+        total_rows: Total number of input rows
+
+    Raises:
+        AnnuityPerformanceTransformationError: If >50% of rows failed
+    """
+    logger.info(f"Successfully processed {len(processed_records)} of {total_rows} rows")
+
+    if processing_errors:
+        logger.warning(f"Encountered {len(processing_errors)} processing errors")
+
+        if len(processing_errors) > total_rows * 0.5:
+            raise AnnuityPerformanceTransformationError(
+                f"Too many processing errors ({len(processing_errors)}/{total_rows}). "
+                f"First error: {processing_errors[0]}"
+            )
+
+
+def _export_unknown_names_csv(
+    unknown_names: List[str],
+    data_source: str,
+    export_enabled: bool,
+) -> Optional[str]:
+    """
+    Export unknown company names to CSV if requested.
+
+    Args:
+        unknown_names: List of unknown company names
+        data_source: Source identifier for CSV filename
+        export_enabled: Whether export is enabled
+
+    Returns:
+        Path to exported CSV file, or None if not exported
+    """
+    if not export_enabled or not unknown_names:
+        return None
+
+    try:
+        csv_path = write_unknowns_csv(unknown_names, data_source)
+        logger.info(
+            f"Exported {len(unknown_names)} unknown company names to: {csv_path}"
+        )
+        return csv_path
+    except Exception as e:
+        logger.warning(f"Failed to export unknown names CSV: {e}")
+        return None
+
+
+def _log_enrichment_stats(
+    enrichment_service: Optional["CompanyEnrichmentService"],
+    stats: EnrichmentStats,
+    processing_time_ms: int,
+    unknown_names_count: int,
+    csv_exported: bool,
+) -> None:
+    """
+    Log enrichment statistics if enrichment was used.
+
+    Args:
+        enrichment_service: Enrichment service (None if not used)
+        stats: Enrichment statistics
+        processing_time_ms: Total processing time
+        unknown_names_count: Number of unknown company names
+        csv_exported: Whether CSV was exported
+    """
+    if enrichment_service and stats.total_records > 0:
+        logger.info(
+            "Enrichment processing completed",
+            extra={
+                "total_records": stats.total_records,
+                "internal_hits": stats.success_internal,
+                "external_hits": stats.success_external,
+                "pending_lookup": stats.pending_lookup,
+                "temp_assigned": stats.temp_assigned,
+                "failed": stats.failed,
+                "sync_budget_used": stats.sync_budget_used,
+                "processing_time_ms": processing_time_ms,
+                "unknown_names_count": unknown_names_count,
+                "csv_exported": csv_exported,
+            },
+        )
 
 
 def process_with_enrichment(
@@ -157,6 +719,7 @@ def process_with_enrichment(
         AnnuityPerformanceTransformationError: If transformation fails
         ValueError: If input data is invalid or cannot be processed
     """
+    # Early return for empty input
     if not rows:
         logger.info("No rows provided for processing")
         return ProcessingResultWithEnrichment(
@@ -171,232 +734,51 @@ def process_with_enrichment(
 
     logger.info(f"Processing {len(rows)} rows from data source: {data_source}")
 
+    # Initialize tracking variables
     start_time = time.time()
     stats = EnrichmentStats()
     unknown_names: List[str] = []
-    processed_records = []
-    processing_errors = []
 
-    # PATTERN: Respect configuration hierarchy (CLI override > setting)
-    if use_pipeline is None:
+    # Determine transformation path
+    pipeline_mode = _determine_pipeline_mode(use_pipeline)
+    logger.info(f"Using {'pipeline' if pipeline_mode else 'legacy'} transformation path")
+
+    # Process rows using selected path
+    if pipeline_mode:
         try:
-            settings = get_settings()
-            use_pipeline = getattr(settings, "annuity_pipeline_enabled", False)
-        except Exception:
-            # Fallback to legacy path if settings unavailable
-            use_pipeline = False
-            logger.warning(
-                "Could not load settings, defaulting to legacy transformation path"
+            processed_records, processing_errors = _process_rows_via_pipeline(
+                rows, data_source, enrichment_service, sync_lookup_budget,
+                stats, unknown_names
             )
-
-    logger.info(f"Using {'pipeline' if use_pipeline else 'legacy'} transformation path")
-
-    if use_pipeline:
-        # New pipeline path - exact transformation parity with legacy
-        try:
-            from .pipeline_steps import (
-                build_annuity_pipeline,
-                load_mappings_from_json_fixture,
-            )
-
-            # Load mappings for pipeline construction
-            try:
-                fixture_path = "tests/fixtures/sample_legacy_mappings.json"
-                mappings = load_mappings_from_json_fixture(fixture_path)
-                pipeline = build_annuity_pipeline(mappings)
-                logger.debug("Built pipeline with mapping fixture")
-            except Exception as mapping_error:
-                # Fallback to empty mappings if fixture unavailable
-                logger.warning(
-                    "Could not load mapping fixture: "
-                    f"{mapping_error}, using empty mappings"
-                )
-                pipeline = build_annuity_pipeline({})
-
-            # Process each row through pipeline
-            for row_index, raw_row in enumerate(rows):
-                try:
-                    # Execute pipeline transformation
-                    result = pipeline.execute(raw_row)
-
-                    if not result.errors:
-                        # Transform pipeline output to domain model
-                        try:
-                            processed_record = _pipeline_row_to_model(
-                                result.row, data_source, row_index
-                            )
-
-                            if processed_record:
-                                # Apply enrichment integration
-                                # (identical to legacy path)
-                                if enrichment_service:
-                                    processed_record = _apply_enrichment_integration(
-                                        processed_record,
-                                        raw_row,
-                                        enrichment_service,
-                                        sync_lookup_budget,
-                                        stats,
-                                        unknown_names,
-                                        row_index,
-                                    )
-
-                                processed_records.append(processed_record)
-                            else:
-                                logger.debug(
-                                    "Row %s filtered out during pipeline "
-                                    "transformation",
-                                    row_index,
-                                )
-                                processing_errors.append(
-                                    f"Row {row_index}: filtered out due to missing "
-                                    "required fields"
-                                )
-
-                        except ValidationError as e:
-                            error_msg = (
-                                f"Pipeline validation failed for row {row_index}: {e}"
-                            )
-                            logger.error(error_msg)
-                            processing_errors.append(error_msg)
-
-                    else:
-                        # Log pipeline errors
-                        error_msg = (
-                            "Pipeline transformation failed for row "
-                            f"{row_index}: {result.errors}"
-                        )
-                        logger.error(error_msg)
-                        processing_errors.append(error_msg)
-
-                except Exception as e:
-                    error_msg = f"Unexpected pipeline error for row {row_index}: {e}"
-                    logger.error(error_msg)
-                    processing_errors.append(error_msg)
-
         except ImportError as e:
-            # Fallback to legacy path if pipeline unavailable
             logger.error(
                 f"Pipeline import failed: {e}, falling back to legacy transformation"
             )
-            use_pipeline = False
-
-    if not use_pipeline:
-        # Existing legacy transformation path
-        # NOTE: Do NOT project columns before transformation.
-        # Transformation may rely on helper fields like 年/月 present in raw rows.
-        # Output models already map to DB columns, and ops will serialize by alias.
-        for row_index, raw_row in enumerate(rows):
-            try:
-                # Transform single row (existing logic)
-                processed_record = _transform_single_row(
-                    raw_row, data_source, row_index
-                )
-
-                if processed_record:
-                    # Optional enrichment integration
-                    if enrichment_service:
-                        try:
-                            # Call enrichment service with proper field mapping
-                            # Extract fields from raw_row since processed_record
-                            # may not have all original fields
-                            enrichment_result = enrichment_service.resolve_company_id(
-                                plan_code=raw_row.get("计划代码"),
-                                customer_name=raw_row.get("客户名称"),
-                                account_name=raw_row.get("年金账户名"),
-                                sync_lookup_budget=sync_lookup_budget,
-                            )
-
-                            # Update record with resolved company_id
-                            if enrichment_result.company_id:
-                                processed_record.company_id = (
-                                    enrichment_result.company_id
-                                )
-
-                            # Record statistics
-                            stats.record(
-                                enrichment_result.status, enrichment_result.source
-                            )
-
-                            # Collect unknown names for CSV export
-                            if not enrichment_result.company_id and raw_row.get(
-                                "客户名称"
-                            ):
-                                customer_name = raw_row.get("客户名称")
-                                if customer_name is not None:
-                                    unknown_names.append(str(customer_name))
-
-                        except Exception as e:
-                            # CRITICAL: Never fail main pipeline on enrichment errors
-                            logger.warning(
-                                f"Enrichment failed for row {row_index}: {e}"
-                            )
-                            stats.failed += 1
-
-                    processed_records.append(processed_record)
-                else:
-                    logger.debug(
-                        f"Row {row_index} was filtered out during transformation"
-                    )
-                    processing_errors.append(
-                        f"Row {row_index}: filtered out due to missing required fields"
-                    )
-
-            except ValidationError as e:
-                error_msg = f"Validation failed for row {row_index}: {e}"
-                logger.error(error_msg)
-                processing_errors.append(error_msg)
-
-            except Exception as e:
-                error_msg = f"Unexpected error processing row {row_index}: {e}"
-                logger.error(error_msg)
-                processing_errors.append(error_msg)
-
-    # Report processing results
-    logger.info(f"Successfully processed {len(processed_records)} of {len(rows)} rows")
-
-    if processing_errors:
-        logger.warning(f"Encountered {len(processing_errors)} processing errors")
-
-        # If more than 50% of rows failed, consider this a critical failure
-        if len(processing_errors) > len(rows) * 0.5:
-            raise AnnuityPerformanceTransformationError(
-                f"Too many processing errors ({len(processing_errors)}/{len(rows)}). "
-                f"First error: {processing_errors[0]}"
+            processed_records, processing_errors = _process_rows_via_legacy(
+                rows, data_source, enrichment_service, sync_lookup_budget,
+                stats, unknown_names
             )
+    else:
+        processed_records, processing_errors = _process_rows_via_legacy(
+            rows, data_source, enrichment_service, sync_lookup_budget,
+            stats, unknown_names
+        )
 
-    # Generate CSV export if requested and unknowns exist
-    csv_path = None
-    if export_unknown_names and unknown_names:
-        try:
-            csv_path = write_unknowns_csv(unknown_names, data_source)
-            logger.info(
-                f"Exported {len(unknown_names)} unknown company names to: {csv_path}"
-            )
-        except Exception as e:
-            # Don't fail processing for CSV export errors
-            logger.warning(f"Failed to export unknown names CSV: {e}")
+    # Validate results
+    _validate_processing_results(processed_records, processing_errors, len(rows))
 
-    # Calculate processing time
+    # Export unknown names if requested
+    csv_path = _export_unknown_names_csv(unknown_names, data_source, export_unknown_names)
+
+    # Calculate final metrics
     processing_time_ms = int((time.time() - start_time) * 1000)
     stats.processing_time_ms = processing_time_ms
 
-    # Log enrichment statistics if enrichment was used
-    if enrichment_service and stats.total_records > 0:
-        logger.info(
-            "Enrichment processing completed",
-            extra={
-                "total_records": stats.total_records,
-                "internal_hits": stats.success_internal,
-                "external_hits": stats.success_external,
-                "pending_lookup": stats.pending_lookup,
-                "temp_assigned": stats.temp_assigned,
-                "failed": stats.failed,
-                "sync_budget_used": stats.sync_budget_used,
-                "processing_time_ms": processing_time_ms,
-                "unknown_names_count": len(unknown_names),
-                "csv_exported": bool(csv_path),
-            },
-        )
+    # Log enrichment statistics
+    _log_enrichment_stats(
+        enrichment_service, stats, processing_time_ms,
+        len(unknown_names), bool(csv_path)
+    )
 
     return ProcessingResultWithEnrichment(
         records=processed_records,

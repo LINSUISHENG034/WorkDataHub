@@ -14,6 +14,7 @@ from dagster import Definitions
 # Import jobs from the jobs module
 from .jobs import (
     annuity_performance_job,
+    annuity_performance_story45_job,
     sample_pipeline_job,
     sample_trustee_performance_job,
     sample_trustee_performance_multi_file_job,
@@ -33,6 +34,7 @@ defs = Definitions(
         sample_trustee_performance_job,
         sample_trustee_performance_multi_file_job,
         annuity_performance_job,
+        annuity_performance_story45_job,
     ],
     schedules=[
         trustee_daily_schedule,
