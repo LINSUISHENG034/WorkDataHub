@@ -1,0 +1,406 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>3</storyId>
+    <title>Annuity Transformation Pipeline (Bronze → Silver)</title>
+    <status>review</status>
+    <generatedAt>2025-11-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/4-3-annuity-transformation-pipeline-bronze-to-silver.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>a transformation pipeline that validates raw annuity data through Bronze and Silver layers with comprehensive error handling</iWant>
+    <soThat>only clean, validated data reaches the database while invalid rows are exported with actionable error details</soThat>
+    <tasks>
+      <task id="1" status="pending">
+        <description>Create transformation pipeline module (AC: 1, 2)</description>
+        <subtasks>
+          <subtask>Create `domain/annuity_performance/transformations.py` module</subtask>
+          <subtask>Define `TransformationResult` dataclass with fields: valid_df, row_count, valid_count, failed_count, error_file_path</subtask>
+          <subtask>Define `transform_bronze_to_silver()` function signature</subtask>
+          <subtask>Add comprehensive docstring with usage examples</subtask>
+        </subtasks>
+      </task>
+      <task id="2" status="pending">
+        <description>Implement Bronze validation step (AC: 1)</description>
+        <subtasks>
+          <subtask>Import `BronzeAnnuitySchema` from `schemas.py`</subtask>
+          <subtask>Apply schema validation with `validate_bronze_dataframe()`</subtask>
+          <subtask>Catch `SchemaError` and re-raise with context</subtask>
+          <subtask>Log Bronze validation success with row count</subtask>
+          <subtask>Stop pipeline immediately on Bronze failure</subtask>
+        </subtasks>
+      </task>
+      <task id="3" status="pending">
+        <description>Implement Silver row-by-row transformation (AC: 2)</description>
+        <subtasks>
+          <subtask>Import `AnnuityPerformanceIn` and `AnnuityPerformanceOut` from `models.py`</subtask>
+          <subtask>Iterate over DataFrame rows with `iterrows()`</subtask>
+          <subtask>Parse each row with `AnnuityPerformanceIn.model_validate()`</subtask>
+          <subtask>Apply date parsing (handled by model validator)</subtask>
+          <subtask>Apply numeric cleaning (handled by model validator)</subtask>
+          <subtask>Validate with `AnnuityPerformanceOut.model_validate()`</subtask>
+          <subtask>Collect valid rows in list</subtask>
+          <subtask>Collect failed rows with error details in list</subtask>
+        </subtasks>
+      </task>
+      <task id="4" status="pending">
+        <description>Implement error collection and export (AC: 3)</description>
+        <subtasks>
+          <subtask>Create error collection structure: [{row_number, error_type, field, error_message, original_data}]</subtask>
+          <subtask>Extract error details from Pydantic `ValidationError`</subtask>
+          <subtask>Export errors to CSV using Epic 2 Story 2.5 error export framework</subtask>
+          <subtask>Include original row data for debugging</subtask>
+          <subtask>Log error summary with percentages</subtask>
+        </subtasks>
+      </task>
+      <task id="5" status="pending">
+        <description>Implement partial success handling (AC: 3)</description>
+        <subtasks>
+          <subtask>Calculate failure percentage: failed_count / total_count</subtask>
+          <subtask>Raise `ValueError` if >10% rows fail: "Transformation failed: 15% of rows invalid (likely systemic issue)"</subtask>
+          <subtask>Allow partial success if &lt;10% fail</subtask>
+          <subtask>Log warning if any rows fail but &lt;10%</subtask>
+        </subtasks>
+      </task>
+      <task id="6" status="pending">
+        <description>Implement result assembly (AC: 4)</description>
+        <subtasks>
+          <subtask>Convert valid rows list to DataFrame</subtask>
+          <subtask>Create `TransformationResult` with all fields</subtask>
+          <subtask>Log success summary: "Processed X rows: Y valid (Z%), W failed (V%)"</subtask>
+          <subtask>Return result</subtask>
+        </subtasks>
+      </task>
+      <task id="7" status="pending">
+        <description>Create unit tests for transformation pipeline (AC: 1-4)</description>
+        <subtasks>
+          <subtask>Test Bronze validation failure stops pipeline</subtask>
+          <subtask>Test Silver validation collects errors correctly</subtask>
+          <subtask>Test partial success (&lt;10% fail) returns valid DataFrame</subtask>
+          <subtask>Test systemic failure (>10% fail) raises ValueError</subtask>
+          <subtask>Test error export creates CSV with correct format</subtask>
+          <subtask>Test TransformationResult structure</subtask>
+          <subtask>Achieve >90% code coverage for transformations.py</subtask>
+        </subtasks>
+      </task>
+      <task id="8" status="pending">
+        <description>Create integration test with real data (Real Data Validation)</description>
+        <subtasks>
+          <subtask>Load DataFrame from `reference/archive/monthly/202412/` Excel file</subtask>
+          <subtask>Run full Bronze → Silver transformation</subtask>
+          <subtask>Verify all 33,615 rows process successfully</subtask>
+          <subtask>Verify error export works for intentionally corrupted rows</subtask>
+          <subtask>Measure performance (target: &lt;1ms per row)</subtask>
+          <subtask>Document any edge cases discovered</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-4.3.1">
+      <title>Pipeline validates Bronze layer structure</title>
+      <given>I receive a raw annuity DataFrame from Epic 3 FileDiscoveryService</given>
+      <when>I execute the Bronze → Silver transformation pipeline</when>
+      <then>
+        - Apply `BronzeAnnuitySchema` validation (Story 4.2)
+        - Verify all required columns present: ['月度', '计划代码', '客户名称', '期初资产规模', '期末资产规模', '投资收益', '当期收益率']
+        - Detect systemic data issues (>10% invalid values)
+        - Raise `SchemaError` with clear message if Bronze validation fails
+        - Stop pipeline immediately on Bronze failure (no partial processing)
+      </then>
+    </criterion>
+    <criterion id="AC-4.3.2">
+      <title>Pipeline validates Silver layer row-by-row</title>
+      <given>DataFrame passed Bronze validation</given>
+      <when>I transform rows to Silver layer</when>
+      <then>
+        - Parse each row with `AnnuityPerformanceIn` model (Story 4.1)
+        - Apply date parsing using `parse_yyyymm_or_chinese()` from Epic 2
+        - Apply numeric cleaning using `CleansingRegistry` from Epic 2
+        - Validate business rules with `AnnuityPerformanceOut` model
+        - Collect validation errors with row numbers and field details
+        - Continue processing valid rows (partial success allowed)
+      </then>
+    </criterion>
+    <criterion id="AC-4.3.3">
+      <title>Error handling exports failed rows</title>
+      <given>Some rows fail Silver validation</given>
+      <when>Pipeline completes</when>
+      <then>
+        - Export failed rows to CSV with error details: {output_dir}/errors/annuity_errors_{timestamp}.csv
+        - Include columns: row_number, error_type, field, error_message, original_data
+        - Log summary: "Processed 33,615 rows: 33,500 valid (99.7%), 115 failed (0.3%)"
+        - Return `TransformationResult` with valid DataFrame and error summary
+        - Fail pipeline if >10% rows fail (likely systemic issue)
+      </then>
+    </criterion>
+    <criterion id="AC-4.3.4">
+      <title>Pipeline returns clean Silver DataFrame</title>
+      <given>Pipeline completes successfully</given>
+      <when>I access the result</when>
+      <then>
+        - Valid DataFrame with all rows passing `AnnuityPerformanceOut` validation
+        - Row count summary (total, valid, failed)
+        - Error file path if any rows failed
+        - Ready for Story 4.4 Gold layer projection
+      </then>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification - Annuity Performance Domain Migration</title>
+        <section>Story 4.3: Transformation Pipeline Design</section>
+        <snippet>Defines Bronze→Silver transformation flow with 7 steps: Bronze validation, date parsing, company cleansing, row validation (Pydantic In), enrichment, output validation (Pydantic Out), error export. Includes TransformationResult dataclass and partial success handling (&lt;10% failure threshold).</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Real Data Validation Strategy - Story 4.3</section>
+        <snippet>Validation plan using 202412 dataset (33,615 rows). Expected: pipeline completes in &lt;6 minutes, &gt;95% success rate, failed rows CSV &lt;1,680 rows. Performance target: &lt;1ms per row for Silver validation using Pydantic v2.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Legacy Parity Requirements - 5-Step Enrichment Logic</section>
+        <snippet>Story 4.3 must implement 5-step company ID enrichment fallback strategy from legacy code (lines 203-227). MVP uses stub provider returning temporary IDs (IN_*) for all unmapped cases. Full enrichment deferred to Epic 5.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Architecture</title>
+        <section>Decision #3: Hybrid Pipeline Step Protocol</section>
+        <snippet>Story 4.3 uses hybrid approach: DataFrame steps for Bronze validation (pandera), Row steps for Silver validation (Pydantic per-row), DataFrame steps for Gold projection. Recommended order: bulk ops first, row validation middle, final projection last.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Architecture</title>
+        <section>Decision #4: Hybrid Error Context Standards</section>
+        <snippet>All validation errors must include ErrorContext with fields: error_type, operation, domain, row_number, field, input_data. Story 4.3 error export uses this structure for failed rows CSV with actionable messages.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Architecture</title>
+        <section>Decision #6: Partial Success Handling</section>
+        <snippet>Story 4.3 implements partial success: continue with valid rows if &lt;10% fail, export failed rows to CSV. Fail pipeline if &gt;10% rows fail (systemic issue). Calculate failure_rate = failed_count / total_count.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture-boundaries.md</path>
+        <title>Clean Architecture Boundaries</title>
+        <section>Domain Layer Responsibilities</section>
+        <snippet>Story 4.3 transformation logic belongs in domain/annuity_performance/transformations.py. Pure business logic with zero dependencies on io/ or orchestration/. Uses Story 1.5 pipeline framework and protocols.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>Product Requirements Document</title>
+        <section>MVP - Annuity Performance Domain Migration</section>
+        <snippet>Story 4.3 is part of MVP proving Bronze→Silver→Gold pattern works. Must integrate company enrichment service adapter, implement layered architecture, and achieve 100% parity with legacy output through golden dataset regression tests.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/schemas.py</path>
+        <kind>module</kind>
+        <symbol>validate_bronze_dataframe</symbol>
+        <lines>461-507</lines>
+        <reason>Bronze validation function to be called in Story 4.3 transformation pipeline. Validates DataFrame structure before row-level processing.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/models.py</path>
+        <kind>module</kind>
+        <symbol>AnnuityPerformanceIn</symbol>
+        <lines>68-283</lines>
+        <reason>Input Pydantic model for loose validation. Story 4.3 uses this to parse each row from Bronze DataFrame with permissive rules.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/models.py</path>
+        <kind>module</kind>
+        <symbol>AnnuityPerformanceOut</symbol>
+        <lines>286-547</lines>
+        <reason>Output Pydantic model for strict business validation. Story 4.3 validates transformed rows against this model before Gold layer.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/schemas.py</path>
+        <kind>module</kind>
+        <symbol>BronzeAnnuitySchema</symbol>
+        <lines>66</lines>
+        <reason>Pandera schema for Bronze layer DataFrame validation. Used in Story 4.2, referenced in Story 4.3 for structural checks.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/utils/date_parser.py</path>
+        <kind>module</kind>
+        <symbol>parse_yyyymm_or_chinese</symbol>
+        <lines>41-78</lines>
+        <reason>Date parsing utility from Epic 2 Story 2.4. Integrated in AnnuityPerformanceIn field validator, handles Chinese date formats.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/cleansing/registry.py</path>
+        <kind>module</kind>
+        <symbol>CleansingRegistry</symbol>
+        <lines>51-287</lines>
+        <reason>Company name cleansing framework from Epic 2 Story 2.3. Story 4.3 uses this for normalizing 客户名称 before enrichment.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/csv_export.py</path>
+        <kind>file</kind>
+        <symbol>N/A</symbol>
+        <lines>N/A</lines>
+        <reason>Error export module from Epic 2 Story 2.5. Story 4.3 uses this to export failed rows to CSV with error details.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/service.py</path>
+        <kind>file</kind>
+        <symbol>N/A</symbol>
+        <lines>N/A</lines>
+        <reason>Existing domain service module. Story 4.3 transformation logic should integrate with or extend this service layer.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <python>
+        <package name="pandas" version="latest" reason="DataFrame operations for bulk transformations" />
+        <package name="pydantic" version="&gt;=2.11.7" reason="Row-level validation with AnnuityPerformanceIn/Out models" />
+        <package name="pandera" version="&gt;=0.18.0,&lt;1.0" reason="Bronze schema validation (validate_bronze_dataframe)" />
+      </python>
+      <internal>
+        <module>work_data_hub.domain.annuity_performance.models</module>
+        <module>work_data_hub.domain.annuity_performance.schemas</module>
+        <module>work_data_hub.utils.date_parser</module>
+        <module>work_data_hub.cleansing.registry</module>
+        <module>work_data_hub.domain.annuity_performance.csv_export</module>
+      </internal>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">
+      <title>Clean Architecture Boundaries (Story 1.6)</title>
+      <description>Transformation logic must reside in domain/annuity_performance/transformations.py with zero dependencies on io/ or orchestration/ layers. Use dependency injection for external services.</description>
+    </constraint>
+    <constraint type="architecture">
+      <title>Hybrid Pipeline Step Protocol (Decision #3)</title>
+      <description>Use DataFrame steps for Bronze validation (fast bulk), Row steps for Silver validation (detailed per-row), DataFrame steps for final projection. Follow recommended order: bulk → row → bulk.</description>
+    </constraint>
+    <constraint type="validation">
+      <title>Partial Success Handling (Decision #6)</title>
+      <description>Allow partial success if &lt;10% rows fail. Export failed rows to CSV. Fail pipeline if &gt;10% rows fail (systemic issue). Calculate failure_rate = failed_count / total_count.</description>
+    </constraint>
+    <constraint type="error-handling">
+      <title>Structured Error Context (Decision #4)</title>
+      <description>All errors must include ErrorContext with fields: error_type, operation, domain, row_number, field, input_data. Use for failed rows CSV export.</description>
+    </constraint>
+    <constraint type="performance">
+      <title>Performance Target</title>
+      <description>Target &lt;1ms per row for Silver validation (33,615 rows in &lt;34 seconds). Pydantic v2 provides 5-50x speedup. Use iterrows() for simplicity unless performance issues arise.</description>
+    </constraint>
+    <constraint type="integration">
+      <title>Epic 2 Dependencies</title>
+      <description>Must use parse_yyyymm_or_chinese() for date parsing (integrated in model validators), CleansingRegistry for company name normalization, and Epic 2 Story 2.5 error export framework.</description>
+    </constraint>
+    <constraint type="integration">
+      <title>Epic 5 Enrichment (MVP Stub)</title>
+      <description>Use StubProvider for company enrichment in MVP. All companies get temporary IDs (IN_*). Full enrichment deferred to Epic 5 Growth phase.</description>
+    </constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>validate_bronze_dataframe</name>
+      <kind>function</kind>
+      <signature>validate_bronze_dataframe(df: pd.DataFrame) -&gt; pd.DataFrame</signature>
+      <path>src/work_data_hub/domain/annuity_performance/schemas.py:461-507</path>
+      <description>Validates Bronze layer DataFrame structure. Raises SchemaError if validation fails. Story 4.3 calls this first before row-level processing.</description>
+    </interface>
+    <interface>
+      <name>AnnuityPerformanceIn.model_validate</name>
+      <kind>method</kind>
+      <signature>AnnuityPerformanceIn.model_validate(row: dict) -&gt; AnnuityPerformanceIn</signature>
+      <path>src/work_data_hub/domain/annuity_performance/models.py:68-283</path>
+      <description>Parses row with loose validation. Handles date parsing, numeric coercion. Story 4.3 iterates over DataFrame rows calling this method.</description>
+    </interface>
+    <interface>
+      <name>AnnuityPerformanceOut.model_validate</name>
+      <kind>method</kind>
+      <signature>AnnuityPerformanceOut.model_validate(data: dict) -&gt; AnnuityPerformanceOut</signature>
+      <path>src/work_data_hub/domain/annuity_performance/models.py:286-547</path>
+      <description>Validates with strict business rules (ge=0 for assets, non-empty company_id). Story 4.3 validates transformed rows before collecting valid results.</description>
+    </interface>
+    <interface>
+      <name>TransformationResult</name>
+      <kind>dataclass</kind>
+      <signature>TransformationResult(valid_df: pd.DataFrame, row_count: int, valid_count: int, failed_count: int, error_file_path: Optional[str])</signature>
+      <path>NEW - to be created in transformations.py</path>
+      <description>Result dataclass for Bronze→Silver transformation. Contains valid DataFrame, counts, and error file path if any rows failed.</description>
+    </interface>
+    <interface>
+      <name>transform_bronze_to_silver</name>
+      <kind>function</kind>
+      <signature>transform_bronze_to_silver(raw_df: pd.DataFrame, output_dir: str = "output/errors") -&gt; TransformationResult</signature>
+      <path>NEW - to be created in transformations.py</path>
+      <description>Main transformation function. Validates Bronze, transforms rows to Silver, exports errors, returns TransformationResult. Raises SchemaError or ValueError on systemic failures.</description>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Testing framework: pytest with markers (unit, integration, postgres, monthly_data, legacy_data, e2e_suite, performance).
+
+      Unit tests: Fast (&lt;1s), isolated, mock external dependencies. Target &gt;90% code coverage for transformations.py.
+
+      Integration tests: Medium speed (&lt;10s), use test fixtures (sample Excel files, stub providers). Test pipeline orchestration and error propagation.
+
+      Real data validation: Use 202412 dataset (33,615 rows) from reference/archive/monthly/202412/. Verify all rows process successfully, error export works, performance meets target (&lt;1ms per row).
+
+      Test data: Fixture at tests/fixtures/annuity_sample.xlsx (100 rows with edge cases). Real data at reference/archive/monthly/202412/收集数据/数据采集/【for年金分战区经营分析】24年12月年金终稿数据1227采集.xlsx.
+    </standards>
+    <locations>
+      tests/unit/domain/annuity_performance/test_transformations.py - Unit tests for transformation pipeline
+      tests/integration/domain/annuity_performance/test_transformations_real_data.py - Real data validation with 202412 dataset
+      tests/fixtures/annuity_sample.xlsx - Sample data fixture (100 rows)
+    </locations>
+    <ideas>
+      <idea ac="AC-4.3.1">
+        <title>Test Bronze validation failure stops pipeline</title>
+        <description>Given DataFrame missing required column '月度', when transform_bronze_to_silver called, then SchemaError raised immediately, no row processing occurs.</description>
+      </idea>
+      <idea ac="AC-4.3.2">
+        <title>Test Silver validation collects errors correctly</title>
+        <description>Given DataFrame with 10 rows (8 valid, 2 invalid dates), when transform_bronze_to_silver called, then 8 rows in valid_df, 2 rows in failed_rows with error details (row_number, field='月度', error_message).</description>
+      </idea>
+      <idea ac="AC-4.3.3">
+        <title>Test partial success (&lt;10% fail) returns valid DataFrame</title>
+        <description>Given DataFrame with 100 rows (95 valid, 5 failed), when transform_bronze_to_silver called, then TransformationResult with valid_df (95 rows), failed_count=5, error_file_path set, no exception raised.</description>
+      </idea>
+      <idea ac="AC-4.3.3">
+        <title>Test systemic failure (&gt;10% fail) raises ValueError</title>
+        <description>Given DataFrame with 100 rows (85 valid, 15 failed), when transform_bronze_to_silver called, then ValueError raised with message "Transformation failed: 15.0% of rows invalid (likely systemic issue)".</description>
+      </idea>
+      <idea ac="AC-4.3.3">
+        <title>Test error export creates CSV with correct format</title>
+        <description>Given DataFrame with 5 failed rows, when transform_bronze_to_silver called, then CSV file created at {output_dir}/errors/annuity_errors_{timestamp}.csv with columns: row_number, error_type, field, error_message, original_data.</description>
+      </idea>
+      <idea ac="AC-4.3.4">
+        <title>Test TransformationResult structure</title>
+        <description>Given successful transformation, when accessing result, then TransformationResult has fields: valid_df (DataFrame), row_count (int), valid_count (int), failed_count (int), error_file_path (Optional[str]).</description>
+      </idea>
+      <idea ac="AC-4.3.1, AC-4.3.2">
+        <title>Test real data validation with 202412 dataset</title>
+        <description>Given 202412 Excel file (33,615 rows), when transform_bronze_to_silver called, then &gt;95% rows pass validation (&gt;31,934 valid), duration &lt;34 seconds (&lt;1ms per row), failed rows CSV exported if any failures.</description>
+      </idea>
+      <idea ac="AC-4.3.2">
+        <title>Test date parsing integration</title>
+        <description>Given rows with various date formats (202412, 2024年12月, 2024-12), when AnnuityPerformanceIn.model_validate called, then all dates parsed correctly using parse_yyyymm_or_chinese().</description>
+      </idea>
+      <idea ac="AC-4.3.2">
+        <title>Test numeric cleaning integration</title>
+        <description>Given rows with numeric strings ("1,234.56", "1234"), when AnnuityPerformanceIn.model_validate called, then values coerced to float correctly.</description>
+      </idea>
+      <idea ac="AC-4.3.3">
+        <title>Test error details extraction from Pydantic ValidationError</title>
+        <description>Given Pydantic ValidationError with multiple field errors, when collecting error details, then each error has row_number, error_type='ValidationError', field (from error['loc']), error_message (from error['msg']).</description>
+      </idea>
+    </ideas>
+  </tests>
+</story-context>

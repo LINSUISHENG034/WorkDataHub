@@ -74,7 +74,7 @@ development_status:
   epic-4: contexted
   4-1-annuity-domain-data-models-pydantic: done
   4-2-annuity-bronze-layer-validation-schema: done
-  4-3-annuity-transformation-pipeline-bronze-silver: backlog
+  4-3-annuity-transformation-pipeline-bronze-silver: done
   4-4-annuity-gold-layer-projection-and-schema: backlog
   4-5-annuity-end-to-end-pipeline-integration: backlog
   4-6-annuity-domain-configuration-and-documentation: backlog
