@@ -1,0 +1,243 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>4.2</storyId>
+    <title>Annuity Bronze Layer Validation Schema</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/4-2-annuity-bronze-layer-validation-schema.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>pandera DataFrame schema validating raw Excel data immediately after load</iWant>
+    <soThat>corrupted source data is rejected before any processing with clear actionable errors</soThat>
+    <tasks>
+- Task 1: Create BronzeAnnuitySchema in schemas.py (AC: 1)
+  - Create `domain/annuity_performance/schemas.py` module
+  - Define `BronzeAnnuitySchema` using pandera `DataFrameSchema`
+  - Add column definitions with Chinese field names
+  - Configure `strict=False` to allow extra columns from Excel
+  - Configure `coerce=True` to attempt type conversion
+  - Add docstring explaining Bronze layer purpose
+
+- Task 2: Implement column validation (AC: 1, 2)
+  - Define expected columns list as constant
+  - Add validation for required columns presence
+  - Add check for completely null columns
+  - Configure numeric columns with `pa.Float` and `coerce=True`
+  - Configure date column with `pa.DateTime` and `coerce=True`
+  - Add minimum row count check (at least 1 data row)
+
+- Task 3: Implement systemic issue detection (AC: 3)
+  - Add custom check for >10% invalid values threshold
+  - Calculate percentage of invalid values per column
+  - Raise SchemaError with percentage when threshold exceeded
+  - Include column name and percentage in error message
+
+- Task 4: Integrate with Epic 2 date parser (AC: 1)
+  - Import `parse_yyyymm_or_chinese` from `utils.date_parser`
+  - Create custom pandera check for date parsing
+  - Apply check to `月度` column
+  - Handle parsing errors with clear messages
+
+- Task 5: Create unit tests for Bronze schema (AC: 1-4)
+  - Test valid DataFrame passes validation
+  - Test missing required column raises SchemaError
+  - Test completely null column raises SchemaError
+  - Test non-numeric values in numeric columns
+  - Test invalid date formats
+  - Test systemic issue detection (>10% invalid)
+  - Test error messages are clear and actionable
+  - Achieve >90% code coverage for schemas.py
+
+- Task 6: Create integration test with real data (Real Data Validation)
+  - Load DataFrame from `reference/archive/monthly/202412/` Excel file
+  - Apply BronzeAnnuitySchema validation (should pass)
+  - Verify all 33,615 rows pass Bronze validation
+  - Verify numeric coercion handles Excel formatting
+  - Verify date parsing handles production formats
+  - Document any edge cases discovered
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+AC-4.2.1: Bronze schema validates raw Excel structure
+- Expected columns present: ['月度', '计划代码', '客户名称', '期初资产规模', '期末资产规模', '投资收益', '当期收益率']
+- No completely null columns (indicates corrupted Excel)
+- Numeric columns coercible to float: 期初资产规模, 期末资产规模, 投资收益, 当期收益率
+- Date column parseable (coerce with custom parser from Epic 2 Story 2.4)
+- At least 1 data row (not just headers)
+- Note: Using `当期收益率` (current period return) from source data, not `年化收益率` (annualized return calculated in Gold layer)
+
+AC-4.2.2: Missing column raises SchemaError
+- Raise `SchemaError` with message: "Bronze validation failed: Missing required column '期末资产规模', found columns: [actual column list]"
+- Error message lists expected vs. actual columns for easy debugging
+
+AC-4.2.3: Systemic data issue detection
+- When >10% of rows have invalid values in a column
+- Raise `SchemaError` with message: "Bronze validation failed: Column '期末资产规模' has 15% invalid values (likely systemic data issue)"
+- Fail fast to prevent processing corrupted data
+
+AC-4.2.4: Validation passes for valid data
+- Excel has all expected columns and valid data types
+- Validation passes and returns DataFrame ready for Silver layer processing
+- No errors or warnings logged
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification: Annuity Performance Domain Migration</title>
+        <section>Story 4.2: Bronze Schema Design (lines 517-530)</section>
+        <snippet>Bronze layer uses pandera DataFrameSchema with strict=False, coerce=True to allow extra columns and attempt type conversion. Validates structural integrity only, deferring business rules to Silver layer.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Real Data Validation Strategy - Story 4.2 (lines 1226-1252)</section>
+        <snippet>Validate Bronze schema against 202412 dataset (33,615 rows). Verify all 23 columns present, numeric coercion successful, no completely null columns. Performance target: &lt;5ms for 33K rows.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Architecture</title>
+        <section>Decision #3: Hybrid Pipeline Step Protocol (lines 282-389)</section>
+        <snippet>Bronze validation uses DataFrame-level pandera for fast structural checks. Silver uses row-level Pydantic for detailed business rules. Gold uses DataFrame-level pandera for final constraints.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Architecture</title>
+        <section>Decision #4: Hybrid Error Context Standards (lines 391-480)</section>
+        <snippet>SchemaError messages must include: error_type, column, expected vs. actual. Example: "Bronze validation failed: Missing required column '期末资产规模', found columns: [...]"</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Architecture</title>
+        <section>Decision #7: Comprehensive Naming Conventions (lines 655-731)</section>
+        <snippet>Pandera schemas use Chinese column names matching Excel sources exactly. Database columns use English snake_case. Explicit column mapping during Gold projection.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture-boundaries.md</path>
+        <title>Clean Architecture Boundaries</title>
+        <section>Domain Layer Responsibilities (lines 22-26)</section>
+        <snippet>Domain layer hosts pure business logic, validation utilities, pandera schemas. No knowledge of files, databases, or Dagster. Schemas define structural contracts for Bronze layer.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/schemas.py</path>
+        <kind>module</kind>
+        <symbol>BronzeAnnuitySchema (existing - Story 4.1 created placeholder)</symbol>
+        <lines>N/A - needs implementation</lines>
+        <reason>Story 4.2 will implement full Bronze schema with column validation, systemic issue detection, and date parsing integration</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/models.py</path>
+        <kind>module</kind>
+        <symbol>AnnuityPerformanceIn, AnnuityPerformanceOut</symbol>
+        <lines>68-283</lines>
+        <reason>Story 4.1 Pydantic models ready for Silver layer validation. Bronze schema validates DataFrame structure before Pydantic row validation.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/utils/date_parser.py</path>
+        <kind>module</kind>
+        <symbol>parse_yyyymm_or_chinese</symbol>
+        <lines>41-78</lines>
+        <reason>Epic 2 Story 2.4 date parser utility. Story 4.2 will integrate with pandera custom check for 月度 column validation.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/unit/domain/annuity_performance/test_schemas.py</path>
+        <kind>test</kind>
+        <symbol>test_bronze_schema_* (to be created)</symbol>
+        <lines>N/A</lines>
+        <reason>Story 4.2 Task 5 will create comprehensive unit tests for Bronze schema validation</reason>
+      </artifact>
+      <artifact>
+        <path>tests/integration/domain/annuity_performance/test_schemas_real_data.py</path>
+        <kind>test</kind>
+        <symbol>test_bronze_real_data_validation (to be created)</symbol>
+        <lines>N/A</lines>
+        <reason>Story 4.2 Task 6 will create integration test with 202412 real data (33,615 rows)</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <python>
+        <package name="pandera" version=">=0.18.0,&lt;1.0" />
+        <package name="pandas" version="latest" />
+        <package name="pydantic" version=">=2.11.7" />
+        <package name="structlog" version="latest" />
+      </python>
+      <internal>
+        <module>work_data_hub.utils.date_parser</module>
+        <module>work_data_hub.domain.annuity_performance.models</module>
+        <module>work_data_hub.cleansing (Epic 2 Story 2.3)</module>
+      </internal>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Clean Architecture: Domain layer (schemas.py) must have zero dependencies on I/O or orchestration layers</constraint>
+    <constraint>Pandera schema must use Chinese field names matching Excel sources: 月度, 计划代码, 客户名称, 期初资产规模, 期末资产规模, 投资收益, 当期收益率</constraint>
+    <constraint>Bronze layer is permissive: strict=False (allow extra columns), coerce=True (attempt type conversion), nullable=True</constraint>
+    <constraint>No business rules in Bronze: validates structure only, not business logic (deferred to Silver layer Pydantic models)</constraint>
+    <constraint>Field name correction: Use 当期收益率 (current period return) from source data, NOT 年化收益率 (annualized return - calculated in Gold layer)</constraint>
+    <constraint>Performance target: &lt;5ms for 33K rows (DataFrame-level validation)</constraint>
+    <constraint>Error messages must follow Decision #4: Include error_type, column, expected vs. actual columns</constraint>
+    <constraint>Testing: >90% code coverage for schemas.py, real data validation with 202412 dataset (33,615 rows)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>validate_bronze_dataframe</name>
+      <kind>function</kind>
+      <signature>validate_bronze_dataframe(df: pd.DataFrame) -> BronzeValidationSummary</signature>
+      <path>src/work_data_hub/domain/annuity_performance/schemas.py</path>
+      <description>Main entry point for Bronze validation. Returns summary with pass/fail status and error details.</description>
+    </interface>
+    <interface>
+      <name>BronzeAnnuitySchema</name>
+      <kind>pandera.DataFrameSchema</kind>
+      <signature>pandera schema with Chinese column definitions</signature>
+      <path>src/work_data_hub/domain/annuity_performance/schemas.py</path>
+      <description>Pandera schema defining Bronze layer structural validation rules</description>
+    </interface>
+    <interface>
+      <name>parse_yyyymm_or_chinese</name>
+      <kind>function</kind>
+      <signature>parse_yyyymm_or_chinese(value: Any) -> date</signature>
+      <path>src/work_data_hub/utils/date_parser.py</path>
+      <description>Epic 2 Story 2.4 date parser. Story 4.2 integrates via pandera custom check for 月度 column.</description>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      <standard>Testing framework: pytest with markers (unit, integration, monthly_data)</standard>
+      <standard>Unit tests: Fast (&lt;1s), isolated, mock external dependencies</standard>
+      <standard>Integration tests: Real data validation with 202412 dataset (33,615 rows)</standard>
+      <standard>Coverage target: >90% for schemas.py (Story 4.2 requirement)</standard>
+      <standard>Test data: Fixture annuity_sample.xlsx (100 rows) + real 202412 data</standard>
+      <standard>Pytest markers: @pytest.mark.unit, @pytest.mark.integration, @pytest.mark.monthly_data</standard>
+    </standards>
+    <locations>
+      <location>tests/unit/domain/annuity_performance/test_schemas.py</location>
+      <location>tests/integration/domain/annuity_performance/test_schemas_real_data.py</location>
+      <location>tests/fixtures/annuity_sample.xlsx</location>
+      <location>reference/archive/monthly/202412/ (real data for integration tests)</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-4.2.1">Test valid DataFrame passes Bronze validation: all expected columns present, correct types, at least 1 data row</idea>
+      <idea ac="AC-4.2.2">Test missing required column raises SchemaError with clear message listing expected vs. actual columns</idea>
+      <idea ac="AC-4.2.2">Test completely null column raises SchemaError (indicates corrupted Excel)</idea>
+      <idea ac="AC-4.2.1">Test numeric columns coercible to float: 期初资产规模, 期末资产规模, 投资收益, 当期收益率</idea>
+      <idea ac="AC-4.2.1">Test date column parseable with custom parser from Epic 2 Story 2.4</idea>
+      <idea ac="AC-4.2.3">Test systemic issue detection: >10% invalid values threshold raises SchemaError with percentage</idea>
+      <idea ac="AC-4.2.4">Test validation passes for valid data and returns DataFrame ready for Silver layer</idea>
+      <idea ac="AC-4.2.1">Integration test: Load 202412 real data (33,615 rows), verify Bronze validation passes</idea>
+      <idea ac="AC-4.2.1">Integration test: Verify numeric coercion handles Excel formatting (commas, etc.)</idea>
+      <idea ac="AC-4.2.1">Integration test: Verify date parsing handles production formats, document edge cases</idea>
+    </ideas>
+  </tests>
+</story-context>

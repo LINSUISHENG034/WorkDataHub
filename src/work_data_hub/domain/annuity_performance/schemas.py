@@ -10,7 +10,7 @@ import pandas as pd
 import pandera as pa
 from pandera.errors import SchemaError, SchemaErrors
 
-from work_data_hub.utils.date_parser import parse_chinese_date
+from work_data_hub.utils.date_parser import parse_yyyymm_or_chinese
 
 from src.work_data_hub.cleansing import get_cleansing_registry
 
@@ -21,14 +21,14 @@ BRONZE_REQUIRED_COLUMNS: Sequence[str] = (
     "期初资产规模",
     "期末资产规模",
     "投资收益",
-    "年化收益率",
+    "当期收益率",
 )
 
 BRONZE_NUMERIC_COLUMNS: Sequence[str] = (
     "期初资产规模",
     "期末资产规模",
     "投资收益",
-    "年化收益率",
+    "当期收益率",
 )
 
 GOLD_NUMERIC_COLUMNS: Sequence[str] = (
@@ -72,7 +72,7 @@ BronzeAnnuitySchema = pa.DataFrameSchema(
         "期初资产规模": pa.Column(pa.Float, nullable=True, coerce=True),
         "期末资产规模": pa.Column(pa.Float, nullable=True, coerce=True),
         "投资收益": pa.Column(pa.Float, nullable=True, coerce=True),
-        "年化收益率": pa.Column(pa.Float, nullable=True, coerce=True),
+        "当期收益率": pa.Column(pa.Float, nullable=True, coerce=True),
     },
     strict=False,
     coerce=True,
@@ -403,6 +403,12 @@ def _coerce_numeric_columns(
 
 
 def _parse_bronze_dates(series: pd.Series) -> Tuple[pd.Series, List[int]]:
+    """
+    Parse date column using Epic 2 Story 2.4 date parser.
+
+    Supports Chinese formats (2024年12月), ISO formats (2024-12), and numeric formats (202412).
+    Returns parsed timestamps and list of invalid row indices.
+    """
     parsed_values: List[pd.Timestamp | pd.NaT] = []
     invalid_rows: List[int] = []
     for idx, value in series.items():
@@ -411,15 +417,11 @@ def _parse_bronze_dates(series: pd.Series) -> Tuple[pd.Series, List[int]]:
             continue
 
         try:
-            parsed = parse_chinese_date(value)
-        except ValueError:
-            parsed = None
-
-        if parsed is None:
+            parsed = parse_yyyymm_or_chinese(value)
+            parsed_values.append(pd.Timestamp(parsed))
+        except (ValueError, TypeError):
             parsed_values.append(pd.NaT)
             invalid_rows.append(idx)
-        else:
-            parsed_values.append(pd.Timestamp(parsed))
     return pd.Series(parsed_values, index=series.index), invalid_rows
 
 

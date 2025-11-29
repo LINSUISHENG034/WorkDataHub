@@ -23,7 +23,7 @@ def _build_bronze_df() -> pd.DataFrame:
                 "期初资产规模": "1,000.00",
                 "期末资产规模": "2,000.00",
                 "投资收益": "500.00",
-                "年化收益率": "5.5%",
+                "当期收益率": "5.5%",
             },
             {
                 "月度": "2025年2月",
@@ -32,7 +32,7 @@ def _build_bronze_df() -> pd.DataFrame:
                 "期初资产规模": 1500,
                 "期末资产规模": 2500,
                 "投资收益": 600,
-                "年化收益率": 0.04,
+                "当期收益率": 0.04,
             },
         ]
     )
@@ -118,7 +118,7 @@ class TestBronzeSchemaValidation:
                     "期初资产规模": "1.5e6",  # Scientific notation
                     "期末资产规模": "2.5e6",
                     "投资收益": "5e5",
-                    "年化收益率": "5.5e-2",  # 0.055
+                    "当期收益率": "5.5e-2",  # 0.055
                 }
             ]
         )
@@ -126,7 +126,7 @@ class TestBronzeSchemaValidation:
         assert validated_df["期初资产规模"].iloc[0] == 1_500_000.0
         assert validated_df["期末资产规模"].iloc[0] == 2_500_000.0
         assert validated_df["投资收益"].iloc[0] == 500_000.0
-        assert abs(validated_df["年化收益率"].iloc[0] - 0.055) < 0.001
+        assert abs(validated_df["当期收益率"].iloc[0] - 0.055) < 0.001
 
     def test_mixed_null_representations(self):
         """Test that None null representations are handled in Bronze layer."""
@@ -139,7 +139,7 @@ class TestBronzeSchemaValidation:
                     "期初资产规模": 1000,
                     "期末资产规模": 2000,
                     "投资收益": 500,
-                    "年化收益率": 0.05,
+                    "当期收益率": 0.05,
                 },
                 {
                     "月度": "2025-02",
@@ -148,7 +148,7 @@ class TestBronzeSchemaValidation:
                     "期初资产规模": 1500,
                     "期末资产规模": 2500,
                     "投资收益": 600,
-                    "年化收益率": None,  # Python None - standard null
+                    "当期收益率": None,  # Python None - standard null
                 },
                 {
                     "月度": "2025-03",
@@ -157,16 +157,16 @@ class TestBronzeSchemaValidation:
                     "期初资产规模": 2000,
                     "期末资产规模": 3000,
                     "投资收益": 700,
-                    "年化收益率": 0.04,
+                    "当期收益率": 0.04,
                 },
             ]
         )
         # Should pass - None values are allowed in Bronze layer
         validated_df, summary = validate_bronze_dataframe(df)
         assert len(validated_df) == 3
-        assert validated_df["年化收益率"].iloc[0] == 0.05
-        assert pd.isna(validated_df["年化收益率"].iloc[1])
-        assert validated_df["年化收益率"].iloc[2] == 0.04
+        assert validated_df["当期收益率"].iloc[0] == 0.05
+        assert pd.isna(validated_df["当期收益率"].iloc[1])
+        assert validated_df["当期收益率"].iloc[2] == 0.04
 
     def test_empty_string_coercion_to_nan(self):
         """Test that empty strings in numeric columns coerce to NaN."""
@@ -179,7 +179,7 @@ class TestBronzeSchemaValidation:
                     "期初资产规模": 1000,  # Valid value
                     "期末资产规模": 2000,  # Valid value
                     "投资收益": "",  # Empty string - should coerce to NaN
-                    "年化收益率": "  ",  # Whitespace - should coerce to NaN
+                    "当期收益率": "  ",  # Whitespace - should coerce to NaN
                 },
                 {
                     "月度": "2025-02",
@@ -188,14 +188,14 @@ class TestBronzeSchemaValidation:
                     "期初资产规模": 1500,
                     "期末资产规模": 2500,
                     "投资收益": 600,  # Valid value prevents column from being all-null
-                    "年化收益率": 0.05,
+                    "当期收益率": 0.05,
                 },
             ]
         )
         validated_df, summary = validate_bronze_dataframe(df)
         # Empty strings should become NaN
         assert pd.isna(validated_df["投资收益"].iloc[0])
-        assert pd.isna(validated_df["年化收益率"].iloc[0])
+        assert pd.isna(validated_df["当期收益率"].iloc[0])
         # Valid values should remain
         assert validated_df["投资收益"].iloc[1] == 600
 
@@ -227,6 +227,151 @@ class TestBronzeSchemaValidation:
         # Should pass because 1/11 = 9.09% < 10%
         validated_df, summary = validate_bronze_dataframe(df, failure_threshold=0.10)
         assert len(summary.invalid_date_rows) == 1
+
+    def test_completely_null_column_raises_error(self):
+        """Test AC-4.2.1: Completely null column indicates corrupted Excel."""
+        df = pd.DataFrame(
+            [
+                {
+                    "月度": "2025-01",
+                    "计划代码": "PLAN001",
+                    "客户名称": "公司A",
+                    "期初资产规模": 1000,
+                    "期末资产规模": None,  # All null
+                    "投资收益": 500,
+                    "当期收益率": 0.05,
+                },
+                {
+                    "月度": "2025-02",
+                    "计划代码": "PLAN002",
+                    "客户名称": "公司B",
+                    "期初资产规模": 1500,
+                    "期末资产规模": None,  # All null
+                    "投资收益": 600,
+                    "当期收益率": 0.04,
+                },
+            ]
+        )
+        with pytest.raises(SchemaError, match="no non-null values"):
+            validate_bronze_dataframe(df)
+
+    def test_error_message_lists_expected_vs_actual_columns(self):
+        """Test AC-4.2.2: Error message lists expected vs. actual columns."""
+        df = _build_bronze_df().drop(columns=["期末资产规模"])
+        try:
+            validate_bronze_dataframe(df)
+            pytest.fail("Expected SchemaError to be raised")
+        except SchemaError as e:
+            error_msg = str(e)
+            assert "期末资产规模" in error_msg
+            assert "found columns:" in error_msg
+
+    def test_validation_passes_for_valid_data(self):
+        """Test AC-4.2.4: Validation passes for valid data with no errors."""
+        df = _build_bronze_df()
+        validated_df, summary = validate_bronze_dataframe(df)
+
+        # Should return DataFrame ready for Silver layer
+        assert len(validated_df) == 2
+        assert summary.row_count == 2
+
+        # No errors or warnings
+        assert summary.invalid_date_rows == []
+        assert summary.numeric_error_rows == {}
+        assert summary.empty_columns == []
+
+    def test_numeric_coercion_with_commas_and_percentages(self):
+        """Test AC-4.2.1: Numeric columns coercible with Excel formatting."""
+        df = pd.DataFrame(
+            [
+                {
+                    "月度": "202501",
+                    "计划代码": "PLAN001",
+                    "客户名称": "公司A",
+                    "期初资产规模": "1,234,567.89",  # Comma-separated
+                    "期末资产规模": "2,345,678.90",
+                    "投资收益": "500,000.00",
+                    "当期收益率": "5.5%",  # Percentage
+                }
+            ]
+        )
+        validated_df, summary = validate_bronze_dataframe(df)
+
+        # Verify numeric coercion worked
+        assert validated_df["期初资产规模"].iloc[0] == 1234567.89
+        assert validated_df["期末资产规模"].iloc[0] == 2345678.90
+        assert validated_df["投资收益"].iloc[0] == 500000.00
+        assert abs(validated_df["当期收益率"].iloc[0] - 0.055) < 0.001
+
+    def test_date_parsing_with_chinese_format(self):
+        """Test AC-4.2.1: Date column parseable with Epic 2 Story 2.4 parser."""
+        df = pd.DataFrame(
+            [
+                {
+                    "月度": "2024年12月",  # Chinese format
+                    "计划代码": "PLAN001",
+                    "客户名称": "公司A",
+                    "期初资产规模": 1000,
+                    "期末资产规模": 2000,
+                    "投资收益": 500,
+                    "当期收益率": 0.05,
+                },
+                {
+                    "月度": "202501",  # Numeric format
+                    "计划代码": "PLAN002",
+                    "客户名称": "公司B",
+                    "期初资产规模": 1500,
+                    "期末资产规模": 2500,
+                    "投资收益": 600,
+                    "当期收益率": 0.04,
+                },
+                {
+                    "月度": "2025-02",  # ISO format
+                    "计划代码": "PLAN003",
+                    "客户名称": "公司C",
+                    "期初资产规模": 2000,
+                    "期末资产规模": 3000,
+                    "投资收益": 700,
+                    "当期收益率": 0.03,
+                },
+            ]
+        )
+        validated_df, summary = validate_bronze_dataframe(df)
+
+        # All dates should be parsed successfully
+        assert summary.invalid_date_rows == []
+        assert len(validated_df) == 3
+        assert pd.notna(validated_df["月度"].iloc[0])
+        assert pd.notna(validated_df["月度"].iloc[1])
+        assert pd.notna(validated_df["月度"].iloc[2])
+
+    def test_at_least_one_data_row_required(self):
+        """Test AC-4.2.1: At least 1 data row required (not just headers)."""
+        df = pd.DataFrame(
+            columns=[
+                "月度",
+                "计划代码",
+                "客户名称",
+                "期初资产规模",
+                "期末资产规模",
+                "投资收益",
+                "当期收益率",
+            ]
+        )
+        with pytest.raises(SchemaError, match="cannot be empty"):
+            validate_bronze_dataframe(df)
+
+    def test_strict_false_allows_extra_columns(self):
+        """Test that strict=False allows extra columns from Excel."""
+        df = _build_bronze_df()
+        df["备注"] = "Extra column"
+        df["子企业号"] = "12345"
+
+        # Should pass - extra columns allowed
+        validated_df, summary = validate_bronze_dataframe(df)
+        assert len(validated_df) == 2
+        assert "备注" in validated_df.columns
+        assert "子企业号" in validated_df.columns
 
 
 @pytest.mark.unit

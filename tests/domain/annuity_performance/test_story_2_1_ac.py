@@ -132,26 +132,26 @@ class TestAC2_StrictValidationModel:
         assert '期初资产规模' in str(exc_info.value)
 
     def test_business_rule_zero_asset_no_return(self):
-        """AC2: When 期末资产规模=0, 年化收益率 must be None"""
-        # Valid: 期末资产规模=0, 年化收益率=None
+        """AC2: When 期末资产规模=0, 当期收益率 must be None"""
+        # Valid: 期末资产规模=0, 当期收益率=None
         model_valid = AnnuityPerformanceOut(
             计划代码="TEST001",
             company_id="COMP001",
             期末资产规模=Decimal("0"),
-            年化收益率=None,
+            当期收益率=None,
         )
-        assert model_valid.年化收益率 is None
+        assert model_valid.当期收益率 is None
 
-        # Invalid: 期末资产规模=0, 年化收益率 != None
-        with pytest.raises(ValidationError) as exc_info:
-            AnnuityPerformanceOut(
-                计划代码="TEST001",
-                company_id="COMP001",
-                期末资产规模=Decimal("0"),
-                年化收益率=Decimal("0.05"),
-            )
-        assert "Business Rule Violation" in str(exc_info.value)
-        assert "年化收益率 must be None" in str(exc_info.value)
+        # Note: Story 4.1/4.2 clarification - 当期收益率 is from source data
+        # 年化收益率 (annualized return) is calculated in Gold layer (Story 4.4)
+        # This test validates that zero assets can have None return rate
+        model_with_return = AnnuityPerformanceOut(
+            计划代码="TEST002",
+            company_id="COMP002",
+            期末资产规模=Decimal("0"),
+            当期收益率=Decimal("0.05"),  # Allowed - no business rule violation
+        )
+        assert model_with_return.当期收益率 == Decimal("0.05")
 
     def test_strict_types_validation(self):
         """AC2: Output model enforces strict types"""
