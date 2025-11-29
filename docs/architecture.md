@@ -387,6 +387,63 @@ result_df = pipeline.run(bronze_df)
 - **Preserve:** Existing brownfield `RowTransformStep` code
 - **Apply:** All domain pipelines (Epic 4, 9) follow this pattern
 
+#### Shared Steps Directory (Story 4.7)
+
+Generic transformation steps are extracted to `domain/pipelines/steps/` for reuse across domains:
+
+**Directory Structure:**
+```
+src/work_data_hub/domain/pipelines/
+├── steps/                          # Shared transformation steps
+│   ├── __init__.py                 # Public exports
+│   ├── column_normalization.py     # ColumnNormalizationStep
+│   ├── date_parsing.py             # DateParsingStep
+│   ├── customer_name_cleansing.py  # CustomerNameCleansingStep
+│   └── field_cleanup.py            # FieldCleanupStep
+├── core.py                         # Pipeline class
+├── types.py                        # Step protocols
+└── config.py                       # Pipeline configuration
+```
+
+**Available Shared Steps:**
+
+| Step | Purpose | Protocol |
+|------|---------|----------|
+| `ColumnNormalizationStep` | Normalize legacy column names to standard format | `RowTransformStep` |
+| `DateParsingStep` | Parse and standardize date fields (YYYYMM, Chinese formats) | `RowTransformStep` |
+| `CustomerNameCleansingStep` | Clean customer names using cleansing registry | `RowTransformStep` |
+| `FieldCleanupStep` | Remove invalid columns and finalize record structure | `RowTransformStep` |
+
+**Usage in Domain Pipelines:**
+```python
+from work_data_hub.domain.pipelines.steps import (
+    ColumnNormalizationStep,
+    DateParsingStep,
+    CustomerNameCleansingStep,
+    FieldCleanupStep,
+)
+
+def build_domain_pipeline(mappings: Dict[str, Any]) -> Pipeline:
+    """Build pipeline using shared steps + domain-specific steps."""
+    steps = [
+        # Shared steps (from domain/pipelines/steps/)
+        ColumnNormalizationStep(),
+        DateParsingStep(),
+        CustomerNameCleansingStep(),
+        FieldCleanupStep(),
+        # Domain-specific steps (in domain/{domain_name}/)
+        DomainSpecificValidationStep(),
+        DomainSpecificEnrichmentStep(mappings),
+    ]
+    return Pipeline(steps=steps)
+```
+
+**Adding New Shared Steps:**
+1. Create step file in `domain/pipelines/steps/`
+2. Implement `RowTransformStep` or `DataFrameStep` protocol
+3. Export from `__init__.py`
+4. Add unit tests in `tests/unit/domain/pipelines/steps/`
+
 ---
 
 ### Decision #4: Hybrid Error Context Standards ✅

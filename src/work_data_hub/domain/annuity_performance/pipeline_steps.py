@@ -7,14 +7,16 @@ decomposed into discrete, testable, and reusable pipeline steps.
 
 Each step corresponds to a specific transformation operation from the legacy cleaner,
 ensuring 100% behavioral parity for safe migration.
+
+Story 4.7 Refactoring:
+- Generic steps (ColumnNormalization, DateParsing, CustomerNameCleansing, FieldCleanup)
+  have been moved to domain/pipelines/steps/ for reuse across domains.
+- Domain-specific steps remain here (PlanCodeCleansing, InstitutionCodeMapping, etc.)
 """
 
 import logging
-import re
-from datetime import date, datetime
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
-import dateutil.parser as dp
 import numpy as np
 import pandas as pd
 import pandera as pa
@@ -34,6 +36,16 @@ from work_data_hub.domain.annuity_performance.schemas import (
 from work_data_hub.domain.pipelines.config import PipelineConfig, StepConfig
 from work_data_hub.domain.pipelines.core import Pipeline, TransformStep
 from work_data_hub.domain.pipelines.exceptions import PipelineStepError
+
+# Import shared steps from domain/pipelines/steps/ (Story 4.7)
+from work_data_hub.domain.pipelines.steps import (
+    ColumnNormalizationStep,
+    CustomerNameCleansingStep,
+    DateParsingStep,
+    FieldCleanupStep,
+    clean_company_name,
+    parse_to_standard_date,
+)
 from work_data_hub.domain.pipelines.types import (
     DataFrameStep,
     PipelineContext,
@@ -57,181 +69,34 @@ ALIAS_COLUMNS = {
 }
 
 
-def parse_to_standard_date(data):
-    """
-    Convert date data to standard format - extracted from legacy common_utils.
-
-    This function replicates the exact date parsing logic from the legacy cleaner.
-    """
-    if isinstance(data, (date, datetime)):
-        return data
-    else:
-        date_string = str(data)
-
-    try:
-        # Match YYYY年MM月 or YY年MM月 format
-        if re.match(r"(\d{2}|\d{4})年\d{1,2}月$", date_string):
-            return datetime.strptime(date_string + "1日", "%Y年%m月%d日")
-
-        # Match YYYY年MM月DD日 or YY年MM月DD日 format
-        elif re.match(r"(\d{2}|\d{4})年\d{1,2}月\d{1,2}日$", date_string):
-            return datetime.strptime(date_string, "%Y年%m月%d日")
-
-        # Match YYYYMMDD format
-        elif re.match(r"\d{8}", date_string):
-            return datetime.strptime(date_string, "%Y%m%d")
-
-        # Match YYYYMM format
-        elif re.match(r"\d{6}", date_string):
-            return datetime.strptime(date_string + "01", "%Y%m%d")
-
-        # Match YYYY-MM format
-        elif re.match(r"\d{4}-\d{2}", date_string):
-            return datetime.strptime(date_string + "-01", "%Y-%m-%d")
-
-        # Match other formats
-        else:
-            return dp.parse(date_string)
-
-    except (ValueError, TypeError):
-        return data
+# Re-export shared functions for backward compatibility
+__all__ = [
+    # Shared steps (from domain/pipelines/steps/)
+    "ColumnNormalizationStep",
+    "DateParsingStep",
+    "CustomerNameCleansingStep",
+    "FieldCleanupStep",
+    "parse_to_standard_date",
+    "clean_company_name",
+    # Domain-specific steps
+    "PlanCodeCleansingStep",
+    "InstitutionCodeMappingStep",
+    "PortfolioCodeDefaultStep",
+    "BusinessTypeCodeMappingStep",
+    "CompanyIdResolutionStep",
+    # Pipeline factory
+    "build_annuity_pipeline",
+    "load_mappings_from_json_fixture",
+    # Validation steps
+    "BronzeSchemaValidationStep",
+    "GoldProjectionStep",
+    "GoldSchemaValidationStep",
+    "ValidateInputRowsStep",
+    "ValidateOutputRowsStep",
+]
 
 
-def clean_company_name(name: str) -> str:
-    """
-    Basic company name cleaning - simplified from legacy common_utils.
-
-    This function replicates the core company name cleaning logic.
-    """
-    if not name:
-        return ""
-
-    # Remove extra spaces
-    name = re.sub(r"\s+", "", name)
-
-    # Remove specified characters
-    name = re.sub(r"及下属子企业", "", name)
-    name = re.sub(r"(?:\(团托\)|-[A-Za-z]+|-\d+|-养老|-福利)$", "", name)
-
-    # Simple cleanup for common suffixes
-    suffixes_to_remove = [
-        "已转出",
-        "待转出",
-        "终止",
-        "转出",
-        "转移终止",
-        "已作废",
-        "已终止",
-        "保留",
-        "保留账户",
-        "存量",
-        "已转移终止",
-        "本部",
-        "未使用",
-        "集合",
-        "原",
-    ]
-
-    for suffix in suffixes_to_remove:
-        if name.endswith(suffix):
-            name = name[: -len(suffix)]
-
-    return name
-
-
-class ColumnNormalizationStep(TransformStep):
-    """
-    Normalize legacy column names to standardized format.
-
-    Replicates the column renaming logic from legacy cleaner:
-    - '机构' -> '机构名称'
-    - '计划号' -> '计划代码'
-    - '流失（含待遇支付）' -> '流失(含待遇支付)'
-    """
-
-    @property
-    def name(self) -> str:
-        return "column_normalization"
-
-    def apply(self, row: Row, context: Dict) -> StepResult:
-        """Apply column name normalization."""
-        try:
-            updated_row = {**row}
-            warnings = []
-
-            # Define column mappings (exact match from legacy cleaner)
-            column_mappings = {
-                "机构": "机构名称",
-                "计划号": "计划代码",
-                "流失（含待遇支付）": "流失(含待遇支付)",
-            }
-
-            # Apply column renaming
-            renamed_count = 0
-            for old_name, new_name in column_mappings.items():
-                if old_name in updated_row:
-                    updated_row[new_name] = updated_row.pop(old_name)
-                    renamed_count += 1
-                    logger.debug(f"Renamed column: {old_name} -> {new_name}")
-
-            if renamed_count > 0:
-                warnings.append(
-                    f"Renamed {renamed_count} legacy column names to standard format"
-                )
-
-            return StepResult(
-                row=updated_row,
-                warnings=warnings,
-                metadata={"renamed_columns": renamed_count},
-            )
-
-        except Exception as e:
-            return StepResult(row=row, errors=[f"Column normalization failed: {e}"])
-
-
-class DateParsingStep(TransformStep):
-    """
-    Parse and standardize date fields using parse_to_standard_date.
-
-    Applies the legacy date parsing logic to the '月度' field.
-    """
-
-    @property
-    def name(self) -> str:
-        return "date_parsing"
-
-    def apply(self, row: Row, context: Dict) -> StepResult:
-        """Apply date parsing to 月度 field."""
-        try:
-            updated_row = {**row}
-            warnings = []
-
-            # Parse 月度 field (exact match from legacy cleaner)
-            if "月度" in updated_row:
-                original_value = updated_row["月度"]
-                try:
-                    parsed_date = parse_to_standard_date(original_value)
-                    updated_row["月度"] = parsed_date
-
-                    if str(parsed_date) != str(original_value):
-                        warnings.append(
-                            f"Parsed date: {original_value} -> {parsed_date}"
-                        )
-
-                except Exception as date_error:
-                    warnings.append(
-                        f"Date parsing failed for '{original_value}': {date_error}"
-                    )
-                    # Keep original value on parsing failure
-
-            return StepResult(
-                row=updated_row,
-                warnings=warnings,
-                metadata={"date_fields_processed": 1 if "月度" in row else 0},
-            )
-
-        except Exception as e:
-            return StepResult(row=row, errors=[f"Date parsing failed: {e}"])
+# ===== Domain-Specific Pipeline Steps =====
 
 
 class PlanCodeCleansingStep(TransformStep):
@@ -247,11 +112,11 @@ class PlanCodeCleansingStep(TransformStep):
     def name(self) -> str:
         return "plan_code_cleansing"
 
-    def apply(self, row: Row, context: Dict) -> StepResult:
+    def apply(self, row: Row, context: Dict[str, Any]) -> StepResult:
         """Apply plan code cleansing rules."""
         try:
             updated_row = {**row}
-            warnings = []
+            warnings: List[str] = []
 
             if "计划代码" in updated_row:
                 original_code = updated_row["计划代码"]
@@ -302,23 +167,28 @@ class InstitutionCodeMappingStep(TransformStep):
         Args:
             company_branch_mapping: Dictionary mapping institution names to codes
         """
-        self.company_branch_mapping = company_branch_mapping or {}
+        self._company_branch_mapping = company_branch_mapping or {}
 
     @property
     def name(self) -> str:
         return "institution_code_mapping"
 
-    def apply(self, row: Row, context: Dict) -> StepResult:
+    @property
+    def company_branch_mapping(self) -> Dict[str, str]:
+        """Return the company branch mapping."""
+        return self._company_branch_mapping
+
+    def apply(self, row: Row, context: Dict[str, Any]) -> StepResult:
         """Apply institution code mapping."""
         try:
             updated_row = {**row}
-            warnings = []
+            warnings: List[str] = []
 
             # Step 1: Map institution names to codes (exact match from legacy)
             if "机构名称" in updated_row:
                 institution_name = updated_row.get("机构名称")
-                if institution_name and institution_name in self.company_branch_mapping:
-                    mapped_code = self.company_branch_mapping[institution_name]
+                if institution_name and institution_name in self._company_branch_mapping:
+                    mapped_code = self._company_branch_mapping[institution_name]
                     updated_row["机构代码"] = mapped_code
                     warnings.append(
                         f"Mapped institution code: {institution_name} -> {mapped_code}"
@@ -358,7 +228,10 @@ class PortfolioCodeDefaultStep(TransformStep):
         Args:
             default_portfolio_mapping: Dictionary mapping plan types to portfolio codes
         """
-        self.default_portfolio_mapping = default_portfolio_mapping or {
+        import re
+
+        self._re = re
+        self._default_portfolio_mapping = default_portfolio_mapping or {
             "集合计划": "QTAN001",
             "单一计划": "QTAN002",
             "职业年金": "QTAN003",
@@ -368,11 +241,16 @@ class PortfolioCodeDefaultStep(TransformStep):
     def name(self) -> str:
         return "portfolio_code_default"
 
-    def apply(self, row: Row, context: Dict) -> StepResult:
+    @property
+    def default_portfolio_mapping(self) -> Dict[str, str]:
+        """Return the default portfolio mapping."""
+        return self._default_portfolio_mapping
+
+    def apply(self, row: Row, context: Dict[str, Any]) -> StepResult:
         """Apply portfolio code defaulting logic."""
         try:
             updated_row = {**row}
-            warnings = []
+            warnings: List[str] = []
 
             # Step 1: Ensure 组合代码 column exists (exact match from legacy)
             if "组合代码" not in updated_row:
@@ -382,7 +260,7 @@ class PortfolioCodeDefaultStep(TransformStep):
             if "组合代码" in updated_row and updated_row["组合代码"]:
                 current_code = str(updated_row["组合代码"])
                 if current_code.startswith("F"):
-                    updated_row["组合代码"] = re.sub(r"^F", "", current_code)
+                    updated_row["组合代码"] = self._re.sub(r"^F", "", current_code)
                     warnings.append(
                         f"Removed F prefix from portfolio code: {current_code}"
                     )
@@ -397,8 +275,8 @@ class PortfolioCodeDefaultStep(TransformStep):
                 if business_type in ["职年受托", "职年投资"]:
                     updated_row["组合代码"] = "QTAN003"
                     warnings.append("Set portfolio code QTAN003 for 职年业务")
-                elif plan_type and plan_type in self.default_portfolio_mapping:
-                    default_code = self.default_portfolio_mapping[plan_type]
+                elif plan_type and plan_type in self._default_portfolio_mapping:
+                    default_code = self._default_portfolio_mapping[plan_type]
                     updated_row["组合代码"] = default_code
                     warnings.append(
                         f"Set default portfolio code {default_code} for {plan_type}"
@@ -431,23 +309,28 @@ class BusinessTypeCodeMappingStep(TransformStep):
             business_type_mapping: Dictionary mapping business types to product
                 line codes
         """
-        self.business_type_mapping = business_type_mapping or {}
+        self._business_type_mapping = business_type_mapping or {}
 
     @property
     def name(self) -> str:
         return "business_type_code_mapping"
 
-    def apply(self, row: Row, context: Dict) -> StepResult:
+    @property
+    def business_type_mapping(self) -> Dict[str, str]:
+        """Return the business type mapping."""
+        return self._business_type_mapping
+
+    def apply(self, row: Row, context: Dict[str, Any]) -> StepResult:
         """Apply business type to product line code mapping."""
         try:
             updated_row = {**row}
-            warnings = []
+            warnings: List[str] = []
 
             # Apply business type mapping (exact match from legacy)
             if "业务类型" in updated_row:
                 business_type = updated_row["业务类型"]
-                if business_type and business_type in self.business_type_mapping:
-                    product_code = self.business_type_mapping[business_type]
+                if business_type and business_type in self._business_type_mapping:
+                    product_code = self._business_type_mapping[business_type]
                     updated_row["产品线代码"] = product_code
                     warnings.append(
                         f"Mapped business type: {business_type} -> {product_code}"
@@ -461,51 +344,6 @@ class BusinessTypeCodeMappingStep(TransformStep):
 
         except Exception as e:
             return StepResult(row=row, errors=[f"Business type mapping failed: {e}"])
-
-
-class CustomerNameCleansingStep(TransformStep):
-    """
-    Clean customer names and create account name field.
-
-    Applies customer name cleaning logic from legacy cleaner:
-    - Copy 客户名称 to 年金账户名
-    - Clean 客户名称 using clean_company_name function
-    """
-
-    @property
-    def name(self) -> str:
-        return "customer_name_cleansing"
-
-    def apply(self, row: Row, context: Dict) -> StepResult:
-        """Apply customer name cleansing."""
-        try:
-            updated_row = {**row}
-            warnings = []
-
-            if "客户名称" in updated_row:
-                original_name = updated_row["客户名称"]
-
-                # Step 1: Copy to account name field (exact match from legacy)
-                updated_row["年金账户名"] = original_name
-
-                # Step 2: Clean customer name (exact match from legacy)
-                if isinstance(original_name, str):
-                    cleaned_name = clean_company_name(original_name)
-                    updated_row["客户名称"] = cleaned_name
-
-                    if cleaned_name != original_name:
-                        warnings.append(
-                            f"Cleaned customer name: {original_name} -> {cleaned_name}"
-                        )
-
-            return StepResult(
-                row=updated_row,
-                warnings=warnings,
-                metadata={"name_cleanings": len(warnings)},
-            )
-
-        except Exception as e:
-            return StepResult(row=row, errors=[f"Customer name cleansing failed: {e}"])
 
 
 class CompanyIdResolutionStep(TransformStep):
@@ -529,28 +367,53 @@ class CompanyIdResolutionStep(TransformStep):
         company_id5_mapping: Optional[Dict[str, str]] = None,
     ):
         """Initialize with all 5 company ID mapping dictionaries."""
-        self.company_id1_mapping = company_id1_mapping or {}
-        self.company_id2_mapping = company_id2_mapping or {}
-        self.company_id3_mapping = company_id3_mapping or {}
-        self.company_id4_mapping = company_id4_mapping or {}
-        self.company_id5_mapping = company_id5_mapping or {}
+        self._company_id1_mapping = company_id1_mapping or {}
+        self._company_id2_mapping = company_id2_mapping or {}
+        self._company_id3_mapping = company_id3_mapping or {}
+        self._company_id4_mapping = company_id4_mapping or {}
+        self._company_id5_mapping = company_id5_mapping or {}
 
     @property
     def name(self) -> str:
         return "company_id_resolution"
 
-    def apply(self, row: Row, context: Dict) -> StepResult:
+    @property
+    def company_id1_mapping(self) -> Dict[str, str]:
+        """Return company ID mapping 1 (plan code)."""
+        return self._company_id1_mapping
+
+    @property
+    def company_id2_mapping(self) -> Dict[str, str]:
+        """Return company ID mapping 2 (account number)."""
+        return self._company_id2_mapping
+
+    @property
+    def company_id3_mapping(self) -> Dict[str, str]:
+        """Return company ID mapping 3 (hardcoded)."""
+        return self._company_id3_mapping
+
+    @property
+    def company_id4_mapping(self) -> Dict[str, str]:
+        """Return company ID mapping 4 (customer name)."""
+        return self._company_id4_mapping
+
+    @property
+    def company_id5_mapping(self) -> Dict[str, str]:
+        """Return company ID mapping 5 (account name)."""
+        return self._company_id5_mapping
+
+    def apply(self, row: Row, context: Dict[str, Any]) -> StepResult:
         """Apply 5-step company ID resolution algorithm."""
         try:
             updated_row = {**row}
-            warnings = []
+            warnings: List[str] = []
             company_id = None
             resolution_method = None
 
             # Step 1: Plan code mapping (priority 1, exact match from legacy)
             plan_code = updated_row.get("计划代码")
-            if plan_code and plan_code in self.company_id1_mapping:
-                company_id = self.company_id1_mapping[plan_code]
+            if plan_code and plan_code in self._company_id1_mapping:
+                company_id = self._company_id1_mapping[plan_code]
                 resolution_method = "plan_code"
                 warnings.append(
                     f"Resolved company_id via plan code: {plan_code} -> {company_id}"
@@ -564,8 +427,8 @@ class CompanyIdResolutionStep(TransformStep):
             # Step 2: Account number mapping (priority 2, exact match from legacy)
             if not company_id:
                 account_number = updated_row.get("集团企业客户号")
-                if account_number and account_number in self.company_id2_mapping:
-                    company_id = self.company_id2_mapping[account_number]
+                if account_number and account_number in self._company_id2_mapping:
+                    company_id = self._company_id2_mapping[account_number]
                     resolution_method = "account_number"
                     warnings.append(
                         "Resolved company_id via account number: "
@@ -578,8 +441,8 @@ class CompanyIdResolutionStep(TransformStep):
                 customer_name = updated_row.get("客户名称")
                 if not customer_name or customer_name == "":
                     # Use hardcoded mapping or default
-                    if plan_code and plan_code in self.company_id3_mapping:
-                        company_id = self.company_id3_mapping[plan_code]
+                    if plan_code and plan_code in self._company_id3_mapping:
+                        company_id = self._company_id3_mapping[plan_code]
                         resolution_method = "hardcoded"
                         warnings.append(
                             "Resolved company_id via hardcoded mapping: "
@@ -596,8 +459,8 @@ class CompanyIdResolutionStep(TransformStep):
             # Step 4: Customer name mapping (priority 4, exact match from legacy)
             if not company_id:
                 customer_name = updated_row.get("客户名称")
-                if customer_name and customer_name in self.company_id4_mapping:
-                    company_id = self.company_id4_mapping[customer_name]
+                if customer_name and customer_name in self._company_id4_mapping:
+                    company_id = self._company_id4_mapping[customer_name]
                     resolution_method = "customer_name"
                     warnings.append(
                         "Resolved company_id via customer name: "
@@ -607,8 +470,8 @@ class CompanyIdResolutionStep(TransformStep):
             # Step 5: Account name mapping (priority 5, exact match from legacy)
             if not company_id:
                 account_name = updated_row.get("年金账户名")
-                if account_name and account_name in self.company_id5_mapping:
-                    company_id = self.company_id5_mapping[account_name]
+                if account_name and account_name in self._company_id5_mapping:
+                    company_id = self._company_id5_mapping[account_name]
                     resolution_method = "account_name"
                     warnings.append(
                         "Resolved company_id via account name: "
@@ -639,55 +502,7 @@ class CompanyIdResolutionStep(TransformStep):
             return StepResult(row=row, errors=[f"Company ID resolution failed: {e}"])
 
 
-class FieldCleanupStep(TransformStep):
-    """
-    Remove invalid columns and finalize record structure.
-
-    Removes the same columns dropped in legacy cleaner:
-    ['备注', '子企业号', '子企业名称', '集团企业客户号', '集团企业客户名称']
-    """
-
-    def __init__(self, columns_to_drop: Optional[List[str]] = None):
-        """
-        Initialize with columns to drop.
-
-        Args:
-            columns_to_drop: List of column names to remove from output
-        """
-        self.columns_to_drop = columns_to_drop or [
-            "备注",
-            "子企业号",
-            "子企业名称",
-            "集团企业客户号",
-            "集团企业客户名称",
-        ]
-
-    @property
-    def name(self) -> str:
-        return "field_cleanup"
-
-    def apply(self, row: Row, context: Dict) -> StepResult:
-        """Remove invalid fields from final record."""
-        try:
-            updated_row = {**row}
-            warnings = []
-            dropped_count = 0
-
-            # Remove specified columns (exact match from legacy)
-            for col_name in self.columns_to_drop:
-                if col_name in updated_row:
-                    updated_row.pop(col_name)
-                    dropped_count += 1
-                    warnings.append(f"Dropped invalid field: {col_name}")
-
-            return StepResult(
-                row=updated_row,
-                warnings=warnings,
-                metadata={"dropped_fields": dropped_count},
-            )
-
-        except Exception as e:
-            return StepResult(row=row, errors=[f"Field cleanup failed: {e}"])
+# ===== Pipeline Factory =====
 
 
 def build_annuity_pipeline(mappings: Optional[Dict[str, Any]] = None) -> Pipeline:
@@ -744,22 +559,23 @@ def build_annuity_pipeline(mappings: Optional[Dict[str, Any]] = None) -> Pipelin
     )
 
     # Create pipeline steps in exact execution order (matching legacy cleaner sequence)
+    # Steps 1, 3, 7, 9 use shared steps from domain/pipelines/steps/ (Story 4.7)
     steps = [
-        # Step 1: Normalize column names
+        # Step 1: Normalize column names (shared step)
         ColumnNormalizationStep(),
-        # Step 2: Map institution codes
+        # Step 2: Map institution codes (domain-specific)
         InstitutionCodeMappingStep(company_branch_mapping=company_branch_mapping),
-        # Step 3: Parse dates
+        # Step 3: Parse dates (shared step)
         DateParsingStep(),
-        # Step 4: Cleanse plan codes
+        # Step 4: Cleanse plan codes (domain-specific)
         PlanCodeCleansingStep(),
-        # Step 5: Set portfolio defaults
+        # Step 5: Set portfolio defaults (domain-specific)
         PortfolioCodeDefaultStep(default_portfolio_mapping=default_portfolio_mapping),
-        # Step 6: Map business type codes
+        # Step 6: Map business type codes (domain-specific)
         BusinessTypeCodeMappingStep(business_type_mapping=business_type_mapping),
-        # Step 7: Clean customer names
+        # Step 7: Clean customer names (shared step)
         CustomerNameCleansingStep(),
-        # Step 8: Resolve company IDs (5-step algorithm)
+        # Step 8: Resolve company IDs (domain-specific, 5-step algorithm)
         CompanyIdResolutionStep(
             company_id1_mapping=company_id1_mapping,
             company_id2_mapping=company_id2_mapping,
@@ -767,7 +583,7 @@ def build_annuity_pipeline(mappings: Optional[Dict[str, Any]] = None) -> Pipelin
             company_id4_mapping=company_id4_mapping,
             company_id5_mapping=company_id5_mapping,
         ),
-        # Step 9: Clean up invalid fields
+        # Step 9: Clean up invalid fields (shared step)
         FieldCleanupStep(),
     ]
 
@@ -1150,13 +966,14 @@ class ValidateInputRowsStep:
             Stores validation errors in context.metadata['validation_errors']
             as list of dicts with keys: row_index, field_name, error_message, original_value
         """
+        from pydantic import ValidationError
+
         from work_data_hub.domain.annuity_performance.models import (
             AnnuityPerformanceIn,
         )
-        from pydantic import ValidationError
 
-        validation_errors = []
-        valid_rows = []
+        validation_errors: List[Dict[str, Any]] = []
+        valid_rows: List[Dict[str, Any]] = []
         total_rows = len(dataframe)
 
         logger.info(
@@ -1283,13 +1100,14 @@ class ValidateOutputRowsStep:
         Raises:
             ValueError: If error rate exceeds 10% threshold (likely systemic issue)
         """
+        from pydantic import ValidationError
+
         from work_data_hub.domain.annuity_performance.models import (
             AnnuityPerformanceOut,
         )
-        from pydantic import ValidationError
 
-        validation_errors = []
-        valid_rows = []
+        validation_errors: List[Dict[str, Any]] = []
+        valid_rows: List[Dict[str, Any]] = []
         total_rows = len(dataframe)
 
         logger.info(

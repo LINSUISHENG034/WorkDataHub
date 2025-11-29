@@ -1,0 +1,227 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>7</storyId>
+    <title>Pipeline Framework Refactoring for Domain Reusability</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/4-7-pipeline-framework-refactoring.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>shared pipeline steps extracted to a common module</iWant>
+    <soThat>future domain migrations (Epic 9) can reuse transformation logic without code duplication</soThat>
+    <tasks>
+- Task 1: Create `domain/pipelines/steps/` directory structure (AC: 4.7.1)
+- Task 2: Extract ColumnNormalizationStep (AC: 4.7.2)
+- Task 3: Extract DateParsingStep (AC: 4.7.2)
+- Task 4: Extract CustomerNameCleansingStep (AC: 4.7.2)
+- Task 5: Extract FieldCleanupStep (AC: 4.7.2)
+- Task 6: Update annuity_performance imports (AC: 4.7.3)
+- Task 7: Refactor service.py to use Pipeline.run() (AC: 4.7.4)
+- Task 8: Update architecture.md Decision #3 (AC: 4.7.5)
+- Task 9: Add unit tests for shared steps (AC: 4.7.6)
+- Task 10: Verify all existing tests pass (AC: 4.7.7)
+- Task 11: Code review and documentation
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+AC-4.7.1: Shared Steps Directory Structure
+- `domain/pipelines/steps/` directory created
+- `__init__.py` with public exports
+- Each step in its own file for maintainability
+
+AC-4.7.2: Extract Generic Steps from annuity_performance
+- `ColumnNormalizationStep` → `domain/pipelines/steps/column_normalization.py`
+- `DateParsingStep` → `domain/pipelines/steps/date_parsing.py`
+- `CustomerNameCleansingStep` → `domain/pipelines/steps/customer_name_cleansing.py`
+- `FieldCleanupStep` → `domain/pipelines/steps/field_cleanup.py`
+
+AC-4.7.3: Refactor annuity_performance to Use Shared Steps
+- Import shared steps from `domain/pipelines/steps/`
+- Keep only domain-specific steps
+- Reduce file from ~1,376 lines to ~600 lines
+
+AC-4.7.4: Refactor service.py to Use Pipeline.run()
+- Use `Pipeline.run()` for step orchestration
+- Reduce `process_with_enrichment()` from ~287 lines to ~100 lines
+- Maintain identical functionality (all tests pass)
+
+AC-4.7.5: Update Architecture Documentation
+- Update Decision #3 with shared steps list
+- Directory structure guidance for new domains
+- Example of how to use shared steps
+
+AC-4.7.6: Shared Steps Have Unit Tests
+- Unit tests in `tests/unit/domain/pipelines/steps/`
+- >90% code coverage
+- Tests for edge cases
+
+AC-4.7.7: Annuity Pipeline Functionality Unchanged
+- All 54 unit tests pass
+- Integration tests pass (33,615 rows)
+- Performance unchanged (<20 seconds)
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Scale Adaptive Architecture</title>
+        <section>Decision #3: Hybrid Pipeline Step Protocol</section>
+        <snippet>Support both DataFrame-level and Row-level steps with clear protocols. Pipeline.run() executes mixed DataFrame and row-level steps. Use DataFrame steps for bulk operations, Row steps for validation/enrichment.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Scale Adaptive Architecture</title>
+        <section>Implementation Patterns - Epic Story Implementation Flow</section>
+        <snippet>Shared steps directory structure guidance for new domains. Establishes repeatable migration patterns.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Legacy Parity Requirements - Critical: 5-Step Company ID Enrichment Logic</section>
+        <snippet>Legacy implementation Lines 203-227 shows 5 sequential fallback steps. Epic 4 MVP Strategy uses stub provider, Epic 5 Growth provides real enrichment service.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Real Data Validation Strategy</section>
+        <snippet>Each story validates against production archive data immediately. Primary dataset: 202412 (33,615 rows, 23 columns). Simplicity Check principle: Keep solution in a relatively elegant state.</snippet>
+      </doc>
+      <doc>
+        <path>docs/brownfield-architecture.md</path>
+        <title>WorkDataHub Brownfield Architecture Document</title>
+        <section>Source Tree and Module Organization</section>
+        <snippet>domain/pipelines/ provides reusable TransformStep abstractions, adapters, and config parsing shared across annuity and forthcoming domains. domain/annuity_performance/ contains large refactor in progress.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/stories/4-7-pipeline-framework-refactoring.md</path>
+        <title>Story 4.7: Pipeline Framework Refactoring</title>
+        <section>Business Context</section>
+        <snippet>Generic transformation steps were implemented within annuity_performance/ instead of shared domain/pipelines/ framework. Code Bloat: ~5,000 lines in domain, ~36% (~1,800 lines) should be shared. Epic 9's 6+ domains would duplicate 10,800+ lines without refactoring.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/core.py</path>
+        <kind>module</kind>
+        <symbol>Pipeline</symbol>
+        <lines>110-645</lines>
+        <reason>Core pipeline execution framework. Pipeline.run() method orchestrates DataFrame and row-level steps. Story 4.7 AC-4.7.4 requires refactoring service.py to use Pipeline.run() instead of manual orchestration.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/pipeline_steps.py</path>
+        <kind>module</kind>
+        <symbol>ColumnNormalizationStep, DateParsingStep, CustomerNameCleansingStep, FieldCleanupStep</symbol>
+        <lines>entire file ~1,376 lines</lines>
+        <reason>Contains 4 generic steps to extract to shared module per AC-4.7.2. Also contains domain-specific steps to keep. Target reduction: ~1,376 lines to ~600 lines.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/service.py</path>
+        <kind>module</kind>
+        <symbol>process_with_enrichment</symbol>
+        <lines>~287 lines function</lines>
+        <reason>Uses manual orchestration instead of Pipeline.run(). AC-4.7.4 requires refactoring to use Pipeline.run() reducing from ~287 lines to ~100 lines while maintaining identical functionality.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/types.py</path>
+        <kind>module</kind>
+        <symbol>DataFrameStep, RowTransformStep, TransformStep</symbol>
+        <lines></lines>
+        <reason>Step protocol definitions. Shared steps must implement these protocols to work with Pipeline.run().</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/__init__.py</path>
+        <kind>module</kind>
+        <symbol>exports</symbol>
+        <lines></lines>
+        <reason>Must be updated to export shared steps from new steps/ directory per AC-4.7.1.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <python>
+        <package name="dagster" version="latest" reason="Orchestration framework" />
+        <package name="pandas" version="latest (locked)" reason="DataFrame operations" />
+        <package name="pandera" version=">=0.18.0,<1.0" reason="DataFrame schema validation" />
+        <package name="pydantic" version=">=2.11.7" reason="Row-level validation with field validators" />
+        <package name="structlog" version="latest" reason="Structured logging for pipeline metrics" />
+        <package name="psycopg2-binary" version="latest" reason="PostgreSQL connection for warehouse loading" />
+        <package name="openpyxl" version="latest" reason="Excel file reading (multi-sheet support)" />
+        <package name="PyYAML" version="latest" reason="Configuration loading" />
+        <package name="pydantic-settings" version=">=2.10.1" reason="Environment-aware configuration" />
+      </python>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+- Clean Architecture Boundaries (Story 1.6): Domain layer CANNOT import from work_data_hub.io or work_data_hub.orchestration. Enforced by Ruff lint rules (TID251).
+- Shared steps must be domain-agnostic and reusable across annuity_performance and future domains (Epic 9).
+- All extracted steps must implement DataFrameStep or RowTransformStep protocols from domain/pipelines/types.py.
+- Maintain 100% backward compatibility - all existing tests must pass (54 unit tests + integration tests).
+- Performance unchanged: Full annuity pipeline <20 seconds for 33,615 rows (current baseline).
+- Directory structure: domain/pipelines/steps/ with each step in its own file for maintainability (AC-4.7.1).
+- No functional changes during refactoring - behavior must remain identical (use existing tests as regression suite).
+- Architecture documentation (Decision #3) must be updated to reflect shared step pattern and usage guidance.
+- Parity requirement: After refactoring, Epic 4 pipeline must maintain 100% output parity with legacy implementation.
+  </constraints>
+  <interfaces>
+- Pipeline.run(initial_data: pd.DataFrame, context: Optional[PipelineContext]) -> PipelineResult
+  Location: src/work_data_hub/domain/pipelines/core.py:135-235
+  Purpose: Execute mixed DataFrame and row-level steps, replacing manual orchestration in service.py
+
+- DataFrameStep Protocol:
+  execute(df: pd.DataFrame, context: PipelineContext) -> pd.DataFrame
+  Purpose: Bulk DataFrame transformation for performance (column operations, filtering, joins)
+
+- RowTransformStep Protocol:
+  apply(row: Row, context: Dict) -> StepResult
+  Purpose: Per-row transformation with detailed error tracking (validation, enrichment)
+
+- TransformStep = Union[DataFrameStep, RowTransformStep]
+  Location: src/work_data_hub/domain/pipelines/types.py
+  Purpose: Union type allowing Pipeline.run() to handle both step types
+
+- build_annuity_pipeline() -> Pipeline
+  Location: src/work_data_hub/domain/annuity_performance/pipeline_steps.py
+  Purpose: Factory function that constructs annuity pipeline with all steps, must be updated to import shared steps
+  </interfaces>
+  <tests>
+    <standards>
+Testing Framework: pytest with custom markers (unit, integration, e2e, performance)
+Test pyramid: Unit (fast, no external deps) → Integration (database/filesystem) → E2E (full pipeline + parity)
+Coverage target: >90% for shared steps, >80% for integration, 100% for parity
+Markers: @pytest.mark.unit, @pytest.mark.integration, @pytest.mark.e2e
+Type checking: mypy strict mode enforced (100% type coverage NFR)
+Performance baseline: Track execution time per step, alert if >20% regression
+    </standards>
+    <locations>
+tests/unit/domain/pipelines/steps/ - New directory for shared step unit tests
+tests/unit/domain/annuity_performance/ - Existing 54 unit tests (must continue passing)
+tests/integration/ - Integration tests with real data (33,615 rows from 202412)
+tests/e2e/test_pipeline_vs_legacy.py - Legacy parity enforcement
+    </locations>
+    <ideas>
+AC-4.7.6: Shared Steps Have Unit Tests
+- test_column_normalization_step.py: Test various column header formats (Chinese, mixed case, special chars), empty DataFrame edge case
+- test_date_parsing_step.py: Test YYYYMM, YYYY年MM月, invalid date formats, full-width digits normalization
+- test_customer_name_cleansing_step.py: Test cleansing registry integration, special character handling, whitespace trimming
+- test_field_cleanup_step.py: Test field value cleanup, null handling, type coercion
+
+AC-4.7.7: Annuity Pipeline Functionality Unchanged
+- Run all 54 existing unit tests in tests/unit/domain/annuity_performance/ as regression suite
+- Integration test with 202412 real data (33,615 rows) - verify same output after refactoring
+- Performance benchmark: Measure before/after refactoring, assert <20 seconds for full pipeline
+- Parity test: Compare refactored pipeline output vs legacy implementation (100% match required)
+
+AC-4.7.4: Refactor service.py to Use Pipeline.run()
+- Test that process_with_enrichment() now delegates to Pipeline.run()
+- Verify manual orchestration code removed (function reduced from ~287 lines to ~100 lines)
+- Mock Pipeline.run() to test orchestration flow in isolation
+- Integration test: Full pipeline execution via refactored service.py produces identical results
+    </ideas>
+  </tests>
+</story-context>

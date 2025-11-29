@@ -78,6 +78,7 @@ development_status:
   4-4-annuity-gold-layer-projection-and-schema: done
   4-5-annuity-end-to-end-pipeline-integration: done
   4-6-annuity-domain-configuration-and-documentation: done
+  4-7-pipeline-framework-refactoring: done  # Code review approved 2025-11-29
   epic-4-retrospective: optional
 
   # Epic 5: Company Enrichment Service

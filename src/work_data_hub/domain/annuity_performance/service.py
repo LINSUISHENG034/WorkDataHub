@@ -18,8 +18,11 @@ import pandas as pd
 
 if TYPE_CHECKING:
     from work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
-    from work_data_hub.io.connectors.file_connector import DataDiscoveryResult, FileDiscoveryService
-    from work_data_hub.io.loader.warehouse_loader import LoadResult, WarehouseLoader
+    from work_data_hub.io.connectors.file_connector import (
+        DataDiscoveryResult,
+        FileDiscoveryService,
+    )
+    from work_data_hub.io.loader.warehouse_loader import WarehouseLoader
 
 from pydantic import ValidationError
 
@@ -434,7 +437,10 @@ def _process_rows_via_pipeline(
     unknown_names: List[str],
 ) -> tuple[List[AnnuityPerformanceOut], List[str]]:
     """
-    Process rows using the pipeline framework.
+    Process rows using Pipeline.run() for DataFrame-level transformation.
+
+    Story 4.7 refactoring: Uses Pipeline.run() instead of row-by-row execute()
+    for improved performance and cleaner orchestration.
 
     Args:
         rows: Raw Excel rows to process
@@ -447,71 +453,135 @@ def _process_rows_via_pipeline(
     Returns:
         Tuple of (processed_records, processing_errors)
     """
-    from .pipeline_steps import (
-        build_annuity_pipeline,
-        load_mappings_from_json_fixture,
+    from .pipeline_steps import build_annuity_pipeline, load_mappings_from_json_fixture
+
+    # Build pipeline with mappings
+    pipeline = _build_pipeline_with_mappings(
+        build_annuity_pipeline, load_mappings_from_json_fixture
     )
 
-    # Load mappings for pipeline construction
+    # Convert rows to DataFrame for Pipeline.run()
+    input_df = pd.DataFrame(rows)
+    logger.debug(f"Running pipeline on DataFrame with {len(input_df)} rows")
+
+    # Execute pipeline on entire DataFrame (Story 4.7: AC-4.7.4)
+    pipeline_result = pipeline.run(input_df)
+
+    # Collect pipeline-level errors
+    processing_errors = list(pipeline_result.errors)
+    if pipeline_result.error_rows:
+        for error_row in pipeline_result.error_rows:
+            row_idx = error_row.get("row_index", "unknown")
+            error_msg = error_row.get("error", "Unknown error")
+            processing_errors.append(f"Row {row_idx}: {error_msg}")
+
+    # Convert output DataFrame to domain models
+    processed_records = _convert_pipeline_output_to_models(
+        pipeline_result.output_data,
+        rows,
+        data_source,
+        enrichment_service,
+        sync_lookup_budget,
+        stats,
+        unknown_names,
+        processing_errors,
+    )
+
+    return processed_records, processing_errors
+
+
+def _build_pipeline_with_mappings(
+    build_fn: Any,
+    load_mappings_fn: Any,
+) -> Any:
+    """
+    Build pipeline with mappings, falling back to empty mappings on error.
+
+    Args:
+        build_fn: Pipeline builder function
+        load_mappings_fn: Mappings loader function
+
+    Returns:
+        Configured Pipeline instance
+    """
     try:
         fixture_path = "tests/fixtures/sample_legacy_mappings.json"
-        mappings = load_mappings_from_json_fixture(fixture_path)
-        pipeline = build_annuity_pipeline(mappings)
+        mappings = load_mappings_fn(fixture_path)
+        pipeline = build_fn(mappings)
         logger.debug("Built pipeline with mapping fixture")
+        return pipeline
     except Exception as mapping_error:
         logger.warning(
             f"Could not load mapping fixture: {mapping_error}, using empty mappings"
         )
-        pipeline = build_annuity_pipeline()
+        return build_fn()
 
-    processed_records = []
-    processing_errors = []
 
-    for row_index, raw_row in enumerate(rows):
+def _convert_pipeline_output_to_models(
+    output_df: pd.DataFrame,
+    original_rows: List[Dict[str, Any]],
+    data_source: str,
+    enrichment_service: Optional["CompanyEnrichmentService"],
+    sync_lookup_budget: int,
+    stats: EnrichmentStats,
+    unknown_names: List[str],
+    processing_errors: List[str],
+) -> List[AnnuityPerformanceOut]:
+    """
+    Convert Pipeline.run() output DataFrame to validated domain models.
+
+    Args:
+        output_df: Transformed DataFrame from Pipeline.run()
+        original_rows: Original input rows for enrichment context
+        data_source: Source identifier
+        enrichment_service: Optional enrichment service
+        sync_lookup_budget: Budget for sync lookups
+        stats: Enrichment statistics tracker
+        unknown_names: List to collect unknown company names
+        processing_errors: List to append conversion errors
+
+    Returns:
+        List of validated AnnuityPerformanceOut models
+    """
+    processed_records: List[AnnuityPerformanceOut] = []
+
+    for row_index, row in output_df.iterrows():
         try:
-            result = pipeline.execute(raw_row)
+            row_dict = row.to_dict()
+            processed_record = _pipeline_row_to_model(
+                row_dict, data_source, int(row_index)
+            )
 
-            if not result.errors:
-                try:
-                    processed_record = _pipeline_row_to_model(
-                        result.row, data_source, row_index
+            if processed_record:
+                # Apply enrichment if service is available
+                if enrichment_service and row_index < len(original_rows):
+                    processed_record = _apply_enrichment_integration(
+                        processed_record,
+                        original_rows[int(row_index)],
+                        enrichment_service,
+                        sync_lookup_budget,
+                        stats,
+                        unknown_names,
+                        int(row_index),
                     )
-
-                    if processed_record:
-                        if enrichment_service:
-                            processed_record = _apply_enrichment_integration(
-                                processed_record,
-                                raw_row,
-                                enrichment_service,
-                                sync_lookup_budget,
-                                stats,
-                                unknown_names,
-                                row_index,
-                            )
-                        processed_records.append(processed_record)
-                    else:
-                        logger.debug(
-                            f"Row {row_index} filtered out during pipeline transformation"
-                        )
-                        processing_errors.append(
-                            f"Row {row_index}: filtered out due to missing required fields"
-                        )
-
-                except ValidationError as e:
-                    error_msg = f"Pipeline validation failed for row {row_index}: {e}"
-                    logger.error(error_msg)
-                    processing_errors.append(error_msg)
+                processed_records.append(processed_record)
             else:
-                error_msg = f"Pipeline transformation failed for row {row_index}: {result.errors}"
-                logger.error(error_msg)
-                processing_errors.append(error_msg)
+                logger.debug(f"Row {row_index} filtered out during model conversion")
+                processing_errors.append(
+                    f"Row {row_index}: filtered out due to missing required fields"
+                )
 
-        except Exception as e:
-            error_msg = f"Unexpected pipeline error for row {row_index}: {e}"
+        except ValidationError as e:
+            error_msg = f"Pipeline validation failed for row {row_index}: {e}"
             logger.error(error_msg)
             processing_errors.append(error_msg)
 
-    return processed_records, processing_errors
+        except Exception as e:
+            error_msg = f"Unexpected error converting row {row_index}: {e}"
+            logger.error(error_msg)
+            processing_errors.append(error_msg)
+
+    return processed_records
 
 
 def _process_rows_via_legacy(

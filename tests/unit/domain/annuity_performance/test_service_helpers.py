@@ -77,7 +77,7 @@ class TestErrorContext:
             operation="row_transformation",
             domain="annuity_performance",
             stage="transformation",
-            message="Transformation failed",
+            error_message="Transformation failed",
         )
 
         log_dict = ctx.to_log_dict()
