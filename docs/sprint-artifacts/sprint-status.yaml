@@ -77,7 +77,7 @@ development_status:
   4-3-annuity-transformation-pipeline-bronze-silver: done
   4-4-annuity-gold-layer-projection-and-schema: done
   4-5-annuity-end-to-end-pipeline-integration: done
-  4-6-annuity-domain-configuration-and-documentation: backlog
+  4-6-annuity-domain-configuration-and-documentation: done
   epic-4-retrospective: optional
 
   # Epic 5: Company Enrichment Service

@@ -1,0 +1,227 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>4.6</storyId>
+    <title>Annuity Domain Configuration and Documentation</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/4-6-annuity-domain-configuration-and-documentation.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>complete configuration and documentation for the annuity domain</iWant>
+    <soThat>the domain is reproducible, maintainable, and serves as reference for future domain migrations</soThat>
+    <tasks>
+### Task 1: Finalize Domain Configuration
+**Estimated Effort:** 30 minutes
+
+1. Review existing `config/data_sources.yml` entry for annuity domain
+2. Add inline comments explaining each configuration field
+3. Verify configuration passes Epic 3 Story 3.0 schema validation
+4. Test configuration loads correctly in pipeline
+
+---
+
+### Task 2: Create Database Migration
+**Estimated Effort:** 1 hour
+
+1. Generate Alembic migration: `alembic revision -m "create_annuity_performance_new"`
+2. Implement `upgrade()` function with table creation
+3. Implement `downgrade()` function with table drop
+4. Test migration on local database
+5. Verify table schema matches Story 4.4 Gold schema
+
+---
+
+### Task 3: Write Domain Documentation
+**Estimated Effort:** 1.5 hours
+
+1. Create `docs/domains/annuity_performance.md` (or README section)
+2. Document sections per AC-4.6.3: Overview, Input format, Transformation steps, Output schema, Configuration reference
+3. Add architecture diagram (optional but recommended)
+4. Review documentation with team member for clarity
+
+---
+
+### Task 4: Create Operational Runbook
+**Estimated Effort:** 1 hour
+
+1. Create `docs/runbooks/annuity_performance.md`
+2. Document manual execution steps (Dagster UI and CLI)
+3. Create troubleshooting table with common errors
+4. Add verification SQL queries
+5. Document rollback procedure
+6. Test runbook by following steps exactly as written
+
+---
+
+### Task 5: Add Configuration Validation Tests
+**Estimated Effort:** 45 minutes
+
+1. Create test file: `tests/integration/test_annuity_config.py`
+2. Test configuration loading and validation
+3. Test database migration (using pytest-postgresql fixture)
+4. Add tests to CI/CD pipeline
+</tasks>
+  </story>
+
+  <acceptanceCriteria>
+### AC-4.6.1: Domain Configuration in data_sources.yml
+- Configuration includes: base_path, file_patterns, exclude_patterns, sheet_name, version_strategy, fallback
+- Configuration passes Epic 3 Story 3.0 schema validation
+- Configuration documented with inline comments
+
+### AC-4.6.2: Database Migration for annuity_performance_NEW Table
+- Creates table `annuity_performance_NEW` with composite PK: (reporting_month, plan_code, company_id)
+- Includes all columns from Story 4.4 Gold schema
+- Adds audit columns: pipeline_run_id, created_at, updated_at
+- Creates indexes: idx_reporting_month, idx_company_id
+- Includes CHECK constraints: starting_assets >= 0, ending_assets >= 0
+- Migration is idempotent
+
+### AC-4.6.3: README Documentation Section
+- Overview: domain purpose, data source, output
+- Input format: Excel structure, example file path, sheet name
+- Transformation steps: Bronze → Silver → Gold
+- Output schema: database table, PK, key fields
+- Configuration: reference to data_sources.yml, environment variables
+- Clear enough for new team member to understand in <15 minutes
+
+### AC-4.6.4: Operational Runbook
+- Manual execution: Dagster UI and CLI commands
+- Common errors and solutions table
+- Verification SQL queries
+- Rollback procedure
+- Enables operator to troubleshoot without developer assistance
+
+### AC-4.6.5: Configuration Validation Test
+- Configuration loads successfully
+- Configuration passes schema validation
+- Database migration applies cleanly
+- Migration is idempotent
+- Table schema matches Gold schema
+- Tests automated in CI/CD
+</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification: Annuity Performance Domain Migration</title>
+        <section>Configuration Dependencies</section>
+        <snippet>Story 4.6 finalizes domain configuration in data_sources.yml, creates database migration for annuity_performance_NEW table, and provides comprehensive documentation including runbook for manual execution and troubleshooting.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Scale Adaptive Architecture</title>
+        <section>Decision #7: Comprehensive Naming Conventions</section>
+        <snippet>Database tables use lowercase_snake_case (annuity_performance), columns use lowercase_snake_case (company_id, reporting_month). Configuration files use snake_case.yml pattern.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>WorkDataHub Product Requirements Document</title>
+        <section>FR-7 Configuration Management</section>
+        <snippet>Configuration should be declarative (what to do, not how), validated (fail fast on startup if invalid), documented (inline comments explain each field), and versioned (committed to git, changes tracked).</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>config/data_sources.yml</path>
+        <kind>configuration</kind>
+        <symbol>annuity_performance domain config</symbol>
+        <lines>23-52</lines>
+        <reason>Existing domain configuration that needs inline comments and validation. Contains base_path, file_patterns, exclude_patterns, sheet_name, version_strategy, and fallback settings.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/models.py</path>
+        <kind>model</kind>
+        <symbol>AnnuityPerformanceOut</symbol>
+        <lines>297-567</lines>
+        <reason>Gold layer Pydantic model defining all output fields. Database schema must match these fields with English column names (月度→reporting_month, 计划代码→plan_code, etc.).</reason>
+      </artifact>
+      <artifact>
+        <path>io/schema/migrations/versions/20251113_000001_create_core_tables.py</path>
+        <kind>migration</kind>
+        <symbol>upgrade/downgrade functions</symbol>
+        <lines>22-106</lines>
+        <reason>Example Alembic migration pattern showing table creation with indexes, constraints, and proper downgrade. Story 4.6 will create similar migration for annuity_performance_NEW table.</reason>
+      </artifact>
+      <artifact>
+        <path>alembic.ini</path>
+        <kind>configuration</kind>
+        <symbol>Alembic configuration</symbol>
+        <lines>1-41</lines>
+        <reason>Alembic configuration file defining script_location (io/schema/migrations), timezone (utc), and logging settings. Used for running migrations.</reason>
+      </artifact>
+      <artifact>
+        <path>io/schema/migrations/env.py</path>
+        <kind>migration-environment</kind>
+        <symbol>Alembic environment setup</symbol>
+        <lines>N/A</lines>
+        <reason>Alembic environment configuration that dynamically overrides sqlalchemy.url using project settings. Required for migration execution.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <python>
+        <package name="alembic" version="latest">Database migration tool for SQLAlchemy, used for creating and managing schema changes</package>
+        <package name="sqlalchemy" version="latest">SQL toolkit and ORM, used by Alembic for database operations</package>
+        <package name="pydantic" version="2.11.7+">Data validation library, AnnuityPerformanceOut model defines expected schema</package>
+        <package name="pyyaml" version="latest">YAML parser for reading data_sources.yml configuration</package>
+        <package name="psycopg2" version="latest">PostgreSQL adapter for Python, required for database connections</package>
+      </python>
+      <environment>
+        <variable name="DATABASE_URL">PostgreSQL connection string for database migrations and data loading</variable>
+        <variable name="WDH_ALIAS_SALT">HMAC salt for temporary company ID generation (used in enrichment)</variable>
+      </environment>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Database migration must create annuity_performance_NEW table (shadow mode for Epic 6 parallel execution)</constraint>
+    <constraint>Composite primary key must be (reporting_month, plan_code, company_id) matching Story 4.4 Gold schema</constraint>
+    <constraint>All columns from AnnuityPerformanceOut model must be included with English snake_case names</constraint>
+    <constraint>Migration must be idempotent (can run twice without errors)</constraint>
+    <constraint>Configuration must pass Epic 3 Story 3.0 schema validation (DomainConfig Pydantic model)</constraint>
+    <constraint>Documentation must enable new team member to understand pipeline in &lt;15 minutes</constraint>
+    <constraint>Runbook must enable operator to troubleshoot common issues without developer assistance</constraint>
+    <constraint>Follow Clean Architecture boundaries: configuration in config/, migrations in io/schema/migrations/, documentation in docs/</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>DomainConfig (Epic 3 Story 3.0)</name>
+      <kind>Pydantic model</kind>
+      <signature>base_path: str, file_patterns: List[str], exclude_patterns: List[str], sheet_name: str, version_strategy: str, fallback: str</signature>
+      <path>src/work_data_hub/config/schemas.py</path>
+    </interface>
+    <interface>
+      <name>Alembic Migration API</name>
+      <kind>Database migration</kind>
+      <signature>upgrade() -> None, downgrade() -> None</signature>
+      <path>io/schema/migrations/versions/*.py</path>
+    </interface>
+    <interface>
+      <name>annuity_performance_NEW table schema</name>
+      <kind>Database table</kind>
+      <signature>CREATE TABLE annuity_performance_NEW (reporting_month DATE, plan_code VARCHAR(50), company_id VARCHAR(50), company_name VARCHAR(255), starting_assets DECIMAL(18,2), ending_assets DECIMAL(18,2), investment_return DECIMAL(18,2), annualized_return_rate DECIMAL(8,4), pipeline_run_id VARCHAR(50), created_at TIMESTAMP, updated_at TIMESTAMP, PRIMARY KEY (reporting_month, plan_code, company_id))</signature>
+      <path>io/schema/migrations/versions/YYYYMMDD_HHMM_create_annuity_performance_new.py</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Testing framework: pytest with markers (@pytest.mark.integration, @pytest.mark.unit). Configuration tests should verify YAML loading, schema validation, and migration idempotency. Use pytest-postgresql fixture for database migration tests. All tests should be automated in CI/CD (Epic 1 Story 1.11).</standards>
+    <locations>
+      <location>tests/integration/test_annuity_config.py - Configuration validation tests</location>
+      <location>tests/integration/test_annuity_migration.py - Database migration tests</location>
+      <location>tests/unit/config/test_data_sources_schema.py - Schema validation unit tests</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-4.6.1">Test configuration loads successfully from config/data_sources.yml and passes DomainConfig validation</idea>
+      <idea ac="AC-4.6.2">Test database migration creates annuity_performance_NEW table with correct schema (composite PK, indexes, constraints)</idea>
+      <idea ac="AC-4.6.2">Test migration is idempotent (running twice produces no errors)</idea>
+      <idea ac="AC-4.6.2">Test CHECK constraints enforce starting_assets >= 0 and ending_assets >= 0</idea>
+      <idea ac="AC-4.6.5">Test configuration validation catches invalid configs (missing required fields, invalid version_strategy)</idea>
+      <idea ac="AC-4.6.5">Integration test: Load config → Run migration → Verify table schema matches AnnuityPerformanceOut model</idea>
+    </ideas>
+  </tests>
+</story-context>
