@@ -1,0 +1,262 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>1</storyId>
+    <title>Annuity Domain Data Models (Pydantic)</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/4-1-annuity-domain-data-models-pydantic.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>Pydantic models for annuity performance data with Chinese field names and strict validation</iWant>
+    <soThat>I can validate row-level data quality and enforce business rules before database loading</soThat>
+    <tasks>
+- [ ] Task 1: Create AnnuityPerformanceIn model (AC: 1, 2)
+  - [ ] Create `domain/annuity_performance/models.py` module
+  - [ ] Define `AnnuityPerformanceIn` class with Chinese field names
+  - [ ] Use `Optional[Union[str, int, date]]` for flexible date input
+  - [ ] Use `Optional[Union[str, float]]` for numeric fields (handle Excel strings)
+  - [ ] Add `model_config` with `str_strip_whitespace=True`
+  - [ ] Add docstring with field descriptions
+
+- [ ] Task 2: Create AnnuityPerformanceOut model (AC: 1, 3)
+  - [ ] Define `AnnuityPerformanceOut` class with strict validation
+  - [ ] Use `date` type for `月度` (not Optional)
+  - [ ] Use `float` with `ge=0` constraint for asset fields
+  - [ ] Use `str` with `min_length=1` for required string fields
+  - [ ] Add `company_id` field for enriched company ID
+  - [ ] Add `年金账户名` field for original company name (AC: 4)
+
+- [ ] Task 3: Implement date field validator (AC: 2)
+  - [ ] Add `@field_validator('月度', mode='before')` to Out model
+  - [ ] Call `parse_yyyymm_or_chinese()` from `utils.date_parser` (Epic 2 Story 2.4)
+  - [ ] Handle various input types: str, int, date, datetime
+  - [ ] Return `date` object (first day of month)
+  - [ ] Raise clear `ValueError` with supported formats on failure
+
+- [ ] Task 4: Implement company_id validator (AC: 3)
+  - [ ] Add `@field_validator('company_id')` to Out model
+  - [ ] Strip whitespace from input
+  - [ ] Validate non-empty after stripping
+  - [ ] Raise `ValueError` if empty: "company_id cannot be empty"
+
+- [ ] Task 5: Add legacy field mappings support (AC: 4)
+  - [ ] Add fields for legacy column names: `机构名称`, `机构代码`, `组合代码`, `产品线代码`
+  - [ ] Add `年金账户名` field for original company name
+  - [ ] Document field mapping in model docstring
+  - [ ] Reference legacy `AnnuityPerformanceCleaner` in comments
+
+- [ ] Task 6: Create unit tests for models (AC: 1-4)
+  - [ ] Test `AnnuityPerformanceIn` accepts various input formats
+  - [ ] Test date parsing: YYYYMM, YYYY年MM月, YYYY-MM, invalid formats
+  - [ ] Test `AnnuityPerformanceOut` enforces business rules
+  - [ ] Test negative asset validation (should fail)
+  - [ ] Test empty company_id validation (should fail)
+  - [ ] Test all required fields validation
+  - [ ] Achieve >90% code coverage for models.py
+
+- [ ] Task 7: Create integration test with real data (Real Data Validation)
+  - [ ] Load first 100 rows from `reference/archive/monthly/202412/` Excel file
+  - [ ] Parse with `AnnuityPerformanceIn` model (should accept all rows)
+  - [ ] Verify date parsing handles production date formats
+  - [ ] Verify numeric coercion handles Excel strings with commas
+  - [ ] Document any edge cases discovered
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+**AC-4.1.1: Pydantic models exist with Chinese field names**
+**Given** I am implementing annuity domain models
+**When** I create `AnnuityPerformanceIn` and `AnnuityPerformanceOut` models
+**Then** Models should have:
+- Chinese field names matching Excel sources: `月度`, `计划代码`, `客户名称`, `期初资产规模`, `期末资产规模`, `投资收益`, `年化收益率`
+- `AnnuityPerformanceIn` with `Optional` fields for loose validation (accepts messy Excel data)
+- `AnnuityPerformanceOut` with strict business rules: `ge=0` for assets, non-empty `company_id`
+- Field descriptions in English for documentation
+
+**AC-4.1.2: Date validator parses Chinese formats**
+**Given** Excel data contains dates in various formats
+**When** I validate `月度` field
+**Then** Field validator should:
+- Parse YYYYMM format (e.g., `202501` → `date(2025, 1, 1)`)
+- Parse YYYY年MM月 format (e.g., `2025年1月` → `date(2025, 1, 1)`)
+- Parse YYYY-MM format (e.g., `2025-01` → `date(2025, 1, 1)`)
+- Raise clear `ValueError` for invalid formats with supported format list
+- Use `parse_yyyymm_or_chinese()` from Epic 2 Story 2.4
+
+**AC-4.1.3: Validation enforces business rules**
+**Given** I am validating output data
+**When** I use `AnnuityPerformanceOut` model
+**Then** Validation should enforce:
+- `期末资产规模 >= 0` (non-negative ending assets)
+- `期初资产规模 >= 0` (non-negative starting assets)
+- `company_id` is non-empty string (enriched or temporary ID)
+- `计划代码` is non-empty string (plan code required)
+- `月度` is valid date object (not string)
+- All required fields present (no None values)
+
+**AC-4.1.4: Models support legacy parity requirements**
+**Given** Legacy system has specific field mappings
+**When** I implement models
+**Then** Models should support:
+- Column renaming: `机构` → `机构名称`, `计划号` → `计划代码`, `流失（含待遇支付）` → `流失(含待遇支付)`
+- Account name preservation: `年金账户名` field for original company name before cleansing
+- All fields from legacy `AnnuityPerformanceCleaner` output
+- [Source: tech-spec-epic-4.md, lines 46-56, Legacy Parity Requirements]
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Pydantic Models Design (lines 463-513)</section>
+        <snippet>Defines AnnuityPerformanceIn with Optional fields for loose validation and AnnuityPerformanceOut with strict business rules (ge=0 for assets, non-empty company_id). Models use Chinese field names matching Excel sources.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Legacy Parity Requirements (lines 29-56)</section>
+        <snippet>Column renaming mappings: 机构→机构名称, 计划号→计划代码. Account name preservation via 年金账户名 field. All fields from legacy AnnuityPerformanceCleaner must be supported.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Document</title>
+        <section>Decision #5: Explicit Chinese Date Format Priority (lines 483-569)</section>
+        <snippet>parse_yyyymm_or_chinese() supports YYYYMM, YYYY年MM月, YYYY-MM formats with explicit priority order. No fallback. Range validation 2000-2030. Full-width digit normalization included.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Document</title>
+        <section>Decision #7: Comprehensive Naming Conventions (lines 655-732)</section>
+        <snippet>Pydantic models use original Chinese field names from Excel sources (no transliteration). Database columns use English snake_case. Explicit column mapping during Gold projection.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture-boundaries.md</path>
+        <title>Clean Architecture Boundaries</title>
+        <section>Layer Responsibilities (lines 20-31)</section>
+        <snippet>Domain layer: Pure business logic, no knowledge of files/databases/Dagster. Pydantic models live in domain/annuity_performance/models.py with zero dependencies on io/ or orchestration/.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>Product Requirements Document</title>
+        <section>FR-2.1: Bronze Layer Validation (lines 756-766)</section>
+        <snippet>Pydantic models validate row-level data. AnnuityPerformanceOut enforces business rules: 期末资产规模 >= 0, company_id non-empty, all required fields present.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/models.py</path>
+        <kind>module</kind>
+        <symbol>AnnuityPerformanceIn, AnnuityPerformanceOut</symbol>
+        <lines>69-608</lines>
+        <reason>EXISTING IMPLEMENTATION - Story 4.1 models already exist with Chinese field names, date validators, and cleansing integration. Review for completeness against AC-4.1.4 legacy parity requirements.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/utils/date_parser.py</path>
+        <kind>utility</kind>
+        <symbol>parse_yyyymm_or_chinese</symbol>
+        <lines>41-78</lines>
+        <reason>Date parsing utility from Epic 2 Story 2.4. Used in AnnuityPerformanceOut @field_validator('月度') for parsing YYYYMM, YYYY年MM月, YYYY-MM formats.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/cleansing/__init__.py</path>
+        <kind>module</kind>
+        <symbol>get_cleansing_registry</symbol>
+        <lines>N/A</lines>
+        <reason>Cleansing registry framework from Epic 2 Story 2.3. Used in models.py for company name normalization and numeric field cleaning via apply_domain_rules().</reason>
+      </artifact>
+      <artifact>
+        <path>tests/domain/annuity_performance/test_models.py</path>
+        <kind>test</kind>
+        <symbol>test_annuity_models</symbol>
+        <lines>N/A</lines>
+        <reason>Existing unit tests for Pydantic models. Review coverage against AC-4.1.1 through AC-4.1.4 requirements. Target >90% coverage.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/utils/test_date_parser.py</path>
+        <kind>test</kind>
+        <symbol>test_parse_yyyymm_or_chinese</symbol>
+        <lines>N/A</lines>
+        <reason>Unit tests for date parser utility. Validates YYYYMM, YYYY年MM月, YYYY-MM format handling and error messages for AC-4.1.2.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <python>
+        <package name="pydantic" version=">=2.11.7">Row-level validation with Chinese field names, field validators, and strict business rules</package>
+        <package name="pandas" version="latest">DataFrame operations for bulk data processing</package>
+        <package name="structlog" version="latest">Structured logging for validation warnings</package>
+      </python>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Domain layer (domain/annuity_performance/) must have ZERO dependencies on io/ or orchestration/ layers per Clean Architecture boundaries (architecture-boundaries.md lines 22-26)</constraint>
+    <constraint>Pydantic models must use Chinese field names matching Excel sources exactly (Decision #7, architecture.md lines 682-699)</constraint>
+    <constraint>Date parsing must use parse_yyyymm_or_chinese() from Epic 2 Story 2.4 with explicit format priority (Decision #5, architecture.md lines 483-569)</constraint>
+    <constraint>All validation errors must include structured context: domain, row_number, field, error_type (Decision #4, architecture.md lines 393-481)</constraint>
+    <constraint>Models must support legacy parity requirements: column renaming (机构→机构名称), account name preservation (年金账户名), all legacy fields (tech-spec-epic-4.md lines 46-56)</constraint>
+    <constraint>Type safety: 100% mypy strict mode compliance required (pyproject.toml lines 101-116)</constraint>
+    <constraint>Test coverage: >90% for models.py per Story 4.1 Task 6 requirements</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>parse_yyyymm_or_chinese</name>
+      <kind>function</kind>
+      <signature>def parse_yyyymm_or_chinese(value: Union[str, int, date, datetime, None]) -> date</signature>
+      <path>src/work_data_hub/utils/date_parser.py</path>
+      <description>Parses various Chinese and ISO date formats. Supports YYYYMM (202501), YYYY年MM月 (2025年1月), YYYY-MM (2025-01). Validates range 2000-2030. Raises ValueError with supported formats on failure.</description>
+    </interface>
+    <interface>
+      <name>get_cleansing_registry</name>
+      <kind>function</kind>
+      <signature>def get_cleansing_registry() -> CleansingRegistry</signature>
+      <path>src/work_data_hub/cleansing/__init__.py</path>
+      <description>Returns singleton CleansingRegistry instance. Provides apply_rules() and get_domain_rules() for field-level data cleansing. Used for company name normalization and numeric field cleaning.</description>
+    </interface>
+    <interface>
+      <name>AnnuityPerformanceIn</name>
+      <kind>class</kind>
+      <signature>class AnnuityPerformanceIn(BaseModel)</signature>
+      <path>src/work_data_hub/domain/annuity_performance/models.py</path>
+      <description>Input model with Optional[Union[...]] fields for loose validation. Accepts messy Excel data with various date/numeric formats. Used for Bronze→Silver transformation.</description>
+    </interface>
+    <interface>
+      <name>AnnuityPerformanceOut</name>
+      <kind>class</kind>
+      <signature>class AnnuityPerformanceOut(BaseModel)</signature>
+      <path>src/work_data_hub/domain/annuity_performance/models.py</path>
+      <description>Output model with strict validation. Enforces business rules: ge=0 for assets, non-empty company_id, required fields. Used for Silver→Gold transformation and database loading.</description>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      <standard>Unit tests use pytest with markers: @pytest.mark.unit for fast tests with no external dependencies</standard>
+      <standard>Integration tests use @pytest.mark.integration for tests with real data files from reference/archive/monthly/</standard>
+      <standard>Test coverage target: >90% for domain/annuity_performance/models.py per Story 4.1 Task 6</standard>
+      <standard>Pydantic validation tests verify both success cases (valid data) and failure cases (invalid data with clear error messages)</standard>
+      <standard>Date parsing tests cover all supported formats: YYYYMM, YYYY年MM月, YYYY-MM, and invalid formats with error messages</standard>
+      <standard>Real data validation tests use first 100 rows from reference/archive/monthly/202412/ Excel file per Story 4.1 Task 7</standard>
+    </standards>
+    <locations>
+      <location>tests/domain/annuity_performance/test_models.py - Unit tests for Pydantic models</location>
+      <location>tests/utils/test_date_parser.py - Unit tests for date parsing utility</location>
+      <location>tests/domain/annuity_performance/test_story_2_1_ac.py - Acceptance criteria validation tests</location>
+      <location>tests/integration/ - Integration tests with real data files</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-4.1.1">Test AnnuityPerformanceIn accepts various input formats: integer dates (202501), string dates ("2025年1月"), numeric strings with commas ("1,234.56"), optional fields (None values)</idea>
+      <idea ac="AC-4.1.1">Test AnnuityPerformanceOut enforces strict validation: non-negative assets (期末资产规模 >= 0), non-empty company_id, required fields present</idea>
+      <idea ac="AC-4.1.2">Test date parsing: YYYYMM (202501 → date(2025,1,1)), YYYY年MM月 ("2025年1月" → date(2025,1,1)), YYYY-MM ("2025-01" → date(2025,1,1))</idea>
+      <idea ac="AC-4.1.2">Test date parsing errors: invalid formats ("INVALID") raise ValueError with supported format list in error message</idea>
+      <idea ac="AC-4.1.3">Test business rules: negative assets fail validation, empty company_id fails validation, missing required fields fail validation</idea>
+      <idea ac="AC-4.1.4">Test legacy field mappings: 机构名称 field accepts both "机构" and "机构名称" column names via alias, 年金账户名 field preserves original company name</idea>
+      <idea ac="Real Data">Integration test loads first 100 rows from reference/archive/monthly/202412/ Excel file, parses with AnnuityPerformanceIn (should accept all rows), verifies date parsing handles production formats</idea>
+    </ideas>
+  </tests>
+</story-context>

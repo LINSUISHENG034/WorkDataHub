@@ -72,7 +72,7 @@ development_status:
 
   # Epic 4: Annuity Performance Domain Migration (MVP)
   epic-4: contexted
-  4-1-annuity-domain-data-models-pydantic: backlog
+  4-1-annuity-domain-data-models-pydantic: done
   4-2-annuity-bronze-layer-validation-schema: backlog
   4-3-annuity-transformation-pipeline-bronze-silver: backlog
   4-4-annuity-gold-layer-projection-and-schema: backlog
