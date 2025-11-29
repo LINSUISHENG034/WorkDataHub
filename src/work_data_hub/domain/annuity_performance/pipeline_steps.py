@@ -12,7 +12,7 @@ ensuring 100% behavioral parity for safe migration.
 import logging
 import re
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 import dateutil.parser as dp
 import numpy as np
@@ -20,6 +20,9 @@ import pandas as pd
 import pandera as pa
 from pandera.errors import SchemaError as PanderaSchemaError
 
+from work_data_hub.domain.annuity_performance.constants import (
+    DEFAULT_ALLOWED_GOLD_COLUMNS,
+)
 from work_data_hub.domain.annuity_performance.schemas import (
     BronzeAnnuitySchema,
     GoldAnnuitySchema,
@@ -31,9 +34,27 @@ from work_data_hub.domain.annuity_performance.schemas import (
 from work_data_hub.domain.pipelines.config import PipelineConfig, StepConfig
 from work_data_hub.domain.pipelines.core import Pipeline, TransformStep
 from work_data_hub.domain.pipelines.exceptions import PipelineStepError
-from work_data_hub.domain.pipelines.types import PipelineContext, Row, StepResult
+from work_data_hub.domain.pipelines.types import (
+    DataFrameStep,
+    PipelineContext,
+    Row,
+    StepResult,
+)
 
 logger = logging.getLogger(__name__)
+
+LEGACY_COLUMNS_TO_DELETE: Sequence[str] = (
+    "id",
+    "备注",
+    "子企业号",
+    "子企业名称",
+    "集团企业客户号",
+    "集团企业客户名称",
+)
+
+ALIAS_COLUMNS = {
+    "流失(含待遇支付)": "流失_含待遇支付",
+}
 
 
 def parse_to_standard_date(data):
@@ -880,6 +901,149 @@ class BronzeSchemaValidationStep:
             )
 
         return validated_df
+
+
+class GoldProjectionStep(DataFrameStep):
+    """
+    Story 4.4: Project Silver output to database columns and run Gold validation.
+
+    Responsibilities:
+    - Fetch allowed columns (WarehouseLoader.get_allowed_columns via DI)
+    - Remove legacy-only columns that should never reach Gold
+    - Log removed columns for audit trail
+    - Apply GoldAnnuitySchema validation (composite PK, ranges, strict typing)
+    """
+
+    def __init__(
+        self,
+        allowed_columns_provider: Optional[Callable[[], List[str]]] = None,
+        table: str = "annuity_performance_new",
+        schema: str = "public",
+        legacy_columns_to_remove: Optional[Sequence[str]] = None,
+    ) -> None:
+        self.table = table
+        self.schema = schema
+        self._allowed_columns_provider = allowed_columns_provider
+        self._allowed_columns: Optional[List[str]] = None
+        self.legacy_columns_to_remove = (
+            list(legacy_columns_to_remove)
+            if legacy_columns_to_remove is not None
+            else list(LEGACY_COLUMNS_TO_DELETE)
+        )
+
+    @property
+    def name(self) -> str:
+        return "gold_projection"
+
+    def execute(
+        self,
+        dataframe: pd.DataFrame,
+        context: PipelineContext,
+    ) -> pd.DataFrame:
+        working_df = dataframe.copy(deep=True)
+        working_df.rename(columns=ALIAS_COLUMNS, inplace=True)
+        self._ensure_annualized_column(working_df)
+        legacy_removed = self._remove_legacy_columns(working_df)
+
+        allowed_columns = self._get_allowed_columns()
+        preserved = [col for col in allowed_columns if col in working_df.columns]
+        removed = [col for col in working_df.columns if col not in allowed_columns]
+
+        if removed:
+            logger.info(
+                "gold_projection.removed_columns",
+                extra={
+                    "columns": removed,
+                    "count": len(removed),
+                    "table": self.table,
+                    "schema": self.schema,
+                },
+            )
+
+        if not preserved:
+            raise PipelineStepError(
+                "Gold projection failed: no columns remain after projection",
+                step_name=self.name,
+            )
+
+        projected_df = working_df.loc[:, preserved].copy()
+
+        validated_df, summary = validate_gold_dataframe(
+            projected_df,
+            project_columns=False,
+        )
+
+        if hasattr(context, "metadata"):
+            context.metadata["gold_projection"] = {
+                "removed_columns": removed,
+                "legacy_removed_columns": legacy_removed,
+                "allowed_columns_count": len(allowed_columns),
+                "table": self.table,
+                "schema": self.schema,
+            }
+            context.metadata["gold_schema_validation"] = gold_summary_to_dict(summary)
+
+        return validated_df
+
+    def _ensure_annualized_column(self, dataframe: pd.DataFrame) -> None:
+        """Ensure Gold-facing annualized return column exists."""
+        if "年化收益率" in dataframe.columns:
+            return
+
+        if "当期收益率" in dataframe.columns:
+            dataframe["年化收益率"] = dataframe["当期收益率"]
+            dataframe.drop(columns=["当期收益率"], inplace=True)
+            logger.info(
+                "gold_projection.created_annualized_return",
+                extra={"source_column": "当期收益率"},
+            )
+
+    def _remove_legacy_columns(self, dataframe: pd.DataFrame) -> List[str]:
+        existing = [col for col in self.legacy_columns_to_remove if col in dataframe.columns]
+        if existing:
+            dataframe.drop(columns=existing, inplace=True)
+            logger.info(
+                "gold_projection.legacy_columns_removed",
+                extra={
+                    "columns": existing,
+                    "count": len(existing),
+                },
+            )
+        return existing
+
+    def _get_allowed_columns(self) -> List[str]:
+        if self._allowed_columns is not None:
+            return self._allowed_columns
+
+        provider = self._allowed_columns_provider or self._default_allowed_columns_provider
+        try:
+            columns = list(provider())
+        except Exception as exc:  # pragma: no cover - defensive
+            raise PipelineStepError(
+                f"Unable to load allowed columns: {exc}",
+                step_name=self.name,
+            ) from exc
+
+        if not columns:
+            raise PipelineStepError(
+                "Allowed columns provider returned an empty list",
+                step_name=self.name,
+            )
+
+        # Preserve provider ordering while de-duplicating.
+        seen = set()
+        deduped: List[str] = []
+        for column in columns:
+            if column not in seen:
+                seen.add(column)
+                deduped.append(column)
+
+        self._allowed_columns = deduped
+        return self._allowed_columns
+
+    @staticmethod
+    def _default_allowed_columns_provider() -> List[str]:
+        return list(DEFAULT_ALLOWED_GOLD_COLUMNS)
 
 
 class GoldSchemaValidationStep:

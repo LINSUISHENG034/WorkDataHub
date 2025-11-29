@@ -20,6 +20,7 @@ from pydantic import ValidationError
 from work_data_hub.config.settings import get_settings
 from work_data_hub.utils.date_parser import parse_chinese_date
 
+from .constants import DEFAULT_ALLOWED_GOLD_COLUMNS
 from .csv_export import write_unknowns_csv
 from .models import (
     AnnuityPerformanceIn,
@@ -39,42 +40,13 @@ class AnnuityPerformanceTransformationError(Exception):
 
 def get_allowed_columns() -> List[str]:
     """
-    Get allowed columns from actual database table schema.
+    Return the canonical list of columns allowed in the gold table.
 
-    Returns all columns that exist in the "规模明细" table based on the
-    actual database schema, not the DDL. This prevents SQL column-not-found
-    errors by filtering data to only valid database columns.
-
-    Returns:
-        List of allowed column names matching actual database schema
+    This list mirrors the database schema and is shared across the legacy
+    service path and the pipeline-based Gold projection step so that column
+    projection stays consistent regardless of execution mode.
     """
-    return [
-        "id",
-        "月度",
-        "业务类型",
-        "计划类型",
-        "计划代码",
-        "计划名称",
-        "组合类型",
-        "组合代码",
-        "组合名称",
-        "客户名称",
-        "期初资产规模",
-        "期末资产规模",
-        "供款",
-        "流失_含待遇支付",  # 与实际 DDL 保持一致（标准化列名）
-        "流失(含待遇支付)",  # 别名用于兼容原始 Excel / DDL 列名
-        "流失",
-        "待遇支付",
-        "投资收益",
-        "当期收益率",
-        "机构代码",
-        "机构名称",
-        "产品线代码",
-        "年金账户号",
-        "年金账户名",
-        "company_id",
-    ]
+    return list(DEFAULT_ALLOWED_GOLD_COLUMNS)
 
 
 def project_columns(

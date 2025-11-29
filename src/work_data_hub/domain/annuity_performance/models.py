@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from work_data_hub.domain.company_enrichment.models import ResolutionStatus
 
 from pydantic import (
+    AliasChoices,
     BaseModel,
     ConfigDict,
     Field,
@@ -133,7 +134,9 @@ class AnnuityPerformanceIn(BaseModel):
         None, description="Investment return (投资收益)"
     )
     当期收益率: Optional[Union[Decimal, float, int, str]] = Field(
-        None, description="Current period return rate (当期收益率)"
+        None,
+        description="Current period return rate (当期收益率)",
+        validation_alias=AliasChoices("当期收益率", "年化收益率"),
     )
 
     # Organizational fields
@@ -283,6 +286,14 @@ class AnnuityPerformanceIn(BaseModel):
         # Convert any numeric or other type to string
         return str(v).strip() if str(v).strip() else None
 
+    @property
+    def 年化收益率(self) -> Optional[Union[Decimal, float, int, str]]:
+        return getattr(self, "当期收益率")
+
+    @年化收益率.setter
+    def 年化收益率(self, value: Optional[Union[Decimal, float, int, str]]) -> None:
+        setattr(self, "当期收益率", value)
+
 
 class AnnuityPerformanceOut(BaseModel):
     """
@@ -365,7 +376,8 @@ class AnnuityPerformanceOut(BaseModel):
         decimal_places=6,
         ge=-1.0,
         le=10.0,
-        description="Current period return rate (当期收益率, sanity check range)"
+        description="Current period return rate (当期收益率, sanity check range)",
+        validation_alias=AliasChoices("当期收益率", "年化收益率"),
     )
 
     # Organizational fields
@@ -546,6 +558,14 @@ class AnnuityPerformanceOut(BaseModel):
                 )
 
         return self
+
+    @property
+    def 年化收益率(self) -> Optional[Decimal]:
+        return getattr(self, "当期收益率")
+
+    @年化收益率.setter
+    def 年化收益率(self, value: Optional[Decimal]) -> None:
+        setattr(self, "当期收益率", value)
 
 
 # ===== Company Enrichment Integration Models =====

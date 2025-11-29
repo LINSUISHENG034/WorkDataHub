@@ -43,7 +43,13 @@ def _build_gold_df() -> pd.DataFrame:
         [
             {
                 "月度": pd.Timestamp("2025-01-01"),
+                "业务类型": "企业年金",
+                "计划类型": "单一计划",
                 "计划代码": "PLAN001",
+                "计划名称": "测试计划",
+                "组合类型": "稳健型",
+                "组合代码": "COMBO001",
+                "组合名称": "稳健组合",
                 "company_id": "COMP001",
                 "客户名称": "公司A",
                 "期初资产规模": 1000.0,
@@ -54,6 +60,11 @@ def _build_gold_df() -> pd.DataFrame:
                 "流失": 5.0,
                 "待遇支付": 2.0,
                 "年化收益率": 0.05,
+                "机构代码": "G00",
+                "机构名称": "总部",
+                "产品线代码": "PROD001",
+                "年金账户号": "ACC001",
+                "年金账户名": "公司A年金账户",
                 "extra_column": "ignore me",
             }
         ]
@@ -400,3 +411,22 @@ class TestGoldSchemaValidation:
         assert context.metadata["gold_schema_validation"]["removed_columns"] == [
             "extra_column"
         ]
+
+    def test_null_required_field_fails_validation(self):
+        df = _build_gold_df()
+        df.loc[0, "期初资产规模"] = None
+        with pytest.raises(SchemaError) as excinfo:
+            validate_gold_dataframe(df)
+        assert "期初资产规模" in str(excinfo.value)
+
+    def test_negative_asset_values_rejected(self):
+        df = _build_gold_df()
+        df.loc[0, "期末资产规模"] = -1.0
+        with pytest.raises(SchemaError) as excinfo:
+            validate_gold_dataframe(df)
+        assert "期末资产规模" in str(excinfo.value)
+
+    def test_extra_columns_rejected_in_strict_mode(self):
+        df = _build_gold_df()
+        with pytest.raises(SchemaError):
+            validate_gold_dataframe(df, project_columns=False)

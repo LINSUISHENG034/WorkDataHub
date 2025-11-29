@@ -40,7 +40,7 @@ from pathlib import Path
 from typing import Optional
 
 import pandas as pd
-from pydantic import ValidationError as PydanticValidationError
+from pydantic import AliasChoices, ValidationError as PydanticValidationError
 
 from work_data_hub.domain.annuity_performance.models import (
     AnnuityPerformanceIn,
@@ -227,12 +227,15 @@ def transform_bronze_to_silver(
                 out_field_names = set()
                 for field_name, field_info in AnnuityPerformanceOut.model_fields.items():
                     out_field_names.add(field_name)
-                    # Add validation_alias if it exists
-                    if hasattr(field_info, 'validation_alias') and field_info.validation_alias:
-                        out_field_names.add(field_info.validation_alias)
-                    # Add alias if it exists
-                    if hasattr(field_info, 'alias') and field_info.alias:
-                        out_field_names.add(field_info.alias)
+                    validation_alias = getattr(field_info, "validation_alias", None)
+                    if validation_alias:
+                        if isinstance(validation_alias, AliasChoices):
+                            out_field_names.update(validation_alias.choices)
+                        else:
+                            out_field_names.add(validation_alias)
+                    alias_name = getattr(field_info, "alias", None)
+                    if alias_name:
+                        out_field_names.add(alias_name)
 
                 filtered_data = {k: v for k, v in in_data.items() if k in out_field_names}
 

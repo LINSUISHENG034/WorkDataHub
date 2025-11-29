@@ -1,0 +1,227 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>4</storyId>
+    <title>Annuity Gold Layer Projection and Schema</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/4-4-annuity-gold-layer-projection-and-schema.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>Gold layer validation ensuring database-ready data meets all integrity constraints</iWant>
+    <soThat>only clean, projection-filtered data with unique composite keys reaches PostgreSQL</soThat>
+    <tasks>
+- Task 1: Implement GoldAnnuitySchema in domain/annuity_performance/schemas.py (AC: All)
+  - Subtask 1.1: Define pandera DataFrameSchema with strict validation
+  - Subtask 1.2: Add composite PK uniqueness constraint: `unique=['月度', '计划代码', 'company_id']`
+  - Subtask 1.3: Add not-null constraints for required fields
+  - Subtask 1.4: Add range checks: `期初资产规模 >= 0`, `期末资产规模 >= 0`
+  - Subtask 1.5: Set `strict=True` to reject extra columns
+
+- Task 2: Implement Gold projection step in domain/annuity_performance/pipeline_steps.py (AC: All)
+  - Subtask 2.1: Create `GoldProjectionStep` class implementing `TransformStep` protocol
+  - Subtask 2.2: Use `WarehouseLoader.get_allowed_columns()` to get database schema
+  - Subtask 2.3: Filter DataFrame to allowed columns only
+  - Subtask 2.4: Log removed columns if >0
+  - Subtask 2.5: Apply `GoldAnnuitySchema` validation
+
+- Task 3: Add column deletion logic per legacy parity requirements (AC: All)
+  - Subtask 3.1: Remove columns: 备注, 子企业号, 子企业名称, 集团企业客户号, 集团企业客户名称
+  - Subtask 3.2: Log deleted columns for audit trail
+
+- Task 4: Write unit tests for GoldAnnuitySchema (AC: All)
+  - Subtask 4.1: Test valid DataFrame passes validation
+  - Subtask 4.2: Test composite PK duplicates detected
+  - Subtask 4.3: Test null required fields detected
+  - Subtask 4.4: Test negative asset values rejected
+  - Subtask 4.5: Test extra columns rejected (strict mode)
+
+- Task 5: Write unit tests for GoldProjectionStep (AC: All)
+  - Subtask 5.1: Test column projection removes extra columns
+  - Subtask 5.2: Test logging of removed columns
+  - Subtask 5.3: Test integration with WarehouseLoader schema query
+
+- Task 6: Real data validation with 202412 dataset (AC: All)
+  - Subtask 6.1: Run Gold validation on 32K+ rows from Story 4.3 Silver output
+  - Subtask 6.2: Verify composite PK uniqueness (0 duplicates expected)
+  - Subtask 6.3: Verify column projection removes 2-3 intermediate fields
+  - Subtask 6.4: Verify performance: <5ms for 32K rows (DataFrame-level)
+  - Subtask 6.5: Document any edge cases discovered
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+**Given** I have Silver DataFrame from Story 4.3 transformation pipeline
+**When** I apply Gold layer projection and validation
+**Then** System should:
+- Project to database columns only (remove intermediate calculation fields)
+- Validate composite PK uniqueness: `(月度, 计划代码, company_id)` has no duplicates
+- Enforce not-null constraints on required fields
+- Apply `GoldAnnuitySchema` pandera validation
+- Prepare for Story 4.5 database loading
+
+**And** When Silver DataFrame has 1000 rows with unique composite keys
+**Then** Gold validation passes, returns 1000 rows ready for database
+
+**And** When composite PK has duplicates (2 rows with same `月度, 计划代码, company_id`)
+**Then** Raise `SchemaError`: "Gold validation failed: Composite PK (月度, 计划代码, company_id) has 2 duplicate combinations: [(2025-01-01, 'ABC123', 'COMP001'), ...]"
+
+**And** When required field is null in Silver output
+**Then** Raise `SchemaError`: "Gold validation failed: Required field 'company_id' is null in 5 rows"
+
+**And** When DataFrame has extra columns not in database schema
+**Then** Gold projection removes extra columns, logs: "Gold projection: removed columns ['intermediate_calc_1', 'temp_field_2']"
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification: Annuity Performance Domain Migration</title>
+        <section>Story 4.4: Gold Layer Projection and Schema</section>
+        <snippet>Gold Layer Projection validates composite PK uniqueness (月度, 计划代码, company_id), performs column projection to database schema, and applies final pandera schema validation before database loading.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>GoldAnnuitySchema Definition (lines 533-543)</section>
+        <snippet>Pandera schema with strict validation, composite PK uniqueness constraint, not-null enforcement for required fields, and range checks for asset values (期初资产规模 >= 0, 期末资产规模 >= 0).</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Database Schema Mapping (lines 548-567)</section>
+        <snippet>Shadow table annuity_performance_NEW with composite PK (reporting_month, plan_code, company_id), check constraints for non-negative assets, and indexes for query optimization.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Scale Adaptive Architecture</title>
+        <section>Decision #3: Hybrid Pipeline Step Protocol</section>
+        <snippet>Gold Layer uses DataFrame-level pandera validation for fast bulk operations. Final validation gate before database loading with composite PK uniqueness checks.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Architecture</title>
+        <section>Decision #7: Comprehensive Naming Conventions</section>
+        <snippet>Pydantic models use Chinese field names (月度, 计划代码), database columns use English snake_case (reporting_month, plan_code). Explicit column mapping during Gold projection.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>WorkDataHub Product Requirements Document</title>
+        <section>FR-2.3: Gold Layer Validation (Database Integrity)</section>
+        <snippet>Final validation before PostgreSQL write guarantees database integrity constraints never violated. Composite PK uniqueness, column projection, SQL injection prevention, transactional writes.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/schemas.py</path>
+        <kind>schema</kind>
+        <symbol>GoldAnnuitySchema</symbol>
+        <lines>138</lines>
+        <reason>Existing pandera schema definition for Gold layer validation - needs to be implemented/updated with composite PK uniqueness constraint</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/pipeline_steps.py</path>
+        <kind>pipeline_steps</kind>
+        <symbol>GoldSchemaValidationStep</symbol>
+        <lines>N/A</lines>
+        <reason>Existing Gold validation step - reference for implementing GoldProjectionStep</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/io/loader/warehouse_loader.py</path>
+        <kind>loader</kind>
+        <symbol>WarehouseLoader.get_allowed_columns</symbol>
+        <lines>156-189</lines>
+        <reason>Method to query database schema for allowed columns - used by GoldProjectionStep for column filtering</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/core.py</path>
+        <kind>framework</kind>
+        <symbol>Pipeline</symbol>
+        <lines>N/A</lines>
+        <reason>Pipeline framework from Epic 1 Story 1.5 - GoldProjectionStep must implement TransformStep protocol</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <python>
+        <package name="pandera" version=">=0.18.0,<1.0" />
+        <package name="pandas" version="latest" />
+        <package name="pydantic" version=">=2.11.7" />
+        <package name="structlog" version="latest" />
+        <package name="psycopg2-binary" version="latest" />
+      </python>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>
+      <type>Architecture Decision #3</type>
+      <description>Gold validation uses DataFrame-level pandera schema (fast bulk validation) - complements Silver layer row-level Pydantic validation</description>
+    </constraint>
+    <constraint>
+      <type>Architecture Decision #7</type>
+      <description>Pydantic models use Chinese field names (月度, 计划代码), database columns use English snake_case (reporting_month, plan_code) - Gold projection performs explicit column mapping</description>
+    </constraint>
+    <constraint>
+      <type>Architecture Decision #4</type>
+      <description>SchemaError includes structured context: domain, validation_layer, constraint_violated - Composite PK violations list all duplicate combinations</description>
+    </constraint>
+    <constraint>
+      <type>Clean Architecture</type>
+      <description>Domain layer (schemas.py, pipeline_steps.py) cannot import from io/ or orchestration/ layers - use dependency injection</description>
+    </constraint>
+    <constraint>
+      <type>Legacy Parity</type>
+      <description>Column deletion: Remove 备注, 子企业号, 子企业名称, 集团企业客户号, 集团企业客户名称 per legacy implementation (tech-spec lines 51-57)</description>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>WarehouseLoader.get_allowed_columns</name>
+      <kind>method</kind>
+      <signature>def get_allowed_columns(self, table: str, schema: str = "public") -> List[str]</signature>
+      <path>src/work_data_hub/io/loader/warehouse_loader.py:156-189</path>
+      <description>Fetches and caches allowed columns for a database table by querying information_schema.columns</description>
+    </interface>
+    <interface>
+      <name>TransformStep Protocol</name>
+      <kind>protocol</kind>
+      <signature>def execute(self, df: pd.DataFrame, context: PipelineContext) -> pd.DataFrame</signature>
+      <path>src/work_data_hub/domain/pipelines/core.py</path>
+      <description>GoldProjectionStep must implement this protocol for pipeline integration</description>
+    </interface>
+    <interface>
+      <name>GoldAnnuitySchema</name>
+      <kind>pandera_schema</kind>
+      <signature>pa.DataFrameSchema with composite PK uniqueness constraint</signature>
+      <path>src/work_data_hub/domain/annuity_performance/schemas.py:138</path>
+      <description>Pandera schema for Gold layer validation - enforces composite PK (月度, 计划代码, company_id), not-null constraints, and range checks</description>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit Test Coverage Target: >90% for Gold schema and projection step. Test all validation constraints (PK uniqueness, not-null, range checks), column projection logic, and error message formatting. Integration tests with 202412 real data (32K+ rows) to verify performance (<5ms for DataFrame-level validation) and edge cases (duplicate PKs, null fields, extra columns). Use pytest markers: @pytest.mark.unit for fast tests, @pytest.mark.integration for database tests, @pytest.mark.postgres for PostgreSQL-dependent tests.
+    </standards>
+    <locations>
+      <location>tests/unit/domain/annuity_performance/test_schemas.py</location>
+      <location>tests/unit/domain/annuity_performance/test_pipeline_steps.py</location>
+      <location>tests/integration/domain/annuity_performance/test_gold_validation.py</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-1">Test GoldAnnuitySchema validates valid DataFrame with 1000 rows and unique composite keys - should pass validation and return 1000 rows</idea>
+      <idea ac="AC-2">Test composite PK duplicates detected - when 2 rows have same (月度, 计划代码, company_id), raise SchemaError with message listing duplicate combinations</idea>
+      <idea ac="AC-3">Test required field null detection - when company_id is null in 5 rows, raise SchemaError with message "Required field 'company_id' is null in 5 rows"</idea>
+      <idea ac="AC-4">Test negative asset values rejected - when 期初资产规模 or 期末资产规模 < 0, raise SchemaError with range check violation</idea>
+      <idea ac="AC-5">Test extra columns rejected in strict mode - when DataFrame has columns not in schema, raise SchemaError</idea>
+      <idea ac="AC-6">Test GoldProjectionStep removes extra columns - when Silver DataFrame has intermediate_calc_1, temp_field_2, projection removes them and logs removed column names</idea>
+      <idea ac="AC-7">Test GoldProjectionStep integration with WarehouseLoader.get_allowed_columns - mock database schema query, verify only allowed columns retained</idea>
+      <idea ac="AC-8">Test column deletion per legacy parity - verify 备注, 子企业号, 子企业名称, 集团企业客户号, 集团企业客户名称 are removed</idea>
+      <idea ac="AC-9">Real data validation with 202412 dataset (32K+ rows) - verify composite PK uniqueness (0 duplicates expected), column projection removes 2-3 intermediate fields, performance <5ms</idea>
+    </ideas>
+  </tests>
+</story-context>

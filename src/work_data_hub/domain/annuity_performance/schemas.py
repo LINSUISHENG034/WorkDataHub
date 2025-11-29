@@ -139,7 +139,13 @@ validated_df = step.execute(raw_df, context)
 GoldAnnuitySchema = pa.DataFrameSchema(
     columns={
         "月度": pa.Column(pa.DateTime, nullable=False, coerce=True),
+        "业务类型": pa.Column(pa.String, nullable=True, coerce=True),
+        "计划类型": pa.Column(pa.String, nullable=True, coerce=True),
         "计划代码": pa.Column(pa.String, nullable=False, coerce=True),
+        "计划名称": pa.Column(pa.String, nullable=True, coerce=True),
+        "组合类型": pa.Column(pa.String, nullable=True, coerce=True),
+        "组合代码": pa.Column(pa.String, nullable=True, coerce=True),
+        "组合名称": pa.Column(pa.String, nullable=True, coerce=True),
         "company_id": pa.Column(
             pa.String,
             nullable=False,
@@ -163,9 +169,15 @@ GoldAnnuitySchema = pa.DataFrameSchema(
             pa.Float, nullable=True, coerce=True, checks=pa.Check.ge(0)
         ),
         "年化收益率": pa.Column(pa.Float, nullable=True, coerce=True),
+        "机构代码": pa.Column(pa.String, nullable=True, coerce=True),
+        "机构名称": pa.Column(pa.String, nullable=True, coerce=True),
+        "产品线代码": pa.Column(pa.String, nullable=True, coerce=True),
+        "年金账户号": pa.Column(pa.String, nullable=True, coerce=True),
+        "年金账户名": pa.Column(pa.String, nullable=True, coerce=True),
     },
     strict=True,
     coerce=True,
+    unique=GOLD_COMPOSITE_KEY,
 )
 """
 Gold Layer DataFrame Schema for Database-Ready Annuity Performance Data.
@@ -291,6 +303,42 @@ def _schema_name(schema: pa.DataFrameSchema) -> str:
     if schema is GoldAnnuitySchema:
         return "Gold"
     return "Bronze"
+
+
+def _format_schema_error_message(
+    schema: pa.DataFrameSchema, failure_cases: pd.DataFrame | None
+) -> str:
+    base = f"{_schema_name(schema)} validation failed"
+    if failure_cases is None or failure_cases.empty:
+        return base
+
+    message_parts: List[str] = []
+
+    if "column" in failure_cases.columns:
+        columns = (
+            failure_cases["column"]
+            .dropna()
+            .astype(str)
+            .unique()
+            .tolist()
+        )
+        if columns:
+            message_parts.append(f"columns {columns[:5]}")
+
+    if "failure_case" in failure_cases.columns:
+        failure_values = (
+            failure_cases["failure_case"]
+            .dropna()
+            .astype(str)
+            .head(5)
+            .tolist()
+        )
+        if failure_values:
+            message_parts.append(f"failure cases {failure_values}")
+
+    if message_parts:
+        return f"{base}: " + "; ".join(message_parts)
+    return base
 
 
 def _ensure_required_columns(
@@ -456,7 +504,13 @@ def _apply_schema_with_lazy_mode(
     try:
         return schema.validate(dataframe, lazy=True)
     except SchemaErrors as exc:
-        _raise_schema_error(schema, dataframe, "Schema validation failed", exc.failure_cases)
+        message = _format_schema_error_message(schema, exc.failure_cases)
+        _raise_schema_error(
+            schema,
+            dataframe,
+            message=message,
+            failure_cases=exc.failure_cases,
+        )
 
 
 def validate_bronze_dataframe(
@@ -527,13 +581,11 @@ def validate_gold_dataframe(
 
     _ensure_required_columns(GoldAnnuitySchema, working_df, GOLD_REQUIRED_COLUMNS)
 
-    validated_df = _apply_schema_with_lazy_mode(GoldAnnuitySchema, working_df)
-
-    duplicate_mask = validated_df.duplicated(subset=GOLD_COMPOSITE_KEY, keep=False)
+    duplicate_mask = working_df.duplicated(subset=GOLD_COMPOSITE_KEY, keep=False)
     duplicate_keys: List[Tuple[str, str, str]] = []
     if duplicate_mask.any():
         duplicate_keys = (
-            validated_df.loc[duplicate_mask, list(GOLD_COMPOSITE_KEY)]
+            working_df.loc[duplicate_mask, list(GOLD_COMPOSITE_KEY)]
             .apply(lambda row: tuple(row.values.tolist()), axis=1)
             .drop_duplicates()
             .tolist()
@@ -543,13 +595,15 @@ def validate_gold_dataframe(
         )
         _raise_schema_error(
             GoldAnnuitySchema,
-            validated_df,
+            working_df,
             message=(
                 "Gold validation failed: Composite PK (月度, 计划代码, company_id) "
                 f"has duplicates {duplicate_keys[:5]}"
             ),
             failure_cases=failure_cases,
         )
+
+    validated_df = _apply_schema_with_lazy_mode(GoldAnnuitySchema, working_df)
 
     summary = GoldValidationSummary(
         row_count=len(validated_df),
