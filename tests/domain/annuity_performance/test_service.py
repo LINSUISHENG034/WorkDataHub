@@ -19,11 +19,8 @@ from src.work_data_hub.domain.annuity_performance.service import (
     _extract_company_code,
     _extract_plan_code,
     _extract_report_date,
-    _parse_report_period,
     get_allowed_columns,
-    process,
     project_columns,
-    validate_input_batch,
 )
 
 
@@ -79,9 +76,9 @@ class TestColumnProjection:
         """Test that allowed columns include all DDL columns."""
         allowed = get_allowed_columns()
 
-        # Should include all DDL columns
-        expected_ddl_cols = [
-            "id",
+        # Should include all Gold layer columns (excludes 'id' which is DB-generated)
+        # Note: Uses standardized column names (流失_含待遇支付, 年化收益率)
+        expected_gold_cols = [
             "月度",
             "业务类型",
             "计划类型",
@@ -94,11 +91,11 @@ class TestColumnProjection:
             "期初资产规模",
             "期末资产规模",
             "供款",
-            "流失(含待遇支付)",
+            "流失_含待遇支付",
             "流失",
             "待遇支付",
             "投资收益",
-            "当期收益率",
+            "年化收益率",
             "机构代码",
             "机构名称",
             "产品线代码",
@@ -107,7 +104,7 @@ class TestColumnProjection:
             "company_id",
         ]
 
-        for col in expected_ddl_cols:
+        for col in expected_gold_cols:
             assert col in allowed, f"Column {col} should be in allowed columns"
 
         # Do not assume non-DDL helper fields exist in allowed set
@@ -150,101 +147,7 @@ class TestColumnProjection:
         assert "extra" not in projected[0]
 
 
-class TestProcess:
-    """Test main process function with various scenarios."""
-
-    def test_process_empty_rows(self):
-        """Test process function with empty input."""
-        result = process([])
-        assert result == []
-
-    def test_process_invalid_input_type(self):
-        """Test process function with invalid input type."""
-        with pytest.raises(ValueError) as exc_info:
-            process("not_a_list")
-
-        assert "Rows must be provided as a list" in str(exc_info.value)
-
-    def test_process_valid_chinese_row(self, valid_row_chinese):
-        """Test processing valid row with Chinese field names."""
-        result = process([valid_row_chinese], "test_source.xlsx")
-
-        assert len(result) == 1
-        record = result[0]
-
-        assert isinstance(record, AnnuityPerformanceOut)
-        assert record.计划代码 == "PLAN001"
-        assert record.月度 == date(2024, 11, 1)
-        assert record.company_id is not None  # Should have company_id derived
-
-    def test_process_with_date_field(self, valid_row_with_date):
-        """Test processing row with existing 月度 date field."""
-        result = process([valid_row_with_date], "test_source.xlsx")
-
-        assert len(result) == 1
-        record = result[0]
-
-        assert record.计划代码 == "PLAN002"
-        assert record.月度 == date(2024, 11, 1)  # Parsed from string
-
-    def test_process_filters_out_invalid_rows(self):
-        """Test that processing with all invalid rows raises transformation error."""
-        invalid_rows = [
-            {"年": "2024"},  # Missing plan code and company
-            {"计划代码": "PLAN001"},  # Missing date and company
-            {"随机字段": "无用数据"},  # Completely invalid
-        ]
-
-        # Should raise error when all rows are invalid (>50% failure rate)
-        with pytest.raises(AnnuityPerformanceTransformationError) as exc_info:
-            process(invalid_rows, "test_source.xlsx")
-
-        assert "Too many processing errors" in str(exc_info.value)
-
-    def test_process_handles_mixed_valid_invalid(self, valid_row_chinese):
-        """Test processing mix of valid and invalid rows."""
-        mixed_rows = [
-            valid_row_chinese,
-            {"年": "2024"},  # Invalid - missing required fields
-            {
-                "年": "2024",
-                "月": "12",
-                "计划代码": "PLAN999",
-                "客户名称": "另一个客户",
-            },  # Valid
-        ]
-
-        result = process(mixed_rows, "test_source.xlsx")
-
-        # Should get 2 valid records (first and third rows)
-        assert len(result) == 2
-        assert result[0].计划代码 == "PLAN001"
-        assert result[1].计划代码 == "PLAN999"
-
-    def test_process_raises_on_too_many_errors(self):
-        """Test that process raises error when too many rows fail."""
-        # Create 10 invalid rows (all should fail validation)
-        invalid_rows = [{"invalid": f"row_{i}"} for i in range(10)]
-
-        with pytest.raises(AnnuityPerformanceTransformationError) as exc_info:
-            process(invalid_rows, "test_source.xlsx")
-
-        assert "Too many processing errors" in str(exc_info.value)
-
-    def test_process_with_column_projection(self, row_with_extra_columns):
-        """Test that process applies column projection correctly."""
-        # Add required fields to make row valid
-        row_with_extra_columns.update(
-            {
-                "客户名称": "测试客户",  # Will be used for company code derivation
-            }
-        )
-
-        result = process([row_with_extra_columns], "test_source.xlsx")
-
-        # Should succeed despite extra columns
-        assert len(result) == 1
-        assert result[0].计划代码 == "PLAN003"
+# Story 4.9: TestProcess removed (tested deleted process() function)
 
 
 class TestExtractFunctions:
@@ -309,31 +212,7 @@ class TestExtractFunctions:
         result = _extract_plan_code(model, 0)
         assert result == "FPLAN003", "F prefix should never be stripped from plan code"
 
-    def test_strip_f_prefix_from_portfolio_code(self):
-        """Test F-prefix stripping from portfolio code with strict pattern matching."""
-        from src.work_data_hub.domain.annuity_performance.service import (
-            _strip_f_prefix_if_pattern_matches,
-        )
-
-        # Test cases that SHOULD have F-prefix stripped (match ^F[0-9A-Z]+$)
-        assert _strip_f_prefix_if_pattern_matches("F123ABC") == "123ABC"
-        assert _strip_f_prefix_if_pattern_matches("F123") == "123"
-        assert _strip_f_prefix_if_pattern_matches("FABC") == "ABC"
-        assert _strip_f_prefix_if_pattern_matches("F001X") == "001X"
-
-        # Test cases that should now have F-prefix stripped (pattern broadened)
-        assert _strip_f_prefix_if_pattern_matches("FIDELITY001") == "IDELITY001"
-        assert _strip_f_prefix_if_pattern_matches("Fund123") == "Fund123"  # Contains lowercase
-        assert _strip_f_prefix_if_pattern_matches("F") == "F"  # No chars after F
-        assert _strip_f_prefix_if_pattern_matches("fPLAN001") == "fPLAN001"  # Lowercase f
-        assert _strip_f_prefix_if_pattern_matches("F-123") == "F-123"  # Contains hyphen
-        assert _strip_f_prefix_if_pattern_matches("F123abc") == "F123abc"  # Contains lowercase
-        assert _strip_f_prefix_if_pattern_matches("F1234567") == "1234567"
-
-        # Test None and empty cases
-        assert _strip_f_prefix_if_pattern_matches(None) is None
-        assert _strip_f_prefix_if_pattern_matches("") == ""
-        assert _strip_f_prefix_if_pattern_matches(" ") == ""  # Whitespace gets stripped
+    # Story 4.9: test_strip_f_prefix_from_portfolio_code removed (tested deleted function)
 
     def test_alias_serialization(self):
         """Test that model serialization uses aliases for column mapping."""
@@ -396,83 +275,4 @@ class TestExtractFunctions:
         assert len(result) <= 20  # Should be truncated
 
 
-class TestReportPeriodParsing:
-    """Test report period string parsing."""
-
-    def test_parse_report_period_year_month_chinese(self):
-        """Test parsing Chinese year/month format."""
-        result = _parse_report_period("2024年11月")
-        assert result == (2024, 11)
-
-    def test_parse_report_period_2digit_year(self):
-        """Test parsing 2-digit year format."""
-        result = _parse_report_period("24年11月")
-        assert result == (2024, 11)
-
-    def test_parse_report_period_slash_format(self):
-        """Test parsing slash format."""
-        result = _parse_report_period("2024/11")
-        assert result == (2024, 11)
-
-    def test_parse_report_period_dash_format(self):
-        """Test parsing dash format."""
-        result = _parse_report_period("2024-11")
-        assert result == (2024, 11)
-
-    def test_parse_report_period_numeric_only(self):
-        """Test parsing numeric-only format."""
-        result = _parse_report_period("202411")
-        assert result == (2024, 11)
-
-    def test_parse_report_period_invalid_returns_none(self):
-        """Test that invalid period returns None."""
-        result = _parse_report_period("invalid_period")
-        assert result is None
-
-    def test_parse_report_period_empty_returns_none(self):
-        """Test that empty period returns None."""
-        result = _parse_report_period("")
-        assert result is None
-
-
-class TestValidateInputBatch:
-    """Test batch validation functionality."""
-
-    def test_validate_input_batch_all_valid(self, valid_row_chinese, valid_row_with_date):
-        """Test validation with all valid rows."""
-        rows = [valid_row_chinese, valid_row_with_date]
-
-        valid_rows, errors = validate_input_batch(rows)
-
-        assert len(valid_rows) == 2
-        assert len(errors) == 0
-
-    def test_validate_input_batch_mixed_validity(self, valid_row_chinese):
-        """Test validation with mix of valid and invalid rows."""
-        rows = [
-            valid_row_chinese,
-            {"年": "2024"},  # Invalid
-            {"invalid": "data"},  # Invalid
-        ]
-
-        valid_rows, errors = validate_input_batch(rows)
-
-        assert len(valid_rows) == 1  # Only first row is valid
-        assert len(errors) == 2  # Two errors from invalid rows
-
-    def test_validate_input_batch_applies_column_projection(self, row_with_extra_columns):
-        """Test that batch validation applies column projection."""
-        # Make row valid by adding required fields
-        row_with_extra_columns.update({"客户名称": "测试客户"})
-        rows = [row_with_extra_columns]
-
-        valid_rows, errors = validate_input_batch(rows)
-
-        # Should succeed (extra columns filtered out)
-        assert len(valid_rows) == 1
-        assert len(errors) == 0
-
-        # Valid row should not contain extra columns
-        valid_row = valid_rows[0]
-        assert "extra_column_1" not in valid_row
-        assert "unknown_field" not in valid_row
+# Story 4.9: TestReportPeriodParsing and TestValidateInputBatch removed (tested deleted functions)

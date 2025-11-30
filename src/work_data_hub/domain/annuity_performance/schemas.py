@@ -16,9 +16,9 @@ import pandera as pa
 from pandera.errors import SchemaError, SchemaErrors
 
 from work_data_hub.domain.pipelines.validation import (
-    ensure_not_empty as _shared_ensure_not_empty,
-    ensure_required_columns as _shared_ensure_required_columns,
-    raise_schema_error as _shared_raise_schema_error,
+    ensure_not_empty,
+    ensure_required_columns,
+    raise_schema_error,
 )
 from work_data_hub.utils.date_parser import parse_yyyymm_or_chinese
 
@@ -294,19 +294,6 @@ class GoldValidationSummary:
     duplicate_keys: List[Tuple[str, str, str]] = field(default_factory=list)
 
 
-def _raise_schema_error(
-    schema: pa.DataFrameSchema,
-    data: pd.DataFrame,
-    message: str,
-    failure_cases: pd.DataFrame | None = None,
-) -> SchemaError:
-    """Helper to raise SchemaError with consistent formatting.
-
-    Story 4.8: Delegates to shared helper in domain/pipelines/validation/.
-    """
-    _shared_raise_schema_error(schema, data, message, failure_cases)
-
-
 def _schema_name(schema: pa.DataFrameSchema) -> str:
     if schema is GoldAnnuitySchema:
         return "Gold"
@@ -349,28 +336,6 @@ def _format_schema_error_message(
     return base
 
 
-def _ensure_required_columns(
-    schema: pa.DataFrameSchema,
-    dataframe: pd.DataFrame,
-    required: Iterable[str],
-) -> None:
-    """Ensure required columns are present.
-
-    Story 4.8: Delegates to shared helper in domain/pipelines/validation/.
-    """
-    _shared_ensure_required_columns(
-        schema, dataframe, required, schema_name=_schema_name(schema)
-    )
-
-
-def _ensure_not_empty(schema: pa.DataFrameSchema, dataframe: pd.DataFrame) -> None:
-    """Ensure DataFrame is not empty.
-
-    Story 4.8: Delegates to shared helper in domain/pipelines/validation/.
-    """
-    _shared_ensure_not_empty(schema, dataframe, schema_name=_schema_name(schema))
-
-
 def _track_invalid_ratio(
     column: str,
     invalid_rows: List[int],
@@ -386,7 +351,7 @@ def _track_invalid_ratio(
         failure_cases = pd.DataFrame(
             {"column": column, "row_index": invalid_rows}
         )
-        _raise_schema_error(
+        raise_schema_error(
             schema,
             dataframe,
             message=(
@@ -488,7 +453,7 @@ def _ensure_non_null_columns(
         failure_cases = pd.DataFrame(
             {"column": empty_columns, "failure": "all values null"}
         )
-        _raise_schema_error(
+        raise_schema_error(
             schema,
             dataframe,
             message=(
@@ -507,7 +472,7 @@ def _apply_schema_with_lazy_mode(
         return schema.validate(dataframe, lazy=True)
     except SchemaErrors as exc:
         message = _format_schema_error_message(schema, exc.failure_cases)
-        _raise_schema_error(
+        raise_schema_error(
             schema,
             dataframe,
             message=message,
@@ -522,9 +487,11 @@ def validate_bronze_dataframe(
     Validate raw Excel DataFrame using Bronze schema with Story 2.2 rules.
     """
     working_df = dataframe.copy(deep=True)
-    _ensure_not_empty(GoldAnnuitySchema, working_df)
-    _ensure_not_empty(BronzeAnnuitySchema, working_df)
-    _ensure_required_columns(BronzeAnnuitySchema, working_df, BRONZE_REQUIRED_COLUMNS)
+    ensure_not_empty(GoldAnnuitySchema, working_df, schema_name="Gold")
+    ensure_not_empty(BronzeAnnuitySchema, working_df, schema_name="Bronze")
+    ensure_required_columns(
+        BronzeAnnuitySchema, working_df, BRONZE_REQUIRED_COLUMNS, schema_name="Bronze"
+    )
 
     numeric_invalid_rows = _coerce_numeric_columns(working_df)
 
@@ -581,7 +548,9 @@ def validate_gold_dataframe(
         if removed_columns:
             working_df = working_df.drop(columns=removed_columns, errors="ignore")
 
-    _ensure_required_columns(GoldAnnuitySchema, working_df, GOLD_REQUIRED_COLUMNS)
+    ensure_required_columns(
+        GoldAnnuitySchema, working_df, GOLD_REQUIRED_COLUMNS, schema_name="Gold"
+    )
 
     duplicate_mask = working_df.duplicated(subset=GOLD_COMPOSITE_KEY, keep=False)
     duplicate_keys: List[Tuple[str, str, str]] = []
@@ -595,7 +564,7 @@ def validate_gold_dataframe(
         failure_cases = pd.DataFrame(
             duplicate_keys, columns=list(GOLD_COMPOSITE_KEY)
         )
-        _raise_schema_error(
+        raise_schema_error(
             GoldAnnuitySchema,
             working_df,
             message=(

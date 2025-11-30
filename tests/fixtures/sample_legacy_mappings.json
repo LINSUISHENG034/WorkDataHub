@@ -76,13 +76,21 @@
       }
     },
     "business_type_code_mapping": {
-      "description": "Business type -> code mappings mirrored from legacy MySQL table",
-      "source": "curated_fixture",
+      "description": "Business type -> product line code mappings from legacy MySQL 产品线 table",
+      "source": "mapping.产品线",
       "data": {
-        "企年受托": "BUSINESS_003",
-        "企年投资": "BUSINESS_004",
-        "职年受托": "BUSINESS_001",
-        "职年投资": "BUSINESS_002"
+        "企年投资": "PL201",
+        "企年受托": "PL202",
+        "职年投资": "PL203",
+        "职年受托": "PL204",
+        "自有险资": "PL205",
+        "直投": "PL206",
+        "三方": "PL207",
+        "团养": "PL208",
+        "企康": "PL209",
+        "企业年金": "PL210",
+        "职业年金": "PL211",
+        "其他": "PL301"
       }
     },
     "default_portfolio_code_mapping": {

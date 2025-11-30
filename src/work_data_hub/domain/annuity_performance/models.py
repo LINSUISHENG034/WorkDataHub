@@ -180,6 +180,28 @@ class AnnuityPerformanceIn(BaseModel):
     report_period: Optional[str] = Field(None, description="Report period string")
     data_source: Optional[str] = Field(None, description="Source file or system")
 
+    @model_validator(mode="before")
+    @classmethod
+    def convert_nan_to_none(cls, data: Any) -> Any:
+        """Convert pandas NaN values to None for all fields.
+
+        Excel data loaded via pandas may contain float('nan') for empty cells,
+        which Pydantic doesn't automatically convert to None for Optional[str] fields.
+        """
+        import math
+
+        if not isinstance(data, dict):
+            return data
+
+        result = {}
+        for key, value in data.items():
+            # Check for NaN (float nan from pandas)
+            if isinstance(value, float) and math.isnan(value):
+                result[key] = None
+            else:
+                result[key] = value
+        return result
+
     @field_validator("年", "月", mode="before")
     @classmethod
     def clean_date_component_fields(cls, v):
@@ -355,14 +377,13 @@ class AnnuityPerformanceOut(BaseModel):
     供款: Optional[Decimal] = Field(
         None, decimal_places=4, ge=0, description="Contribution (non-negative)"
     )
-    # Preserve original alias throughout serialization so downstream SQL can reuse it
+    # Accept input with parentheses but serialize with underscore for database column
     流失_含待遇支付: Optional[Decimal] = Field(
         None,
         decimal_places=4,
         description="Loss including benefit payment",
-        alias="流失(含待遇支付)",
         validation_alias="流失(含待遇支付)",
-        serialization_alias="流失(含待遇支付)",
+        # No serialization_alias - use field name "流失_含待遇支付" for database
     )
     流失: Optional[Decimal] = Field(None, decimal_places=4, description="Loss")
     待遇支付: Optional[Decimal] = Field(

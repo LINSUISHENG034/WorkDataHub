@@ -8,7 +8,7 @@ from Excel files containing Chinese "规模明细" data into PostgreSQL.
 import logging
 
 from .models import AnnuityPerformanceIn, AnnuityPerformanceOut
-from .service import process, process_with_enrichment
+from .service import process_with_enrichment
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,5 @@ __all__ = [
     "GoldAnnuitySchema",
     "validate_bronze_dataframe",
     "validate_gold_dataframe",
-    "process",
     "process_with_enrichment",
 ]

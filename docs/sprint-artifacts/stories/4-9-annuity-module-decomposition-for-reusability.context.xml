@@ -1,0 +1,265 @@
+<story-context id="4-9-annuity-module-decomposition-for-reusability" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>9</storyId>
+    <title>Annuity Module Decomposition for Reusability</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-30</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/4-9-annuity-module-decomposition-for-reusability.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>the annuity_performance module to use shared pipeline infrastructure and eliminate duplicate code</iWant>
+    <soThat>the module is maintainable, serves as a clean reference for Epic 9 domain migrations, and supports the PRD goal of "add a domain in &lt;4 hours"</soThat>
+    <tasks>
+      <task id="1" title="Record Baselines (BEFORE ANY CHANGES)">
+        <subtask>Record line count baseline</subtask>
+        <subtask>Record test coverage baseline</subtask>
+        <subtask>Record legacy callers (for safety check)</subtask>
+        <subtask>Run 202412 validation and save output</subtask>
+      </task>
+      <task id="2" title="Delete Dual-Track Architecture (AC: 4.9.2)">
+        <subtask>Delete process_rows_via_legacy() from processing_helpers.py</subtask>
+        <subtask>Remove pipeline_mode parameter and branching from service.py</subtask>
+        <subtask>Remove _determine_pipeline_mode() if exists</subtask>
+        <subtask>Update all callers to use pipeline-only path</subtask>
+      </task>
+      <task id="3" title="Delete Orphaned Code (AC: 4.9.3)">
+        <subtask>Delete transformations.py</subtask>
+        <subtask>Delete related test files</subtask>
+        <subtask>Remove any imports of transformations module</subtask>
+      </task>
+      <task id="4" title="Refactor to Use Shared Steps (AC: 4.9.4)">
+        <subtask>Identify which steps in pipeline_steps.py duplicate shared steps</subtask>
+        <subtask>Replace duplicates with imports from domain/pipelines/steps/</subtask>
+        <subtask>Keep only domain-specific steps (PlanCodeCleansingStep, CompanyIdResolutionStep)</subtask>
+        <subtask>Update pipeline construction to use imported steps</subtask>
+      </task>
+      <task id="5" title="Clean Up Wrapper Functions (AC: 4.9.5)">
+        <subtask>Identify wrapper functions in schemas.py (lines 297-371)</subtask>
+        <subtask>Replace with direct calls to domain/pipelines/validation/helpers.py</subtask>
+        <subtask>Or delete if no longer needed</subtask>
+      </task>
+      <task id="6" title="Clean Up Unused Entry Functions (AC: 4.9.1)">
+        <subtask>Identify unused entry functions in service.py</subtask>
+        <subtask>Remove or consolidate unused entry functions</subtask>
+        <subtask>Update __init__.py exports to only include production-used functions</subtask>
+        <subtask>Update any test files that depend on removed functions</subtask>
+      </task>
+      <task id="7" title="Verify and Document (AC: 4.9.1, 4.9.6, 4.9.7, 4.9.8)">
+        <subtask>Run all verification commands from ACs</subtask>
+        <subtask>Ensure all tests pass (AC: 4.9.6)</subtask>
+        <subtask>Verify coverage >= baseline (AC: 4.9.7)</subtask>
+        <subtask>Run 202412 real data validation (AC: 4.9.8)</subtask>
+        <subtask>Record final line count and verify &lt; 2,000 (AC: 4.9.1)</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-4.9.1" title="Module Size Reduction (QUANTIFIED)">
+      <requirement>Total lines of Python code in annuity_performance/ MUST be &lt; 2,000 lines</requirement>
+      <baseline>4,942 lines (as of 2025-11-30)</baseline>
+      <verification>find src/work_data_hub/domain/annuity_performance -name "*.py" -exec cat {} + | wc -l</verification>
+      <passCriteria>Output &lt; 2000</passCriteria>
+    </criterion>
+    <criterion id="AC-4.9.2" title="Dual-Track Architecture Removed (DELETION REQUIRED)">
+      <requirement>Single pipeline execution path only. No legacy fallback.</requirement>
+      <mustDelete>
+        <item>processing_helpers.py::process_rows_via_legacy() function (~165 lines)</item>
+        <item>service.py - all pipeline_mode branching logic (~50 lines)</item>
+        <item>service.py::_determine_pipeline_mode() function if exists</item>
+      </mustDelete>
+      <verification>grep -r "process_rows_via_legacy\|pipeline_mode\|_determine_pipeline_mode" src/work_data_hub/domain/annuity_performance --include="*.py"</verification>
+      <passCriteria>Command returns empty (no matches)</passCriteria>
+    </criterion>
+    <criterion id="AC-4.9.3" title="Orphaned Code Removed (FILE DELETION REQUIRED)">
+      <requirement>Delete transformations.py and all related test files</requirement>
+      <mustDelete>
+        <item>src/work_data_hub/domain/annuity_performance/transformations.py (~362 lines)</item>
+        <item>tests/unit/domain/annuity_performance/test_transformations.py (if exists)</item>
+        <item>tests/integration/domain/annuity_performance/test_transformations*.py (if exists)</item>
+      </mustDelete>
+      <verification>test ! -f src/work_data_hub/domain/annuity_performance/transformations.py &amp;&amp; echo "PASS" || echo "FAIL"</verification>
+      <passCriteria>Output is "PASS"</passCriteria>
+    </criterion>
+    <criterion id="AC-4.9.4" title="Shared Steps Used (IMPORT REQUIRED)">
+      <requirement>pipeline_steps.py MUST import and use shared steps from domain/pipelines/steps/</requirement>
+      <mustImport>ColumnNormalizationStep, DateParsingStep, CustomerNameCleansingStep, FieldCleanupStep</mustImport>
+      <mustNotDuplicate>Any step class that already exists in domain/pipelines/steps/</mustNotDuplicate>
+      <verification>grep -E "^from work_data_hub\.domain\.pipelines\.steps import|^from \.\.pipelines\.steps import" src/work_data_hub/domain/annuity_performance/pipeline_steps.py</verification>
+      <passCriteria>At least one import statement found</passCriteria>
+    </criterion>
+    <criterion id="AC-4.9.5" title="Wrapper Functions Removed (DIRECT CALLS REQUIRED)">
+      <requirement>Remove redundant wrapper functions in schemas.py, use direct calls to shared helpers</requirement>
+      <mustDelete>schemas.py lines 297-371 (wrapper functions that only delegate)</mustDelete>
+      <verification>Wrapper functions either deleted or replaced with direct imports from domain/pipelines/validation/helpers.py</verification>
+    </criterion>
+    <criterion id="AC-4.9.6" title="All Tests Pass (REGRESSION GATE)">
+      <requirement>All existing tests must pass after refactoring</requirement>
+      <verification>uv run pytest tests/ -v --tb=short</verification>
+      <passCriteria>Exit code 0, all tests pass</passCriteria>
+    </criterion>
+    <criterion id="AC-4.9.7" title="Test Coverage Maintained (QUALITY GATE)">
+      <requirement>Test coverage must not decrease from baseline</requirement>
+      <verification>uv run pytest tests/ --cov=src/work_data_hub/domain/annuity_performance --cov-report=term-missing</verification>
+      <passCriteria>Coverage % >= baseline %</passCriteria>
+    </criterion>
+    <criterion id="AC-4.9.8" title="Real Data Validation (FUNCTIONAL PARITY)">
+      <requirement>Pipeline output for 202412 dataset must be identical before and after refactoring</requirement>
+      <passCriteria>Row count identical, no functional regression</passCriteria>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/specific/annuity-module-bloat-analysis.md</path>
+        <title>Annuity Performance Module Bloat Analysis Report</title>
+        <section>Root Cause Analysis</section>
+        <snippet>annuity_performance module did not use existing shared Pipeline framework, instead implemented parallel processing logic. Tech-Spec guidance was incomplete - said "use Pipeline framework" but did not mandate "reuse shared steps".</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>WorkDataHub Scale Adaptive Architecture</title>
+        <section>Decision #3: Hybrid Pipeline Step Protocol - Mandatory Shared Step Usage (Story 4.9)</section>
+        <snippet>All domain pipelines MUST use shared steps from domain/pipelines/steps/ where applicable. Domain-specific steps should ONLY be created for business logic unique to that domain.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic Technical Specification: Annuity Performance Domain Migration (MVP)</title>
+        <section>Legacy Parity Requirements</section>
+        <snippet>Epic 4 must achieve 100% functional parity with legacy AnnuityPerformanceCleaner. Uses Pipeline framework from Story 1.5 for step execution.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>src/work_data_hub/domain/annuity_performance/pipeline_steps.py</path>
+        <kind>pipeline-steps</kind>
+        <symbol>build_annuity_pipeline, PlanCodeCleansingStep, InstitutionCodeMappingStep, PortfolioCodeDefaultStep, BusinessTypeCodeMappingStep, CompanyIdResolutionStep</symbol>
+        <lines>1-1195</lines>
+        <reason>Main file to refactor - already imports shared steps (lines 41-48), contains domain-specific steps to keep and validation steps</reason>
+      </file>
+      <file>
+        <path>src/work_data_hub/domain/annuity_performance/processing_helpers.py</path>
+        <kind>helper</kind>
+        <symbol>process_rows_via_pipeline, process_rows_via_legacy, transform_single_row</symbol>
+        <lines>1-888</lines>
+        <reason>Contains dual-track architecture (process_rows_via_legacy at lines 195-265) that must be deleted per AC-4.9.2</reason>
+      </file>
+      <file>
+        <path>src/work_data_hub/domain/annuity_performance/service.py</path>
+        <kind>service</kind>
+        <symbol>process_annuity_performance, process_with_enrichment, _determine_pipeline_mode</symbol>
+        <lines>1-524</lines>
+        <reason>Contains pipeline_mode branching logic (lines 320-343, 405-427) that must be removed per AC-4.9.2</reason>
+      </file>
+      <file>
+        <path>src/work_data_hub/domain/annuity_performance/transformations.py</path>
+        <kind>orphaned-code</kind>
+        <symbol>transform_bronze_to_silver</symbol>
+        <lines>1-362</lines>
+        <reason>MUST DELETE - orphaned code only called by tests, not production (AC-4.9.3)</reason>
+      </file>
+      <file>
+        <path>src/work_data_hub/domain/annuity_performance/schemas.py</path>
+        <kind>schema</kind>
+        <symbol>BronzeAnnuitySchema, GoldAnnuitySchema, wrapper functions</symbol>
+        <lines>297-371</lines>
+        <reason>Contains wrapper functions that delegate to shared helpers - should use direct imports (AC-4.9.5)</reason>
+      </file>
+      <file>
+        <path>src/work_data_hub/domain/pipelines/steps/__init__.py</path>
+        <kind>shared-steps</kind>
+        <symbol>ColumnNormalizationStep, DateParsingStep, CustomerNameCleansingStep, FieldCleanupStep</symbol>
+        <lines>1-45</lines>
+        <reason>Shared steps that annuity module MUST use - already imported in pipeline_steps.py</reason>
+      </file>
+      <file>
+        <path>src/work_data_hub/domain/pipelines/validation/helpers.py</path>
+        <kind>shared-validation</kind>
+        <symbol>raise_schema_error, ensure_required_columns, ensure_not_empty</symbol>
+        <lines>all</lines>
+        <reason>Shared validation helpers that schemas.py should use directly instead of wrapper functions</reason>
+      </file>
+    </code>
+    <dependencies>
+      <python>
+        <package name="pandas" version="latest" />
+        <package name="pandera" version=">=0.18.0,&lt;1.0" />
+        <package name="pydantic" version=">=2.11.7" />
+        <package name="structlog" version="latest" />
+        <package name="numpy" version=">=2.0.0" />
+      </python>
+      <dev>
+        <package name="pytest" version="latest" />
+        <package name="pytest-cov" version=">=6.2.1" />
+        <package name="ruff" version=">=0.12.12" />
+        <package name="mypy" version=">=1.17.1" />
+      </dev>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">
+      <rule>All domain pipelines MUST use shared steps from domain/pipelines/steps/ where applicable (Architecture Decision #3)</rule>
+      <rule>Domain layer cannot import from work_data_hub.io or work_data_hub.orchestration (Story 1.6 Clean Architecture)</rule>
+      <rule>Single pipeline execution path only - no legacy fallback allowed after this story</rule>
+    </constraint>
+    <constraint type="code-quality">
+      <rule>Module size MUST be &lt; 2,000 lines (down from 4,942 baseline)</rule>
+      <rule>Test coverage must not decrease from baseline</rule>
+      <rule>All tests must pass (exit code 0)</rule>
+      <rule>mypy strict mode must pass</rule>
+      <rule>ruff linting must pass</rule>
+    </constraint>
+    <constraint type="anti-patterns">
+      <rule>DO NOT keep legacy path "just in case" - delete completely</rule>
+      <rule>DO NOT re-implement shared steps locally - import from domain/pipelines/steps/</rule>
+      <rule>DO NOT add new wrapper functions - call shared helpers directly</rule>
+      <rule>DO NOT keep transformations.py partially - delete entire file</rule>
+      <rule>DO NOT defer optimization - this IS the final optimization Story</rule>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="TransformStep" kind="protocol" path="src/work_data_hub/domain/pipelines/core.py">
+      <signature>class TransformStep(Protocol): def apply(self, row: Row, context: Dict[str, Any]) -> StepResult</signature>
+    </interface>
+    <interface name="DataFrameStep" kind="protocol" path="src/work_data_hub/domain/pipelines/types.py">
+      <signature>class DataFrameStep(Protocol): def execute(self, dataframe: pd.DataFrame, context: PipelineContext) -> pd.DataFrame</signature>
+    </interface>
+    <interface name="Pipeline.run" kind="method" path="src/work_data_hub/domain/pipelines/core.py">
+      <signature>def run(self, input_data: pd.DataFrame) -> PipelineResult</signature>
+    </interface>
+    <interface name="build_annuity_pipeline" kind="factory" path="src/work_data_hub/domain/annuity_performance/pipeline_steps.py">
+      <signature>def build_annuity_pipeline(mappings: Optional[Dict[str, Any]] = None) -> Pipeline</signature>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing follows pytest with markers for unit/integration/postgres/performance tests.
+      Unit tests should be fast with no external dependencies.
+      Integration tests may use database or filesystem.
+      Coverage is tracked via pytest-cov with term-missing report.
+      mypy strict mode and ruff linting are enforced in CI.
+    </standards>
+    <locations>
+      <location>tests/unit/domain/annuity_performance/</location>
+      <location>tests/integration/domain/annuity_performance/</location>
+      <location>tests/unit/domain/pipelines/</location>
+    </locations>
+    <ideas>
+      <idea acRef="AC-4.9.1">Test that module line count is &lt; 2000 after refactoring</idea>
+      <idea acRef="AC-4.9.2">Test that process_rows_via_legacy is not callable/importable after deletion</idea>
+      <idea acRef="AC-4.9.3">Test that transformations.py does not exist</idea>
+      <idea acRef="AC-4.9.4">Test that pipeline_steps.py imports shared steps correctly</idea>
+      <idea acRef="AC-4.9.6">Run full test suite to verify no regressions</idea>
+      <idea acRef="AC-4.9.7">Compare coverage before/after refactoring</idea>
+      <idea acRef="AC-4.9.8">Run 202412 real data validation and compare output hash</idea>
+    </ideas>
+  </tests>
+</story-context>

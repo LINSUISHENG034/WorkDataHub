@@ -80,6 +80,7 @@ development_status:
   4-6-annuity-domain-configuration-and-documentation: done
   4-7-pipeline-framework-refactoring: done  # Code review approved 2025-11-29
   4-8-annuity-module-deep-refactoring: done  # Completed 2025-11-30
+  4-9-annuity-module-decomposition-for-reusability: done  # Code review approved 2025-11-30
   epic-4-retrospective: optional
 
   # Epic 5: Company Enrichment Service

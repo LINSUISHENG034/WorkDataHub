@@ -135,7 +135,6 @@ class TestProcessAnnuityPerformance:
             "202501",
             file_discovery=discovery,
             warehouse_loader=loader,
-            use_pipeline=False,
         )
 
         assert isinstance(result, PipelineResult)
@@ -160,13 +159,11 @@ class TestProcessAnnuityPerformance:
             "202404",
             file_discovery=discovery,
             warehouse_loader=loader,
-            use_pipeline=False,
         )
         second = process_annuity_performance(
             "202404",
             file_discovery=discovery,
             warehouse_loader=loader,
-            use_pipeline=False,
         )
 
         assert first.rows_loaded == 4
@@ -184,8 +181,7 @@ class TestProcessAnnuityPerformance:
                 "20251",  # malformed
                 file_discovery=discovery,
                 warehouse_loader=loader,
-                use_pipeline=False,
-            )
+                )
 
     def test_discovery_failure_bubbles_up(self):
         class FailingDiscovery:
@@ -199,8 +195,7 @@ class TestProcessAnnuityPerformance:
                 "202501",
                 file_discovery=FailingDiscovery(),  # type: ignore[arg-type]
                 warehouse_loader=loader,
-                use_pipeline=False,
-            )
+                )
 
     def test_loader_failure_propagates(self):
         df = _build_source_dataframe()
@@ -217,5 +212,4 @@ class TestProcessAnnuityPerformance:
                 "202501",
                 file_discovery=discovery,
                 warehouse_loader=loader,
-                use_pipeline=False,
-            )
+                )

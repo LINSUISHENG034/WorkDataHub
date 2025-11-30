@@ -444,6 +444,38 @@ def build_domain_pipeline(mappings: Dict[str, Any]) -> Pipeline:
 3. Export from `__init__.py`
 4. Add unit tests in `tests/unit/domain/pipelines/steps/`
 
+#### Mandatory Shared Step Usage (Story 4.9)
+
+> **REQUIREMENT:** All domain pipelines MUST use shared steps from `domain/pipelines/steps/` where applicable. Domain-specific steps should ONLY be created for business logic unique to that domain.
+
+**Shared Step Usage Requirements:**
+
+| Shared Step | When to Use | Domain-Specific Alternative |
+|-------------|-------------|----------------------------|
+| `ColumnNormalizationStep` | All domains with Excel input | ❌ Do NOT re-implement |
+| `DateParsingStep` | All domains with date fields | ❌ Do NOT re-implement |
+| `CustomerNameCleansingStep` | All domains with customer names | ❌ Do NOT re-implement |
+| `FieldCleanupStep` | All domains before Gold projection | ❌ Do NOT re-implement |
+
+**Domain-Specific Steps (Allowed):**
+- Business logic unique to that domain (e.g., `PlanCodeCleansingStep` for annuity)
+- Domain-specific mappings (e.g., `InstitutionCodeMappingStep`)
+- Domain-specific enrichment logic (e.g., `CompanyIdResolutionStep`)
+
+**Verification (Code Review Requirement):**
+```bash
+# Check that domain pipeline imports shared steps
+grep -E "from work_data_hub\.domain\.pipelines\.steps import" \
+  src/work_data_hub/domain/{domain_name}/pipeline_steps.py
+
+# Check for duplicate step class names (should be empty or justified)
+grep "^class.*Step" src/work_data_hub/domain/pipelines/steps/*.py | cut -d: -f2 | sort > /tmp/shared.txt
+grep "^class.*Step" src/work_data_hub/domain/{domain_name}/pipeline_steps.py | cut -d: -f2 | sort > /tmp/domain.txt
+comm -12 /tmp/shared.txt /tmp/domain.txt  # Should be empty
+```
+
+**Rationale:** Story 4.9 analysis revealed that incomplete Tech-Spec guidance ("use Pipeline framework" without "reuse shared steps") led to 4,942 lines of code in `annuity_performance/` when <2,000 was achievable. This mandatory requirement prevents future domains from repeating the same mistake.
+
 #### Shared Domain Types and Validation (Story 4.8)
 
 Story 4.8 extends the shared infrastructure with domain-level types and validation utilities:

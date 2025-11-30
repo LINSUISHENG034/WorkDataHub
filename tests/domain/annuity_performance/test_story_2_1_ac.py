@@ -107,8 +107,8 @@ class TestAC2_StrictValidationModel:
 
         errors = exc_info.value.errors()
         error_fields = {e['loc'][0] for e in errors}
+        # 计划代码 is the only required field; company_id is Optional (Epic 5 enrichment)
         assert '计划代码' in error_fields
-        assert 'company_id' in error_fields
 
     def test_non_negative_constraints(self):
         """AC2: Asset fields must be non-negative (>= 0)"""

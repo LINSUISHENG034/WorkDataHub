@@ -192,79 +192,6 @@ def convert_pipeline_output_to_models(
     return processed_records
 
 
-def process_rows_via_legacy(
-    rows: List[Dict[str, Any]],
-    data_source: str,
-    enrichment_service: Optional["CompanyEnrichmentService"],
-    sync_lookup_budget: int,
-    stats: EnrichmentStats,
-    unknown_names: List[str],
-) -> tuple[List[AnnuityPerformanceOut], List[str]]:
-    """
-    Process rows using the legacy transformation path.
-
-    Args:
-        rows: Raw Excel rows to process
-        data_source: Source identifier
-        enrichment_service: Optional enrichment service
-        sync_lookup_budget: Budget for sync lookups
-        stats: Enrichment statistics tracker
-        unknown_names: List to collect unknown company names
-
-    Returns:
-        Tuple of (processed_records, processing_errors)
-    """
-    processed_records = []
-    processing_errors = []
-
-    for row_index, raw_row in enumerate(rows):
-        try:
-            processed_record = transform_single_row(raw_row, data_source, row_index)
-
-            if processed_record:
-                if enrichment_service:
-                    try:
-                        enrichment_result = enrichment_service.resolve_company_id(
-                            plan_code=raw_row.get("计划代码"),
-                            customer_name=raw_row.get("客户名称"),
-                            account_name=raw_row.get("年金账户名"),
-                            sync_lookup_budget=sync_lookup_budget,
-                        )
-
-                        if enrichment_result.company_id:
-                            processed_record.company_id = enrichment_result.company_id
-
-                        stats.record(enrichment_result.status, enrichment_result.source)
-
-                        if not enrichment_result.company_id and raw_row.get("客户名称"):
-                            customer_name = raw_row.get("客户名称")
-                            if customer_name is not None:
-                                unknown_names.append(str(customer_name))
-
-                    except Exception as e:
-                        logger.warning(f"Enrichment failed for row {row_index}: {e}")
-                        stats.failed += 1
-
-                processed_records.append(processed_record)
-            else:
-                logger.debug(f"Row {row_index} was filtered out during transformation")
-                processing_errors.append(
-                    f"Row {row_index}: filtered out due to missing required fields"
-                )
-
-        except ValidationError as e:
-            error_msg = f"Validation failed for row {row_index}: {e}"
-            logger.error(error_msg)
-            processing_errors.append(error_msg)
-
-        except Exception as e:
-            error_msg = f"Unexpected error processing row {row_index}: {e}"
-            logger.error(error_msg)
-            processing_errors.append(error_msg)
-
-    return processed_records, processing_errors
-
-
 def validate_processing_results(
     processed_records: List[AnnuityPerformanceOut],
     processing_errors: List[str],
@@ -621,11 +548,54 @@ def extract_plan_code(
     return None
 
 
+def generate_temp_company_id(customer_name: str) -> str:
+    """
+    Generate a temporary company ID in IN_<16-char-base32> format.
+
+    Uses HMAC-SHA1 with a salt to generate a stable, deterministic ID
+    for unresolved company names. The same customer name will always
+    produce the same IN_* ID.
+
+    Args:
+        customer_name: The customer name to generate ID for
+
+    Returns:
+        Temporary ID in format IN_<16-char-base32> (e.g., IN_ABCDEFGHIJKLMNOP)
+    """
+    import base64
+    import hashlib
+    import hmac
+    import os
+
+    # Get salt from environment or use default for development
+    salt = os.environ.get("WDH_ALIAS_SALT", "default_dev_salt_change_in_prod")
+
+    # Generate HMAC-SHA1 hash
+    key = salt.encode("utf-8")
+    message = customer_name.encode("utf-8")
+    digest = hmac.new(key, message, hashlib.sha1).digest()
+
+    # Take first 10 bytes (80 bits) and encode as base32 (16 chars)
+    # Base32 produces 8 chars per 5 bytes, so 10 bytes = 16 chars
+    encoded = base64.b32encode(digest[:10]).decode("ascii")
+
+    return f"IN_{encoded}"
+
+
 def extract_company_code(
     input_model: AnnuityPerformanceIn, row_index: int
 ) -> Optional[str]:
-    """Extract company code from input model."""
-    # Try explicit company_id field first
+    """Extract company code from input model.
+
+    Priority:
+    1. Explicit company_id field (already resolved)
+    2. Chinese 公司代码 field
+    3. Generate IN_* temporary ID from customer name
+
+    For unresolved company names, generates a stable IN_<hash> format ID
+    that can be resolved later via company enrichment service.
+    """
+    # Try explicit company_id field first (already resolved)
     if input_model.company_id:
         return str(input_model.company_id).strip()
 
@@ -633,20 +603,17 @@ def extract_company_code(
     if input_model.公司代码:
         return str(input_model.公司代码).strip()
 
-    # For annuity data, we might derive company code from customer name or other fields
-    # This is domain-specific logic
+    # Generate IN_* temporary ID from customer name
+    # This provides a stable, deterministic ID for unresolved names
     if input_model.客户名称:
-        # Simple heuristic: use first part of customer name as company code
         customer = str(input_model.客户名称).strip()
-        # Remove common company suffixes and take first meaningful part
-        simplified = (
-            customer.replace("有限公司", "")
-            .replace("股份有限公司", "")
-            .replace("集团", "")
-            .strip()
-        )
-        if simplified:
-            return simplified[:20]  # Truncate to reasonable length
+        if customer:
+            temp_id = generate_temp_company_id(customer)
+            logger.debug(
+                f"Row {row_index}: Generated temp company_id {temp_id} "
+                f"for customer: {customer[:30]}..."
+            )
+            return temp_id
 
     logger.debug(f"Row {row_index}: No company code found")
     return None
@@ -778,14 +745,13 @@ def pipeline_row_to_model(
         financial_metrics = extract_financial_metrics(input_model, row_index)
         metadata_fields = extract_metadata_fields(input_model, row_index)
 
-        # Combine all fields for output model
+        # Combine all fields for output model (use Chinese field names to match model)
         output_data = {
-            "report_date": report_date,
-            "plan_code": plan_code,
-            "company_code": company_code,
+            "月度": report_date,
+            "计划代码": plan_code,
+            "company_id": company_code,  # For composite PK - matches database column
             **financial_metrics,
             **metadata_fields,
-            "data_source": data_source,
         }
 
         # Create and validate output model
@@ -863,7 +829,6 @@ def apply_enrichment_integration(
 __all__ = [
     # Processing functions
     "process_rows_via_pipeline",
-    "process_rows_via_legacy",
     "validate_processing_results",
     "export_unknown_names_csv",
     "log_enrichment_stats",

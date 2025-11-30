@@ -355,13 +355,13 @@ def process_annuity_performance_op(
             )
 
         # Call service with enrichment metadata support
+        # Note: use_pipeline parameter removed in Story 4.8/4.9 refactoring
         result = process_with_enrichment(
             excel_rows,
             data_source=file_path,
             enrichment_service=enrichment_service,
             sync_lookup_budget=config.enrichment_sync_budget,
             export_unknown_names=config.export_unknown_names,
-            use_pipeline=config.use_pipeline,  # Pass CLI override to service
         )
 
         # Serialize only the records for downstream compatibility

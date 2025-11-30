@@ -6,7 +6,6 @@ import pytest
 
 from work_data_hub.domain.annuity_performance.service import (
     ErrorContext,
-    _determine_pipeline_mode,
     _export_unknown_names_csv,
     _extract_company_code,
     _extract_financial_metrics,
@@ -86,24 +85,6 @@ class TestErrorContext:
         assert "row_number" not in log_dict
         assert "field" not in log_dict
         assert "details" not in log_dict
-
-
-class TestDeterminePipelineMode:
-    """Test _determine_pipeline_mode function."""
-
-    def test_explicit_true(self):
-        """Test explicit True override."""
-        assert _determine_pipeline_mode(True) is True
-
-    def test_explicit_false(self):
-        """Test explicit False override."""
-        assert _determine_pipeline_mode(False) is False
-
-    def test_none_defaults_to_false(self):
-        """Test None falls back to settings (which defaults to False)."""
-        # Without settings, should default to False
-        result = _determine_pipeline_mode(None)
-        assert isinstance(result, bool)
 
 
 class TestNormalizeMonth:

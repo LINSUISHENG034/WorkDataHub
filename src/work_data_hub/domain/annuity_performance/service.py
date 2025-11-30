@@ -28,7 +28,6 @@ if TYPE_CHECKING:
     )
     from work_data_hub.io.loader.warehouse_loader import WarehouseLoader
 
-from work_data_hub.config.settings import get_settings
 from work_data_hub.domain.pipelines.types import (
     DomainPipelineResult,
     ErrorContext,
@@ -48,7 +47,6 @@ from .processing_helpers import (
     extract_plan_code,
     extract_report_date,
     log_enrichment_stats,
-    process_rows_via_legacy,
     process_rows_via_pipeline,
     validate_processing_results,
 )
@@ -76,7 +74,6 @@ from .processing_helpers import (
 )
 
 _process_rows_via_pipeline = process_rows_via_pipeline
-_process_rows_via_legacy = process_rows_via_legacy
 _validate_processing_results = validate_processing_results
 _export_unknown_names_csv = export_unknown_names_csv
 _log_enrichment_stats = log_enrichment_stats
@@ -154,7 +151,6 @@ def process_annuity_performance(
     sync_lookup_budget: int = 0,
     export_unknown_names: bool = True,
     upsert_keys: Optional[List[str]] = None,
-    use_pipeline: Optional[bool] = True,
 ) -> PipelineResult:
     """
     Execute the complete annuity performance pipeline for the requested month.
@@ -163,6 +159,8 @@ def process_annuity_performance(
         1. Discover and load the Excel file via FileDiscoveryService
         2. Transform + validate rows using process_with_enrichment()
         3. Load the resulting DataFrame to PostgreSQL through WarehouseLoader
+
+    Story 4.9: Simplified to use pipeline-only path (legacy path removed).
 
     Args:
         month: Target reporting month in YYYYMM format
@@ -175,7 +173,6 @@ def process_annuity_performance(
         sync_lookup_budget: Budget passed to enrichment for sync lookups
         export_unknown_names: Whether to export unknown companies CSV
         upsert_keys: Override composite key list (defaults to 月度/计划代码/company_id)
-        use_pipeline: Force pipeline vs legacy path (tests can set False)
 
     Returns:
         PipelineResult metadata object
@@ -221,7 +218,6 @@ def process_annuity_performance(
         enrichment_service=enrichment_service,
         sync_lookup_budget=sync_lookup_budget,
         export_unknown_names=export_unknown_names,
-        use_pipeline=use_pipeline,
     )
 
     metrics["processing"] = {
@@ -284,71 +280,12 @@ def _records_to_dataframe(records: List[AnnuityPerformanceOut]) -> pd.DataFrame:
     return pd.DataFrame(serialized)
 
 
-def process(
-    rows: List[Dict[str, Any]],
-    data_source: str = "unknown",
-    enrichment_service: Optional["CompanyEnrichmentService"] = None,
-    sync_lookup_budget: int = 0,
-    export_unknown_names: bool = True,
-) -> List[AnnuityPerformanceOut]:
-    """
-    Process raw Excel rows into validated annuity performance output models.
-
-    BACKWARD COMPATIBLE: Returns list of processed records only.
-    For enrichment metadata and statistics, use process_with_enrichment().
-
-    Args:
-        rows: List of dictionaries representing Excel rows
-        data_source: Identifier for the source file or system
-        enrichment_service: Optional CompanyEnrichmentService for company ID resolution
-        sync_lookup_budget: Budget for synchronous EQC lookups per processing session
-        export_unknown_names: Whether to export unknown company names to CSV
-
-    Returns:
-        List of AnnuityPerformanceOut records
-
-    Raises:
-        AnnuityPerformanceTransformationError: If transformation fails
-        ValueError: If input data is invalid or cannot be processed
-    """
-    result = process_with_enrichment(
-        rows, data_source, enrichment_service, sync_lookup_budget, export_unknown_names
-    )
-    return result.records
-
-
-def _determine_pipeline_mode(use_pipeline: Optional[bool]) -> bool:
-    """
-    Determine whether to use pipeline or legacy transformation path.
-
-    Respects configuration hierarchy: CLI override > setting > default (False).
-
-    Args:
-        use_pipeline: Optional CLI override for pipeline mode
-
-    Returns:
-        True if pipeline mode should be used, False for legacy mode
-    """
-    if use_pipeline is not None:
-        return use_pipeline
-
-    try:
-        settings = get_settings()
-        return getattr(settings, "annuity_pipeline_enabled", False)
-    except Exception:
-        logger.warning(
-            "Could not load settings, defaulting to legacy transformation path"
-        )
-        return False
-
-
 def process_with_enrichment(
     rows: List[Dict[str, Any]],
     data_source: str = "unknown",
     enrichment_service: Optional["CompanyEnrichmentService"] = None,
     sync_lookup_budget: int = 0,
     export_unknown_names: bool = True,
-    use_pipeline: Optional[bool] = None,
 ) -> ProcessingResultWithEnrichment:
     """
     Process raw Excel rows into validated annuity performance output models
@@ -362,6 +299,8 @@ def process_with_enrichment(
     internal mappings, EQC lookups, and async queue processing according to the
     configured budget and export settings.
 
+    Story 4.9: Simplified to use pipeline-only path (legacy path removed).
+
     Args:
         rows: List of dictionaries representing Excel rows
         data_source: Identifier for the source file or system
@@ -370,8 +309,6 @@ def process_with_enrichment(
         sync_lookup_budget: Budget for synchronous EQC lookups per processing
             session
         export_unknown_names: Whether to export unknown company names to CSV
-        use_pipeline: Whether to use shared pipeline framework
-            (None=respect config setting)
 
     Returns:
         ProcessingResultWithEnrichment with processed records, statistics, and
@@ -401,30 +338,11 @@ def process_with_enrichment(
     stats = EnrichmentStats()
     unknown_names: List[str] = []
 
-    # Determine transformation path
-    pipeline_mode = _determine_pipeline_mode(use_pipeline)
-    logger.info(f"Using {'pipeline' if pipeline_mode else 'legacy'} transformation path")
-
-    # Process rows using selected path
-    if pipeline_mode:
-        try:
-            processed_records, processing_errors = process_rows_via_pipeline(
-                rows, data_source, enrichment_service, sync_lookup_budget,
-                stats, unknown_names
-            )
-        except ImportError as e:
-            logger.error(
-                f"Pipeline import failed: {e}, falling back to legacy transformation"
-            )
-            processed_records, processing_errors = process_rows_via_legacy(
-                rows, data_source, enrichment_service, sync_lookup_budget,
-                stats, unknown_names
-            )
-    else:
-        processed_records, processing_errors = process_rows_via_legacy(
-            rows, data_source, enrichment_service, sync_lookup_budget,
-            stats, unknown_names
-        )
+    # Process rows using pipeline (Story 4.9: single execution path)
+    processed_records, processing_errors = process_rows_via_pipeline(
+        rows, data_source, enrichment_service, sync_lookup_budget,
+        stats, unknown_names
+    )
 
     # Validate results
     validate_processing_results(processed_records, processing_errors, len(rows))
@@ -451,58 +369,6 @@ def process_with_enrichment(
     )
 
 
-def validate_input_batch(
-    rows: List[Dict[str, Any]],
-) -> tuple[List[Dict[str, Any]], List[str]]:
-    """
-    Validate a batch of input rows and return valid rows plus error messages.
-
-    This is a utility function for pre-validating input data before processing.
-    Includes column projection step.
-
-    Args:
-        rows: List of raw Excel row dictionaries
-
-    Returns:
-        Tuple of (valid_rows, error_messages)
-    """
-    from pydantic import ValidationError
-
-    from .models import AnnuityPerformanceIn
-    from .processing_helpers import (
-        extract_company_code,
-        extract_plan_code,
-        extract_report_date,
-    )
-
-    valid_rows = []
-    errors = []
-
-    allowed_columns = get_allowed_columns()
-
-    for i, row in enumerate(rows):
-        try:
-            # Basic structural validation
-            model = AnnuityPerformanceIn(**row)
-            # Require at least date info (derivable) and identifiers
-            has_date = extract_report_date(model, i) is not None
-            has_plan = extract_plan_code(model, i) is not None
-            has_company = extract_company_code(model, i) is not None
-
-            if has_date and has_plan and has_company:
-                # Project to allowed columns for downstream safety
-                projected = project_columns([row], allowed_columns)
-                valid_rows.append(projected[0] if projected else {})
-            else:
-                errors.append(f"Row {i}: missing required fields (date/plan/company)")
-        except ValidationError as e:
-            errors.append(f"Row {i}: {e}")
-        except Exception as e:
-            errors.append(f"Row {i}: Unexpected validation error: {e}")
-
-    return valid_rows, errors
-
-
 # =============================================================================
 # Module exports
 # =============================================================================
@@ -511,8 +377,6 @@ __all__ = [
     # Main entry points
     "process_annuity_performance",
     "process_with_enrichment",
-    "process",
-    "validate_input_batch",
     # Utility functions
     "get_allowed_columns",
     "project_columns",
