@@ -1,0 +1,581 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>12</storyId>
+    <title>Implement Standard Domain Generic Steps</title>
+    <status>Drafted</status>
+    <generatedAt>2025-11-30</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/1-12-implement-standard-domain-generic-steps.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>generic, configuration-driven pipeline steps in the shared framework</iWant>
+    <soThat>domain-specific pipelines can eliminate boilerplate code and use Pandas vectorized operations instead of row-by-row processing</soThat>
+    <tasks>
+### Task 1: Implement DataFrameMappingStep
+- Create src/work_data_hub/domain/pipelines/steps/mapping_step.py
+- Implement DataFrameMappingStep class implementing TransformStep protocol
+- Add configuration validation (mapping must be dict)
+- Add logging for renamed columns
+- Handle missing columns (log warning, continue)
+- Write unit tests: tests/unit/domain/pipelines/steps/test_mapping_step.py
+
+### Task 2: Implement DataFrameValueReplacementStep
+- Create src/work_data_hub/domain/pipelines/steps/replacement_step.py
+- Implement DataFrameValueReplacementStep class
+- Support multiple columns with different replacement dicts
+- Add logging for number of values replaced per column
+- Write unit tests: tests/unit/domain/pipelines/steps/test_replacement_step.py
+
+### Task 3: Implement DataFrameCalculatedFieldStep
+- Create src/work_data_hub/domain/pipelines/steps/calculated_field_step.py
+- Implement DataFrameCalculatedFieldStep class
+- Support lambda functions and callable objects
+- Add error handling for calculation failures (log error, skip field)
+- Write unit tests: tests/unit/domain/pipelines/steps/test_calculated_field_step.py
+
+### Task 4: Implement DataFrameFilterStep
+- Create src/work_data_hub/domain/pipelines/steps/filter_step.py
+- Implement DataFrameFilterStep class
+- Add logging for number of rows filtered out
+- Handle empty result gracefully (return empty DataFrame, not error)
+- Write unit tests: tests/unit/domain/pipelines/steps/test_filter_step.py
+
+### Task 5: Module Organization and Documentation
+- Create src/work_data_hub/domain/pipelines/steps/__init__.py with exports
+- Write src/work_data_hub/domain/pipelines/steps/README.md
+- Update docs/architecture.md with Architecture Decision #9
+
+### Task 6: Integration Test
+- Create tests/integration/pipelines/test_generic_steps_pipeline.py
+- Build sample pipeline using all 4 generic steps
+- Verify end-to-end execution with realistic data
+
+### Task 7: Verification and Documentation
+- Run unit tests with coverage validation
+- Run integration test
+- Update main README.md with link to generic steps README
+- Commit changes
+</tasks>
+  </story>
+
+  <acceptanceCriteria>
+### AC-1.12.1: DataFrameMappingStep (Column Renaming)
+**Requirement:** Generic step that renames DataFrame columns based on configuration
+**Pass Criteria:**
+- Step implements TransformStep protocol from Epic 1 Story 1.5
+- Uses df.rename(columns=mapping) (Pandas vectorized operation)
+- Handles missing columns gracefully: log warning, skip rename
+- Returns new DataFrame (does not mutate input)
+
+### AC-1.12.2: DataFrameValueReplacementStep (Value Mapping)
+**Requirement:** Generic step that replaces values in specified columns based on configuration
+**Pass Criteria:**
+- Uses df.replace(replacement_dict) (Pandas vectorized operation)
+- Supports multiple columns with different mappings
+- Values not in mapping remain unchanged
+- Returns new DataFrame (does not mutate input)
+
+### AC-1.12.3: DataFrameCalculatedFieldStep (Generic Calculations)
+**Requirement:** Generic step that adds calculated fields using lambda functions or vectorized operations
+**Pass Criteria:**
+- Accepts dict mapping field_name -> calculation_function
+- Calculation functions receive entire DataFrame (enabling vectorized operations)
+- Handles errors gracefully (e.g., division by zero, missing columns)
+- Returns new DataFrame with additional calculated columns
+
+### AC-1.12.4: DataFrameFilterStep (Row Filtering)
+**Requirement:** Generic step that filters rows based on boolean conditions
+**Pass Criteria:**
+- Accepts lambda function returning boolean Series
+- Uses df[condition] (Pandas boolean indexing)
+- Logs number of rows filtered out
+- Returns new DataFrame (does not mutate input)
+
+### AC-1.12.5: Shared Steps Module Structure
+**Requirement:** Generic steps organized in shared module accessible to all domains
+**Pass Criteria:**
+- All steps in domain/pipelines/steps/ directory
+- __init__.py exports all public classes
+- README.md includes purpose, examples, usage patterns, and reference to Architecture Decision #3
+
+### AC-1.12.6: Unit Tests for Generic Steps
+**Requirement:** Comprehensive unit tests for all generic steps
+**Pass Criteria:**
+- Exit code 0, all tests pass
+- Coverage >= 90% for domain/pipelines/steps/ module
+
+### AC-1.12.7: Integration Test with Sample Pipeline
+**Requirement:** Integration test demonstrating generic steps in end-to-end pipeline
+**Pass Criteria:**
+- Pipeline executes all steps in sequence
+- Output DataFrame reflects all transformations
+- No row-by-row iteration (vectorized operations only)
+- Test file: tests/integration/pipelines/test_generic_steps_pipeline.py
+</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <!-- Architecture and Design Documentation -->
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision #3: Hybrid Pipeline Step Protocol</title>
+        <section>Decision #3 - Lines 283-545</section>
+        <snippet>
+          Defines two protocol types: DataFrameStep (bulk operations using vectorized pandas) and RowTransformStep (per-row validation/enrichment).
+          Story 1.12 implements generic DataFrame steps to complement existing row-level steps.
+        </snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-1.md</path>
+        <title>Epic 1 Technical Specification - Pipeline Framework</title>
+        <section>Decision #3 Implementation - Lines 283-460</section>
+        <snippet>
+          Pipeline class supports both DataFrame and Row steps. Story 1.5 provides basic framework, Story 1.10 adds advanced features.
+          Generic steps follow builder pattern: pipeline.add_step(DataFrameMappingStep(config)).
+        </snippet>
+      </doc>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>Product Requirements - Fearless Extensibility</title>
+        <section>Success Criteria #2 - Lines 87-88</section>
+        <snippet>
+          "Configuration Over Code" - Static mappings (column renames, value replacements) live in config.py, not step classes.
+          Generic steps enable adding new domains in &lt;4 hours.
+        </snippet>
+      </doc>
+    </docs>
+    <code>
+      <!-- Core Pipeline Framework -->
+      <code>
+        <path>src/work_data_hub/domain/pipelines/types.py</path>
+        <kind>protocol</kind>
+        <symbol>DataFrameStep</symbol>
+        <lines>252-260</lines>
+        <reason>Protocol that Story 1.12 generic steps must implement. Requires execute(dataframe, context) method.</reason>
+      </code>
+      <code>
+        <path>src/work_data_hub/domain/pipelines/types.py</path>
+        <kind>dataclass</kind>
+        <symbol>PipelineContext</symbol>
+        <lines>140-160</lines>
+        <reason>Context object passed to all steps. Contains pipeline_name, execution_id, config, metadata.</reason>
+      </code>
+      <code>
+        <path>src/work_data_hub/domain/pipelines/core.py</path>
+        <kind>class</kind>
+        <symbol>Pipeline</symbol>
+        <lines>110-645</lines>
+        <reason>Pipeline executor that will use the new generic DataFrame steps. Calls execute() method on DataFrame steps.</reason>
+      </code>
+
+      <!-- Existing Shared Steps (for reference) -->
+      <code>
+        <path>src/work_data_hub/domain/pipelines/steps/__init__.py</path>
+        <kind>module</kind>
+        <symbol>__all__</symbol>
+        <lines>1-45</lines>
+        <reason>
+          Exports existing shared steps (ColumnNormalizationStep, DateParsingStep, CustomerNameCleansingStep, FieldCleanupStep).
+          Story 1.12 will add 4 new DataFrame step exports to this file.
+        </reason>
+      </code>
+      <code>
+        <path>src/work_data_hub/domain/pipelines/steps/column_normalization.py</path>
+        <kind>class</kind>
+        <symbol>ColumnNormalizationStep</symbol>
+        <lines>1-100</lines>
+        <reason>
+          Example of existing RowTransformStep implementation. Shows pattern for step name property, apply() method, StepResult usage.
+          Story 1.12 steps follow similar structure but implement DataFrameStep protocol instead.
+        </reason>
+      </code>
+
+      <!-- Test Infrastructure -->
+      <code>
+        <path>tests/unit/domain/pipelines/steps/test_column_normalization.py</path>
+        <kind>test</kind>
+        <symbol>TestColumnNormalizationStep</symbol>
+        <lines>1-50</lines>
+        <reason>
+          Example test pattern for shared steps. Story 1.12 tests should follow same structure: test_step_name, test configuration, test transformations, test edge cases.
+        </reason>
+      </code>
+      <code>
+        <path>tests/unit/domain/pipelines/test_core.py</path>
+        <kind>test</kind>
+        <symbol>test_pipeline_integration</symbol>
+        <lines>N/A</lines>
+        <reason>Existing pipeline core tests. Integration test (AC-1.12.7) should be added here or in new file.</reason>
+      </code>
+    </code>
+    <dependencies>
+      <!-- Runtime Dependencies -->
+      <python>
+        <package>pandas</package>
+        <version>latest (locked in uv.lock)</version>
+        <usage>DataFrame operations - core to all 4 generic steps. Methods: df.rename(), df.replace(), boolean indexing.</usage>
+      </python>
+      <python>
+        <package>structlog</package>
+        <version>latest</version>
+        <usage>Logging within steps. Use logger.info/warning for column warnings, transformation metrics.</usage>
+      </python>
+
+      <!-- Dev Dependencies -->
+      <python>
+        <package>pytest</package>
+        <version>latest</version>
+        <usage>Unit tests for all 4 generic steps. Use @pytest.mark.unit marker.</usage>
+      </python>
+      <python>
+        <package>pytest-cov</package>
+        <version>latest</version>
+        <usage>Coverage measurement. AC-1.12.6 requires &gt;=90% coverage for domain/pipelines/steps/.</usage>
+      </python>
+      <python>
+        <package>mypy</package>
+        <version>&gt;=1.17.1</version>
+        <usage>Type checking. All steps must pass mypy --strict with no errors.</usage>
+      </python>
+      <python>
+        <package>ruff</package>
+        <version>&gt;=0.12.12</version>
+        <usage>Linting and formatting. Use ruff check and ruff format.</usage>
+      </python>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <!-- Architecture Constraints -->
+    <constraint>
+      <type>Clean Architecture Boundary</type>
+      <rule>domain/pipelines/steps/ CANNOT import from io/ or orchestration/</rule>
+      <enforcement>ruff linting - CI blocks merge on violations</enforcement>
+      <reference>Story 1.6, pyproject.toml lines 57-61</reference>
+    </constraint>
+    <constraint>
+      <type>Immutability</type>
+      <rule>All DataFrameStep.execute() methods MUST return NEW DataFrame (df.copy()). NEVER mutate input DataFrame.</rule>
+      <enforcement>Unit tests verify original DataFrame unchanged</enforcement>
+      <reference>AC-1.12.1 Pass Criteria, Architecture Decision #3</reference>
+    </constraint>
+    <constraint>
+      <type>Pandas Vectorized Operations</type>
+      <rule>PROHIBITED: df.iterrows(), df.apply(axis=1). REQUIRED: Vectorized operations (df.rename, df.replace, boolean indexing)</rule>
+      <enforcement>Code review checklist, performance benchmarks</enforcement>
+      <reference>Anti-Pattern Warnings in story, Dev Notes Architecture Decision #9</reference>
+    </constraint>
+    <constraint>
+      <type>Type Safety</type>
+      <rule>100% type hints on all public methods. mypy --strict must pass with zero errors.</rule>
+      <enforcement>CI pipeline (Story 1.2)</enforcement>
+      <reference>NFR §1027-1032</reference>
+    </constraint>
+    <constraint>
+      <type>Test Coverage</type>
+      <rule>domain/pipelines/steps/ module requires &gt;=90% coverage</rule>
+      <enforcement>CI warns if below (30-day grace period, then blocks)</enforcement>
+      <reference>AC-1.12.6, Story 1.11 coverage thresholds</reference>
+    </constraint>
+    <constraint>
+      <type>Performance</type>
+      <rule>
+        DataFrameMappingStep: &lt;5ms for 10,000 rows
+        DataFrameValueReplacementStep: &lt;10ms for 10,000 rows
+        DataFrameCalculatedFieldStep: &lt;20ms for 10,000 rows (depends on calculation)
+        DataFrameFilterStep: &lt;5ms for 10,000 rows
+      </rule>
+      <enforcement>AC-1.12.7 integration test, Dev Notes Performance Baseline</enforcement>
+      <reference>Dev Notes Performance Baseline section</reference>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <!-- Protocol Interface -->
+    <interface>
+      <name>DataFrameStep</name>
+      <kind>Protocol (typing_extensions.Protocol)</kind>
+      <signature>
+        @runtime_checkable
+        class DataFrameStep(TransformStep, Protocol):
+            @property
+            def name(self) -> str:
+                """Return human-friendly step name used for logging."""
+
+            def execute(
+                self,
+                dataframe: pd.DataFrame,
+                context: PipelineContext,
+            ) -> pd.DataFrame:
+                """Return a transformed DataFrame."""
+      </signature>
+      <path>src/work_data_hub/domain/pipelines/types.py:252-260</path>
+    </interface>
+
+    <!-- Configuration Interface -->
+    <interface>
+      <name>Step Configuration Pattern</name>
+      <kind>Constructor Parameter</kind>
+      <signature>
+        # Example: DataFrameMappingStep
+        def __init__(self, column_mapping: Dict[str, str]):
+            """
+            Args:
+                column_mapping: Dict mapping old_column_name -> new_column_name
+            """
+            self._column_mapping = column_mapping
+      </signature>
+      <path>Story 1.12 implementation guidance</path>
+    </interface>
+
+    <!-- Pipeline Integration -->
+    <interface>
+      <name>Pipeline.add_step()</name>
+      <kind>Method</kind>
+      <signature>
+        def add_step(self, step: Union[DataFrameStep, RowTransformStep]) -> 'Pipeline':
+            """Add transformation step (builder pattern)."""
+      </signature>
+      <path>src/work_data_hub/domain/pipelines/core.py:130-132</path>
+    </interface>
+
+    <!-- Usage Pattern -->
+    <interface>
+      <name>Domain Pipeline Usage</name>
+      <kind>Usage Example</kind>
+      <signature>
+        from work_data_hub.domain.pipelines.steps import (
+            DataFrameMappingStep,
+            DataFrameValueReplacementStep,
+            DataFrameCalculatedFieldStep,
+            DataFrameFilterStep,
+        )
+
+        # Configuration-driven usage
+        pipeline.add_step(DataFrameMappingStep({'月度': 'report_date', '计划代码': 'plan_code'}))
+        pipeline.add_step(DataFrameValueReplacementStep({'status': {'draft': 'pending'}}))
+        pipeline.add_step(DataFrameCalculatedFieldStep({'total': lambda df: df['a'] + df['b']}))
+        pipeline.add_step(DataFrameFilterStep(lambda df: df['total'] > 0))
+      </signature>
+      <path>AC-1.12.7 Integration Test, Dev Notes Example</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      <!-- Unit Test Standards -->
+      <standard>
+        <name>Test File Naming</name>
+        <rule>tests/unit/domain/pipelines/steps/test_{step_module}.py</rule>
+        <example>tests/unit/domain/pipelines/steps/test_mapping_step.py</example>
+      </standard>
+      <standard>
+        <name>Test Class Naming</name>
+        <rule>class Test{StepClassName}:</rule>
+        <example>class TestDataFrameMappingStep:</example>
+      </standard>
+      <standard>
+        <name>Test Method Naming</name>
+        <rule>test_{what_is_tested} with descriptive docstrings</rule>
+        <example>def test_rename_columns_with_valid_mapping():</example>
+      </standard>
+      <standard>
+        <name>Pytest Markers</name>
+        <rule>@pytest.mark.unit for all generic step tests</rule>
+        <enforcement>Fast execution, no external dependencies</enforcement>
+      </standard>
+      <standard>
+        <name>Coverage Target</name>
+        <rule>domain/pipelines/steps/ module requires &gt;=90% coverage</rule>
+        <command>uv run pytest -v -m unit --cov=src/work_data_hub/domain/pipelines/steps --cov-report=term-missing</command>
+      </standard>
+      <standard>
+        <name>Type Checking</name>
+        <rule>mypy --strict must pass with zero errors for all step modules</rule>
+        <command>uv run mypy --strict src/work_data_hub/domain/pipelines/steps/</command>
+      </standard>
+    </standards>
+
+    <locations>
+      <!-- Unit Tests -->
+      <location>
+        <path>tests/unit/domain/pipelines/steps/test_mapping_step.py</path>
+        <purpose>Unit tests for DataFrameMappingStep</purpose>
+        <coverage>AC-1.12.1</coverage>
+      </location>
+      <location>
+        <path>tests/unit/domain/pipelines/steps/test_replacement_step.py</path>
+        <purpose>Unit tests for DataFrameValueReplacementStep</purpose>
+        <coverage>AC-1.12.2</coverage>
+      </location>
+      <location>
+        <path>tests/unit/domain/pipelines/steps/test_calculated_field_step.py</path>
+        <purpose>Unit tests for DataFrameCalculatedFieldStep</purpose>
+        <coverage>AC-1.12.3</coverage>
+      </location>
+      <location>
+        <path>tests/unit/domain/pipelines/steps/test_filter_step.py</path>
+        <purpose>Unit tests for DataFrameFilterStep</purpose>
+        <coverage>AC-1.12.4</coverage>
+      </location>
+
+      <!-- Integration Tests -->
+      <location>
+        <path>tests/integration/pipelines/test_generic_steps_pipeline.py</path>
+        <purpose>End-to-end integration test using all 4 generic steps in a pipeline</purpose>
+        <coverage>AC-1.12.7</coverage>
+      </location>
+
+      <!-- Performance Baseline -->
+      <location>
+        <path>tests/fixtures/performance/baseline_10k_rows.csv</path>
+        <purpose>10,000-row fixture for performance testing</purpose>
+        <coverage>Dev Notes Performance Baseline</coverage>
+      </location>
+    </locations>
+
+    <ideas>
+      <!-- DataFrameMappingStep Test Cases -->
+      <testCase>
+        <step>DataFrameMappingStep</step>
+        <scenario>test_rename_single_column</scenario>
+        <input>DataFrame with {'old_col': [1, 2, 3]}</input>
+        <config>{'old_col': 'new_col'}</config>
+        <expected>DataFrame with {'new_col': [1, 2, 3]}, 'old_col' not present</expected>
+      </testCase>
+      <testCase>
+        <step>DataFrameMappingStep</step>
+        <scenario>test_rename_multiple_columns</scenario>
+        <input>DataFrame with {'a': [1], 'b': [2], 'c': [3]}</input>
+        <config>{'a': 'x', 'b': 'y'}</config>
+        <expected>DataFrame with {'x': [1], 'y': [2], 'c': [3]}</expected>
+      </testCase>
+      <testCase>
+        <step>DataFrameMappingStep</step>
+        <scenario>test_missing_columns_gracefully_ignored</scenario>
+        <input>DataFrame with {'col1': [1]}</input>
+        <config>{'missing_col': 'new_col', 'col1': 'renamed_col'}</config>
+        <expected>DataFrame with {'renamed_col': [1]}, log warning for missing_col</expected>
+      </testCase>
+      <testCase>
+        <step>DataFrameMappingStep</step>
+        <scenario>test_original_dataframe_unchanged</scenario>
+        <input>original_df = DataFrame(...)</input>
+        <config>{'a': 'b'}</config>
+        <expected>original_df columns unchanged after step.execute()</expected>
+      </testCase>
+
+      <!-- DataFrameValueReplacementStep Test Cases -->
+      <testCase>
+        <step>DataFrameValueReplacementStep</step>
+        <scenario>test_replace_values_single_column</scenario>
+        <input>DataFrame with {'status': ['draft', 'active', 'draft']}</input>
+        <config>{'status': {'draft': 'pending'}}</config>
+        <expected>DataFrame with {'status': ['pending', 'active', 'pending']}</expected>
+      </testCase>
+      <testCase>
+        <step>DataFrameValueReplacementStep</step>
+        <scenario>test_replace_values_multiple_columns</scenario>
+        <input>DataFrame with {'status': ['draft'], 'type': ['A']}</input>
+        <config>{'status': {'draft': 'pending'}, 'type': {'A': 'Alpha'}}</config>
+        <expected>DataFrame with {'status': ['pending'], 'type': ['Alpha']}</expected>
+      </testCase>
+      <testCase>
+        <step>DataFrameValueReplacementStep</step>
+        <scenario>test_unmapped_values_unchanged</scenario>
+        <input>DataFrame with {'status': ['draft', 'unknown', 'active']}</input>
+        <config>{'status': {'draft': 'pending'}}</config>
+        <expected>DataFrame with {'status': ['pending', 'unknown', 'active']}</expected>
+      </testCase>
+
+      <!-- DataFrameCalculatedFieldStep Test Cases -->
+      <testCase>
+        <step>DataFrameCalculatedFieldStep</step>
+        <scenario>test_simple_calculation_lambda</scenario>
+        <input>DataFrame with {'a': [1, 2], 'b': [3, 4]}</input>
+        <config>{'total': lambda df: df['a'] + df['b']}</config>
+        <expected>DataFrame with {'a': [1, 2], 'b': [3, 4], 'total': [4, 6]}</expected>
+      </testCase>
+      <testCase>
+        <step>DataFrameCalculatedFieldStep</step>
+        <scenario>test_multiple_calculated_fields</scenario>
+        <input>DataFrame with {'a': [10], 'b': [5]}</input>
+        <config>{'sum': lambda df: df['a'] + df['b'], 'diff': lambda df: df['a'] - df['b']}</config>
+        <expected>DataFrame with {'a': [10], 'b': [5], 'sum': [15], 'diff': [5]}</expected>
+      </testCase>
+      <testCase>
+        <step>DataFrameCalculatedFieldStep</step>
+        <scenario>test_error_handling_missing_column</scenario>
+        <input>DataFrame with {'a': [1]}</input>
+        <config>{'total': lambda df: df['a'] + df['missing']}</config>
+        <expected>KeyError logged, field skipped, original DataFrame returned</expected>
+      </testCase>
+      <testCase>
+        <step>DataFrameCalculatedFieldStep</step>
+        <scenario>test_error_handling_division_by_zero</scenario>
+        <input>DataFrame with {'a': [1], 'b': [0]}</input>
+        <config>{'ratio': lambda df: df['a'] / df['b']}</config>
+        <expected>Error logged, field skipped (or inf depending on pandas handling)</expected>
+      </testCase>
+
+      <!-- DataFrameFilterStep Test Cases -->
+      <testCase>
+        <step>DataFrameFilterStep</step>
+        <scenario>test_filter_positive_values</scenario>
+        <input>DataFrame with {'value': [1, -2, 3, -4, 5]}</input>
+        <config>lambda df: df['value'] > 0</config>
+        <expected>DataFrame with {'value': [1, 3, 5]}, log "2 rows filtered out"</expected>
+      </testCase>
+      <testCase>
+        <step>DataFrameFilterStep</step>
+        <scenario>test_filter_all_rows_removed</scenario>
+        <input>DataFrame with {'value': [1, 2, 3]}</input>
+        <config>lambda df: df['value'] < 0</config>
+        <expected>Empty DataFrame with correct columns, log "3 rows filtered out"</expected>
+      </testCase>
+      <testCase>
+        <step>DataFrameFilterStep</step>
+        <scenario>test_filter_none_removed</scenario>
+        <input>DataFrame with {'value': [1, 2, 3]}</input>
+        <config>lambda df: df['value'] > 0</config>
+        <expected>DataFrame with {'value': [1, 2, 3]}, log "0 rows filtered out"</expected>
+      </testCase>
+
+      <!-- Integration Test -->
+      <testCase>
+        <step>Integration</step>
+        <scenario>test_all_generic_steps_in_pipeline</scenario>
+        <input>DataFrame with sample data (100 rows)</input>
+        <pipeline>
+          1. DataFrameMappingStep({'old_name': 'new_name'})
+          2. DataFrameValueReplacementStep({'status': {'draft': 'pending'}})
+          3. DataFrameCalculatedFieldStep({'total': lambda df: df['a'] + df['b']})
+          4. DataFrameFilterStep(lambda df: df['total'] > 0)
+        </pipeline>
+        <expected>
+          - All transformations applied in sequence
+          - Output DataFrame has correct structure
+          - No row-by-row iteration detected
+          - Performance: &lt;100ms for 100 rows
+        </expected>
+      </testCase>
+
+      <!-- Performance Test -->
+      <testCase>
+        <step>Performance</step>
+        <scenario>test_performance_10k_rows</scenario>
+        <input>DataFrame with 10,000 rows from fixtures/performance/baseline_10k_rows.csv</input>
+        <pipeline>All 4 generic steps chained</pipeline>
+        <expected>
+          - DataFrameMappingStep: &lt;5ms
+          - DataFrameValueReplacementStep: &lt;10ms
+          - DataFrameCalculatedFieldStep: &lt;20ms
+          - DataFrameFilterStep: &lt;5ms
+          - Total pipeline: &lt;50ms
+        </expected>
+      </testCase>
+    </ideas>
+  </tests>
+</story-context>

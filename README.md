@@ -16,6 +16,7 @@ The project follows Clean Architecture with clear layer separation:
 src/work_data_hub/
 ├── domain/              # Pure business logic (no external dependencies)
 │   ├── pipelines/       # Core pipeline framework
+│   │   └── steps/       # Generic transformation steps (see [README](src/work_data_hub/domain/pipelines/steps/README.md))
 │   └── ...              # Domain models and business rules
 ├── io/                  # Data access layer
 │   ├── readers/         # Excel and file readers

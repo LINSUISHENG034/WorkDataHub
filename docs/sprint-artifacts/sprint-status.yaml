@@ -49,6 +49,7 @@ development_status:
   1-9-dagster-orchestration-setup: done
   1-10-pipeline-framework-advanced-features: done
   1-11-enhanced-cicd-with-integration-tests: done
+  1-12-implement-standard-domain-generic-steps: done  # Code review 2025-11-30: Approved after documentation updates
   epic-1-retrospective: completed
 
   # Epic 2: Multi-Layer Data Quality Framework
@@ -81,6 +82,7 @@ development_status:
   4-7-pipeline-framework-refactoring: done  # Code review approved 2025-11-29
   4-8-annuity-module-deep-refactoring: done  # Completed 2025-11-30
   4-9-annuity-module-decomposition-for-reusability: done  # Code review approved 2025-11-30
+  4-10-refactor-annuity-performance-to-standard-domain-pattern: drafted  # Sprint Change Proposal 2025-11-30, depends on Story 1.12
   epic-4-retrospective: optional
 
   # Epic 5: Company Enrichment Service

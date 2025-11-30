@@ -982,6 +982,85 @@ LOG_FILE_PATH=logs/workdatahub.log
 
 ---
 
+### Decision #9: Configuration-Driven Generic Steps ✅
+
+**Problem:** Domain pipelines (Epic 4, 9) require common transformations like column renaming, value replacement, calculated fields, and row filtering. Without standardization, each domain re-implements these patterns, leading to code duplication and inconsistency.
+
+**Decision:** Provide configuration-driven generic DataFrame steps that accept dictionaries/lambdas instead of hardcoded logic.
+
+#### Generic Steps Architecture
+
+**Available Steps:**
+
+| Step | Purpose | Configuration Type |
+|------|---------|-------------------|
+| `DataFrameMappingStep` | Rename columns | `Dict[str, str]` (old → new) |
+| `DataFrameValueReplacementStep` | Replace values in columns | `Dict[str, Dict[Any, Any]]` (column → {old: new}) |
+| `DataFrameCalculatedFieldStep` | Add calculated columns | `Dict[str, Callable[[DataFrame], Series]]` |
+| `DataFrameFilterStep` | Filter rows by condition | `Callable[[DataFrame], Series[bool]]` |
+
+#### Implementation Pattern
+
+```python
+from work_data_hub.domain.pipelines.steps import (
+    DataFrameMappingStep,
+    DataFrameValueReplacementStep,
+    DataFrameCalculatedFieldStep,
+    DataFrameFilterStep,
+)
+
+# Configuration in domain config.py (not in step classes)
+COLUMN_MAPPING = {'月度': 'report_date', '计划代码': 'plan_code'}
+VALUE_REPLACEMENTS = {'status': {'draft': 'pending', 'old': 'new'}}
+CALCULATED_FIELDS = {'total': lambda df: df['a'] + df['b']}
+FILTER_CONDITION = lambda df: df['total'] > 0
+
+# Pipeline assembly
+pipeline.add_step(DataFrameMappingStep(COLUMN_MAPPING))
+pipeline.add_step(DataFrameValueReplacementStep(VALUE_REPLACEMENTS))
+pipeline.add_step(DataFrameCalculatedFieldStep(CALCULATED_FIELDS))
+pipeline.add_step(DataFrameFilterStep(FILTER_CONDITION))
+```
+
+#### Design Principles
+
+1. **Configuration Over Code**: Static mappings live in `config.py`, not step classes
+2. **Pandas Vectorized Operations**: All steps use `df.rename()`, `df.replace()`, boolean indexing
+3. **Immutability**: Input DataFrames are never mutated; new DataFrames are always returned
+4. **Graceful Error Handling**: Missing columns logged as warnings, not errors
+
+#### When to Use Generic Steps vs. Custom Steps
+
+**Use Generic Steps:**
+- ✅ Column renaming (`DataFrameMappingStep`)
+- ✅ Value replacement/mapping (`DataFrameValueReplacementStep`)
+- ✅ Simple calculations (addition, ratios) (`DataFrameCalculatedFieldStep`)
+- ✅ Row filtering based on conditions (`DataFrameFilterStep`)
+
+**Create Custom Steps:**
+- ❌ Complex business logic with conditional branching
+- ❌ External API calls or database lookups
+- ❌ Stateful transformations depending on previous rows
+- ❌ Domain-specific validation with custom error handling
+
+#### Performance Targets
+
+| Step | Target (10,000 rows) |
+|------|---------------------|
+| DataFrameMappingStep | <5ms |
+| DataFrameValueReplacementStep | <10ms |
+| DataFrameCalculatedFieldStep | <20ms |
+| DataFrameFilterStep | <5ms |
+
+#### Implementation (Story 1.12)
+
+- **Module:** `domain/pipelines/steps/`
+- **Files:** `mapping_step.py`, `replacement_step.py`, `calculated_field_step.py`, `filter_step.py`
+- **Documentation:** `domain/pipelines/steps/README.md`
+- **Tests:** `tests/unit/domain/pipelines/steps/test_*_step.py`
+
+---
+
 ## Novel Patterns
 
 This section documents unique technical patterns specific to WorkDataHub.
@@ -1400,6 +1479,7 @@ Epic 9 (Growth Domains)
 | 6 | Stub-Only Enrichment MVP | Epic 5 (Enrichment) | MVP (defer to Growth) |
 | 7 | Comprehensive Naming Conventions | All epics | MVP |
 | 8 | structlog with Sanitization | Epic 1, 8 (Foundation, Monitoring) | MVP |
+| 9 | Configuration-Driven Generic Steps | Epic 1, 4, 9 (All pipelines) | MVP |
 
 ### Appendix B: Technology Dependency Matrix
 
