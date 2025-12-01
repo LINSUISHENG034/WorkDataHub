@@ -1,0 +1,277 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>10</storyId>
+    <title>Refactor Annuity Performance to Standard Domain Pattern</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-30</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/4-10-refactor-annuity-performance-to-standard-domain-pattern.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>data engineer</asA>
+    <iWant>the annuity_performance module refactored to use shared generic steps and configuration-driven transformations</iWant>
+    <soThat>the module is maintainable (&lt;1,000 lines), serves as the reference implementation for Epic 9, and demonstrates the "Standard Domain Pattern"</soThat>
+    <tasks>
+      <task id="1">Create Configuration File (AC-4.10.2)
+        <subtask>Create src/work_data_hub/domain/annuity_performance/config.py</subtask>
+        <subtask>Extract all hardcoded mappings from pipeline_steps.py, service.py</subtask>
+        <subtask>Organize into logical sections (column mappings, value replacements, constants)</subtask>
+        <subtask>Add docstrings explaining each configuration section</subtask>
+        <subtask>Validate configuration structure (no typos, consistent formatting)</subtask>
+      </task>
+      <task id="2">Refactor Pipeline Steps to Use Generic Steps (AC-4.10.3, AC-4.10.4)
+        <subtask>Audit existing pipeline_steps.py: identify steps replaceable by generic steps</subtask>
+        <subtask>Replace simple mapping/replacement steps with DataFrameMappingStep, DataFrameValueReplacementStep</subtask>
+        <subtask>Update pipeline construction in service.py or pipeline_steps.py</subtask>
+        <subtask>Delete obsolete custom step classes</subtask>
+        <subtask>Update imports to use generic steps from work_data_hub.domain.pipelines.steps</subtask>
+      </task>
+      <task id="3">Baseline Capture (BEFORE REFACTORING)
+        <subtask>Run pipeline on 202412 dataset</subtask>
+        <subtask>Save output to baseline_202412.csv</subtask>
+        <subtask>Record line count baseline</subtask>
+        <subtask>Record test coverage baseline</subtask>
+      </task>
+      <task id="4">Update Tests
+        <subtask>Identify tests that mock deleted custom steps</subtask>
+        <subtask>Update mocks to use generic steps</subtask>
+        <subtask>Update imports in test files</subtask>
+        <subtask>Add tests for config.py (validate configuration structure)</subtask>
+        <subtask>Run all tests, fix failures</subtask>
+      </task>
+      <task id="5">Functional Parity Verification (AC-4.10.5)
+        <subtask>Run refactored pipeline on 202412 dataset</subtask>
+        <subtask>Save output to refactored_202412.csv</subtask>
+        <subtask>Compare baseline vs. refactored outputs</subtask>
+        <subtask>Investigate any differences (acceptable vs. regression)</subtask>
+        <subtask>Document comparison results</subtask>
+      </task>
+      <task id="6">Documentation Update (AC-4.10.7)
+        <subtask>Update docs/domains/annuity_performance.md with "Standard Domain Pattern Reference Implementation" section</subtask>
+        <subtask>Update docs/architecture.md: Enhance Architecture Decision #9 with annuity example</subtask>
+        <subtask>Update main README.md (if applicable)</subtask>
+      </task>
+      <task id="7">Final Verification (ALL ACs)
+        <subtask>Verify line count &lt; 1,000</subtask>
+        <subtask>Verify config.py exists and complete</subtask>
+        <subtask>Verify generic steps imported and used</subtask>
+        <subtask>Verify &lt;=5 custom steps remaining</subtask>
+        <subtask>Verify all tests pass</subtask>
+        <subtask>Verify functional parity (CSV comparison)</subtask>
+        <subtask>Verify documentation updated</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-4.10.1" title="Module Line Count Reduction">
+      <requirement>Total Python code in annuity_performance/ MUST be &lt; 1,000 lines</requirement>
+      <baseline>3,710 lines (before Story 4.10)</baseline>
+      <target>&lt; 1,000 lines (73% reduction)</target>
+      <verification>find src/work_data_hub/domain/annuity_performance -name "*.py" -exec cat {} + | wc -l</verification>
+    </criterion>
+    <criterion id="AC-4.10.2" title="Configuration File Created">
+      <requirement>All static mappings moved to domain/annuity_performance/config.py</requirement>
+      <mustInclude>COLUMN_MAPPING, PLAN_CODE_CORRECTIONS, BUSINESS_TYPE_MAPPING, INSTITUTION_CODE_MAPPING, BRONZE_EXPECTED_COLUMNS, GOLD_OUTPUT_COLUMNS</mustInclude>
+      <verification>test -f src/work_data_hub/domain/annuity_performance/config.py</verification>
+    </criterion>
+    <criterion id="AC-4.10.3" title="Generic Steps Used in Pipeline">
+      <requirement>pipeline_steps.py MUST import and use generic steps from Story 1.12</requirement>
+      <mustImport>DataFrameMappingStep, DataFrameValueReplacementStep, DataFrameCalculatedFieldStep, FieldCleanupStep</mustImport>
+      <verification>grep -E "from work_data_hub.domain.pipelines.steps import" src/work_data_hub/domain/annuity_performance/pipeline_steps.py</verification>
+    </criterion>
+    <criterion id="AC-4.10.4" title="Custom Steps Reduced">
+      <requirement>pipeline_steps.py contains ONLY domain-specific steps (complex business logic)</requirement>
+      <mustKeep>CompanyIdResolutionStep (enrichment integration with fallback logic)</mustKeep>
+      <mustDelete>Any step that only renames columns, replaces values, or calculates simple math</mustDelete>
+      <verification>grep -c "^class.*Step" src/work_data_hub/domain/annuity_performance/pipeline_steps.py (should be &lt;=5)</verification>
+    </criterion>
+    <criterion id="AC-4.10.5" title="100% Functional Parity">
+      <requirement>Refactored pipeline produces IDENTICAL output to pre-refactor version</requirement>
+      <verification>diff baseline_202412.csv refactored_202412.csv</verification>
+    </criterion>
+    <criterion id="AC-4.10.6" title="All Tests Pass">
+      <requirement>All existing annuity_performance tests pass after refactoring</requirement>
+      <verification>uv run pytest tests/ -k "annuity_performance" -v --tb=short</verification>
+      <coverageBaseline>&gt;=58% (from Story 4.9)</coverageBaseline>
+    </criterion>
+    <criterion id="AC-4.10.7" title="Reference Implementation Documentation">
+      <requirement>Documentation updated to position annuity_performance as Epic 9 reference</requirement>
+      <mustUpdate>docs/domains/annuity_performance.md, docs/architecture.md (Decision #9)</mustUpdate>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Legacy Parity Requirements, 5-Step Company ID Enrichment Logic</section>
+        <snippet>Epic 4 represents the first critical domain migration using the Strangler Fig pattern. The 5-step enrichment logic (lines 203-227 in legacy) must be preserved for parity.</snippet>
+      </doc>
+      <doc>
+        <path>docs/domains/annuity_performance.md</path>
+        <title>Annuity Performance Domain Documentation</title>
+        <section>Architecture, Transformation Steps, Output Schema</section>
+        <snippet>The Annuity Performance domain processes monthly annuity performance data from Excel files into a validated PostgreSQL table. This is the reference implementation for Epic 9.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/stories/1-12-implement-standard-domain-generic-steps.md</path>
+        <title>Story 1.12: Implement Standard Domain Generic Steps</title>
+        <section>Acceptance Criteria, Implementation</section>
+        <snippet>Story 1.12 provides DataFrameMappingStep, DataFrameValueReplacementStep, DataFrameCalculatedFieldStep, DataFrameFilterStep. All 4 generic steps implemented with 94% coverage.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decisions</title>
+        <section>Decision #9: Configuration-Driven Generic Steps</section>
+        <snippet>Standard Domain Architecture Pattern: Pandas First (vectorized operations), Config Over Code (mappings in config.py), Shared Generic Steps (framework-provided steps for standard operations).</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-change-proposal-2025-11-30_fix_bloat.md</path>
+        <title>Sprint Change Proposal: Annuity Performance Refactoring</title>
+        <section>Problem Analysis, Solution</section>
+        <snippet>Stories 4.7-4.9 reduced annuity_performance from 4,942 to 3,710 lines (25% reduction), but module still contains significant boilerplate that can be replaced with generic steps.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/pipeline_steps.py</path>
+        <kind>pipeline-steps</kind>
+        <symbol>PlanCodeCleansingStep, InstitutionCodeMappingStep, PortfolioCodeDefaultStep, BusinessTypeCodeMappingStep, CompanyIdResolutionStep, BronzeSchemaValidationStep, GoldProjectionStep, GoldSchemaValidationStep</symbol>
+        <lines>1-923</lines>
+        <reason>Primary refactoring target. Contains 8 custom step classes, most can be replaced with generic steps. Only CompanyIdResolutionStep has complex business logic that must remain.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/service.py</path>
+        <kind>service</kind>
+        <symbol>process_annuity_performance, build_annuity_pipeline</symbol>
+        <lines>1-388</lines>
+        <reason>Main orchestration. Pipeline construction may need updates to use generic steps with config imports.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/schemas.py</path>
+        <kind>schemas</kind>
+        <symbol>BronzeAnnuitySchema, GoldAnnuitySchema</symbol>
+        <lines>1-607</lines>
+        <reason>Pandera schemas. May contain wrapper functions that can be simplified.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/annuity_performance/models.py</path>
+        <kind>models</kind>
+        <symbol>AnnuityPerformanceIn, AnnuityPerformanceOut</symbol>
+        <lines>1-100</lines>
+        <reason>Pydantic models. Should remain mostly unchanged, but review for any hardcoded mappings.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/steps/__init__.py</path>
+        <kind>module-exports</kind>
+        <symbol>DataFrameMappingStep, DataFrameValueReplacementStep, DataFrameCalculatedFieldStep, DataFrameFilterStep</symbol>
+        <lines>1-67</lines>
+        <reason>Story 1.12 generic steps. These are the replacement steps to import and use.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/steps/mapping_step.py</path>
+        <kind>generic-step</kind>
+        <symbol>DataFrameMappingStep</symbol>
+        <lines>35-132</lines>
+        <reason>Generic column renaming step. Uses df.rename() for vectorized operation. Replace custom column renaming steps with this.</reason>
+      </artifact>
+      <artifact>
+        <path>src/work_data_hub/domain/pipelines/steps/replacement_step.py</path>
+        <kind>generic-step</kind>
+        <symbol>DataFrameValueReplacementStep</symbol>
+        <lines>34-144</lines>
+        <reason>Generic value replacement step. Uses df.replace() for vectorized operation. Replace custom value mapping steps with this.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <python>
+        <package name="pandas" version="^2.0">DataFrame operations, vectorized transformations</package>
+        <package name="pydantic" version="^2.0">Data validation models (AnnuityPerformanceIn/Out)</package>
+        <package name="pandera" version="^0.18">DataFrame schema validation (Bronze/Gold)</package>
+        <package name="structlog" version="^24.0">Structured logging</package>
+        <package name="pytest" version="^8.0">Testing framework</package>
+        <package name="pytest-cov" version="^4.0">Coverage reporting</package>
+      </python>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">
+      <rule>Clean Architecture: domain/ has zero dependencies on io/ or orchestration/</rule>
+      <rule>All transformations must use Pandas vectorized operations (no df.iterrows() or df.apply(axis=1))</rule>
+      <rule>Configuration over code: static mappings in config.py, not step classes</rule>
+    </constraint>
+    <constraint type="pattern">
+      <rule>Standard Domain Pattern: Use framework-provided generic steps for standard operations</rule>
+      <rule>Only create custom steps for domain-specific business logic that cannot be vectorized</rule>
+      <rule>Immutability: All steps must return new DataFrame, never mutate input</rule>
+    </constraint>
+    <constraint type="testing">
+      <rule>All existing tests must pass after refactoring</rule>
+      <rule>Coverage must remain &gt;=58% (baseline from Story 4.9)</rule>
+      <rule>Functional parity: CSV comparison must show identical output</rule>
+    </constraint>
+    <constraint type="performance">
+      <rule>Pipeline must process 10,000 rows in &lt;10 minutes</rule>
+      <rule>Generic steps performance: &lt;5ms for 10,000 rows (mapping), &lt;10ms (replacement)</rule>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>DataFrameMappingStep</name>
+      <kind>class</kind>
+      <signature>DataFrameMappingStep(column_mapping: Dict[str, str])</signature>
+      <path>src/work_data_hub/domain/pipelines/steps/mapping_step.py</path>
+    </interface>
+    <interface>
+      <name>DataFrameValueReplacementStep</name>
+      <kind>class</kind>
+      <signature>DataFrameValueReplacementStep(value_replacements: Dict[str, Dict[str, str]])</signature>
+      <path>src/work_data_hub/domain/pipelines/steps/replacement_step.py</path>
+    </interface>
+    <interface>
+      <name>DataFrameCalculatedFieldStep</name>
+      <kind>class</kind>
+      <signature>DataFrameCalculatedFieldStep(calculated_fields: Dict[str, Callable[[pd.DataFrame], pd.Series]])</signature>
+      <path>src/work_data_hub/domain/pipelines/steps/calculated_field_step.py</path>
+    </interface>
+    <interface>
+      <name>DataFrameFilterStep</name>
+      <kind>class</kind>
+      <signature>DataFrameFilterStep(filter_condition: Callable[[pd.DataFrame], pd.Series])</signature>
+      <path>src/work_data_hub/domain/pipelines/steps/filter_step.py</path>
+    </interface>
+    <interface>
+      <name>TransformStep Protocol</name>
+      <kind>protocol</kind>
+      <signature>execute(self, data: pd.DataFrame, context: PipelineContext) -&gt; pd.DataFrame</signature>
+      <path>src/work_data_hub/domain/pipelines/core.py</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing follows pytest conventions with fixtures for DataFrame creation. Unit tests must complete in &lt;30 seconds, integration tests in &lt;3 minutes. Coverage threshold is 90% for domain/ module. All tests use structlog for logging. Tests verify immutability (input DataFrame not modified) and functional parity (output matches baseline).
+    </standards>
+    <locations>
+      <location>tests/unit/domain/annuity_performance/</location>
+      <location>tests/integration/domain/annuity_performance/</location>
+      <location>tests/unit/domain/pipelines/steps/</location>
+      <location>tests/integration/pipelines/</location>
+    </locations>
+    <ideas>
+      <idea acId="AC-4.10.1">test_module_line_count_under_1000: Count lines in annuity_performance/*.py, assert &lt; 1000</idea>
+      <idea acId="AC-4.10.2">test_config_py_exists_with_required_mappings: Verify config.py exists and contains COLUMN_MAPPING, PLAN_CODE_CORRECTIONS, etc.</idea>
+      <idea acId="AC-4.10.3">test_generic_steps_imported: Verify pipeline_steps.py imports DataFrameMappingStep, DataFrameValueReplacementStep</idea>
+      <idea acId="AC-4.10.4">test_custom_step_count_reduced: Count class.*Step definitions, assert &lt;= 5</idea>
+      <idea acId="AC-4.10.5">test_functional_parity_202412: Run pipeline on 202412 data, compare output to baseline CSV</idea>
+      <idea acId="AC-4.10.6">test_all_annuity_tests_pass: Run pytest -k annuity_performance, verify exit code 0</idea>
+      <idea acId="AC-4.10.7">test_documentation_updated: Verify docs/domains/annuity_performance.md contains "Standard Domain Pattern"</idea>
+    </ideas>
+  </tests>
+</story-context>

@@ -1489,3 +1489,49 @@ stub_provider = StubProvider(fixtures={
 - Run integration tests on PR (<3 minutes)
 - Track coverage trends: warn if <target
 - Performance regression alert: >20% slower than baseline
+
+### AC → Test Coverage Matrix
+
+| AC | Test Type | Test Case | Status |
+|----|-----------|-----------|--------|
+| **Story 4.1** | | | |
+| AC-4.1.1 | Unit | `test_pydantic_models_chinese_fields` | ✅ |
+| AC-4.1.2 | Unit | `test_date_validator_chinese_formats` | ✅ |
+| AC-4.1.3 | Unit | `test_validation_business_rules_assets_nonnegative` | ✅ |
+| **Story 4.2** | | | |
+| AC-4.2.1 | Unit | `test_bronze_schema_validates_excel_structure` | ✅ |
+| AC-4.2.2 | Unit | `test_bronze_missing_column_raises_schema_error` | ✅ |
+| AC-4.2.3 | Unit | `test_bronze_systemic_issue_detection_10pct_threshold` | ✅ |
+| **Story 4.3** | | | |
+| AC-4.3.1 | Unit | `test_pipeline_7_steps_execution_order` | ✅ |
+| AC-4.3.2 | Unit | `test_failed_rows_csv_export_structure` | ✅ |
+| AC-4.3.3 | Unit | `test_enrichment_stub_returns_temp_ids` | ✅ |
+| AC-4.3.4 | Unit | `test_partial_success_handling_under_10pct_failure` | ✅ |
+| AC-4.3.5 | Unit | `test_legacy_transformation_steps_column_rename_branch_code` | ✅ |
+| AC-4.3.6 | Unit | `test_5step_enrichment_fallback_order` | ✅ |
+| **Story 4.4** | | | |
+| AC-4.4.1 | Unit | `test_gold_composite_pk_uniqueness_validation` | ✅ |
+| AC-4.4.2 | Unit | `test_gold_column_projection_removes_extra_fields` | ✅ |
+| AC-4.4.3 | Unit | `test_gold_notnull_constraints_enforced` | ✅ |
+| **Story 4.5** | | | |
+| AC-4.5.1 | Integration | `test_e2e_pipeline_complete_execution` | ✅ |
+| AC-4.5.2 | Integration | `test_database_upsert_on_conflict` | ✅ |
+| AC-4.5.3 | Integration | `test_idempotent_rerun_identical_state` | ✅ |
+| AC-4.5.4 | Integration | `test_dagster_job_visible_in_ui` | ✅ |
+| AC-4.5.5 | Performance | `test_10k_rows_under_10_minutes` | ✅ |
+| **Story 4.6** | | | |
+| AC-4.6.1 | Integration | `test_data_sources_yml_config_loading` | ✅ |
+| AC-4.6.2 | Integration | `test_database_migration_creates_table` | ✅ |
+| AC-4.6.3 | Manual | Documentation review checklist | ✅ |
+| **Epic-Level** | | | |
+| AC-EPIC4.1 | Integration | `test_architecture_validation_bronze_silver_gold` | ✅ |
+| AC-EPIC4.2 | Performance | `test_performance_targets_met` | ✅ |
+| AC-EPIC4.3 | Manual | Reference implementation review | ✅ |
+| AC-EPIC4.4 | Integration | `test_parity_validation_plan_documented` (Epic 6 prep) | ✅ |
+
+**Legend:**
+- ✅ = Test case defined and mapped
+- Unit = pytest unit test
+- Integration = pytest integration test with fixtures
+- Performance = pytest-benchmark or manual timing
+- Manual = Documentation/review checklist

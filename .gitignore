@@ -1,8 +1,3 @@
-# 忽略 docs 文件夹下（不含子目录）所有 bmm- 开头、.md 结尾的文件
-docs/bmm-*.md
-docs/implementation-*.md
-docs/validation-*.md
-
 # Claude Code settings
 monthly/
 db_migration/
@@ -27,6 +22,7 @@ bmad/
 .github/
 docs/sprint*.md
 .tmp_dagster_*/
+.agentvibes/
 
 # Python Virtual Environments (Backend)
 # uv-managed environment

@@ -276,6 +276,81 @@ validate_data_sources_config_v2('config/data_sources.yml')
 | Database Migration | `io/schema/migrations/versions/20251129_000001_create_annuity_performance_new.py` |
 | Data Source Config | `config/data_sources.yml` |
 
+## Standard Domain Pattern Reference Implementation
+
+> **Story 4.10** - Configuration-driven transformations using generic steps
+
+### Overview
+
+As of Story 4.10, the annuity_performance module serves as the **reference implementation** for the Standard Domain Pattern. This pattern uses:
+
+1. **Configuration-driven mappings** in `config.py` instead of hardcoded values in step classes
+2. **Generic steps from Story 1.12** (`DataFrameMappingStep`, `DataFrameValueReplacementStep`) for standard operations
+3. **Domain-specific steps only** for complex business logic that cannot be generalized
+
+### Configuration File Pattern
+
+**File:** `src/work_data_hub/domain/annuity_performance/config.py`
+
+```python
+# All static mappings centralized in config.py
+PLAN_CODE_CORRECTIONS = {"1P0290": "P0290", "1P0807": "P0807"}
+BUSINESS_TYPE_CODE_MAPPING = {"企年投资": "PL201", "企年受托": "PL202", ...}
+DEFAULT_PORTFOLIO_CODE_MAPPING = {"集合计划": "QTAN001", "单一计划": "QTAN002"}
+COMPANY_BRANCH_MAPPING = {"总部": "G00", "北京": "G01", ...}
+```
+
+### Generic Steps Usage
+
+**Before (Custom Step Class - 80+ lines):**
+```python
+class PlanCodeCleansingStep(TransformStep):
+    def apply(self, row, context):
+        # Hardcoded mapping logic
+        if row["计划代码"] == "1P0290":
+            row["计划代码"] = "P0290"
+        ...
+```
+
+**After (Config-Driven - 3 lines):**
+```python
+from work_data_hub.domain.pipelines.steps import DataFrameValueReplacementStep
+from .config import PLAN_CODE_CORRECTIONS
+
+pipeline.add_step(DataFrameValueReplacementStep({"计划代码": PLAN_CODE_CORRECTIONS}))
+```
+
+### Remaining Custom Steps
+
+Only `CompanyIdResolutionStep` remains as a custom step because it implements complex 5-priority business logic:
+
+1. Plan code mapping (priority 1)
+2. Account number mapping (priority 2)
+3. Hardcoded mapping with default fallback (priority 3)
+4. Customer name mapping (priority 4)
+5. Account name mapping (priority 5)
+
+### Code Metrics
+
+| Metric | Before Story 4.10 | After Story 4.10 | Change |
+|--------|-------------------|------------------|--------|
+| `pipeline_steps.py` | 923 lines | 444 lines | -52% |
+| Custom step classes | 8 | 1 | -87% |
+| Test coverage | 58% | 78% | +20% |
+
+### Epic 9 Migration Guide
+
+When migrating additional domains, follow this pattern:
+
+1. **Create `config.py`** with all static mappings
+2. **Use generic steps** for column renaming, value replacement, calculated fields
+3. **Create custom steps only** for domain-specific business logic
+4. **Import from `work_data_hub.domain.pipelines.steps`**:
+   - `DataFrameMappingStep` - Column renaming
+   - `DataFrameValueReplacementStep` - Value mapping
+   - `DataFrameCalculatedFieldStep` - Computed fields
+   - `DataFrameFilterStep` - Row filtering
+
 ## Future Enhancements (Epic 9)
 
 When migrating additional domains, use this implementation as a template:
@@ -283,7 +358,9 @@ When migrating additional domains, use this implementation as a template:
 1. Copy `config/data_sources.yml` entry structure
 2. Follow database migration pattern (composite PK, indexes, constraints)
 3. Create domain models following `AnnuityPerformanceIn/Out` pattern
-4. Use documentation template from this file
-5. Adapt runbook template for domain-specific errors
+4. **NEW:** Create `config.py` following the Standard Domain Pattern
+5. **NEW:** Use generic steps from `domain/pipelines/steps/` for standard operations
+6. Use documentation template from this file
+7. Adapt runbook template for domain-specific errors
 
 **Expected time savings:** Each new domain's configuration and documentation should take <2 hours instead of starting from scratch.
