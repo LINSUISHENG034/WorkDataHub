@@ -10,10 +10,10 @@
 | Category | Document | Description |
 |----------|----------|-------------|
 | **Start Here** | [BMM Index](./bmm-index.md) | Complete documentation index with all links |
-| **Product** | [PRD](./prd.md) | Product requirements and vision |
-| **Architecture** | [Architecture](./architecture.md) | System architecture overview |
+| **Product** | [PRD](./prd/index.md) | Product requirements and vision |
+| **Architecture** | [Architecture](./architecture/index.md) | System architecture overview |
 | **Development** | [Developer Guide](./developer-guide.md) | Setup and development workflows |
-| **Sprint** | [Epics](./epics.md) | Epic overview and progress |
+| **Sprint** | [Epics](./epics/index.md) | Epic overview and progress |
 
 ---
 
@@ -23,10 +23,38 @@
 docs/
 ├── index.md                    # This file - navigation entry point
 ├── bmm-index.md               # Complete documentation index (BMM generated)
-├── prd.md                     # Product Requirements Document
-├── architecture.md            # System Architecture
+├── prd/                       # Product Requirements Document (sharded)
+│   ├── index.md              # PRD navigation
+│   ├── executive-summary.md
+│   ├── project-classification.md
+│   ├── success-criteria.md
+│   ├── product-scope.md
+│   ├── data-platform-specific-requirements.md
+│   ├── functional-requirements.md
+│   ├── non-functional-requirements.md
+│   ├── implementation-planning.md
+│   ├── references.md
+│   ├── next-steps.md
+│   └── prd-summary.md
+├── architecture/              # System Architecture (sharded)
+│   ├── index.md              # Architecture navigation
+│   ├── executive-summary.md
+│   ├── technology-stack.md
+│   ├── architectural-decisions.md
+│   ├── novel-patterns.md
+│   ├── implementation-patterns.md
+│   ├── integration-architecture.md
+│   ├── non-functional-requirements.md
+│   ├── migration-strategy.md
+│   └── appendices.md
 ├── developer-guide.md         # Developer onboarding guide
-├── epics.md                   # Epic planning overview
+├── epics/                     # Epic planning (sharded by epic)
+│   ├── index.md              # Epic navigation & overview
+│   ├── epic-1-foundation-core-infrastructure.md
+│   ├── epic-2-multi-layer-data-quality-framework.md
+│   ├── epic-3-intelligent-file-discovery-version-detection.md
+│   ├── epic-4-annuity-performance-domain-migration-mvp.md
+│   └── epic-5-company-enrichment-service.md
 ├── backlog.md                 # Product backlog
 │
 ├── bmm-data-models.md         # Data models & database schema
@@ -48,7 +76,7 @@ docs/
 ## For New Developers
 
 1. Read [Developer Guide](./developer-guide.md)
-2. Review [Architecture](./architecture.md)
+2. Review [Architecture](./architecture/index.md)
 3. Explore [BMM Index](./bmm-index.md) for comprehensive context
 
 ## For AI Assistants

@@ -33,12 +33,12 @@ workflow_status:
   research: docs/initial/research-deep-prompt-2025-11-08.md
 
   # Phase 1: Planning
-  prd: docs/PRD.md
+  prd: docs/prd/
   validate-prd: optional
   create-design: conditional  # if_has_ui - determined after PRD
 
   # Phase 2: Solutioning
-  create-architecture: docs/architecture.md
+  create-architecture: docs/architecture/
   validate-architecture: docs/initial/validation-report-architecture-2025-11-09.md
   solutioning-gate-check: docs/initial/implementation-readiness-report-2025-11-09.md
 

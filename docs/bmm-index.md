@@ -26,8 +26,8 @@
 
 ### Essential Reading
 
-1. **[Product Requirements Document (PRD)](./prd.md)** - Product vision and requirements
-2. **[System Architecture](./architecture.md)** - Complete system architecture
+1. **[Product Requirements Document (PRD)](./prd/index.md)** - Product vision and requirements
+2. **[System Architecture](./architecture/index.md)** - Complete system architecture
 3. **[Brownfield Architecture Analysis](./brownfield-architecture.md)** - Legacy system analysis
 4. **[Developer Guide](./developer-guide.md)** - Setup, workflows, and conventions
 5. **[Architecture Boundaries](./architecture-boundaries.md)** - Clean architecture enforcement
@@ -43,7 +43,7 @@
 
 ### System Architecture
 
-- [System Architecture](./architecture.md) - Complete architecture overview
+- [System Architecture](./architecture/index.md) - Complete architecture overview
 - [Architecture Boundaries](./architecture-boundaries.md) - Clean architecture rules
 - [Brownfield Architecture](./brownfield-architecture.md) - Legacy analysis
 - [Database Migrations Guide](./database-migrations.md) - Migration procedures
@@ -164,7 +164,12 @@ uv run pytest -m e2e_suite         # E2E workflows
 
 ### Epic Planning
 
-- [Epic Overview](./epics.md) - All epics and progress
+- [Epic Overview](./epics/index.md) - All epics and progress
+  - [Epic 1: Foundation & Core Infrastructure](./epics/epic-1-foundation-core-infrastructure.md)
+  - [Epic 2: Multi-Layer Data Quality Framework](./epics/epic-2-multi-layer-data-quality-framework.md)
+  - [Epic 3: Intelligent File Discovery & Version Detection](./epics/epic-3-intelligent-file-discovery-version-detection.md)
+  - [Epic 4: Annuity Performance Domain Migration (MVP)](./epics/epic-4-annuity-performance-domain-migration-mvp.md)
+  - [Epic 5: Company Enrichment Service](./epics/epic-5-company-enrichment-service.md)
 - [Product Backlog](./backlog.md) - Prioritized backlog
 
 ### Sprint Artifacts
@@ -291,7 +296,7 @@ uv run pytest -m e2e_suite         # E2E workflows
 
 1. **Read:** [Developer Guide](./developer-guide.md)
 2. **Setup:** Follow setup instructions in Developer Guide
-3. **Architecture:** Read [System Architecture](./architecture.md)
+3. **Architecture:** Read [System Architecture](./architecture/index.md)
 4. **Code Structure:** Review [Source Tree Analysis](./bmm-source-tree-analysis.md)
 5. **Data Models:** Understand [Data Models](./bmm-data-models.md)
 6. **Run Tests:** `uv run pytest -m unit`
@@ -304,7 +309,7 @@ When creating a **brownfield PRD** for new features:
 1. **Reference this index:** `docs/bmm-index.md` (this file)
 2. **For data-related features:** Point to [Data Models](./bmm-data-models.md)
 3. **For UI-only features:** N/A (no UI in this project)
-4. **For backend features:** Reference [Architecture](./architecture.md) + [Source Tree](./bmm-source-tree-analysis.md)
+4. **For backend features:** Reference [Architecture](./architecture/index.md) + [Source Tree](./bmm-source-tree-analysis.md)
 5. **For full-stack features:** Reference all architecture docs
 
 ### For Understanding Existing Domains
