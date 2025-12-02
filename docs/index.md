@@ -54,7 +54,8 @@ docs/
 │   ├── epic-2-multi-layer-data-quality-framework.md
 │   ├── epic-3-intelligent-file-discovery-version-detection.md
 │   ├── epic-4-annuity-performance-domain-migration-mvp.md
-│   └── epic-5-company-enrichment-service.md
+│   ├── epic-5-epic-5-infrastructure-layer.md
+│   └── epic-6-company-enrichment-service.md
 ├── backlog.md                 # Product backlog
 │
 ├── bmm-data-models.md         # Data models & database schema

@@ -40,7 +40,7 @@ workflow_status:
   # Phase 2: Solutioning
   create-architecture: docs/architecture/
   validate-architecture: docs/initial/validation-report-architecture-2025-11-09.md
-  solutioning-gate-check: docs/initial/implementation-readiness-report-2025-11-09.md
+  solutioning-gate-check: docs/implementation-readiness-report-2025-12-02.md
 
   # Phase 3: Implementation
   sprint-planning: required

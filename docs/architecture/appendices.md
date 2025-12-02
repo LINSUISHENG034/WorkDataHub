@@ -5,14 +5,15 @@
 | # | Decision | Impact | MVP/Growth |
 |---|----------|--------|------------|
 | 1 | File-Pattern-Aware Version Detection | Epic 3 (Discovery) | MVP |
-| 2 | Legacy-Compatible Temporary Company IDs | Epic 5 (Enrichment) | MVP |
+| 2 | Legacy-Compatible Temporary Company IDs | Epic 6 (Enrichment) | MVP |
 | 3 | Hybrid Pipeline Step Protocol | Epic 1, 4, 9 (All pipelines) | MVP |
 | 4 | Hybrid Error Context Standards | Epic 2, 8 (Validation, Monitoring) | MVP |
 | 5 | Explicit Chinese Date Format Priority | Epic 2, 4 (Validation, Annuity) | MVP |
-| 6 | Stub-Only Enrichment MVP | Epic 5 (Enrichment) | MVP (defer to Growth) |
+| 6 | Stub-Only Enrichment MVP | Epic 6 (Enrichment) | MVP (defer to Growth) |
 | 7 | Comprehensive Naming Conventions | All epics | MVP |
 | 8 | structlog with Sanitization | Epic 1, 8 (Foundation, Monitoring) | MVP |
 | 9 | Configuration-Driven Generic Steps | Epic 1, 4, 9 (All pipelines) | MVP |
+| 10 | Infrastructure Layer & Pipeline Composition | Epic 5 (Infrastructure), Epic 9 (Growth) | MVP |
 
 ### Appendix B: Technology Dependency Matrix
 

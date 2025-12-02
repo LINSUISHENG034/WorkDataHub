@@ -1,4 +1,4 @@
-# generated: 2025-11-28
+# generated: 2025-12-02
 # project: WorkDataHub
 # project_key: WorkDataHub
 # tracking_system: file-system
@@ -8,36 +8,36 @@
 # ==================
 # Epic Status:
 #   - backlog: Epic exists in epic file but not contexted
-#   - contexted: Epic tech context created (required before drafting stories)
+#   - contexted or in-progress
+#   - done: Epic completed
 #
 # Story Status:
 #   - backlog: Story only exists in epic file
-#   - drafted: Story file created in stories folder
-#   - ready-for-dev: Draft approved and story context created
-#   - in-progress: Developer actively working on implementation
-#   - review: Under SM review (via code-review workflow)
-#   - done: Story completed
+#   - drafted: Story file created in stories folder by *create-story
+#   - ready-for-dev: Draft approved and story context created by *story-ready
+#   - in-progress: Developer actively working on implementation by *dev-story
+#   - review: Implementation complete, ready for review by *code-review
+#   - done: Story completed by *story-done
 #
 # Retrospective Status:
 #   - optional: Can be completed but not required
-#   - completed: Retrospective has been done
+#   - completed: Retrospective has been done by *retrospective
 #
 # WORKFLOW NOTES:
 # ===============
-# - Epics should be 'contexted' before stories can be 'drafted'
-# - Stories can be worked in parallel if team capacity allows
-# - SM typically drafts next story after previous one is 'done' to incorporate learnings
-# - Dev moves story to 'review', SM reviews, then Dev moves to 'done'
+# - Epics should be marked `in-progress` before stories can be marked beyond `backlog`
+# - SM typically drafts next story ONLY after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', dev reviews, then Dev moves to 'done'
 
-generated: '2025-11-28'
+generated: 2025-12-02
 project: WorkDataHub
 project_key: WorkDataHub
 tracking_system: file-system
 story_location: E:\Projects\WorkDataHub\docs\sprint-artifacts\stories
 
 development_status:
-  # Epic 1: Foundation & Core Infrastructure
-  epic-1: contexted
+  # Epic 1: Foundation & Core Infrastructure - COMPLETED
+  epic-1: done
   1-1-project-structure-and-development-environment-setup: done
   1-2-basic-cicd-pipeline-setup: done
   1-3-structured-logging-framework: done
@@ -49,11 +49,11 @@ development_status:
   1-9-dagster-orchestration-setup: done
   1-10-pipeline-framework-advanced-features: done
   1-11-enhanced-cicd-with-integration-tests: done
-  1-12-implement-standard-domain-generic-steps: done  # Code review 2025-11-30: Approved after documentation updates
+  1-12-implement-standard-domain-generic-steps: done
   epic-1-retrospective: completed
 
-  # Epic 2: Multi-Layer Data Quality Framework
-  epic-2: contexted
+  # Epic 2: Multi-Layer Data Quality Framework - COMPLETED
+  epic-2: done
   2-1-pydantic-models-for-row-level-validation-silver-layer: done
   2-2-pandera-schemas-for-dataframe-validation-bronze-gold-layers: done
   2-3-cleansing-registry-framework: done
@@ -61,8 +61,8 @@ development_status:
   2-5-validation-error-handling-and-reporting: done
   epic-2-retrospective: completed
 
-  # Epic 3: Intelligent File Discovery & Version Detection
-  epic-3: contexted
+  # Epic 3: Intelligent File Discovery & Version Detection - COMPLETED
+  epic-3: done
   3-0-data-source-configuration-schema-validation: done
   3-1-version-aware-folder-scanner: done
   3-2-pattern-based-file-matcher: done
@@ -71,36 +71,51 @@ development_status:
   3-5-file-discovery-integration: done
   epic-3-retrospective: completed
 
-  # Epic 4: Annuity Performance Domain Migration (MVP)
-  epic-4: contexted
+  # Epic 4: Annuity Performance Domain Migration (MVP) - COMPLETED
+  epic-4: done
   4-1-annuity-domain-data-models-pydantic: done
   4-2-annuity-bronze-layer-validation-schema: done
-  4-3-annuity-transformation-pipeline-bronze-silver: done
+  4-3-annuity-transformation-pipeline-bronze-to-silver: done
   4-4-annuity-gold-layer-projection-and-schema: done
   4-5-annuity-end-to-end-pipeline-integration: done
   4-6-annuity-domain-configuration-and-documentation: done
-  4-7-pipeline-framework-refactoring: done  # Code review approved 2025-11-29
-  4-8-annuity-module-deep-refactoring: done  # Completed 2025-11-30
-  4-9-annuity-module-decomposition-for-reusability: done  # Code review approved 2025-11-30
-  4-10-refactor-annuity-performance-to-standard-domain-pattern: done  # Completed 2025-12-01, target <1,000 lines not achieved (3,446) due to framework constraints
+  4-7-pipeline-framework-refactoring: done
+  4-8-annuity-module-deep-refactoring: done
+  4-9-annuity-module-decomposition-for-reusability: done
+  4-10-refactor-annuity-performance-to-standard-domain-pattern: done
   epic-4-retrospective: optional
 
-  # Epic 5: Company Enrichment Service
-  epic-5: backlog
-  5-1-enterpriseinfoprovider-protocol-and-stub-implementation: backlog
-  5-2-temporary-company-id-generation-hmac-based: backlog
-  5-3-internal-mapping-tables-and-database-schema: backlog
-  5-4-internal-mapping-resolver-multi-tier-lookup: backlog
-  5-5-enrichmentgateway-integration-and-fallback-logic: backlog
-  5-6-eqc-api-provider-sync-lookup-with-budget: backlog
-  5-7-async-enrichment-queue-deferred-resolution: backlog
-  5-8-enrichment-observability-and-export: backlog
+  # Epic 5: Infrastructure Layer Architecture - READY FOR IMPLEMENTATION
+  # Tech spec approved 2025-12-01, Sprint Change Proposal approved
+  # CRITICAL: Must be completed before Epic 9 (Growth Domains Migration)
+  # Refactors domain layer from 3,446 lines to <500 lines, establishes reusable infrastructure
+  epic-5: in-progress
+  5-1-infrastructure-foundation: drafted
+  5-2-cleansing-migration: backlog
+  5-3-config-reorganization: backlog
+  5-4-company-id-resolver: backlog
+  5-5-validation-utilities: backlog
+  5-6-pipeline-steps: backlog
+  5-7-service-refactoring: backlog
+  5-8-integration-and-docs: backlog
   epic-5-retrospective: optional
 
-  # Epic 6: Testing & Validation Infrastructure
+  # Epic 6: Company Enrichment Service
   epic-6: backlog
-  6-1-golden-dataset-extraction-from-legacy-system: backlog
-  6-2-automated-reconciliation-engine: backlog
-  6-3-parity-test-integration-in-ci-pipeline: backlog
-  6-4-divergence-reporting-and-sql-diff-tool: backlog
+  6-1-enterpriseinfoprovider-protocol-and-stub-implementation: backlog
+  6-2-temporary-company-id-generation-hmac-based: backlog
+  6-3-internal-mapping-tables-and-database-schema: backlog
+  6-4-internal-mapping-resolver-multi-tier-lookup: backlog
+  6-5-enrichmentgateway-integration-and-fallback-logic: backlog
+  6-6-eqc-api-provider-sync-lookup-with-budget: backlog
+  6-7-async-enrichment-queue-deferred-resolution: backlog
+  6-8-enrichment-observability-and-export: backlog
   epic-6-retrospective: optional
+
+  # Epic 7: Testing & Validation Infrastructure
+  epic-7: backlog
+  7-1-golden-dataset-extraction-from-legacy-system: backlog
+  7-2-automated-reconciliation-engine: backlog
+  7-3-parity-test-integration-in-ci-pipeline: backlog
+  7-4-divergence-reporting-and-sql-diff-tool: backlog
+  epic-7-retrospective: optional

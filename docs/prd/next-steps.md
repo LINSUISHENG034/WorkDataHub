@@ -30,14 +30,15 @@ Following the **Strangler Fig pattern** from Gemini research:
 - Epic 4: Pandera data contracts (Bronze/Silver/Gold)
 
 **Phase 2: Growth (Complete Migration)**
-- Epic 5-10: Migrate remaining 5+ domains (业务收集, 数据采集, etc.)
-- Epic 11: Enhanced orchestration (cross-domain dependencies)
-- Epic 12: Operational tooling (CLI, monitoring dashboards)
+- Epic 5: Infrastructure Layer Architecture (Critical - Unblocks Epic 6+)
+- Epic 6-11: Migrate remaining 5+ domains (业务收集, 数据采集, etc.)
+- Epic 12: Enhanced orchestration (cross-domain dependencies)
+- Epic 13: Operational tooling (CLI, monitoring dashboards)
 
 **Phase 3: Vision (Intelligent Platform)**
-- Epic 13: Predictive data quality (ML anomaly detection)
-- Epic 14: Self-healing pipelines
-- Epic 15: Schema evolution automation
+- Epic 14: Predictive data quality (ML anomaly detection)
+- Epic 15: Self-healing pipelines
+- Epic 16: Schema evolution automation
 
 ---
 

@@ -7,7 +7,7 @@
 | Full monthly processing | <30 min | Epic 7 Story 7.4 (performance testing) |
 | Single domain (50K rows) | <5 min | Epic 4 Story 4.7 (annuity perf test) |
 | File discovery | <10 sec | Epic 3 Story 3.6 (discovery perf) |
-| Company enrichment (MVP stub) | <1 ms/company | Epic 5 Story 5.1 (stub implementation) |
+| Company enrichment (MVP stub) | <1 ms/company | Epic 6 Story 6.1 (stub implementation) |
 
 **Architecture Support:**
 - **Decision #3:** DataFrame steps for vectorized operations (10-100x faster than row iteration)

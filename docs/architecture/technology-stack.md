@@ -24,7 +24,7 @@
 | **Medallion (Bronze→Silver→Gold)** | Layered data quality progression | Epic 2 (Validation), Epic 4 (Annuity) |
 | **Strangler Fig** | Gradual legacy replacement with parity | Epic 4, 9 (Domain migrations) |
 | **Configuration-Driven Discovery** | YAML-based file discovery | Epic 3 (File Discovery) |
-| **Provider Protocol** | Abstraction for enrichment sources | Epic 5 (Enrichment - deferred to Growth) |
+| **Provider Protocol** | Abstraction for enrichment sources | Epic 6 (Enrichment - deferred to Growth) |
 
 ---
 

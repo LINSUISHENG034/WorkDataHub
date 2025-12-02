@@ -199,11 +199,11 @@ WDH_ALIAS_SALT="<32+ character random string>"  # Required, must be secret
 - If salt lost/changed, all temporary IDs become different (document in runbook)
 - Never commit salt to git (validate with gitleaks in CI)
 
-#### Implementation (Epic 5 Story 5.2)
+#### Implementation (Epic 6 Story 6.2)
 
 - **Module:** `utils/company_normalizer.py`
 - **Extract:** `CORE_REPLACE_STRING` → `cleansing/config/status_markers.py`
-- **Integration:** `EnrichmentGateway` calls when lookup fails (Epic 5 Story 5.5)
+- **Integration:** `EnrichmentGateway` calls when lookup fails (Epic 6 Story 6.5)
 - **Testing:** Parity tests with legacy normalization using golden datasets
 
 ---
@@ -656,27 +656,27 @@ def _validate_date_range(d: date, min_year: int = 2000, max_year: int = 2030) ->
 
 ### Decision #6: Stub-Only Enrichment MVP ✅
 
-**Problem:** Epic 5 defines sophisticated company enrichment with 8 stories. Risk: blocks Epic 4 annuity migration, adds complexity.
+**Problem:** Epic 6 (Company Enrichment Service) defines sophisticated company enrichment with 8 stories. Risk: blocks Epic 4 annuity migration, adds complexity.
 
 **Decision:** Defer real enrichment to Growth phase. MVP uses StubProvider + temporary IDs only.
 
-#### MVP Scope (Epic 5)
+#### MVP Scope (Epic 6)
 
 **Implemented Stories:**
-- ✅ Story 5.1: `StubProvider` with test fixtures
-- ✅ Story 5.2: Temporary ID generation (Decision #2)
-- ✅ Story 5.5: `EnrichmentGateway` shell (stub + temp ID fallback only)
+- ✅ Story 6.1: `StubProvider` with test fixtures
+- ✅ Story 6.2: Temporary ID generation (Decision #2)
+- ✅ Story 6.5: `EnrichmentGateway` shell (stub + temp ID fallback only)
 
 **Result:** All companies get temporary IDs in MVP
 
 #### Growth Phase (Epic 9-10)
 
 **Deferred Stories:**
-- Story 5.3: Full database schema (3 tables)
-- Story 5.4: Multi-tier internal mapping resolver
-- Story 5.6: Sync EQC API provider (budget-limited, token management)
-- Story 5.7: Async enrichment queue (deferred resolution)
-- Story 5.8: Observability & metrics (CSV export, cache hit rates)
+- Story 6.3: Full database schema (3 tables)
+- Story 6.4: Multi-tier internal mapping resolver
+- Story 6.6: Sync EQC API provider (budget-limited, token management)
+- Story 6.7: Async enrichment queue (deferred resolution)
+- Story 6.8: Observability & metrics (CSV export, cache hit rates)
 
 **Result:** Backfill job resolves MVP temporary IDs to real company IDs
 
@@ -908,6 +908,118 @@ LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR
 LOG_TO_FILE=1   # 0 (disabled), 1 (enabled)
 LOG_FILE_PATH=logs/workdatahub.log
 ```
+
+---
+
+### Decision #10: Infrastructure Layer & Pipeline Composition ✅
+
+**Problem:** Domain layer was becoming bloated with infrastructure concerns (Epic 4 implementation reached 3,446 lines vs target <1,000 lines). Infrastructure logic (enrichment, validation, transforms) was embedded in domain layer instead of being extracted as reusable components, blocking Epic 9 (Growth Domains Migration).
+
+**Decision:** Establish `infrastructure/` layer with **Python Code Composition** (Pipeline Pattern) instead of JSON Configuration for data transformations.
+
+#### Infrastructure Layer Structure
+
+```
+src/work_data_hub/infrastructure/
+├── enrichment/                  # Data enrichment services
+│   └── company_id_resolver.py   # CompanyIdResolver with batch optimization
+├── validation/                  # Validation utilities and error handling
+│   ├── error_handler.py         # Threshold checking, structured logging
+│   └── report_generator.py      # CSV export for failed rows
+├── transforms/                  # Reusable pipeline steps (Python classes)
+│   ├── base.py                  # TransformStep base class, Pipeline composer
+│   └── standard_steps.py        # MappingStep, CleansingStep, CalculationStep, etc.
+├── cleansing/                   # Data cleansing registry (migrated from top-level)
+│   ├── registry.py
+│   ├── rules/
+│   └── settings/
+└── settings/                    # Infrastructure configuration
+    ├── data_source_schema.py    # Schema validation for configs
+    └── loader.py                # Config loading utilities
+```
+
+#### Python Code Composition Pattern
+
+**Core Principle:** Domain services compose pipelines using Python code, not JSON config
+
+```python
+# Domain service builds pipeline through code composition
+from work_data_hub.infrastructure.transforms import (
+    Pipeline, RenameStep, CleansingStep, MappingStep, CalculationStep
+)
+
+class AnnuityPerformanceService:
+    def _build_domain_pipeline(self) -> Pipeline:
+        """Build domain-specific transformation pipeline using code composition"""
+        return Pipeline([
+            RenameStep(CHINESE_TO_ENGLISH_MAPPING),
+            CleansingStep(self.cleansing, {
+                "客户名称": ["trim_whitespace", "normalize_company_name"],
+                "交易日期": ["standardize_date"]
+            }),
+            MappingStep(BUSINESS_TYPE_CODE_MAPPING, "业务类型", "product_line_code"),
+            CalculationStep(
+                lambda df: (df["期末资产规模"] - df["期初资产规模"]) / df["期初资产规模"],
+                "当期收益率"
+            )
+        ])
+```
+
+#### Architecture Boundaries
+
+| Layer | Responsibility | Code Location |
+|-------|---------------|---------------|
+| **Infrastructure** | Reusable utilities and pipeline building blocks | `infrastructure/` |
+| **Domain** | Business orchestration using infrastructure components | `domain/{domain_name}/` |
+| **Config** | Runtime configuration (environment variables, deployment-time settings) | `config/` |
+| **Data** | Business data (mappings, reference data) | `data/mappings/` |
+
+**Clean Architecture Enforcement:**
+- Domain layer: <500 lines per domain (Pure business orchestration)
+- Infrastructure provides utilities, NOT black-box engines
+- Dependency injection for testability
+- All infrastructure components have >85% test coverage
+
+#### Rationale
+
+1. **Python is the superior DSL** - No need for custom configuration languages/parsers
+2. **Maintenance burden avoidance** - JSON config requires custom parser, validation, error handling
+3. **Clean Architecture compliance** - Clear separation between infrastructure and business logic
+4. **Cross-domain code reuse** - Epic 9 (6+ domains) can reuse infrastructure components
+5. **Improved testability** - Code composition easier to test than config-driven engines
+6. **Performance optimization** - Vectorized Pandas operations in infrastructure steps
+
+#### Implications
+
+**For Domain Development (Epic 4, Epic 9):**
+- Domain service becomes lightweight orchestrator (<150 lines)
+- Pipeline composition uses infrastructure building blocks
+- Business logic stays in domain, infrastructure logic in infrastructure layer
+
+**For Infrastructure Development (Epic 5):**
+- Infrastructure provides reusable Steps (MappingStep, CleansingStep, etc.)
+- Each Step uses vectorized Pandas operations for performance
+- Steps are composable through Pipeline class
+- No configuration engines - domain code composes steps directly
+
+**For Configuration:**
+- `config/` contains only runtime/deployment-time configuration
+- `infrastructure/settings/` contains infrastructure configuration logic
+- `data/mappings/` contains business data (not configuration)
+- Domain `constants.py` contains business constants (avoid `config.py` naming conflicts)
+
+#### Implementation (Epic 5)
+
+- **Story 5.1-5.3:** Foundation and config reorganization
+- **Story 5.4-5.6:** Infrastructure components (CompanyIdResolver, validation utilities, pipeline steps)
+- **Story 5.7:** Refactor annuity_performance to lightweight orchestrator
+- **Story 5.8:** Integration testing and documentation
+
+**Expected Results:**
+- Domain layer: 3,446 → <500 lines (-85% code)
+- Infrastructure layer: 0 → ~1,200 lines (reusable)
+- Net reduction: -1,246 lines
+- Performance: 5-10x improvement (batch processing)
 
 ---
 
