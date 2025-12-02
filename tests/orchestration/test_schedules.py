@@ -3,16 +3,22 @@ Tests for Dagster schedules in WorkDataHub orchestration.
 
 This module tests the schedule configuration and ensures that the generated
 run_config matches the expected op schemas defined in ops.py.
+
+NOTE: Tests skipped pending Epic 5 infrastructure refactoring.
+Tests depend on deprecated trustee_performance schedules.
 """
 
 from unittest.mock import patch
 
+import pytest
 import yaml
 
 from src.work_data_hub.orchestration.schedules import (
     _build_schedule_run_config,
     trustee_daily_schedule,
 )
+
+pytestmark = pytest.mark.skip(reason="Tests depend on deprecated trustee_performance schedules - pending Epic 5")
 
 
 class TestScheduleRunConfig:

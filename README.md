@@ -267,7 +267,7 @@ uv run ruff format src/work_data_hub docs
 uv run ruff format --check src/work_data_hub docs
 ```
 
-> ℹ️ The `legacy/` tree and the broad `tests/` tree carry outstanding lint debt from the historical codebase. The default Ruff command excludes those paths so guardrails stay green. Opt-in linting for them is still available with `uv run ruff check legacy tests/legacy` when you are ready to tackle the backlog.
+> ℹ️ The `legacy/` tree has been removed as part of Epic 5 infrastructure refactoring. The broad `tests/` tree may still carry some lint debt from the historical codebase. The default Ruff command excludes problematic paths so guardrails stay green. Opt-in linting for them is still available with `uv run ruff check tests/` when you are ready to tackle the backlog.
 
 ### Dagster Orchestration
 

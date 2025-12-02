@@ -1,1 +1,0 @@
-# Legacy data smoke tests

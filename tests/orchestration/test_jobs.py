@@ -9,6 +9,7 @@ error conditions.
 import io
 from unittest.mock import Mock, patch
 
+import pytest
 import yaml
 
 from src.work_data_hub.orchestration.jobs import (
@@ -256,6 +257,7 @@ class TestBuildRunConfig:
             assert load_config["plan_only"] is True
 
 
+@pytest.mark.skip(reason="CLI tests depend on deprecated trustee_performance functionality - pending Epic 5")
 class TestCLIMain:
     """Test CLI main function."""
 

@@ -567,7 +567,7 @@ class TestDecimalQuantization:
 
     def test_none_values_preserved(self):
         """Test that None values are preserved through quantization."""
-        from src.work_data_hub.domain.trustee_performance.models import TrusteePerformanceOut
+        from src.work_data_hub.domain.sample_trustee_performance.models import TrusteePerformanceOut
 
         model = TrusteePerformanceOut(
             report_date="2024-01-01",

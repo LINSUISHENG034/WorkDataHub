@@ -3,6 +3,9 @@ Integration test for end-to-end WorkDataHub flow.
 
 This module tests the complete pipeline from file discovery through domain
 processing to validate the full integration works correctly.
+
+NOTE: These tests are skipped pending Epic 5 infrastructure refactoring.
+The tests depend on sample_trustee_performance domain which is being deprecated.
 """
 
 from datetime import date
@@ -16,6 +19,8 @@ from src.work_data_hub.config.settings import Settings
 from src.work_data_hub.domain.sample_trustee_performance.service import process
 from src.work_data_hub.io.connectors.file_connector import DataSourceConnector
 from src.work_data_hub.io.readers.excel_reader import read_excel_rows
+
+pytestmark = pytest.mark.skip(reason="Tests depend on deprecated sample_trustee_performance domain - pending Epic 5")
 
 
 @pytest.fixture

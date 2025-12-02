@@ -227,11 +227,11 @@ class TestSpecificLoaderFunctions:
         """Test successful loading of business type code mapping."""
         mapping = load_business_type_code()
 
-        # Assert known sample entries from YAML
+        # Assert known sample entries from YAML (updated to match current mapping file)
         assert "职年受托" in mapping
-        assert mapping["职年受托"] == "ZNST"
+        assert mapping["职年受托"] == "PL204"
         assert "职年投资" in mapping
-        assert mapping["职年投资"] == "ZNTZ"
+        assert mapping["职年投资"] == "PL203"
 
         # Verify all values are strings
         for key, value in mapping.items():

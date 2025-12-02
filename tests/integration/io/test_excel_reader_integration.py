@@ -190,11 +190,12 @@ class TestExcelReadSheetIntegration:
         # Verify error structure
         assert exc_info.value.domain == "unknown"
         assert exc_info.value.failed_stage == "excel_reading"
-        assert "Sheet '不存在的表' not found" in str(exc_info.value.message)
-        assert "available sheets:" in str(exc_info.value.message)
-        assert "规模明细" in str(exc_info.value.message)
-        assert "Summary" in str(exc_info.value.message)
-        assert "Notes" in str(exc_info.value.message)
+        error_str = str(exc_info.value)
+        assert "Sheet '不存在的表' not found" in error_str
+        assert "available sheets:" in error_str
+        assert "规模明细" in error_str
+        assert "Summary" in error_str
+        assert "Notes" in error_str
 
     @pytest.mark.integration
     def test_read_sheet_empty_row_handling_with_count_logging(
@@ -256,7 +257,7 @@ class TestExcelReadSheetIntegration:
         # Verify error structure
         assert exc_info.value.domain == "unknown"
         assert exc_info.value.failed_stage == "excel_reading"
-        assert "Excel file not found" in str(exc_info.value.message)
+        assert "Excel file not found" in str(exc_info.value)
 
     @pytest.mark.integration
     def test_read_sheet_corrupted_file_error(self, corrupted_excel_file):

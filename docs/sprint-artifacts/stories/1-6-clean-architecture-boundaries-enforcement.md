@@ -154,7 +154,7 @@ ChatGPT Codex (GPT-5)
 - Domain/IO/orchestration packages now carry Story 1.6 docstrings that reference Story 1.5 assets and Clean Architecture dependency flow.
 - Authored `docs/architecture-boundaries.md` plus README amplifier covering medallion mapping, the `transform_annuity_data` DI example, and instructions for the new Ruff guardrail.
 - Ruff TID251 banned-import rule (with per-layer allowances) protects the domain package; documentation records how to run `uv run ruff check`. Full-suite pytest currently fails due to longstanding legacy/integration issues; targeted pipeline suite passes for referenced assets.
-- Legacy + E2E suites now route through shared pytest gating (`tests/conftest.py` + new markers/CLI flags) and the Ruff surface is constrained to `src/work_data_hub`/docs; validated via `uv run ruff check src/work_data_hub docs`, `pytest tests/e2e -q`, and `pytest tests/legacy -q`.
+- Legacy tests have been removed as part of Epic 5 infrastructure refactoring. E2E suite now routes through shared pytest gating (`tests/conftest.py` + new markers/CLI flags) and the Ruff surface is constrained to `src/work_data_hub`/docs; validated via `uv run ruff check src/work_data_hub docs`, `pytest tests/e2e -q`.
 
 ### File List
 
@@ -242,7 +242,7 @@ Story 1.6 successfully establishes Clean Architecture boundaries with automated 
 **Test Infrastructure:**
 - ✅ tests/conftest.py:1-50 - Shared pytest gating layer for legacy_suite and e2e_suite markers
 - ✅ tests/e2e/test_annuity_overwrite_append_small_subsets.py:14 - Module-level marker: `pytestmark = pytest.mark.e2e_suite`
-- ✅ tests/legacy/test_annuity_performance_discovery.py:14 - Module-level marker: `pytestmark = pytest.mark.legacy_suite`
+- ✅ ~~tests/legacy/test_annuity_performance_discovery.py:14~~ - Module-level marker: `pytestmark = pytest.mark.legacy_suite` (REMOVED: Legacy tests cleaned up in Epic 5)
 - ✅ pytest collection successful: 8 unit tests in tests/unit/domain/pipelines/
 
 **Test Quality:**

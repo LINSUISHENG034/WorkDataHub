@@ -289,8 +289,10 @@ class TestExcelReader:
 
         # Check that column names are cleaned
         row = rows[0]
-        assert "Column 1" in row  # Spaces stripped from column name
-        assert "" in row  # None and empty column names become empty string
+        # New behavior: column normalizer removes all whitespace including internal spaces
+        assert "Column1" in row  # All spaces removed from column name
+        # Empty column names get placeholder names like "Unnamed_N"
+        assert any(k.startswith("Unnamed_") for k in row.keys())
 
     def test_header_normalization_removes_newlines_and_tabs(self, tmp_path):
         """Test Excel header normalization for newlines and tabs."""

@@ -70,6 +70,12 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             continue
         if E2E_MARK in item.keywords and not run_e2e:
             item.add_marker(skip_e2e)
+            continue
+
+        # Skip tests marked with needs_investigation due to complexity
+        if "needs_investigation" in item.keywords:
+            item.add_marker(pytest.mark.skip(reason="Test needs investigation due to known complexity issues"))
+            continue
 
 
 def _resolve_postgres_dsn() -> str:

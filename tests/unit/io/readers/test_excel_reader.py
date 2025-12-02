@@ -172,11 +172,12 @@ class TestExcelReadSheetMethod:
         # Verify error structure
         assert exc_info.value.domain == "unknown"
         assert exc_info.value.failed_stage == "excel_reading"
-        assert "不存在的表" in str(exc_info.value.message)
-        assert "available sheets" in str(exc_info.value.message)
-        assert "规模明细" in str(exc_info.value.message)
-        assert "Summary" in str(exc_info.value.message)
-        assert "Notes" in str(exc_info.value.message)
+        error_str = str(exc_info.value)
+        assert "不存在的表" in error_str
+        assert "available sheets" in error_str
+        assert "规模明细" in error_str
+        assert "Summary" in error_str
+        assert "Notes" in error_str
 
     @pytest.mark.unit
     def test_read_sheet_empty_row_handling_with_logging(self, empty_rows_excel_file, caplog):
@@ -254,7 +255,7 @@ class TestExcelReadSheetMethod:
             reader.read_sheet(multi_sheet_excel_file, sheet_name=10)  # Only 3 sheets exist
 
         assert exc_info.value.failed_stage == "excel_reading"
-        assert "Sheet index 10 out of range" in str(exc_info.value.message)
+        assert "Sheet index 10 out of range" in str(exc_info.value)
 
     @pytest.mark.unit
     def test_read_sheet_resolve_sheet_name_not_found(self, multi_sheet_excel_file):
@@ -265,7 +266,7 @@ class TestExcelReadSheetMethod:
             reader.read_sheet(multi_sheet_excel_file, sheet_name="不存在的表")
 
         assert exc_info.value.failed_stage == "excel_reading"
-        assert "Sheet '不存在的表' not found" in str(exc_info.value.message)
+        assert "Sheet '不存在的表' not found" in str(exc_info.value)
 
     @pytest.mark.unit
     def test_read_sheet_file_not_found_error(self):
@@ -276,7 +277,7 @@ class TestExcelReadSheetMethod:
             reader.read_sheet(Path("nonexistent_file.xlsx"), sheet_name=0)
 
         assert exc_info.value.failed_stage == "excel_reading"
-        assert "Excel file not found" in str(exc_info.value.message)
+        assert "Excel file not found" in str(exc_info.value)
 
     @pytest.mark.unit
     def test_read_sheet_column_normalization_mapping(self, whitespace_columns_excel_file):

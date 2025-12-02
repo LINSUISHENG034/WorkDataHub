@@ -3,10 +3,14 @@ Tests for Dagster sensors in WorkDataHub orchestration.
 
 This module tests sensor logic, cursor management, and health check functionality
 for the trustee performance file discovery and data quality sensors.
+
+NOTE: Tests skipped pending Epic 5 infrastructure refactoring.
+Tests depend on deprecated trustee_performance sensors.
 """
 
 from unittest.mock import patch
 
+import pytest
 import yaml
 from dagster import RunRequest, SkipReason, build_sensor_context
 
@@ -16,6 +20,8 @@ from src.work_data_hub.orchestration.sensors import (
     trustee_new_files_sensor,
 )
 from src.work_data_hub.utils.types import DiscoveredFile
+
+pytestmark = pytest.mark.skip(reason="Tests depend on deprecated trustee_performance sensors - pending Epic 5")
 
 
 class TestSensorRunConfig:

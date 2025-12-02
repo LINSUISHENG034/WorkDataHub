@@ -203,10 +203,12 @@ class TestExtractCompanyCode:
         assert result == "COMP002"
 
     def test_derive_from_客户名称(self):
-        """Test deriving from 客户名称 field."""
+        """Test deriving from 客户名称 field generates IN_* temporary ID."""
         model = AnnuityPerformanceIn(客户名称="测试公司有限公司")
         result = _extract_company_code(model, 0)
-        assert result == "测试公司"  # Suffixes removed
+        # New behavior: generates IN_<hash> format for unresolved company names
+        assert result.startswith("IN_")
+        assert len(result) == 19  # IN_ + 16 char hash
 
     def test_missing_company_code_returns_none(self):
         """Test missing company code returns None."""

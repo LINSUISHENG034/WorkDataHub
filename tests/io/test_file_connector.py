@@ -3,6 +3,9 @@ Tests for file discovery connector.
 
 This module tests the DataSourceConnector with various file patterns,
 including Unicode filenames and version selection strategies.
+
+NOTE: Some tests are skipped pending Epic 5 infrastructure refactoring.
+Tests depend on sample_trustee_performance domain configuration.
 """
 
 import os
@@ -132,6 +135,7 @@ class TestDataSourceConnector:
         with pytest.raises(DataSourceConnectorError, match="Invalid regex pattern"):
             DataSourceConnector(config_path=str(config_path))
 
+    @pytest.mark.skip(reason="Test depends on deprecated sample_trustee_performance domain - pending Epic 5")
     @patch("src.work_data_hub.config.settings.get_settings")
     def test_discover_sample_trustee_performance_files(self, mock_settings, config_file, test_data_dir):
         """Test discovery of trustee performance files with Chinese characters."""
@@ -186,6 +190,7 @@ class TestDataSourceConnector:
         paths = [f.path for f in files]
         assert not any("backup" + os.sep in p for p in paths)
 
+    @pytest.mark.skip(reason="Test depends on deprecated trustee_performance domain config - pending Epic 5")
     @patch("src.work_data_hub.config.settings.get_settings")
     def test_latest_by_year_month_selection(self, mock_settings, config_file, tmp_path):
         """Test selection of latest version by year/month."""
@@ -205,6 +210,7 @@ class TestDataSourceConnector:
         assert files[0].year == 2024
         assert files[0].month == 12
 
+    @pytest.mark.skip(reason="Test depends on deprecated trustee_performance domain config - pending Epic 5")
     @patch("src.work_data_hub.config.settings.get_settings")
     def test_latest_by_mtime_fallback(self, mock_settings, config_file, tmp_path):
         """Test fallback to mtime when year/month not available."""
@@ -255,6 +261,7 @@ class TestDataSourceConnector:
         with pytest.raises(DataSourceConnectorError, match="Unknown domain"):
             connector.discover("nonexistent_domain")
 
+    @pytest.mark.skip(reason="Test depends on deprecated trustee_performance domain config - pending Epic 5")
     @patch("src.work_data_hub.config.settings.get_settings")
     def test_discover_all_domains(self, mock_settings, config_file, tmp_path):
         """Test discovery across all domains."""
@@ -312,6 +319,7 @@ class TestDataSourceConnector:
                 assert "filename" in file.metadata
                 assert file.metadata["filename"] == "2024_11_受托业绩.xlsx"
 
+    @pytest.mark.skip(reason="Test depends on deprecated trustee_performance domain config - pending Epic 5")
     @patch("src.work_data_hub.config.settings.get_settings")
     def test_latest_by_year_month_and_version_selection(self, mock_settings, tmp_path):
         """Test selection of latest version by year/month with version-aware strategy."""

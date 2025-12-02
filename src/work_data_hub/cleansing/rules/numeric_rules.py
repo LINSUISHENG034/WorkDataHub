@@ -262,6 +262,9 @@ def comprehensive_decimal_cleaning(
         # 移除货币符号
         cleaned_value = remove_currency_symbols(cleaned_value)
 
+        # 移除千位分隔符
+        cleaned_value = clean_comma_separated_number(cleaned_value)
+
         # 再次检查空值
         cleaned_value = standardize_null_values(cleaned_value)
         if cleaned_value is None:
