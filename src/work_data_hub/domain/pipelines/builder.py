@@ -9,7 +9,7 @@ import importlib
 import logging
 from typing import Any, Dict, List, Optional, Union
 
-from .config import PipelineConfig, StepConfig
+from .pipeline_config import PipelineConfig, StepConfig
 from .core import Pipeline, TransformStep
 from .exceptions import PipelineAssemblyError
 from .types import DataFrameStep, RowTransformStep

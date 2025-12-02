@@ -8,7 +8,7 @@ configuration, including validation of domain configurations and error handling.
 import pytest
 import yaml
 
-from src.work_data_hub.config.schema import (
+from src.work_data_hub.infrastructure.settings.data_source_schema import (
     DataSourcesConfig,
     DataSourcesValidationError,
     DiscoveryConfig,

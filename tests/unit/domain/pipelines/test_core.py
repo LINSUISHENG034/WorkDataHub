@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from work_data_hub.config import get_settings
-from src.work_data_hub.domain.pipelines.config import PipelineConfig, StepConfig
+from src.work_data_hub.domain.pipelines.pipeline_config import PipelineConfig, StepConfig
 from src.work_data_hub.domain.pipelines.core import Pipeline
 from src.work_data_hub.domain.pipelines.examples import build_reference_pipeline
 from src.work_data_hub.domain.pipelines.exceptions import PipelineStepError, StepSkipped

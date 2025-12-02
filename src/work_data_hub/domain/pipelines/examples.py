@@ -16,7 +16,7 @@ from typing import List
 
 import pandas as pd
 
-from .config import PipelineConfig, StepConfig
+from .pipeline_config import PipelineConfig, StepConfig
 from .core import Pipeline
 from .types import DataFrameStep, PipelineContext
 

@@ -19,7 +19,7 @@ import pandas as pd
 import yaml
 
 import src.work_data_hub.config.settings as settings_module
-from src.work_data_hub.config.schema import (
+from src.work_data_hub.infrastructure.settings.data_source_schema import (
     DataSourceConfigV2,
     DataSourcesValidationError,
     DomainConfigV2,

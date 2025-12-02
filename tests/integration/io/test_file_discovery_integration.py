@@ -21,7 +21,7 @@ from work_data_hub.io.connectors.file_connector import FileDiscoveryService
 from work_data_hub.io.connectors.file_pattern_matcher import FilePatternMatcher
 from work_data_hub.io.connectors.version_scanner import VersionScanner
 from work_data_hub.io.readers.excel_reader import ExcelReader
-from src.work_data_hub.config.schema import DataSourceConfigV2, DomainConfigV2
+from src.work_data_hub.infrastructure.settings.data_source_schema import DataSourceConfigV2, DomainConfigV2
 
 
 # Path to realistic fixture file

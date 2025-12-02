@@ -11,7 +11,7 @@ import yaml
 from pathlib import Path
 from pydantic import ValidationError
 
-from src.work_data_hub.config.schema import (
+from src.work_data_hub.infrastructure.settings.data_source_schema import (
     DomainConfigV2,
     DataSourceConfigV2,
     DataSourcesValidationError,

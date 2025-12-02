@@ -11,7 +11,7 @@ from typing import Dict, List
 
 from src.work_data_hub.domain.pipelines.core import TransformStep
 from src.work_data_hub.domain.pipelines.types import Row, StepResult
-from src.work_data_hub.domain.pipelines.config import PipelineConfig, StepConfig
+from src.work_data_hub.domain.pipelines.pipeline_config import PipelineConfig, StepConfig
 
 
 class MockTransformStep(TransformStep):

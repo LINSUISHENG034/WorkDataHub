@@ -18,7 +18,7 @@ import pandas as pd
 
 from work_data_hub.utils.logging import get_logger
 
-from .config import PipelineConfig
+from .pipeline_config import PipelineConfig
 from .exceptions import PipelineStepError, StepSkipped
 from .types import (
     DataFrameStep,

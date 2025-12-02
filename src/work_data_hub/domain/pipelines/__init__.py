@@ -66,7 +66,7 @@ Available Components:
 # Adapter classes for integration
 from .adapters import CleansingRuleStep, FieldMapperStep
 from .builder import PipelineBuilder, build_pipeline
-from .config import PipelineConfig, StepConfig
+from .pipeline_config import PipelineConfig, StepConfig
 from .core import Pipeline, TransformStep
 
 # Exception hierarchy for error handling

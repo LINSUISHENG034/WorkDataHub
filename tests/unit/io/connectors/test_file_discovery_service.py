@@ -12,7 +12,7 @@ from work_data_hub.io.connectors.exceptions import DiscoveryError
 from work_data_hub.io.connectors.file_pattern_matcher import FileMatchResult
 from work_data_hub.io.connectors.version_scanner import VersionedPath
 from work_data_hub.io.readers.excel_reader import ExcelReadResult, ExcelReader
-from src.work_data_hub.config.schema import DataSourceConfigV2, DomainConfigV2
+from src.work_data_hub.infrastructure.settings.data_source_schema import DataSourceConfigV2, DomainConfigV2
 
 
 class DummyScanner:

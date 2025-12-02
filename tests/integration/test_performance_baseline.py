@@ -11,7 +11,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from work_data_hub.domain.pipelines.config import PipelineConfig, StepConfig
+from work_data_hub.domain.pipelines.pipeline_config import PipelineConfig, StepConfig
 from work_data_hub.domain.pipelines.core import Pipeline
 from work_data_hub.domain.pipelines.types import DataFrameStep
 

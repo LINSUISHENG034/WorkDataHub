@@ -15,7 +15,7 @@ from src.work_data_hub.domain.pipelines.builder import (
     _create_step_instance,
     _validate_step_dependencies
 )
-from src.work_data_hub.domain.pipelines.config import PipelineConfig, StepConfig
+from src.work_data_hub.domain.pipelines.pipeline_config import PipelineConfig, StepConfig
 from src.work_data_hub.domain.pipelines.core import Pipeline
 from src.work_data_hub.domain.pipelines.exceptions import PipelineAssemblyError
 

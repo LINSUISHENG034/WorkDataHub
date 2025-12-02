@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 from psycopg2 import sql
 
-from work_data_hub.domain.pipelines.config import PipelineConfig, StepConfig
+from work_data_hub.domain.pipelines.pipeline_config import PipelineConfig, StepConfig
 from work_data_hub.domain.pipelines.core import Pipeline
 from work_data_hub.domain.pipelines.types import DataFrameStep, RowTransformStep, StepResult
 from work_data_hub.io.loader.warehouse_loader import WarehouseLoader

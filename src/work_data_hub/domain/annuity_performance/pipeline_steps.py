@@ -24,13 +24,11 @@ import pandas as pd
 import pandera as pa
 from pandera.errors import SchemaError as PanderaSchemaError
 
-from work_data_hub.domain.annuity_performance.config import (
+from work_data_hub.domain.annuity_performance.constants import (
     COLUMN_ALIAS_MAPPING,
+    DEFAULT_ALLOWED_GOLD_COLUMNS,
     DEFAULT_COMPANY_ID,
     LEGACY_COLUMNS_TO_DELETE,
-)
-from work_data_hub.domain.annuity_performance.constants import (
-    DEFAULT_ALLOWED_GOLD_COLUMNS,
 )
 from work_data_hub.domain.annuity_performance.schemas import (
     BronzeAnnuitySchema,
@@ -40,7 +38,7 @@ from work_data_hub.domain.annuity_performance.schemas import (
     validate_bronze_dataframe,
     validate_gold_dataframe,
 )
-from work_data_hub.domain.pipelines.config import PipelineConfig, StepConfig
+from work_data_hub.domain.pipelines.pipeline_config import PipelineConfig, StepConfig
 from work_data_hub.domain.pipelines.core import Pipeline, TransformStep
 from work_data_hub.domain.pipelines.exceptions import PipelineStepError
 

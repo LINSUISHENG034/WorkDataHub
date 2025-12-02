@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from src.work_data_hub.config.schema import (
+from src.work_data_hub.infrastructure.settings.data_source_schema import (
     DataSourceConfigV2,
     DataSourcesValidationError,
     DomainConfigV2,

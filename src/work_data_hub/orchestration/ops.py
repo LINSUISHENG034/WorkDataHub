@@ -56,7 +56,7 @@ def _load_valid_domains() -> List[str]:
     """
     # Optional: Validate data_sources.yml for fail-fast behavior
     try:
-        from src.work_data_hub.config.schema import (
+        from src.work_data_hub.infrastructure.settings.data_source_schema import (
             DataSourcesValidationError,
             validate_data_sources_config,
         )

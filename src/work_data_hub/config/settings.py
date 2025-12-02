@@ -18,7 +18,10 @@ from typing import Literal, Optional
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from .schema import DataSourceConfigV2, DataSourcesValidationError
+from work_data_hub.infrastructure.settings.data_source_schema import (
+    DataSourceConfigV2,
+    DataSourcesValidationError,
+)
 
 logger = structlog.get_logger(__name__)
 

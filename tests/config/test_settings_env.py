@@ -14,6 +14,8 @@ def test_settings_reads_custom_env_file(tmp_path, monkeypatch):
     env_path.write_text("WDH_DATA_BASE_DIR=/tmp/custom-data\n")
 
     monkeypatch.setenv("WDH_ENV_FILE", str(env_path))
+    # Ensure environment variable doesn't override the file
+    monkeypatch.delenv("WDH_DATA_BASE_DIR", raising=False)
 
     settings_module = _reload_settings_module()
     try:

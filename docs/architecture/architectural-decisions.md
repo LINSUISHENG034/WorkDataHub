@@ -1101,4 +1101,67 @@ pipeline.add_step(DataFrameFilterStep(FILTER_CONDITION))
 - **Tests:** `tests/unit/domain/pipelines/steps/test_*_step.py`
 
 ---
+
+## Technical Debt & Future Considerations
+
+### TD-001: Cross-Domain Mapping Data Consolidation
+
+**Identified:** Story 5.3 (2025-12-02)
+**Priority:** Medium (address in Epic 9)
+**Status:** Deferred
+
+#### Problem
+
+Some mappings in `domain/annuity_performance/constants.py` have strong cross-domain applicability but are currently locked in a single domain module:
+
+| Mapping | Current Location | Cross-Domain Applicability |
+|---------|------------------|---------------------------|
+| `COMPANY_BRANCH_MAPPING` | `annuity_performance/constants.py` | High - all domains use institution codes |
+| `BUSINESS_TYPE_CODE_MAPPING` | `annuity_performance/constants.py` | High - product line codes are company-wide |
+| `PLAN_CODE_CORRECTIONS` | `annuity_performance/constants.py` | Low - annuity-specific |
+| `DEFAULT_ALLOWED_GOLD_COLUMNS` | `annuity_performance/constants.py` | Low - domain-specific schema |
+
+#### Current State
+
+1. **`data/mappings/*.yml`** - Created but loader functions unused in production code
+2. **`domain/xxx/constants.py`** - Contains both domain-specific and cross-domain mappings
+3. **Data duplication** - `business_type_code.yml` duplicates `BUSINESS_TYPE_CODE_MAPPING`
+
+#### Recommended Resolution (Epic 9)
+
+When second domain requires same mappings:
+
+```python
+# 1. Move cross-domain mappings to data/mappings/
+data/mappings/
+├── company_branch.yml          # Complete institution code mapping
+├── business_type_code.yml      # Complete business type mapping
+
+# 2. Domain constants.py retains only domain-specific items
+domain/annuity_performance/constants.py:
+├── DEFAULT_ALLOWED_GOLD_COLUMNS  # Domain-specific
+├── PLAN_CODE_CORRECTIONS         # Domain-specific
+├── LEGACY_COLUMNS_TO_DELETE      # Domain-specific
+
+# 3. Load cross-domain mappings via infrastructure
+from work_data_hub.infrastructure.settings import (
+    load_company_branch,
+    load_business_type_code,
+)
+```
+
+#### Decision Criteria
+
+| Mapping Type | Location | Criteria |
+|-------------|----------|----------|
+| Cross-domain | `data/mappings/` | Used by 2+ domains, company-wide reference data |
+| Domain-specific | `constants.py` | Used by single domain, domain-specific business rules |
+
+#### Impact if Not Addressed
+
+- Code duplication when Epic 9 domains need same mappings
+- Inconsistent data if mappings updated in one location but not another
+- Reduced maintainability as domain count grows
+
+---
 

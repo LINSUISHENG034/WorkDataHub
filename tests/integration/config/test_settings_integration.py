@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from src.work_data_hub.config.settings import Settings, get_settings
-from src.work_data_hub.config.schema import DataSourcesValidationError
+from src.work_data_hub.infrastructure.settings.data_source_schema import DataSourcesValidationError
 
 
 @pytest.fixture
@@ -239,7 +239,7 @@ class TestEndToEndIntegration:
             yaml.dump(config_data, f, allow_unicode=True)
 
         # Test that configuration system can load and validate this without errors
-        from src.work_data_hub.config.schema import validate_data_sources_config_v2
+        from src.work_data_hub.infrastructure.settings.data_source_schema import validate_data_sources_config_v2
 
         try:
             # This should not raise any errors if system works correctly
@@ -247,7 +247,7 @@ class TestEndToEndIntegration:
             assert result is True
 
             # Test that we can get domain configuration
-            from src.work_data_hub.config.schema import get_domain_config_v2
+            from src.work_data_hub.infrastructure.settings.data_source_schema import get_domain_config_v2
             domain_config = get_domain_config_v2("annuity_performance", str(config_path))
 
             # Verify configuration matches what we expect
@@ -265,14 +265,14 @@ class TestEndToEndIntegration:
 
         if Path(config_path).exists():
             # Test loading real configuration file
-            from src.work_data_hub.config.schema import validate_data_sources_config_v2
+            from src.work_data_hub.infrastructure.settings.data_source_schema import validate_data_sources_config_v2
 
             try:
                 result = validate_data_sources_config_v2(config_path)
                 assert result is True
 
                 # Test getting annuity_performance domain
-                from src.work_data_hub.config.schema import get_domain_config_v2
+                from src.work_data_hub.infrastructure.settings.data_source_schema import get_domain_config_v2
                 annuity_config = get_domain_config_v2("annuity_performance", config_path)
 
                 assert annuity_config.sheet_name == "规模明细"

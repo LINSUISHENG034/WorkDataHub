@@ -130,7 +130,7 @@ class PipelineConfig(BaseModel):
         description="HTTP status codes that trigger retry"
     )
     retry_limits: Dict[str, int] = Field(
-        default={
+        default_factory=lambda: {
             "database": 5,
             "network": 3,
             "http_429_503": 3,
