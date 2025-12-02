@@ -101,7 +101,8 @@ ehthumbs.db
 Thumbs.db
 
 # Project specific
-data/
+data/*
+!data/mappings/
 storage/
 temp/
 downloads/

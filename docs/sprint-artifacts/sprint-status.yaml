@@ -85,12 +85,12 @@ development_status:
   4-10-refactor-annuity-performance-to-standard-domain-pattern: done
   epic-4-retrospective: optional
 
-  # Epic 5: Infrastructure Layer Architecture - READY FOR IMPLEMENTATION
+  # Epic 5: Infrastructure Layer Architecture - IN PROGRESS
   # Tech spec approved 2025-12-01, Sprint Change Proposal approved
   # CRITICAL: Must be completed before Epic 9 (Growth Domains Migration)
   # Refactors domain layer from 3,446 lines to <500 lines, establishes reusable infrastructure
   epic-5: in-progress
-  5-1-infrastructure-foundation: drafted
+  5-1-infrastructure-foundation: done
   5-2-cleansing-migration: backlog
   5-3-config-reorganization: backlog
   5-4-company-id-resolver: backlog
