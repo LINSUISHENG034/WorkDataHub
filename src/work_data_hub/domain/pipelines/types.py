@@ -20,7 +20,7 @@ import pandas as pd
 from typing_extensions import Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from work_data_hub.utils.error_reporter import ValidationErrorReporter
+    pass  # Story 5.5: ValidationErrorReporter removed, use infrastructure.validation
 
 # Type alias for data rows flowing through pipeline steps
 Row = Dict[str, Any]
@@ -147,8 +147,10 @@ class PipelineContext:
         timestamp: UTC timestamp when the run started
         config: Serialized pipeline configuration for reference in steps
         metadata: Mutable map for steps to stash scratchpad data
-        reporter: Optional ValidationErrorReporter for collecting validation errors
-                  (Story 2.5 integration)
+
+    Note:
+        Story 5.5: ValidationErrorReporter removed. Use infrastructure.validation
+        utilities directly for error handling and reporting.
     """
 
     pipeline_name: str
@@ -156,7 +158,6 @@ class PipelineContext:
     timestamp: datetime
     config: Mapping[str, Any]
     metadata: MutableMapping[str, Any] = field(default_factory=dict)
-    reporter: Optional[ValidationErrorReporter] = None
 
 
 @dataclass

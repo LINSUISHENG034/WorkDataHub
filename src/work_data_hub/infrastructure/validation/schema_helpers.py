@@ -1,11 +1,27 @@
-"""
-Generic validation helper functions for DataFrame schema validation.
+"""Schema validation helper functions for DataFrame validation.
 
-Story 4.8: Extracted from annuity_performance/schemas.py for reuse across
-multiple domains (annuity_performance, Epic 9 domains, etc.).
+This module provides utility functions for Pandera schema validation
+with consistent error formatting and common validation checks.
 
-These helpers provide consistent validation behavior and error formatting
-for Pandera schema validation across all domain modules.
+Migrated from: domain/pipelines/validation/helpers.py (Story 5.5)
+
+Key Functions:
+- raise_schema_error: Raise SchemaError with consistent formatting
+- ensure_required_columns: Validate required columns are present
+- ensure_not_empty: Validate DataFrame is not empty
+
+Usage:
+    >>> from work_data_hub.infrastructure.validation import (
+    ...     raise_schema_error,
+    ...     ensure_required_columns,
+    ...     ensure_not_empty,
+    ... )
+    >>>
+    >>> # Check required columns before validation
+    >>> ensure_required_columns(schema, df, ['col1', 'col2'], 'BronzeSchema')
+    >>>
+    >>> # Check DataFrame is not empty
+    >>> ensure_not_empty(schema, df, 'BronzeSchema')
 """
 
 from __future__ import annotations
@@ -25,8 +41,7 @@ def raise_schema_error(
     message: str,
     failure_cases: pd.DataFrame | None = None,
 ) -> SchemaError:
-    """
-    Raise SchemaError with consistent formatting.
+    """Raise SchemaError with consistent formatting.
 
     This helper ensures all schema validation errors across domains have
     consistent structure and formatting for logging and error handling.
@@ -39,6 +54,15 @@ def raise_schema_error(
 
     Raises:
         SchemaError: Always raises with the provided details
+
+    Example:
+        >>> import pandera as pa
+        >>> schema = pa.DataFrameSchema({'col': pa.Column(int)})
+        >>> df = pd.DataFrame({'col': ['not_int']})
+        >>> raise_schema_error(schema, df, "Type mismatch")
+        Traceback (most recent call last):
+            ...
+        pandera.errors.SchemaError: Type mismatch
     """
     raise SchemaError(
         schema=schema,
@@ -54,8 +78,10 @@ def ensure_required_columns(
     required: Iterable[str],
     schema_name: str = "Schema",
 ) -> None:
-    """
-    Ensure all required columns are present in the DataFrame.
+    """Ensure all required columns are present in the DataFrame.
+
+    This check should be performed before schema validation to provide
+    clear error messages about missing columns.
 
     Args:
         schema: The Pandera schema for error context
@@ -65,6 +91,15 @@ def ensure_required_columns(
 
     Raises:
         SchemaError: If any required columns are missing
+
+    Example:
+        >>> import pandera as pa
+        >>> schema = pa.DataFrameSchema({'a': pa.Column(), 'b': pa.Column()})
+        >>> df = pd.DataFrame({'a': [1]})
+        >>> ensure_required_columns(schema, df, ['a', 'b'], 'TestSchema')
+        Traceback (most recent call last):
+            ...
+        pandera.errors.SchemaError: TestSchema validation failed: ...
     """
     missing = [col for col in required if col not in dataframe.columns]
     if missing:
@@ -85,8 +120,10 @@ def ensure_not_empty(
     dataframe: pd.DataFrame,
     schema_name: str = "Schema",
 ) -> None:
-    """
-    Ensure the DataFrame is not empty.
+    """Ensure the DataFrame is not empty.
+
+    This check should be performed before schema validation to provide
+    clear error messages about empty DataFrames.
 
     Args:
         schema: The Pandera schema for error context
@@ -95,6 +132,15 @@ def ensure_not_empty(
 
     Raises:
         SchemaError: If the DataFrame is empty
+
+    Example:
+        >>> import pandera as pa
+        >>> schema = pa.DataFrameSchema({'col': pa.Column()})
+        >>> df = pd.DataFrame()
+        >>> ensure_not_empty(schema, df, 'TestSchema')
+        Traceback (most recent call last):
+            ...
+        pandera.errors.SchemaError: TestSchema validation failed: ...
     """
     if dataframe.empty:
         raise SchemaError(

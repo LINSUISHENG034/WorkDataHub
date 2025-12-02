@@ -350,30 +350,32 @@ class TestExportUnknownNamesCsv:
         assert result is None
 
     def test_export_enabled_with_names(self, tmp_path, monkeypatch):
-        """Test export enabled with names calls write_unknowns_csv."""
-        # Story 4.8: Mock in processing_helpers where the function is now defined
-        import work_data_hub.domain.annuity_performance.processing_helpers as helpers_module
+        """Test export enabled with names calls export_error_csv."""
+        # Story 5.5: Mock export_error_csv from infrastructure.validation
+        from pathlib import Path
 
-        # Mock write_unknowns_csv to return a test path
-        test_csv_path = str(tmp_path / "unknown_companies.csv")
+        import work_data_hub.infrastructure.validation as validation_module
 
-        def mock_write_unknowns_csv(names, source):
+        # Mock export_error_csv to return a test path
+        test_csv_path = tmp_path / "unknown_companies.csv"
+
+        def mock_export_error_csv(df, filename_prefix, output_dir):
             return test_csv_path
 
-        monkeypatch.setattr(helpers_module, "write_unknowns_csv", mock_write_unknowns_csv)
+        monkeypatch.setattr(validation_module, "export_error_csv", mock_export_error_csv)
 
         result = _export_unknown_names_csv(["Company1", "Company2"], "test_source", export_enabled=True)
-        assert result == test_csv_path
+        assert result == str(test_csv_path)
 
     def test_export_failure_returns_none(self, monkeypatch):
         """Test export failure returns None instead of raising."""
-        # Story 4.8: Mock in processing_helpers where the function is now defined
-        import work_data_hub.domain.annuity_performance.processing_helpers as helpers_module
+        # Story 5.5: Mock export_error_csv from infrastructure.validation
+        import work_data_hub.infrastructure.validation as validation_module
 
-        def mock_write_unknowns_csv(names, source):
+        def mock_export_error_csv(df, filename_prefix, output_dir):
             raise IOError("Disk full")
 
-        monkeypatch.setattr(helpers_module, "write_unknowns_csv", mock_write_unknowns_csv)
+        monkeypatch.setattr(validation_module, "export_error_csv", mock_export_error_csv)
 
         # Should not raise, should return None
         result = _export_unknown_names_csv(["Company1"], "test_source", export_enabled=True)

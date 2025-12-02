@@ -15,7 +15,7 @@ import pandas as pd
 import pandera as pa
 from pandera.errors import SchemaError, SchemaErrors
 
-from work_data_hub.domain.pipelines.validation import (
+from work_data_hub.infrastructure.validation import (
     ensure_not_empty,
     ensure_required_columns,
     raise_schema_error,

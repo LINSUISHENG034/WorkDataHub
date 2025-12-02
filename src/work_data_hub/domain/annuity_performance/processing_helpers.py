@@ -17,7 +17,6 @@ from pydantic import ValidationError
 
 from work_data_hub.utils.date_parser import parse_chinese_date
 
-from .csv_export import write_unknowns_csv
 from .models import (
     AnnuityPerformanceIn,
     AnnuityPerformanceOut,
@@ -236,15 +235,25 @@ def export_unknown_names_csv(
     Returns:
         Path to exported CSV file, or None if not exported
     """
+    from pathlib import Path
+
+    from work_data_hub.infrastructure.validation import export_error_csv
+
     if not export_enabled or not unknown_names:
         return None
 
     try:
-        csv_path = write_unknowns_csv(unknown_names, data_source)
+        # Convert unknown names to DataFrame for export
+        df = pd.DataFrame({"unknown_company_name": unknown_names})
+        csv_path = export_error_csv(
+            df,
+            filename_prefix=f"unknown_companies_{data_source}",
+            output_dir=Path("logs"),
+        )
         logger.info(
             f"Exported {len(unknown_names)} unknown company names to: {csv_path}"
         )
-        return csv_path
+        return str(csv_path)
     except Exception as e:
         logger.warning(f"Failed to export unknown names CSV: {e}")
         return None
