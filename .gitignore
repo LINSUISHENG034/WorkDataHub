@@ -4,6 +4,10 @@ db_migration/
 reference/claude-code-full-guide/
 reference/patoken/
 
+/node_modules/
+/package-lock.json
+/package.json
+
 # Ignore folders
 deprecated/
 /legacy/docs/

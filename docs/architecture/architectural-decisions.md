@@ -199,12 +199,18 @@ WDH_ALIAS_SALT="<32+ character random string>"  # Required, must be secret
 - If salt lost/changed, all temporary IDs become different (document in runbook)
 - Never commit salt to git (validate with gitleaks in CI)
 
-#### Implementation (Epic 6 Story 6.2)
+#### Implementation
 
-- **Module:** `utils/company_normalizer.py`
-- **Extract:** `CORE_REPLACE_STRING` → `cleansing/config/status_markers.py`
-- **Integration:** `EnrichmentGateway` calls when lookup fails (Epic 6 Story 6.5)
+> **UPDATE (2025-12-02):** Implementation moved from Epic 6 to Epic 5 Story 5.4 for earlier availability.
+
+- **Module:** `infrastructure/enrichment/normalizer.py` (Story 5.4)
+- **Status Markers:** `CORE_REPLACE_STRING` defined inline in normalizer module
+- **Integration Points:**
+  - `infrastructure/enrichment/CompanyIdResolver._generate_temp_id()` (Story 5.4)
+  - `EnrichmentGateway` calls when lookup fails (Epic 6 Story 6.5)
 - **Testing:** Parity tests with legacy normalization using golden datasets
+
+**CRITICAL:** Any code generating temporary company IDs MUST call `normalize_for_temp_id()` before hashing. Failure to do so will result in the same customer receiving different IDs due to whitespace, status markers, or character width variations.
 
 ---
 
