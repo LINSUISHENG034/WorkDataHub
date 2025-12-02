@@ -360,7 +360,7 @@ class TestFactoryMethodSupport:
     def test_build_pipeline_with_registry_factory_method(self):
         """Test building pipeline with CleansingRuleStep.from_registry factory method."""
         with patch('src.work_data_hub.domain.pipelines.adapters.registry') as mock_registry:
-            from work_data_hub.cleansing.registry import CleansingRule, RuleCategory
+            from work_data_hub.infrastructure.cleansing.registry import CleansingRule, RuleCategory
 
             # Mock the registry to return a test rule
             mock_rule = CleansingRule(

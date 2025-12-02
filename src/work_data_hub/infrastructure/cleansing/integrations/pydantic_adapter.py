@@ -10,8 +10,8 @@ from typing import Dict, Optional
 
 from pydantic import ValidationInfo, field_validator
 
-from src.work_data_hub.cleansing.registry import registry
-from src.work_data_hub.cleansing.rules.numeric_rules import (
+from work_data_hub.infrastructure.cleansing.registry import registry
+from work_data_hub.infrastructure.cleansing.rules.numeric_rules import (
     comprehensive_decimal_cleaning,
 )
 

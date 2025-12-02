@@ -2,11 +2,11 @@
 
 import pytest
 
-from src.work_data_hub.cleansing.rules.numeric_rules import (
+from src.work_data_hub.infrastructure.cleansing.rules.numeric_rules import (
     clean_comma_separated_number,
     remove_currency_symbols,
 )
-from src.work_data_hub.cleansing.rules.string_rules import (
+from src.work_data_hub.infrastructure.cleansing.rules.string_rules import (
     normalize_company_name,
     trim_whitespace,
 )

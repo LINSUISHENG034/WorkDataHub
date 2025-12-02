@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.work_data_hub.cleansing.registry import RuleCategory, rule
+from work_data_hub.infrastructure.cleansing.registry import RuleCategory, rule
 
-_DECORATIVE_CHARS = "「」『』\"“”《》"
+_DECORATIVE_CHARS = "「」『』\"""《》"
 
 
 @rule(

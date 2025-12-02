@@ -293,7 +293,7 @@ df['月度'] = df['月度'].apply(
 ### Use Case 2: Cleansing Registry Integration
 
 ```python
-from work_data_hub.cleansing.registry import rule, RuleCategory
+from work_data_hub.infrastructure.cleansing.registry import rule, RuleCategory
 from work_data_hub.utils.date_parser import parse_yyyymm_or_chinese
 
 @rule("parse_chinese_date", RuleCategory.DATE, "Parse Chinese date formats")

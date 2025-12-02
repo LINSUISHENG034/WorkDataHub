@@ -23,7 +23,7 @@ def test_major_issues_fixed():
 
     # This would have failed before due to import path mismatch
     with patch('work_data_hub.domain.pipelines.adapters.registry') as mock_registry:
-        from work_data_hub.cleansing.registry import CleansingRule, RuleCategory
+        from work_data_hub.infrastructure.cleansing.registry import CleansingRule, RuleCategory
 
         # Mock the registry
         mock_rule = CleansingRule(

@@ -9,7 +9,7 @@ within the new pipeline architecture.
 import logging
 from typing import Any, Dict, List, Optional
 
-from work_data_hub.cleansing.registry import CleansingRule, registry
+from work_data_hub.infrastructure.cleansing.registry import CleansingRule, registry
 
 from .core import TransformStep
 from .exceptions import PipelineAssemblyError

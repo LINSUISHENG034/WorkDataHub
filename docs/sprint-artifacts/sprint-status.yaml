@@ -91,7 +91,7 @@ development_status:
   # Refactors domain layer from 3,446 lines to <500 lines, establishes reusable infrastructure
   epic-5: in-progress
   5-1-infrastructure-foundation: done
-  5-2-cleansing-migration: backlog
+  5-2-cleansing-migration: done
   5-3-config-reorganization: backlog
   5-4-company-id-resolver: backlog
   5-5-validation-utilities: backlog

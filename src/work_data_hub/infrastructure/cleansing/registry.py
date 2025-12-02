@@ -72,7 +72,7 @@ class CleansingRegistry:
             return
 
         self._config_lock = RLock()
-        self._config_path = Path(__file__).resolve().parent / "config" / "cleansing_rules.yml"
+        self._config_path = Path(__file__).resolve().parent / "settings" / "cleansing_rules.yml"
         self._config_mtime: Optional[float] = None
         self._domain_config: Dict[str, Any] = {
             "domains": {},

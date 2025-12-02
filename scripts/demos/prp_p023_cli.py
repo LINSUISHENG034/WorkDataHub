@@ -31,7 +31,7 @@ try:
 
     import psycopg2
 
-    from src.work_data_hub.cleansing.rules.numeric_rules import comprehensive_decimal_cleaning
+    from src.work_data_hub.infrastructure.cleansing.rules.numeric_rules import comprehensive_decimal_cleaning
     from src.work_data_hub.config.settings import get_settings
     from src.work_data_hub.domain.annuity_performance.models import AnnuityPerformanceIn
     from src.work_data_hub.domain.annuity_performance.service import _extract_plan_code, process

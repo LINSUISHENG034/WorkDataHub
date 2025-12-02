@@ -99,7 +99,7 @@ print(features)
 # 5. 扩展性示例
 print("5. 扩展性示例 - 新增清洗规则:")
 extension_example = """
-from work_data_hub.cleansing import rule, RuleCategory
+from work_data_hub.infrastructure.cleansing import rule, RuleCategory
 
 @rule(
     name="company_name_standardization",

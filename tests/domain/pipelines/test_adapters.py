@@ -12,7 +12,7 @@ from unittest.mock import Mock, patch
 from src.work_data_hub.domain.pipelines.adapters import CleansingRuleStep, FieldMapperStep
 from src.work_data_hub.domain.pipelines.exceptions import PipelineAssemblyError
 from src.work_data_hub.domain.pipelines.types import StepResult
-from work_data_hub.cleansing.registry import CleansingRule, RuleCategory
+from work_data_hub.infrastructure.cleansing.registry import CleansingRule, RuleCategory
 
 
 class TestCleansingRuleStepInitialization:
@@ -298,7 +298,7 @@ class TestCleansingRuleStepWithRealRules:
     def test_with_decimal_quantization_rule(self, mock_registry, decimal_test_data):
         """Test CleansingRuleStep with decimal quantization rule."""
         # Import the real rule function
-        from work_data_hub.cleansing.rules.numeric_rules import decimal_quantization
+        from work_data_hub.infrastructure.cleansing.rules.numeric_rules import decimal_quantization
 
         mock_rule = CleansingRule(
             name="decimal_quantization",

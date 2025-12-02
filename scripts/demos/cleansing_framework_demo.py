@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from src.work_data_hub.cleansing import (
+from src.work_data_hub.infrastructure.cleansing import (
     decimal_fields_cleaner,
     find_rules_for_field,
     get_framework_info,
@@ -199,7 +199,7 @@ except Exception as e:
 
 print("\n=== 演示 4: 框架扩展性 - 新增自定义规则 ===\n")
 
-from src.work_data_hub.cleansing import RuleCategory, rule
+from src.work_data_hub.infrastructure.cleansing import RuleCategory, rule
 
 
 @rule(

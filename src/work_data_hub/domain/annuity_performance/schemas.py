@@ -22,7 +22,7 @@ from work_data_hub.domain.pipelines.validation import (
 )
 from work_data_hub.utils.date_parser import parse_yyyymm_or_chinese
 
-from src.work_data_hub.cleansing import get_cleansing_registry
+from src.work_data_hub.infrastructure.cleansing import get_cleansing_registry
 
 BRONZE_REQUIRED_COLUMNS: Sequence[str] = (
     "月度",

@@ -18,7 +18,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 try:
-    from src.work_data_hub.cleansing import (
+    from src.work_data_hub.infrastructure.cleansing import (
         registry,
         decimal_fields_cleaner,
         comprehensive_decimal_cleaning,
@@ -35,6 +35,9 @@ class TestCleansingFramework:
 
     def test_registry_functionality(self):
         """测试简化注册表的基本功能"""
+        # Import RuleCategory from the same module as registry to ensure consistency
+        from src.work_data_hub.infrastructure.cleansing import RuleCategory
+
         # 检查是否有注册的规则
         all_rules = registry.list_all_rules()
         assert len(all_rules) > 0, "应该有已注册的清洗规则"
@@ -44,8 +47,6 @@ class TestCleansingFramework:
         assert decimal_rule is not None, "应该能找到 comprehensive_decimal_cleaning 规则"
 
         # 检查是否能按分类查找规则
-        from src.work_data_hub.cleansing.registry import RuleCategory
-
         numeric_rules = registry.find_by_category(RuleCategory.NUMERIC)
         assert len(numeric_rules) > 0, "应该能找到数值类型的清洗规则"
 
@@ -140,8 +141,8 @@ class TestCleansingFramework:
 
     def test_extensibility(self):
         """测试简化框架的扩展性"""
-        from src.work_data_hub.cleansing import rule
-        from src.work_data_hub.cleansing.registry import RuleCategory
+        from src.work_data_hub.infrastructure.cleansing import rule
+        from src.work_data_hub.infrastructure.cleansing.registry import RuleCategory
 
         # 动态添加新规则（使用简化的装饰器）
         @rule(name="test_custom_rule", category=RuleCategory.STRING, description="测试自定义规则")

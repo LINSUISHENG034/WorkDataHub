@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.work_data_hub.cleansing import get_cleansing_registry
+from src.work_data_hub.infrastructure.cleansing import get_cleansing_registry
 
 
 @pytest.mark.unit

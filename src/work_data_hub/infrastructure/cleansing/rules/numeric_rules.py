@@ -9,7 +9,7 @@ import unicodedata
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Dict, Optional, Union
 
-from src.work_data_hub.cleansing.registry import RuleCategory, rule
+from work_data_hub.infrastructure.cleansing.registry import RuleCategory, rule
 
 # 字段精度配置 - 可以通过配置文件外部化
 DEFAULT_PRECISION_CONFIG = {

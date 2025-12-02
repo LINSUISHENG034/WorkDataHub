@@ -30,7 +30,7 @@ from pydantic import (
     model_validator,
 )
 
-from src.work_data_hub.cleansing import get_cleansing_registry
+from src.work_data_hub.infrastructure.cleansing import get_cleansing_registry
 from work_data_hub.utils.date_parser import parse_yyyymm_or_chinese
 
 logger = logging.getLogger(__name__)
