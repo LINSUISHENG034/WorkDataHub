@@ -49,7 +49,7 @@ def get_mappings_dir() -> Path:
     for parent in current_path.parents:
         if (parent / "pyproject.toml").exists():
             return parent / "data" / "mappings"
-    
+
     # Fallback if pyproject.toml not found (e.g. installed package context)
     # Assume standard structure: src/work_data_hub/infrastructure/settings/loader.py -> root
     return Path(__file__).parents[4] / "data" / "mappings"

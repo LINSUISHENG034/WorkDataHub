@@ -13,16 +13,15 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import pandas as pd
 import pandera as pa
-from pandera.errors import SchemaError, SchemaErrors
+from pandera.errors import SchemaErrors
 
+from src.work_data_hub.infrastructure.cleansing import get_cleansing_registry
 from work_data_hub.infrastructure.validation import (
     ensure_not_empty,
     ensure_required_columns,
     raise_schema_error,
 )
 from work_data_hub.utils.date_parser import parse_yyyymm_or_chinese
-
-from src.work_data_hub.infrastructure.cleansing import get_cleansing_registry
 
 BRONZE_REQUIRED_COLUMNS: Sequence[str] = (
     "月度",
@@ -124,7 +123,9 @@ print(f"Numeric errors: {summary.numeric_error_rows}")
 
 **Usage Example (Pipeline Integration):**
 ```python
-from work_data_hub.domain.annuity_performance.pipeline_steps import BronzeSchemaValidationStep
+from work_data_hub.domain.annuity_performance.pipeline_steps import (
+    BronzeSchemaValidationStep,
+)
 from work_data_hub.domain.pipelines.core import Pipeline
 
 step = BronzeSchemaValidationStep(failure_threshold=0.10)
@@ -245,12 +246,14 @@ if summary.duplicate_keys:
 
 **Usage Example (Pipeline Integration):**
 ```python
-from work_data_hub.domain.annuity_performance.pipeline_steps import GoldSchemaValidationStep
+from work_data_hub.domain.annuity_performance.pipeline_steps import (
+    GoldSchemaValidationStep,
+)
 
 step = GoldSchemaValidationStep(project_columns=True)
 validated_df = step.execute(silver_df, context)
 
-# Validation summary stored in context.metadata['gold_schema_validation']
+# Validation summary in context.metadata['gold_schema_validation']
 # Ready for Epic 1 Story 1.8 warehouse loader
 ```
 
@@ -421,7 +424,8 @@ def _parse_bronze_dates(series: pd.Series) -> Tuple[pd.Series, List[int]]:
     """
     Parse date column using Epic 2 Story 2.4 date parser.
 
-    Supports Chinese formats (2024年12月), ISO formats (2024-12), and numeric formats (202412).
+    Supports Chinese formats (2024年12月), ISO formats (2024-12),
+    and numeric formats (202412).
     Returns parsed timestamps and list of invalid row indices.
     """
     parsed_values: List[pd.Timestamp | pd.NaT] = []
@@ -457,8 +461,8 @@ def _ensure_non_null_columns(
             schema,
             dataframe,
             message=(
-                f"{_schema_name(schema)} validation failed: columns have no non-null values "
-                f"{empty_columns}"
+                f"{_schema_name(schema)} validation failed: "
+                f"columns have no non-null values {empty_columns}"
             ),
             failure_cases=failure_cases,
         )
@@ -542,8 +546,9 @@ def validate_gold_dataframe(
     removed_columns: List[str] = []
 
     if project_columns:
+        gold_cols = GoldAnnuitySchema.columns
         removed_columns = [
-            column for column in working_df.columns if column not in GoldAnnuitySchema.columns
+            column for column in working_df.columns if column not in gold_cols
         ]
         if removed_columns:
             working_df = working_df.drop(columns=removed_columns, errors="ignore")

@@ -7,7 +7,6 @@ ops inject this connector into domain transformations instead of importing
 domain ← io ← orchestration intact.
 """
 
-import logging
 import os
 import re
 import time
@@ -32,11 +31,10 @@ from src.work_data_hub.utils.types import (
 )
 from work_data_hub.io.connectors.exceptions import DiscoveryError
 from work_data_hub.io.connectors.file_pattern_matcher import (
-    FileMatchResult,
     FilePatternMatcher,
 )
-from work_data_hub.io.connectors.version_scanner import VersionScanner, VersionedPath
-from work_data_hub.io.readers.excel_reader import ExcelReadResult, ExcelReader
+from work_data_hub.io.connectors.version_scanner import VersionedPath, VersionScanner
+from work_data_hub.io.readers.excel_reader import ExcelReader
 from work_data_hub.utils.logging import get_logger
 
 

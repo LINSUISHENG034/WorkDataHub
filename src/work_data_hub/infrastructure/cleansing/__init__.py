@@ -57,7 +57,10 @@ from work_data_hub.infrastructure.cleansing.rules.numeric_rules import (
     standardize_null_values,
     trustee_decimal_cleaner,
 )
-from work_data_hub.infrastructure.cleansing.rules.string_rules import normalize_company_name, trim_whitespace
+from work_data_hub.infrastructure.cleansing.rules.string_rules import (
+    normalize_company_name,
+    trim_whitespace,
+)
 
 # 版本信息
 __version__ = "1.1.0"

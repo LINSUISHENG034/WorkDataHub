@@ -10,9 +10,9 @@ import pandas as pd
 import pytest
 
 from work_data_hub.domain.annuity_performance.service import (
-    PipelineResult,
     process_annuity_performance,
 )
+from work_data_hub.domain.pipelines.types import DomainPipelineResult
 from work_data_hub.io.connectors.exceptions import DiscoveryError
 from work_data_hub.io.connectors.file_connector import DataDiscoveryResult
 from work_data_hub.io.loader.warehouse_loader import (
@@ -137,10 +137,10 @@ class TestProcessAnnuityPerformance:
             warehouse_loader=loader,
         )
 
-        assert isinstance(result, PipelineResult)
+        assert isinstance(result, DomainPipelineResult)
         assert result.success is True
         assert result.rows_loaded == 4
-        assert result.rows_failed == 1  # One intentionally invalid row
+        assert result.rows_failed == 1  # 1 intentionally invalid row dropped
         assert result.metrics["discovery"]["row_count"] == len(df.index)
         assert loader.calls[0]["table"] == "annuity_performance_NEW"
         assert loader.calls[0]["upsert_keys"] == ["月度", "计划代码", "company_id"]
@@ -167,7 +167,7 @@ class TestProcessAnnuityPerformance:
         )
 
         assert first.rows_loaded == 4
-        assert second.rows_loaded == 4  # Updated rows count as loaded
+        assert second.rows_loaded == 4  # Upsert path still loads same 4 rows
         assert loader.calls[1]["schema"] == "public"
         assert loader.calls[1]["df"].shape[0] == 4
 

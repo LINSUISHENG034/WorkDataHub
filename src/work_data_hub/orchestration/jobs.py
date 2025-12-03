@@ -16,9 +16,9 @@ from dagster import Config, DagsterInstance, job, op
 
 from src.work_data_hub.config.settings import get_settings
 from src.work_data_hub.domain.annuity_performance.service import (
-    PipelineResult,
     process_annuity_performance,
 )
+from src.work_data_hub.domain.pipelines.types import DomainPipelineResult
 from src.work_data_hub.io.connectors.file_connector import FileDiscoveryService
 from src.work_data_hub.io.loader.company_mapping_loader import (
     extract_legacy_mappings,
@@ -245,8 +245,8 @@ def sample_pipeline_job():
     load_to_db_op(validated)
 
 
-def _log_pipeline_metrics(logger, result: PipelineResult) -> None:
-    """Log concise telemetry for PipelineResult."""
+def _log_pipeline_metrics(logger, result: DomainPipelineResult) -> None:
+    """Log concise telemetry for DomainPipelineResult."""
     logger.info(
         "annuity_pipeline.completed",
         extra={

@@ -1252,7 +1252,6 @@ def validate_op(
 
     try:
         # Import Pipeline framework from Story 1.5
-        from src.work_data_hub.domain.pipelines.core import Pipeline
 
         context.log.info(
             f"Starting sample validation pipeline - rows: {len(rows)}"

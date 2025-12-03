@@ -5,16 +5,15 @@ following Decision #1 (File-Pattern-Aware Version Detection) and
 Decision #4 (Hybrid Error Context Standards) from architecture.
 """
 
+import fnmatch
+import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Tuple
-import fnmatch
-import unicodedata
 
-from work_data_hub.utils.logging import get_logger
 from work_data_hub.io.connectors.exceptions import DiscoveryError
-
+from work_data_hub.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

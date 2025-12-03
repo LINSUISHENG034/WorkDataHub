@@ -19,8 +19,8 @@ import pandas as pd
 
 try:  # pragma: no cover - availability checked at runtime
     from psycopg2 import OperationalError
-    from psycopg2.pool import ThreadedConnectionPool
     from psycopg2.extras import execute_values
+    from psycopg2.pool import ThreadedConnectionPool
 except ImportError:  # pragma: no cover - handled gracefully
     OperationalError = None  # type: ignore[assignment]
     ThreadedConnectionPool = None  # type: ignore[assignment]
@@ -48,6 +48,7 @@ class LoadResult:
     rows_updated: int
     duration_ms: float
     execution_id: str
+    query_count: int = 0
     errors: List[str] = field(default_factory=list)
 
 

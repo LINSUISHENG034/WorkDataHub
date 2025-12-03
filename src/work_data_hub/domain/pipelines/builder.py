@@ -9,9 +9,9 @@ import importlib
 import logging
 from typing import Any, Dict, List, Optional, Union
 
-from .pipeline_config import PipelineConfig, StepConfig
 from .core import Pipeline, TransformStep
 from .exceptions import PipelineAssemblyError
+from .pipeline_config import PipelineConfig, StepConfig
 from .types import DataFrameStep, RowTransformStep
 
 logger = logging.getLogger(__name__)

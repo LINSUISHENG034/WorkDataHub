@@ -18,8 +18,8 @@ import pandas as pd
 
 from work_data_hub.utils.logging import get_logger
 
-from .pipeline_config import PipelineConfig
 from .exceptions import PipelineStepError, StepSkipped
+from .pipeline_config import PipelineConfig
 from .types import (
     DataFrameStep,
     PipelineContext,
@@ -283,7 +283,11 @@ class Pipeline:
             execution_id=execution_id,
             timestamp=timestamp,
             config=self.config.model_dump(),
+            domain=str(seed.get("domain", "unknown")),
+            run_id=str(seed.get("run_id") or execution_id),
+            logger=self.logger,
             metadata=metadata,
+            extra=seed.get("extra", {}),
         )
 
     def _run_step(

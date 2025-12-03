@@ -9,12 +9,12 @@ Story 3.0: Integrated Epic 3 data source configuration validation at startup.
 """
 
 import os
-import structlog
-import yaml
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Optional
 
+import structlog
+import yaml
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -322,7 +322,7 @@ class Settings(BaseSettings):
         """
         Load and validate Epic 3 data sources configuration at startup.
 
-        Story 3.0: Fail-fast validation - configuration errors prevent application startup.
+        Story 3.0: Fail-fast validation - config errors prevent startup.
 
         Returns:
             The validated Settings instance with loaded data_sources

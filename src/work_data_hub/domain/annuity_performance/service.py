@@ -1,20 +1,27 @@
 from __future__ import annotations
-import time
 
-import structlog
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
 import pandas as pd
+import structlog
 
 from work_data_hub.domain.pipelines.types import DomainPipelineResult, PipelineContext
 from work_data_hub.infrastructure.validation import handle_validation_errors
 
 from .discovery_helpers import normalize_month, run_discovery
 from .models import ProcessingResultWithEnrichment
-from .pipeline_builder import build_bronze_to_silver_pipeline, load_plan_override_mapping
-from .processing_helpers import convert_dataframe_to_models, export_unknown_names_csv, summarize_enrichment
+from .pipeline_builder import (
+    build_bronze_to_silver_pipeline,
+    load_plan_override_mapping,
+)
+from .processing_helpers import (
+    convert_dataframe_to_models,
+    export_unknown_names_csv,
+    summarize_enrichment,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -68,11 +75,21 @@ def process_annuity_performance(
         rows_failed=rows_failed,
         duration_ms=duration_ms,
     )
+    def _to_dict(obj):
+        if hasattr(obj, "model_dump"):
+            return obj.model_dump()
+        return getattr(obj, "__dict__", obj)
+
     metrics = {
-        "parameters": {"month": normalized_month, "domain": domain, "table": table_name, "schema": schema},
-        "discovery": discovery_result.model_dump() if hasattr(discovery_result, "model_dump") else getattr(discovery_result, "__dict__", discovery_result),
-        "processing": processing.model_dump() if hasattr(processing, "model_dump") else getattr(processing, "__dict__", processing),
-        "loading": load_result.model_dump() if hasattr(load_result, "model_dump") else getattr(load_result, "__dict__", load_result),
+        "parameters": {
+            "month": normalized_month,
+            "domain": domain,
+            "table": table_name,
+            "schema": schema,
+        },
+        "discovery": _to_dict(discovery_result),
+        "processing": _to_dict(processing),
+        "loading": _to_dict(load_result),
     }
     return DomainPipelineResult(
         success=True,
@@ -114,6 +131,9 @@ def process_with_enrichment(
         execution_id=f"annuity-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
         timestamp=datetime.now(timezone.utc),
         config={"domain": "annuity_performance", "data_source": data_source},
+        domain="annuity_performance",
+        run_id=f"annuity-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+        extra={"data_source": data_source},
     )
     start_time = time.perf_counter()
     result_df = pipeline.execute(pd.DataFrame(rows), context)

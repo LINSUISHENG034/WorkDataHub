@@ -7,8 +7,8 @@
 
 from __future__ import annotations
 
-import logging
 import inspect
+import logging
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -72,7 +72,8 @@ class CleansingRegistry:
             return
 
         self._config_lock = RLock()
-        self._config_path = Path(__file__).resolve().parent / "settings" / "cleansing_rules.yml"
+        config_dir = Path(__file__).resolve().parent / "settings"
+        self._config_path = config_dir / "cleansing_rules.yml"
         self._config_mtime: Optional[float] = None
         self._domain_config: Dict[str, Any] = {
             "domains": {},
@@ -132,7 +133,8 @@ class CleansingRegistry:
         if not rule:
             available = sorted(self._rules.keys())
             raise ValueError(
-                f"Cleansing rule '{rule_name}' not registered. Available rules: {available}"
+                f"Cleansing rule '{rule_name}' not registered. "
+                f"Available: {available}"
             )
 
         try:
@@ -239,7 +241,9 @@ class CleansingRegistry:
 
             domains = parsed.get("domains") or {}
             if not isinstance(domains, dict):
-                raise ValueError("'domains' section in cleansing_rules.yml must be a mapping")
+                raise ValueError(
+                    "'domains' section in cleansing_rules.yml must be a mapping"
+                )
 
             default_rules: Iterable[RuleSpec] = parsed.get("default_rules") or []
             # 兼容旧格式: domains.default

@@ -13,7 +13,7 @@ Story 2.1 Enhancements:
 """
 
 import logging
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, List, Optional, Union
 
@@ -266,7 +266,7 @@ class AnnuityPerformanceIn(BaseModel):
             return float(cleaned)
         except (TypeError, ValueError) as exc:
             raise ValueError(
-                f"Field '{field_name}': Cannot convert '{v}' to number. Expected numeric format."
+                f"Field '{field_name}': Cannot convert '{v}' to number."
             ) from exc
 
     @field_validator("月度", mode="before")
@@ -372,7 +372,7 @@ class AnnuityPerformanceOut(BaseModel):
         None, decimal_places=4, ge=0, description="Initial asset scale (non-negative)"
     )
     期末资产规模: Optional[Decimal] = Field(
-        None, decimal_places=4, ge=0, description="Final asset scale (non-negative, AC2 requirement)"
+        None, decimal_places=4, ge=0, description="Final asset scale"
     )
     供款: Optional[Decimal] = Field(
         None, decimal_places=4, ge=0, description="Contribution (non-negative)"
@@ -428,10 +428,10 @@ class AnnuityPerformanceOut(BaseModel):
         None, max_length=255, description="Sub-enterprise name (子企业名称)"
     )
     集团企业客户号: Optional[str] = Field(
-        None, max_length=50, description="Group enterprise customer number (集团企业客户号)"
+        None, max_length=50, description="Group enterprise customer number"
     )
     集团企业客户名称: Optional[str] = Field(
-        None, max_length=255, description="Group enterprise customer name (集团企业客户名称)"
+        None, max_length=255, description="Group enterprise customer name"
     )
 
     @field_validator('月度', mode='before')
@@ -572,10 +572,10 @@ class AnnuityPerformanceOut(BaseModel):
                     f"(today: {current_date})"
                 )
 
-            # Rule 2: Warn if date is too old (more than 10 years) - just log, don't fail
+            # Rule 2: Warn if date is too old (>10 years) - just log
             if (current_date - report_date).days > 3650:
                 logger.warning(
-                    f"Report date {report_date} is older than 10 years (today: {current_date})"
+                    f"Report date {report_date} is older than 10 years"
                 )
 
         return self

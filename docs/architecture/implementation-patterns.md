@@ -176,4 +176,10 @@ uv run pytest -v --cov=src --cov-report=term-missing
 ```
 
 ---
-
+
+### Pattern 5: Pipeline Context Contract (Epic 5.8)
+
+- `PipelineContext` MUST include: `pipeline_name`, `execution_id`, `run_id`, `domain`, `timestamp`, `config`, `metadata`, optional `logger` and `extra`.
+- Context propagates through every TransformStep; steps may read/write `metadata` for metrics (e.g., `db_queries` counters).
+- Service entrypoints are responsible for constructing a fully populated `PipelineContext` and passing it into pipeline execution to satisfy AC10/AC11.
+

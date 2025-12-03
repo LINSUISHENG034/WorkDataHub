@@ -85,7 +85,7 @@ Based on architecture decision document:
 
 2. **No Backward Compatibility Adapters**
    - Breaking changes allowed - synchronous caller updates
-   - Focus on data compatibility, not API compatibility
+   - Focus on数据兼容，与 `legacy/annuity_hub/data_handler` 基线对齐（无旧架构适配层）
    - Update `orchestration/jobs.py` in same PR
 
 3. **Configurable Error Handling**
@@ -272,16 +272,15 @@ def benchmark_before_after():
 ### Notes
 
 **Critical Success Factors:**
-1. **Data Compatibility** - Output must be bit-identical to current implementation
-2. **No Adapters** - Direct breaking changes with caller updates
+1. **Data Compatibility** - Output must match legacy baseline (`legacy/annuity_hub/data_handler`) snapshot
+2. **No Adapters** - Direct breaking changes with caller updates（新架构单路径）
 3. **Vectorization** - Eliminate Python loops for 5-10x performance
 4. **Clear Boundaries** - Infrastructure provides utilities, not black boxes
 5. **Python Composition** - Code is the DSL, no custom config languages
 
 **Risk Mitigations:**
-- Keep `_legacy.py` files temporarily for rollback
-- Feature flags for gradual rollout
-- Comprehensive regression testing
+- 基线快照留存（legacy data handler）用于对比；不保留旧架构运行代码路径
+- Comprehensive regression + parity/performance gating
 - Performance monitoring in production
 
 **Migration Script Example:**

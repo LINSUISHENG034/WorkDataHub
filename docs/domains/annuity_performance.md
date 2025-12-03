@@ -1,38 +1,70 @@
 # Annuity Performance Domain
 
-> **Story 4.6** - Reference implementation for Epic 9 domain migrations
+> **Epic 5 Refactored** - Reference implementation for Epic 9 domain migrations
 
 ## Overview
 
 The Annuity Performance domain processes monthly annuity performance data from Excel files into a validated PostgreSQL table. This is the first domain migrated under the WorkDataHub platform and serves as the **reference implementation** for all future domain migrations (Epic 9).
+
+**Post-Epic 5 Architecture:** The domain has been refactored to use the new infrastructure layer, reducing domain code from ~3,446 lines to ~900 lines while improving performance and maintainability.
 
 | Attribute | Value |
 |-----------|-------|
 | **Domain Name** | `annuity_performance` |
 | **Data Source** | Excel files from `收集数据/数据采集` folder |
 | **Sheet Name** | `规模明细` |
-| **Output Table** | `annuity_performance_new` |
-| **Primary Key** | `(reporting_month, plan_code, company_id)` |
+| **Output Table** | `annuity_performance_NEW` |
+| **Primary Key** | `(月度, 计划代码, company_id)` |
 
-## Architecture
+## Architecture (Post-Epic 5)
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   Excel File    │────▶│ Bronze Layer    │────▶│ Silver Layer    │────▶│  Gold Layer     │
-│  (规模明细 sheet)│     │  (Validation)   │     │ (Transform)     │     │  (Projection)   │
-└─────────────────┘     └─────────────────┘     └─────────────────┘     └─────────────────┘
-                               │                       │                       │
-                               ▼                       ▼                       ▼
-                        AnnuityPerformanceIn    Cleansing Rules      AnnuityPerformanceOut
-                        (Loose validation)      Date parsing         (Strict validation)
-                                               Company enrichment
-                                               Numeric cleaning
-                                                                            │
-                                                                            ▼
-                                                                    ┌─────────────────┐
-                                                                    │   PostgreSQL    │
-                                                                    │ annuity_perf_new│
-                                                                    └─────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Orchestration Layer                                  │
+│                    (Dagster jobs, CLI, scheduling)                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              I/O Layer                                       │
+│              (FileDiscoveryService, WarehouseLoader)                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        Infrastructure Layer                                  │
+│    ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │
+│    │ transforms/ │  │ cleansing/  │  │ enrichment/ │  │ validation/ │      │
+│    │  Pipeline   │  │  Registry   │  │ CompanyId   │  │   Error     │      │
+│    │   Steps     │  │   Rules     │  │  Resolver   │  │  Handler    │      │
+│    └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘      │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           Domain Layer                                       │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │                    annuity_performance/                               │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │   │
+│  │  │ service.py  │  │ pipeline_   │  │  models.py  │  │ schemas.py  │  │   │
+│  │  │ (~150 lines)│  │ builder.py  │  │  (Pydantic) │  │ (Pandera)   │  │   │
+│  │  │ Orchestrator│  │ (~150 lines)│  │  (~200 lines│  │ (~300 lines)│  │   │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Data Flow
+
+```
+Excel File → FileDiscoveryService → Bronze Validation → Pipeline Execution → Gold Validation → WarehouseLoader
+     │              │                      │                    │                   │              │
+     │              ▼                      ▼                    ▼                   ▼              ▼
+     │        discover_and_load()    BronzeSchema         MappingStep          GoldSchema    load_dataframe()
+     │                                (Pandera)          CleansingStep         (Pandera)
+     │                                                   CompanyIdStep
+     └─────────────────────────────────────────────────────────────────────────────────────────────┘
+                                    process_annuity_performance()
 ```
 
 ## Input Format
@@ -266,15 +298,35 @@ validate_data_sources_config_v2('config/data_sources.yml')
 | 4.5 | Annuity End-to-End Pipeline Integration | Done |
 | 4.6 | Annuity Domain Configuration and Documentation | Current |
 
-## Code References
+## Code References (Post-Epic 5)
 
-| Component | Path |
-|-----------|------|
-| Input Model | `src/work_data_hub/domain/annuity_performance/models.py:AnnuityPerformanceIn` |
-| Output Model | `src/work_data_hub/domain/annuity_performance/models.py:AnnuityPerformanceOut` |
-| Configuration Schema | `src/work_data_hub/config/schema.py:DomainConfigV2` |
-| Database Migration | `io/schema/migrations/versions/20251129_000001_create_annuity_performance_new.py` |
-| Data Source Config | `config/data_sources.yml` |
+| Component | Path | Lines |
+|-----------|------|-------|
+| **Service Orchestrator** | `domain/annuity_performance/service.py` | ~150 |
+| **Pipeline Builder** | `domain/annuity_performance/pipeline_builder.py` | ~150 |
+| **Pydantic Models** | `domain/annuity_performance/models.py` | ~200 |
+| **Pandera Schemas** | `domain/annuity_performance/schemas.py` | ~300 |
+| **Constants** | `domain/annuity_performance/constants.py` | ~150 |
+| **Infrastructure Steps** | `infrastructure/transforms/standard_steps.py` | (shared) |
+| **Company ID Resolver** | `infrastructure/enrichment/company_id_resolver.py` | (shared) |
+| **Validation Utilities** | `infrastructure/validation/error_handler.py` | (shared) |
+| Data Source Config | `config/data_sources.yml` | - |
+
+### Key Infrastructure Dependencies
+
+```python
+# Service imports from infrastructure layer
+from work_data_hub.infrastructure.transforms.base import Pipeline
+from work_data_hub.infrastructure.transforms.standard_steps import (
+    MappingStep, ReplacementStep, CleansingStep, DropStep
+)
+from work_data_hub.infrastructure.enrichment.company_id_resolver import (
+    CompanyIdResolver, ResolutionStrategy
+)
+from work_data_hub.infrastructure.validation.error_handler import (
+    handle_validation_errors
+)
+```
 
 ## Standard Domain Pattern Reference Implementation
 

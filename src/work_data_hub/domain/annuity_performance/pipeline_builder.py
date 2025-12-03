@@ -24,9 +24,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Dict, Optional
 
-import structlog
-
 import pandas as pd
+import structlog
 
 from work_data_hub.domain.pipelines.types import PipelineContext
 from work_data_hub.infrastructure.enrichment import (
@@ -46,7 +45,6 @@ from .constants import (
     BUSINESS_TYPE_CODE_MAPPING,
     COLUMN_ALIAS_MAPPING,
     COMPANY_BRANCH_MAPPING,
-    DEFAULT_INSTITUTION_CODE,
     LEGACY_COLUMNS_TO_DELETE,
     PLAN_CODE_CORRECTIONS,
 )
@@ -93,9 +91,9 @@ class CompanyIdResolutionStep(TransformStep):
         Initialize the CompanyIdResolutionStep.
 
         Args:
-            enrichment_service: Optional CompanyEnrichmentService for complex resolution.
+            enrichment_service: Optional CompanyEnrichmentService.
             plan_override_mapping: Dict mapping plan codes to company IDs.
-            sync_lookup_budget: Maximum synchronous API lookups allowed.
+            sync_lookup_budget: Maximum synchronous API lookups.
         """
         self._resolver = CompanyIdResolver(
             enrichment_service=enrichment_service,
@@ -134,7 +132,8 @@ class CompanyIdResolutionStep(TransformStep):
 
         # Log resolution statistics
         stats = result.statistics
-        domain = context.config.get("domain", "annuity_performance") if context.config else "annuity_performance"
+        cfg = context.config or {}
+        domain = getattr(context, "domain", None) or cfg.get("domain", "annuity_performance")
         logger.bind(domain=domain, step=self.name).info(
             "Company ID resolution complete",
             **stats.to_dict(),
@@ -240,8 +239,9 @@ def load_plan_override_mapping(mapping_path: Optional[str] = None) -> Dict[str, 
         >>> mapping.get("FP0001")
         '614810477'
     """
-    import yaml
     from pathlib import Path
+
+    import yaml
 
     if mapping_path is None:
         # Default path for plan override mappings

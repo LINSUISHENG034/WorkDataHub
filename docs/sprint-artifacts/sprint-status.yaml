@@ -95,9 +95,9 @@ development_status:
   5-3-config-reorganization: done
   5-4-company-id-resolver: done
   5-5-validation-utilities: done
-  5-6-pipeline-steps: review
-  5-7-service-refactoring: review
-  5-8-integration-and-docs: backlog
+  5-6-pipeline-steps: done
+  5-7-service-refactoring: done
+  5-8-integration-and-docs: done
   epic-5-retrospective: optional
 
   # Epic 6: Company Enrichment Service

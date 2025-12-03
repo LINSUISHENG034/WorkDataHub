@@ -1,5 +1,7 @@
 # Architectural Decisions
 
+> Epic 5 status: AD-010 (Infrastructure Layer & Pipeline Composition) implemented in code and documented in `docs/architecture/infrastructure-layer.md`.
+
 ### Decision #1: File-Pattern-Aware Version Detection ✅
 
 **Problem:** Monthly data arrives in versioned folders (V1, V2, V3). Different domains may have corrections at different version levels. Need automatic selection without data loss.
@@ -1170,4 +1172,4 @@ from work_data_hub.infrastructure.settings import (
 - Reduced maintainability as domain count grows
 
 ---
-
+

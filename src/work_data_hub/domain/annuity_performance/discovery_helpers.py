@@ -3,30 +3,36 @@ File discovery helper functions for annuity performance domain.
 
 Story 4.8: Extracted from service.py to reduce module size and improve
 separation of concerns. Contains discovery-related utilities.
+
+Story 5.8: Removed TYPE_CHECKING import from io layer to comply with
+TID251 Clean Architecture rules. Uses Protocol-based typing instead.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from work_data_hub.io.connectors.file_connector import (
-        DataDiscoveryResult,
-        FileDiscoveryService,
-    )
+from typing import Any, Protocol
 
 from work_data_hub.domain.pipelines.types import ErrorContext
+
+
+# Protocol for FileDiscoveryService to avoid importing from io layer
+class FileDiscoveryProtocol(Protocol):
+    """Protocol for file discovery service (Clean Architecture boundary)."""
+
+    def discover_and_load(self, *, domain: str, month: str) -> Any:
+        """Discover and load data for a domain and month."""
+        ...
 
 logger = logging.getLogger(__name__)
 
 
 def run_discovery(
     *,
-    file_discovery: "FileDiscoveryService",
+    file_discovery: FileDiscoveryProtocol,
     domain: str,
     month: str,
-) -> "DataDiscoveryResult":
+) -> Any:
     """
     Wrapper for FileDiscoveryService.discover_and_load with consistent logging.
 

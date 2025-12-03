@@ -830,16 +830,16 @@ As a **team member**, I want **comprehensive integration testing and updated doc
 
 **1. End-to-End Test Suite:**
 - Complete annuity pipeline execution (discover → process → load)
-- Output data 100% consistency verification (vs pre-refactor baseline)
+- Output data 100% consistency vs legacy baseline (`legacy/annuity_hub/data_handler` snapshot)
 - Performance benchmarks:
   - 1000 rows processed in <3 seconds
   - Memory usage <200MB
   - Database queries <10
 
-**2. Backward Compatibility Verification:**
-- Dagster jobs run without modification
-- Existing calling code works (via adapters)
-- Configuration file format compatible
+**2. Legacy Baseline Parity (No Adapters):**
+- Parity against `legacy/annuity_hub/data_handler` output snapshot
+- No backward-compatibility adapters; callers updated to new architecture
+- Config format aligned to new architecture (no dual paths)
 
 **3. Code Quality Checks:**
 - Mypy strict mode passes
@@ -961,17 +961,16 @@ Day 11-12: Story 5.8 - Testing & Documentation        ✓ 1.5d
 
 | Risk | Probability | Impact | Mitigation | Owner |
 |------|-------------|--------|------------|-------|
-| Output data inconsistency | Medium | High | Comparison testing + parallel validation | Dev |
+| Output data inconsistency | Medium | High | Comparison testing vs `legacy/annuity_hub/data_handler` snapshot（无适配器） | Dev |
 | Performance degradation | Low | Medium | Performance benchmarking + optimization | Dev |
-| Breaking existing functionality | Low | High | Backward compatibility adapters + feature flags | Dev |
+| Breaking existing functionality | Low | High | 新架构单路径，Parity/Perf 测试作为发布闸门 | Dev |
 | Effort overrun | Medium | Medium | 2-day buffer + scope adjustment options | SM |
 | Insufficient test coverage | Low | Medium | Mandatory coverage gates in CI | Dev |
 
 ### Rollback Plan
-- ✅ Preserve old implementations as `_legacy` files (temporary)
-- ✅ Feature flags for new/old implementation switching
-- ✅ Git branching: Each story on separate branch
+- ✅ Git branching: Each story on separate branch；若 parity/perf 未达标则回滚分支
 - ✅ No destructive database changes (code refactor only)
+- ✅ 保留 legacy 基线快照用于比对；无运行时适配器或双路切换
 
 ---
 

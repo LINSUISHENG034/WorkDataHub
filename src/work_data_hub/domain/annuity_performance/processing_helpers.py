@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
-import structlog
-
 import pandas as pd
+import structlog
 from pydantic import ValidationError
 
 from work_data_hub.domain.annuity_performance.models import (
@@ -36,7 +35,8 @@ def convert_dataframe_to_models(
     for idx, row in df.iterrows():
         try:
             row_dict = {
-                key: (None if pd.isna(val) else val) for key, val in row.to_dict().items()
+                key: (None if pd.isna(val) else val)
+                for key, val in row.to_dict().items()
             }
 
             # Require minimal fields (plan code + month) to build a record
@@ -86,7 +86,9 @@ def export_unknown_names_csv(
             output_dir=Path("logs"),
         )
         logger.bind(domain="annuity_performance", step="export_unknown_names").info(
-            "Exported unknown company names", count=len(unknown_names), path=str(csv_path)
+            "Exported unknown company names",
+            count=len(unknown_names),
+            path=str(csv_path),
         )
         return str(csv_path)
     except Exception as exc:  # pragma: no cover - defensive logging

@@ -11,10 +11,10 @@ Remaining Custom Steps (domain-specific business logic):
 - CompanyIdResolutionStep: 5-priority company ID resolution algorithm
 
 Deleted Steps (replaced by generic steps + config):
-- PlanCodeCleansingStep → DataFrameValueReplacementStep + PLAN_CODE_CORRECTIONS
-- InstitutionCodeMappingStep → DataFrameValueReplacementStep + COMPANY_BRANCH_MAPPING
+- PlanCodeCleansingStep → ReplacementStep + PLAN_CODE_CORRECTIONS
+- InstitutionCodeMappingStep → ReplacementStep + COMPANY_BRANCH_MAPPING
 - PortfolioCodeDefaultStep → Inline logic in pipeline construction
-- BusinessTypeCodeMappingStep → DataFrameValueReplacementStep + BUSINESS_TYPE_CODE_MAPPING
+- BusinessTypeCodeMappingStep → ReplacementStep + BUSINESS_TYPE_CODE_MAPPING
 """
 
 import logging
@@ -38,9 +38,9 @@ from work_data_hub.domain.annuity_performance.schemas import (
     validate_bronze_dataframe,
     validate_gold_dataframe,
 )
-from work_data_hub.domain.pipelines.pipeline_config import PipelineConfig, StepConfig
 from work_data_hub.domain.pipelines.core import Pipeline, TransformStep
 from work_data_hub.domain.pipelines.exceptions import PipelineStepError
+from work_data_hub.domain.pipelines.pipeline_config import PipelineConfig, StepConfig
 
 # Import shared steps from domain/pipelines/steps/ (Story 4.7)
 from work_data_hub.domain.pipelines.steps import (
@@ -51,15 +51,14 @@ from work_data_hub.domain.pipelines.steps import (
     clean_company_name,
     parse_to_standard_date,
 )
-
-# Import DataFrame steps from infrastructure/transforms/ (Story 5.6)
-from work_data_hub.infrastructure.transforms import ReplacementStep
 from work_data_hub.domain.pipelines.types import (
     DataFrameStep,
     PipelineContext,
     Row,
     StepResult,
 )
+
+# Import DataFrame steps from infrastructure/transforms/ (Story 5.6)
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +155,7 @@ class CompanyIdResolutionStep(TransformStep):
             if plan_code and plan_code in self._company_id1_mapping:
                 company_id = self._company_id1_mapping[plan_code]
                 resolution_method = "plan_code"
-                warnings.append(f"Resolved company_id via plan code: {plan_code} -> {company_id}")
+                warnings.append(f"Resolved via plan_code: {plan_code}")
 
             # Clean enterprise customer number
             if "集团企业客户号" in updated_row and updated_row["集团企业客户号"]:
@@ -169,7 +168,7 @@ class CompanyIdResolutionStep(TransformStep):
                 if account_number and account_number in self._company_id2_mapping:
                     company_id = self._company_id2_mapping[account_number]
                     resolution_method = "account_number"
-                    warnings.append(f"Resolved company_id via account number: {account_number} -> {company_id}")
+                    warnings.append(f"Resolved via account_number: {account_number}")
 
             # Step 3: Special case with default fallback (priority 3)
             if not company_id:
@@ -178,11 +177,11 @@ class CompanyIdResolutionStep(TransformStep):
                     if plan_code and plan_code in self._company_id3_mapping:
                         company_id = self._company_id3_mapping[plan_code]
                         resolution_method = "hardcoded"
-                        warnings.append(f"Resolved company_id via hardcoded mapping: {plan_code} -> {company_id}")
+                        warnings.append(f"Resolved via hardcoded: {plan_code}")
                     else:
                         company_id = DEFAULT_COMPANY_ID
                         resolution_method = "default_fallback"
-                        warnings.append(f"Applied default company_id {DEFAULT_COMPANY_ID} for empty customer name")
+                        warnings.append(f"Applied default: {DEFAULT_COMPANY_ID}")
 
             # Step 4: Customer name mapping (priority 4)
             if not company_id:
@@ -190,7 +189,7 @@ class CompanyIdResolutionStep(TransformStep):
                 if customer_name and customer_name in self._company_id4_mapping:
                     company_id = self._company_id4_mapping[customer_name]
                     resolution_method = "customer_name"
-                    warnings.append(f"Resolved company_id via customer name: {customer_name} -> {company_id}")
+                    warnings.append(f"Resolved via customer_name: {customer_name}")
 
             # Step 5: Account name mapping (priority 5)
             if not company_id:
@@ -198,7 +197,7 @@ class CompanyIdResolutionStep(TransformStep):
                 if account_name and account_name in self._company_id5_mapping:
                     company_id = self._company_id5_mapping[account_name]
                     resolution_method = "account_name"
-                    warnings.append(f"Resolved company_id via account name: {account_name} -> {company_id}")
+                    warnings.append(f"Resolved via account_name: {account_name}")
 
             updated_row["company_id"] = company_id
 
@@ -233,7 +232,9 @@ def build_annuity_pipeline(mappings: Optional[Dict[str, Any]] = None) -> Pipelin
     if mappings is None:
         mappings = {}
 
-    def extract_mapping(key: str, fallback: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+    def extract_mapping(
+        key: str, fallback: Optional[Dict[str, str]] = None
+    ) -> Dict[str, str]:
         if fallback is None:
             fallback = {}
         mapping_entry = mappings.get(key, {})
@@ -278,7 +279,8 @@ def build_annuity_pipeline(mappings: Optional[Dict[str, Any]] = None) -> Pipelin
     )
 
     pipeline = Pipeline(steps=steps, config=config)
-    logger.info(f"Built annuity pipeline with {len(steps)} steps: {[s.name for s in steps]}")
+    step_names = [s.name for s in steps]
+    logger.info(f"Built annuity pipeline with {len(steps)} steps: {step_names}")
     return pipeline
 
 
@@ -318,14 +320,19 @@ class BronzeSchemaValidationStep:
     def _validate_with_decorator(self, df1: pd.DataFrame) -> pd.DataFrame:
         return df1
 
-    def execute(self, dataframe: pd.DataFrame, context: PipelineContext) -> pd.DataFrame:
+    def execute(
+        self, dataframe: pd.DataFrame, context: PipelineContext
+    ) -> pd.DataFrame:
         try:
-            validated_df, summary = validate_bronze_dataframe(dataframe, failure_threshold=self.failure_threshold)
+            validated_df, summary = validate_bronze_dataframe(
+                dataframe, failure_threshold=self.failure_threshold
+            )
         except PanderaSchemaError as exc:
             raise PipelineStepError(str(exc), step_name=self.name) from exc
 
         if hasattr(context, "metadata"):
-            context.metadata.setdefault("bronze_schema_validation", bronze_summary_to_dict(summary))
+            summary_dict = bronze_summary_to_dict(summary)
+            context.metadata.setdefault("bronze_schema_validation", summary_dict)
         return validated_df
 
 
@@ -352,7 +359,9 @@ class GoldProjectionStep(DataFrameStep):
     def name(self) -> str:
         return "gold_projection"
 
-    def execute(self, dataframe: pd.DataFrame, context: PipelineContext) -> pd.DataFrame:
+    def execute(
+        self, dataframe: pd.DataFrame, context: PipelineContext
+    ) -> pd.DataFrame:
         working_df = dataframe.copy(deep=True)
         working_df.rename(columns=COLUMN_ALIAS_MAPPING, inplace=True)
         self._ensure_annualized_column(working_df)
@@ -363,13 +372,18 @@ class GoldProjectionStep(DataFrameStep):
         removed = [col for col in working_df.columns if col not in allowed_columns]
 
         if removed:
-            logger.info("gold_projection.removed_columns", extra={"columns": removed, "count": len(removed)})
+            extra = {"columns": removed, "count": len(removed)}
+            logger.info("gold_projection.removed_columns", extra=extra)
 
         if not preserved:
-            raise PipelineStepError("Gold projection failed: no columns remain", step_name=self.name)
+            raise PipelineStepError(
+                "Gold projection failed: no columns remain", step_name=self.name
+            )
 
         projected_df = working_df.loc[:, preserved].copy()
-        validated_df, summary = validate_gold_dataframe(projected_df, project_columns=False)
+        validated_df, summary = validate_gold_dataframe(
+            projected_df, project_columns=False
+        )
 
         if hasattr(context, "metadata"):
             context.metadata["gold_projection"] = {
@@ -389,7 +403,8 @@ class GoldProjectionStep(DataFrameStep):
             dataframe.drop(columns=["当期收益率"], inplace=True)
 
     def _remove_legacy_columns(self, dataframe: pd.DataFrame) -> List[str]:
-        existing = [col for col in self.legacy_columns_to_remove if col in dataframe.columns]
+        cols_to_remove = self.legacy_columns_to_remove
+        existing = [col for col in cols_to_remove if col in dataframe.columns]
         if existing:
             dataframe.drop(columns=existing, inplace=True)
         return existing
@@ -398,11 +413,15 @@ class GoldProjectionStep(DataFrameStep):
         if self._allowed_columns is not None:
             return self._allowed_columns
 
-        provider = self._allowed_columns_provider or self._default_allowed_columns_provider
+        default_provider = self._default_allowed_columns_provider
+        provider = self._allowed_columns_provider or default_provider
         columns = list(provider())
 
         if not columns:
-            raise PipelineStepError("Allowed columns provider returned empty list", step_name=self.name)
+            raise PipelineStepError(
+                "Allowed columns provider returned empty list",
+                step_name=self.name,
+            )
 
         seen = set()
         deduped: List[str] = []
@@ -433,12 +452,17 @@ class GoldSchemaValidationStep:
     def _validate_with_decorator(self, df1: pd.DataFrame) -> pd.DataFrame:
         return df1
 
-    def execute(self, dataframe: pd.DataFrame, context: PipelineContext) -> pd.DataFrame:
+    def execute(
+        self, dataframe: pd.DataFrame, context: PipelineContext
+    ) -> pd.DataFrame:
         try:
-            validated_df, summary = validate_gold_dataframe(dataframe, project_columns=self.project_columns)
+            validated_df, summary = validate_gold_dataframe(
+                dataframe, project_columns=self.project_columns
+            )
         except PanderaSchemaError as exc:
             raise PipelineStepError(str(exc), step_name=self.name) from exc
 
         if hasattr(context, "metadata"):
-            context.metadata.setdefault("gold_schema_validation", gold_summary_to_dict(summary))
+            summary_dict = gold_summary_to_dict(summary)
+            context.metadata.setdefault("gold_schema_validation", summary_dict)
         return validated_df

@@ -5,7 +5,7 @@ Consolidated from config.py (Story 4.10) and constants.py (Story 4.4) in Story 5
 
 This module centralizes all static mappings and configuration constants that were
 previously hardcoded in pipeline_steps.py and other modules. This enables:
-- Configuration-driven generic steps (DataFrameMappingStep, DataFrameValueReplacementStep)
+- Configuration-driven generic steps (MappingStep, ReplacementStep)
 - Single source of truth for domain-specific mappings
 - Easy maintenance and updates without code changes
 - Reference implementation for Epic 9 domain migrations

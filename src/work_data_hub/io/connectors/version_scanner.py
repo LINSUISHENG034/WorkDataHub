@@ -1,4 +1,4 @@
-"""Version-aware folder scanner for intelligent file discovery.
+r"""Version-aware folder scanner for intelligent file discovery.
 
 Implements Story 3.1: Version-Aware Folder Scanner with configurable
 precedence rules and file-pattern-aware detection (Decision #1).
@@ -11,15 +11,14 @@ Key Features:
 - Cross-platform compatibility with Unicode support
 """
 
-import os
 import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Literal
+from typing import List, Literal, Optional
 
-from work_data_hub.utils.logging import get_logger
 from work_data_hub.io.connectors.exceptions import DiscoveryError
+from work_data_hub.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

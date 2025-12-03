@@ -14,16 +14,22 @@ The project follows Clean Architecture with clear layer separation:
 
 ```
 src/work_data_hub/
-├── domain/              # Pure business logic (no external dependencies)
-│   ├── pipelines/       # Core pipeline framework
-│   │   └── steps/       # Generic transformation steps (see [README](src/work_data_hub/domain/pipelines/steps/README.md))
-│   └── ...              # Domain models and business rules
+├── domain/                   # Pure business logic (no external dependencies)
+│   ├── pipelines/            # Core pipeline framework
+│   │   └── steps/            # Generic transformation steps
+│   ├── annuity_performance/  # Reference domain implementation
+│   └── ...                   # Domain models and business rules
+├── infrastructure/           # Reusable cross-domain services (Epic 5)
+│   ├── transforms/           # Pipeline steps (MappingStep, CleansingStep, etc.)
+│   ├── cleansing/            # Registry-driven data cleansing rules
+│   ├── enrichment/           # Company ID resolution and normalization
+│   ├── validation/           # Error handling and report generation
+│   └── settings/             # Configuration schema and loaders
 ├── io/                  # Data access layer
 │   ├── readers/         # Excel and file readers
 │   ├── loader/          # PostgreSQL loading framework
 │   └── connectors/      # File discovery and external connectors
 ├── orchestration/       # Dagster jobs and schedules
-├── cleansing/           # Registry-driven data cleansing rules
 ├── config/              # Configuration management (Pydantic settings)
 └── utils/               # Shared utilities (logging, date parsing)
 
@@ -38,24 +44,30 @@ tests/
 ### Layer Responsibilities
 
 **Domain Layer** (`domain/`)
-- Pure business logic and transformations
+- Pure business logic and lightweight orchestration
 - 100% testable without external services
 - NO imports from `io/` or `orchestration/` layers
-- Contains pipeline framework, domain models, and business rules
+- Contains domain models, schemas, and service orchestrators
+- Each domain ~500-900 lines (post-Epic 5 refactoring)
+
+**Infrastructure Layer** (`infrastructure/`) - NEW in Epic 5
+- Reusable cross-domain services and utilities
+- Transform pipeline steps (MappingStep, CleansingStep, etc.)
+- Data cleansing registry with YAML configuration
+- Company ID resolution and normalization
+- Validation error handling and report generation
+- NO imports from `io/` or `orchestration/` layers
+- Architecture diagram & narrative: see `docs/architecture/infrastructure-layer.md`
 
 **I/O Layer** (`io/`)
 - File reading, database writes, external API calls
-- May import from `domain/` layer
-- Handles all infrastructure concerns
+- May import from `domain/` and `infrastructure/` layers
+- Handles all external system interactions
 
 **Orchestration Layer** (`orchestration/`)
 - Dagster job definitions and schedule triggers
-- Wires together `domain/` and `io/` components
+- Wires together `domain/`, `infrastructure/`, and `io/` components
 - Top-level layer that can import from all other layers
-
-**Cleansing Layer** (`cleansing/`)
-- Reusable data cleansing rules using registry pattern
-- Validation and normalization logic
 
 **Config Layer** (`config/`)
 - Pydantic settings for type-safe configuration

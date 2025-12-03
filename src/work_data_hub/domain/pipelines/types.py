@@ -43,11 +43,11 @@ class ErrorContext:
     to ensure consistent error reporting and logging.
 
     Attributes:
-        error_type: Classification of error (e.g., 'discovery', 'validation', 'transformation')
-        operation: Specific operation that failed (e.g., 'file_discovery', 'bronze_validation')
+        error_type: Classification of error (e.g., 'discovery', 'validation')
+        operation: Specific operation that failed (e.g., 'file_discovery')
         domain: Domain being processed (e.g., 'annuity_performance')
-        stage: Pipeline stage where error occurred (e.g., 'discovery', 'transformation', 'loading')
-        error_message: Human-readable error message (renamed from 'message' to avoid logging conflict)
+        stage: Pipeline stage where error occurred (e.g., 'discovery')
+        error_message: Human-readable error message
         details: Additional context-specific details
         row_number: Optional row number for row-level errors
         field: Optional field name for field-level errors
@@ -144,9 +144,13 @@ class PipelineContext:
     Attributes:
         pipeline_name: Logical name of the pipeline being executed
         execution_id: Unique identifier (uuid/slug) for this execution
+        run_id: Stable run identifier (defaults to execution_id)
+        domain: Domain name for downstream logging/metrics
         timestamp: UTC timestamp when the run started
         config: Serialized pipeline configuration for reference in steps
         metadata: Mutable map for steps to stash scratchpad data
+        logger: Optional logger bound to this execution
+        extra: Arbitrary additional context to propagate
 
     Note:
         Story 5.5: ValidationErrorReporter removed. Use infrastructure.validation
@@ -157,7 +161,16 @@ class PipelineContext:
     execution_id: str
     timestamp: datetime
     config: Mapping[str, Any]
+    domain: str = "unknown"
+    run_id: Optional[str] = None
     metadata: MutableMapping[str, Any] = field(default_factory=dict)
+    logger: Any = None
+    extra: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # Ensure run_id is always populated for contract compliance
+        if not self.run_id:
+            self.run_id = self.execution_id
 
 
 @dataclass
