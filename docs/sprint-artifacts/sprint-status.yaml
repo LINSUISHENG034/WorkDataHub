@@ -96,7 +96,7 @@ development_status:
   5-4-company-id-resolver: done
   5-5-validation-utilities: done
   5-6-pipeline-steps: review
-  5-7-service-refactoring: backlog
+  5-7-service-refactoring: review
   5-8-integration-and-docs: backlog
   epic-5-retrospective: optional
 

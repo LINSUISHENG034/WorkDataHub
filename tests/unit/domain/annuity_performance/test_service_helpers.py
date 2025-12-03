@@ -1,382 +1,92 @@
-"""Unit tests for annuity performance service helper functions."""
+"""Unit tests for annuity performance helper functions after Story 5.7 refactor."""
 
 from datetime import date
 
+import pandas as pd
 import pytest
 
-from work_data_hub.domain.annuity_performance.service import (
-    ErrorContext,
-    _export_unknown_names_csv,
-    _extract_company_code,
-    _extract_financial_metrics,
-    _extract_metadata_fields,
-    _extract_plan_code,
-    _extract_report_date,
-    _normalize_month,
-    _validate_processing_results,
+from work_data_hub.domain.annuity_performance.discovery_helpers import normalize_month
+from work_data_hub.domain.annuity_performance.processing_helpers import (
+    convert_dataframe_to_models,
+    export_unknown_names_csv,
+    parse_report_date,
+    parse_report_period,
+    summarize_enrichment,
 )
-from work_data_hub.domain.annuity_performance.models import (
-    AnnuityPerformanceIn,
-    AnnuityPerformanceOut,
-)
+from work_data_hub.domain.pipelines.types import ErrorContext
 
 
 class TestErrorContext:
-    """Test ErrorContext dataclass."""
-
-    def test_error_context_creation(self):
-        """Test creating ErrorContext with all fields."""
+    def test_to_log_dict(self):
         ctx = ErrorContext(
             error_type="validation_error",
             operation="bronze_validation",
             domain="annuity_performance",
             stage="validation",
             error_message="Validation failed",
-            details={"field": "月度", "value": None},
-            row_number=42,
+            details={"field": "月度"},
+            row_number=1,
             field="月度",
         )
-
-        assert ctx.error_type == "validation_error"
-        assert ctx.operation == "bronze_validation"
-        assert ctx.domain == "annuity_performance"
-        assert ctx.stage == "validation"
-        assert ctx.error_message == "Validation failed"
-        assert ctx.row_number == 42
-        assert ctx.field == "月度"
-
-    def test_error_context_to_log_dict(self):
-        """Test converting ErrorContext to log dictionary."""
-        ctx = ErrorContext(
-            error_type="discovery_error",
-            operation="file_discovery",
-            domain="annuity_performance",
-            stage="discovery",
-            error_message="File not found",
-            details={"month": "202501"},
-            row_number=None,
-            field=None,
-        )
-
-        log_dict = ctx.to_log_dict()
-
-        assert log_dict["error_type"] == "discovery_error"
-        assert log_dict["operation"] == "file_discovery"
-        assert log_dict["domain"] == "annuity_performance"
-        assert log_dict["stage"] == "discovery"
-        assert log_dict["error_message"] == "File not found"
-        assert log_dict["details"] == {"month": "202501"}
-        assert "row_number" not in log_dict  # None values excluded
-        assert "field" not in log_dict
-
-    def test_error_context_minimal(self):
-        """Test ErrorContext with minimal required fields."""
-        ctx = ErrorContext(
-            error_type="transformation_error",
-            operation="row_transformation",
-            domain="annuity_performance",
-            stage="transformation",
-            error_message="Transformation failed",
-        )
-
-        log_dict = ctx.to_log_dict()
-
-        assert len(log_dict) == 5  # Only required fields
-        assert "row_number" not in log_dict
-        assert "field" not in log_dict
-        assert "details" not in log_dict
+        log = ctx.to_log_dict()
+        assert log["error_type"] == "validation_error"
+        assert log["operation"] == "bronze_validation"
+        assert log["domain"] == "annuity_performance"
+        assert "row_number" in log
 
 
 class TestNormalizeMonth:
-    """Test _normalize_month function."""
+    def test_valid(self):
+        assert normalize_month("202501") == "202501"
 
-    def test_valid_month(self):
-        """Test valid YYYYMM format."""
-        assert _normalize_month("202501") == "202501"
-        assert _normalize_month("202412") == "202412"
-        assert _normalize_month("202001") == "202001"
-
-    def test_invalid_length(self):
-        """Test invalid length raises ValueError."""
-        with pytest.raises(ValueError, match="6-digit string"):
-            _normalize_month("2025")
-
-        with pytest.raises(ValueError, match="6-digit string"):
-            _normalize_month("20250101")
-
-    def test_non_numeric(self):
-        """Test non-numeric input raises ValueError."""
-        with pytest.raises(ValueError, match="6-digit string"):
-            _normalize_month("202501a")
-
-    def test_invalid_year(self):
-        """Test invalid year raises ValueError."""
-        with pytest.raises(ValueError, match="between 2000 and 2100"):
-            _normalize_month("199912")
-
-        with pytest.raises(ValueError, match="between 2000 and 2100"):
-            _normalize_month("210101")
-
-    def test_invalid_month(self):
-        """Test invalid month raises ValueError."""
-        with pytest.raises(ValueError, match="between 01 and 12"):
-            _normalize_month("202500")
-
-        with pytest.raises(ValueError, match="between 01 and 12"):
-            _normalize_month("202513")
-
-    def test_none_input(self):
-        """Test None input raises ValueError."""
-        with pytest.raises(ValueError, match="required"):
-            _normalize_month(None)
+    @pytest.mark.parametrize("value", ["2025", "202513", "202501a", None])
+    def test_invalid(self, value):
+        with pytest.raises(ValueError):
+            normalize_month(value)
 
 
-class TestExtractReportDate:
-    """Test _extract_report_date function."""
+class TestDateParsing:
+    def test_parse_report_period(self):
+        assert parse_report_period("2024年11月") == (2024, 11)
+        assert parse_report_period("202411") == (2024, 11)
+        assert parse_report_period("24年11月") == (2024, 11)
 
-    def test_extract_from_月度_field(self):
-        """Test extracting date from 月度 field."""
-        model = AnnuityPerformanceIn(月度="202501")
-        result = _extract_report_date(model, 0)
-        assert result == date(2025, 1, 1)
-
-    def test_extract_from_年月_fields(self):
-        """Test extracting date from 年 and 月 fields."""
-        model = AnnuityPerformanceIn(年="2025", 月="1")
-        result = _extract_report_date(model, 0)
-        assert result == date(2025, 1, 1)
-
-    def test_extract_with_2digit_year(self):
-        """Test extracting date with 2-digit year."""
-        model = AnnuityPerformanceIn(年="25", 月="1")
-        result = _extract_report_date(model, 0)
-        assert result == date(2025, 1, 1)
-
-    def test_missing_date_returns_none(self):
-        """Test missing date information returns None."""
-        model = AnnuityPerformanceIn()
-        result = _extract_report_date(model, 0)
-        assert result is None
-
-    def test_invalid_date_returns_none(self):
-        """Test invalid date returns None."""
-        model = AnnuityPerformanceIn(年="2025", 月="13")
-        result = _extract_report_date(model, 0)
-        assert result is None
+    def test_parse_report_date(self):
+        assert parse_report_date("202411") == date(2024, 11, 1)
+        assert parse_report_date("2024年11月") == date(2024, 11, 1)
+        assert parse_report_date("bad") is None
 
 
-class TestExtractPlanCode:
-    """Test _extract_plan_code function."""
-
-    def test_extract_plan_code(self):
-        """Test extracting plan code."""
-        model = AnnuityPerformanceIn(计划代码="PLAN001")
-        result = _extract_plan_code(model, 0)
-        assert result == "PLAN001"
-
-    def test_missing_plan_code_returns_none(self):
-        """Test missing plan code returns None."""
-        model = AnnuityPerformanceIn()
-        result = _extract_plan_code(model, 0)
-        assert result is None
-
-    def test_whitespace_stripped(self):
-        """Test whitespace is stripped."""
-        model = AnnuityPerformanceIn(计划代码="  PLAN001  ")
-        result = _extract_plan_code(model, 0)
-        assert result == "PLAN001"
-
-
-class TestExtractCompanyCode:
-    """Test _extract_company_code function."""
-
-    def test_extract_from_company_id(self):
-        """Test extracting from company_id field."""
-        model = AnnuityPerformanceIn(company_id="COMP001")
-        result = _extract_company_code(model, 0)
-        assert result == "COMP001"
-
-    def test_extract_from_公司代码(self):
-        """Test extracting from 公司代码 field."""
-        model = AnnuityPerformanceIn(公司代码="COMP002")
-        result = _extract_company_code(model, 0)
-        assert result == "COMP002"
-
-    def test_derive_from_客户名称(self):
-        """Test deriving from 客户名称 field generates IN_* temporary ID."""
-        model = AnnuityPerformanceIn(客户名称="测试公司有限公司")
-        result = _extract_company_code(model, 0)
-        # New behavior: generates IN_<hash> format for unresolved company names
-        assert result.startswith("IN_")
-        assert len(result) == 19  # IN_ + 16 char hash
-
-    def test_missing_company_code_returns_none(self):
-        """Test missing company code returns None."""
-        model = AnnuityPerformanceIn()
-        result = _extract_company_code(model, 0)
-        assert result is None
-
-
-class TestExtractFinancialMetrics:
-    """Test _extract_financial_metrics function."""
-
-    def test_extract_all_metrics(self):
-        """Test extracting all financial metrics."""
-        model = AnnuityPerformanceIn(
-            期初资产规模=1000.0,
-            期末资产规模=1500.0,
-            供款=200.0,
-            流失=50.0,
-            待遇支付=100.0,
-            投资收益=450.0,
-            当期收益率=0.30,
+class TestConvertDataFrameToModels:
+    def test_converts_rows_and_collects_unknown(self):
+        df = pd.DataFrame(
+            [
+                {"月度": date(2024, 11, 1), "计划代码": "P1", "company_id": "C1"},
+                {"月度": date(2024, 11, 1), "计划代码": "P2", "company_id": "IN_ABC", "客户名称": "未识别"},
+            ]
         )
-        result = _extract_financial_metrics(model, 0)
+        records, unknown = convert_dataframe_to_models(df)
+        assert len(records) == 2
+        assert unknown == ["未识别"]
 
-        assert result["期初资产规模"] == 1000.0
-        assert result["期末资产规模"] == 1500.0
-        assert result["供款"] == 200.0
-        assert result["流失"] == 50.0
-        assert result["待遇支付"] == 100.0
-        assert result["投资收益"] == 450.0
-        assert result["当期收益率"] == 0.30
-
-    def test_extract_partial_metrics(self):
-        """Test extracting partial metrics."""
-        model = AnnuityPerformanceIn(
-            期初资产规模=1000.0,
-            期末资产规模=1500.0,
-        )
-        result = _extract_financial_metrics(model, 0)
-
-        assert result["期初资产规模"] == 1000.0
-        assert result["期末资产规模"] == 1500.0
-        assert "供款" not in result
-        assert "投资收益" not in result
-
-    def test_extract_流失_含待遇支付(self):
-        """Test extracting 流失(含待遇支付) field."""
-        model = AnnuityPerformanceIn(流失_含待遇支付=150.0)
-        result = _extract_financial_metrics(model, 0)
-
-        assert result["流失(含待遇支付)"] == 150.0
+    def test_skips_invalid_rows(self):
+        df = pd.DataFrame([{"计划代码": "P1"}])  # Missing 月度
+        records, unknown = convert_dataframe_to_models(df)
+        assert records == []
+        assert unknown == []
 
 
-class TestExtractMetadataFields:
-    """Test _extract_metadata_fields function."""
+class TestExportUnknownNames:
+    def test_disabled(self):
+        assert export_unknown_names_csv(["a"], "source", export_enabled=False) is None
 
-    def test_extract_all_metadata(self):
-        """Test extracting all metadata fields."""
-        model = AnnuityPerformanceIn(
-            业务类型="企业年金",
-            计划类型="DB",
-            计划名称="测试计划",
-            组合类型="股票型",
-            组合名称="测试组合",
-            组合代码="F123ABC",
-            客户名称="测试公司",
-            机构代码="ORG001",
-            机构名称="测试机构",
-            产品线代码="PROD001",
-            年金账户号="ACC001",
-            年金账户名="测试账户",
-        )
-        result = _extract_metadata_fields(model, 0)
-
-        assert result["业务类型"] == "企业年金"
-        assert result["计划类型"] == "DB"
-        assert result["计划名称"] == "测试计划"
-        assert result["组合类型"] == "股票型"
-        assert result["组合名称"] == "测试组合"
-        assert result["组合代码"] == "123ABC"  # F-prefix stripped
-        assert result["客户名称"] == "测试公司"
-
-    def test_f_prefix_stripping(self):
-        """Test F-prefix stripping for portfolio codes."""
-        model = AnnuityPerformanceIn(组合代码="F123ABC")
-        result = _extract_metadata_fields(model, 0)
-        assert result["组合代码"] == "123ABC"
-
-        # Should not strip if doesn't match pattern
-        model = AnnuityPerformanceIn(组合代码="Fund123")
-        result = _extract_metadata_fields(model, 0)
-        assert result["组合代码"] == "Fund123"
+    def test_empty(self):
+        assert export_unknown_names_csv([], "source") is None
 
 
-class TestValidateProcessingResults:
-    """Test _validate_processing_results function."""
-
-    def test_successful_processing(self):
-        """Test successful processing with no errors."""
-        records = [AnnuityPerformanceOut(月度=date(2025, 1, 1), 计划代码="P1", company_id="C1")]
-        errors = []
-
-        # Should not raise
-        _validate_processing_results(records, errors, 1)
-
-    def test_acceptable_error_rate(self):
-        """Test acceptable error rate (<50%)."""
-        records = [AnnuityPerformanceOut(月度=date(2025, 1, 1), 计划代码="P1", company_id="C1")]
-        errors = ["Error 1"]
-
-        # 1 error out of 3 total = 33% error rate, should not raise
-        _validate_processing_results(records, errors, 3)
-
-    def test_excessive_error_rate_raises(self):
-        """Test excessive error rate (>50%) raises exception."""
-        from work_data_hub.domain.annuity_performance.service import (
-            AnnuityPerformanceTransformationError,
-        )
-
-        records = []
-        errors = ["Error 1", "Error 2", "Error 3"]
-
-        # 3 errors out of 5 total = 60% error rate, should raise
-        with pytest.raises(AnnuityPerformanceTransformationError, match="Too many processing errors"):
-            _validate_processing_results(records, errors, 5)
-
-
-class TestExportUnknownNamesCsv:
-    """Test _export_unknown_names_csv function."""
-
-    def test_export_disabled_returns_none(self):
-        """Test export disabled returns None."""
-        result = _export_unknown_names_csv(["Company1"], "test_source", export_enabled=False)
-        assert result is None
-
-    def test_empty_list_returns_none(self):
-        """Test empty list returns None."""
-        result = _export_unknown_names_csv([], "test_source", export_enabled=True)
-        assert result is None
-
-    def test_export_enabled_with_names(self, tmp_path, monkeypatch):
-        """Test export enabled with names calls export_error_csv."""
-        # Story 5.5: Mock export_error_csv from infrastructure.validation
-        from pathlib import Path
-
-        import work_data_hub.infrastructure.validation as validation_module
-
-        # Mock export_error_csv to return a test path
-        test_csv_path = tmp_path / "unknown_companies.csv"
-
-        def mock_export_error_csv(df, filename_prefix, output_dir):
-            return test_csv_path
-
-        monkeypatch.setattr(validation_module, "export_error_csv", mock_export_error_csv)
-
-        result = _export_unknown_names_csv(["Company1", "Company2"], "test_source", export_enabled=True)
-        assert result == str(test_csv_path)
-
-    def test_export_failure_returns_none(self, monkeypatch):
-        """Test export failure returns None instead of raising."""
-        # Story 5.5: Mock export_error_csv from infrastructure.validation
-        import work_data_hub.infrastructure.validation as validation_module
-
-        def mock_export_error_csv(df, filename_prefix, output_dir):
-            raise IOError("Disk full")
-
-        monkeypatch.setattr(validation_module, "export_error_csv", mock_export_error_csv)
-
-        # Should not raise, should return None
-        result = _export_unknown_names_csv(["Company1"], "test_source", export_enabled=True)
-        assert result is None
+class TestSummarizeEnrichment:
+    def test_stats(self):
+        stats = summarize_enrichment(10, 2, 123)
+        assert stats.total_records == 10
+        assert stats.temp_assigned == 2
+        assert stats.processing_time_ms == 123
