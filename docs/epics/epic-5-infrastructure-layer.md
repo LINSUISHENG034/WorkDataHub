@@ -367,11 +367,63 @@ So that **refactoring quality is assured and Epic 9 has a reference implementati
 
 ---
 
+### Story 5.9: Epic 5 Migration Cleanup (6-File Standard)
+
+As a **developer**,
+I want to **complete the Epic 5 migration cleanup by consolidating to the 6-file domain standard**,
+So that **the domain layer is lightweight, well-organized, and provides a replicable template for Epic 9**.
+
+**Background:** Added 2025-12-04 via Correct-Course workflow after gap analysis revealed incomplete cleanup.
+
+**Acceptance Criteria:**
+
+**Given** Stories 5.1-5.8 complete but cleanup incomplete
+**When** cleanup is performed
+**Then**:
+
+**1. Domain Structure Matches 6-File Standard:**
+```
+domain/annuity_performance/
+├── __init__.py          # Module exports
+├── service.py           # <200 lines
+├── models.py            # <400 lines
+├── schemas.py           # <250 lines
+├── constants.py         # ~200 lines
+├── pipeline_builder.py  # <150 lines
+└── helpers.py           # <150 lines (NEW)
+```
+
+**2. Files Consolidated/Deleted:**
+- `helpers.py` created (merged from `discovery_helpers.py` + `processing_helpers.py`)
+- `discovery_helpers.py` DELETED
+- `processing_helpers.py` DELETED
+- `pipeline_steps.py` DELETED (468 lines)
+
+**3. Validation/Projection Steps Migrated:**
+- `BronzeSchemaValidationStep` → `infrastructure/validation/schema_steps.py`
+- `GoldSchemaValidationStep` → `infrastructure/validation/schema_steps.py`
+- `GoldProjectionStep` → `infrastructure/transforms/projection_step.py`
+
+**4. Line Count Targets:**
+- Domain file count: 9 → 7
+- Domain total lines: 2,683 → <1,100
+
+**5. All Tests Pass**
+
+**6. Documentation Updated**
+
+**Prerequisites:** Story 5.8
+**Estimated Effort:** 2-2.5 days
+
+---
+
 ## Epic Summary
 
-**Total Stories:** 8 (5.1 - 5.8)
-**Estimated Effort:** 10 working days + 1 buffer = 11 days (2.2 weeks)
+**Total Stories:** 9 (5.1 - 5.9)
+**Estimated Effort:** 12.5 working days + 1 buffer = 13.5 days (~2.7 weeks)
 **Priority:** Critical (blocks Epic 9)
+
+> **Note:** Story 5.9 added 2025-12-04 via Correct-Course workflow to complete domain cleanup to 6-file standard.
 
 **Success Metrics:**
 

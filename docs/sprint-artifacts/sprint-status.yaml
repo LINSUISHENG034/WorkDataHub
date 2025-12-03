@@ -88,7 +88,8 @@ development_status:
   # Epic 5: Infrastructure Layer Architecture - IN PROGRESS
   # Tech spec approved 2025-12-01, Sprint Change Proposal approved
   # CRITICAL: Must be completed before Epic 9 (Growth Domains Migration)
-  # Refactors domain layer from 3,446 lines to <500 lines, establishes reusable infrastructure
+  # Refactors domain layer to 6-file standard, establishes reusable infrastructure
+  # Story 5.9 added 2025-12-04 via Correct-Course workflow to complete cleanup
   epic-5: in-progress
   5-1-infrastructure-foundation: done
   5-2-cleansing-migration: done
@@ -98,6 +99,7 @@ development_status:
   5-6-pipeline-steps: done
   5-7-service-refactoring: done
   5-8-integration-and-docs: done
+  5-9-epic5-migration-cleanup: ready-for-dev
   epic-5-retrospective: optional
 
   # Epic 6: Company Enrichment Service
