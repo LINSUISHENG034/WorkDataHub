@@ -1,7 +1,7 @@
 # Source Tree Analysis
 
 **Project:** WorkDataHub Data Platform
-**Generated:** 2025-12-01
+**Generated:** 2025-12-03
 **Architecture:** Domain-Driven Design (DDD) with Layered Architecture
 
 ---
@@ -153,23 +153,46 @@ orchestration/
 
 ---
 
-### 4. `src/work_data_hub/cleansing/` - Data Cleansing
+### 4. `src/work_data_hub/infrastructure/` - Infrastructure Layer (Epic 5)
 
-**Purpose:** Centralized data cleansing rules and registry
+**Purpose:** Reusable infrastructure components extracted from domain layer
 
 ```
-cleansing/
-├── rules/                      # Cleansing rule definitions
-│   └── __init__.py
+infrastructure/
+├── cleansing/                  # 🧹 Data cleansing framework
+│   ├── registry.py             # Cleansing rule registry
+│   ├── rules/                  # Rule implementations
+│   │   ├── string_rules.py     # String cleansing rules
+│   │   └── numeric_rules.py    # Numeric cleansing rules
+│   ├── integrations/           # Framework integrations
+│   │   └── pydantic_adapter.py # Pydantic integration
+│   └── settings/               # Cleansing configuration
+│       └── cleansing_rules.yml # Rule definitions
 │
-└── integrations/               # External cleansing integrations
-    └── __init__.py
+├── enrichment/                 # 🏢 Company enrichment utilities
+│   ├── company_id_resolver.py  # Company ID resolution
+│   ├── normalizer.py           # Name normalization
+│   └── types.py                # Enrichment types
+│
+├── settings/                   # ⚙️ Configuration management
+│   ├── data_source_schema.py   # Data source schema validation
+│   └── loader.py               # Configuration loader
+│
+├── transforms/                 # 🔄 Data transformation utilities
+│   ├── base.py                 # Base transform classes
+│   └── standard_steps.py       # Standard pipeline steps
+│
+└── validation/                 # ✅ Validation utilities
+    ├── error_handler.py        # Error handling
+    ├── report_generator.py     # Validation reports
+    ├── schema_helpers.py       # Schema utilities
+    └── types.py                # Validation types
 ```
 
-**Cleansing Registry:**
-- Domain-specific rules (per domain)
-- Global rules (cross-domain)
-- Rule composition and chaining
+**Architecture Notes:**
+- Extracted from domain layer (Epic 5 refactoring)
+- Reduces domain layer from ~3,446 lines to <500 lines
+- Provides reusable components for all domains
 
 ---
 
@@ -474,5 +497,5 @@ uv run <command>        # Run in environment
 ---
 
 **Document Status:** ✅ Complete
-**Last Updated:** 2025-12-01
+**Last Updated:** 2025-12-03
 **Maintained By:** Development Team

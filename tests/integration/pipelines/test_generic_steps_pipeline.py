@@ -16,13 +16,15 @@ import pytest
 
 from work_data_hub.domain.pipelines.pipeline_config import PipelineConfig, StepConfig
 from work_data_hub.domain.pipelines.core import Pipeline
-from work_data_hub.domain.pipelines.steps import (
-    DataFrameCalculatedFieldStep,
-    DataFrameFilterStep,
-    DataFrameMappingStep,
-    DataFrameValueReplacementStep,
-)
 from work_data_hub.domain.pipelines.types import PipelineContext, TransformStep
+
+# Import DataFrame steps from infrastructure/transforms/ (Story 5.6)
+from work_data_hub.infrastructure.transforms import (
+    CalculationStep as DataFrameCalculatedFieldStep,
+    FilterStep as DataFrameFilterStep,
+    MappingStep as DataFrameMappingStep,
+    ReplacementStep as DataFrameValueReplacementStep,
+)
 
 
 def create_pipeline(name: str, steps: List[TransformStep]) -> Pipeline:
@@ -30,7 +32,7 @@ def create_pipeline(name: str, steps: List[TransformStep]) -> Pipeline:
     step_configs = [
         StepConfig(
             name=step.name,
-            import_path=f"work_data_hub.domain.pipelines.steps.{step.__class__.__name__}",
+            import_path=f"work_data_hub.infrastructure.transforms.{step.__class__.__name__}",
         )
         for step in steps
     ]

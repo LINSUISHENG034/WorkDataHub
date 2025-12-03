@@ -1,8 +1,8 @@
 # Data Models Documentation
 
 **Project:** WorkDataHub Data Platform
-**Generated:** 2025-12-01
-**Scan Level:** Deep
+**Generated:** 2025-12-03
+**Scan Level:** Exhaustive
 
 ---
 
@@ -295,5 +295,5 @@ Current migrations:
 ---
 
 **Document Status:** ✅ Complete
-**Last Updated:** 2025-12-01
+**Last Updated:** 2025-12-03
 **Maintained By:** Development Team

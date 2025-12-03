@@ -42,16 +42,18 @@ from work_data_hub.domain.pipelines.pipeline_config import PipelineConfig, StepC
 from work_data_hub.domain.pipelines.core import Pipeline, TransformStep
 from work_data_hub.domain.pipelines.exceptions import PipelineStepError
 
-# Import shared steps from domain/pipelines/steps/ (Story 4.7 + Story 1.12)
+# Import shared steps from domain/pipelines/steps/ (Story 4.7)
 from work_data_hub.domain.pipelines.steps import (
     ColumnNormalizationStep,
     CustomerNameCleansingStep,
-    DataFrameValueReplacementStep,
     DateParsingStep,
     FieldCleanupStep,
     clean_company_name,
     parse_to_standard_date,
 )
+
+# Import DataFrame steps from infrastructure/transforms/ (Story 5.6)
+from work_data_hub.infrastructure.transforms import ReplacementStep
 from work_data_hub.domain.pipelines.types import (
     DataFrameStep,
     PipelineContext,
