@@ -8,11 +8,9 @@ from pandera.errors import SchemaError
 from work_data_hub.domain.annuity_performance.constants import (
     DEFAULT_ALLOWED_GOLD_COLUMNS,
 )
-from work_data_hub.domain.annuity_performance.pipeline_steps import (
-    GoldProjectionStep,
-)
 from work_data_hub.domain.annuity_performance.schemas import GoldAnnuitySchema
 from work_data_hub.domain.pipelines.types import PipelineContext
+from work_data_hub.infrastructure.transforms.projection_step import GoldProjectionStep
 
 GOLD_SCHEMA_COLUMNS = list(GoldAnnuitySchema.columns.keys())
 

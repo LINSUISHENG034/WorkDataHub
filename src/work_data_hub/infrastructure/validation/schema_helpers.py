@@ -26,10 +26,10 @@ Usage:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Iterable, List
 
 import pandas as pd
-from pandera.errors import SchemaError
+from pandera.errors import SchemaError, SchemaErrors
 
 if TYPE_CHECKING:
     import pandera as pa
@@ -150,8 +150,100 @@ def ensure_not_empty(
         )
 
 
+def get_schema_name(schema: "pa.DataFrameSchema") -> str:
+    """Return a short schema name for error messages."""
+    return getattr(schema, "name", None) or getattr(schema, "__class__", type("", (), {})).__name__
+
+
+def format_schema_error_message(
+    schema: "pa.DataFrameSchema", failure_cases: pd.DataFrame | None
+) -> str:
+    base = f"{get_schema_name(schema)} validation failed"
+    if failure_cases is None or getattr(failure_cases, "empty", True):
+        return base
+
+    message_parts: List[str] = []
+    if "column" in failure_cases.columns:
+        columns = failure_cases["column"].dropna().astype(str).unique().tolist()
+        if columns:
+            message_parts.append(f"columns {columns[:5]}")
+
+    if "failure_case" in failure_cases.columns:
+        failure_values = (
+            failure_cases["failure_case"].dropna().astype(str).head(5).tolist()
+        )
+        if failure_values:
+            message_parts.append(f"failure cases {failure_values}")
+
+    return f"{base}: " + "; ".join(message_parts) if message_parts else base
+
+
+def track_invalid_ratio(
+    column: str,
+    invalid_rows: List[int],
+    dataframe: pd.DataFrame,
+    schema: "pa.DataFrameSchema",
+    threshold: float,
+    reason: str,
+) -> None:
+    if not invalid_rows:
+        return
+    ratio = len(invalid_rows) / max(len(dataframe), 1)
+    if ratio > threshold:
+        failure_cases = pd.DataFrame({"column": column, "row_index": invalid_rows})
+        raise_schema_error(
+            schema,
+            dataframe,
+            message=(
+                f"{reason}: column '{column}' has {ratio:.1%} invalid values "
+                f"(rows {invalid_rows[:10]})"
+            ),
+            failure_cases=failure_cases,
+        )
+
+
+def ensure_non_null_columns(
+    schema: "pa.DataFrameSchema",
+    dataframe: pd.DataFrame,
+    columns: Iterable[str],
+) -> List[str]:
+    empty_columns: List[str] = []
+    for column in columns:
+        if column in dataframe.columns and dataframe[column].notna().sum() == 0:
+            empty_columns.append(column)
+    if empty_columns:
+        failure_cases = pd.DataFrame({"column": empty_columns, "failure": "all values null"})
+        raise_schema_error(
+            schema,
+            dataframe,
+            message=f"{get_schema_name(schema)} validation failed: columns have no non-null values {empty_columns}",
+            failure_cases=failure_cases,
+        )
+    return empty_columns
+
+
+def apply_schema_with_lazy_mode(
+    schema: "pa.DataFrameSchema", dataframe: pd.DataFrame
+) -> pd.DataFrame:
+    try:
+        return schema.validate(dataframe, lazy=True)
+    except SchemaErrors as exc:
+        message = format_schema_error_message(schema, exc.failure_cases)
+        raise_schema_error(
+            schema,
+            dataframe,
+            message=message,
+            failure_cases=exc.failure_cases,
+        )
+
+
 __all__ = [
     "raise_schema_error",
     "ensure_required_columns",
     "ensure_not_empty",
+    "get_schema_name",
+    "format_schema_error_message",
+    "track_invalid_ratio",
+    "ensure_non_null_columns",
+    "apply_schema_with_lazy_mode",
 ]

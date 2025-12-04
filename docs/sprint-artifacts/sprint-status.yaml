@@ -90,7 +90,7 @@ development_status:
   # CRITICAL: Must be completed before Epic 9 (Growth Domains Migration)
   # Refactors domain layer to 6-file standard, establishes reusable infrastructure
   # Story 5.9 added 2025-12-04 via Correct-Course workflow to complete cleanup
-  epic-5: in-progress
+  epic-5: done
   5-1-infrastructure-foundation: done
   5-2-cleansing-migration: done
   5-3-config-reorganization: done
@@ -99,8 +99,8 @@ development_status:
   5-6-pipeline-steps: done
   5-7-service-refactoring: done
   5-8-integration-and-docs: done
-  5-9-epic5-migration-cleanup: ready-for-dev
-  epic-5-retrospective: optional
+  5-9-epic5-migration-cleanup: done
+  epic-5-retrospective: completed
 
   # Epic 6: Company Enrichment Service
   epic-6: backlog

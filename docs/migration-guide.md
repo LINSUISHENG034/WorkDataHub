@@ -21,7 +21,7 @@ reference implementation.
 3. **Document business rules** - Cleansing rules, enrichment logic
 4. **Catalog output schema** - Database table structure, required columns
 
-### Step 2: Create Domain Directory Structure
+### Step 2: Create Domain Directory Structure (6-File Standard)
 
 ```
 src/work_data_hub/domain/{domain_name}/
@@ -29,8 +29,9 @@ src/work_data_hub/domain/{domain_name}/
 ├── constants.py      # Static mappings, configuration
 ├── models.py         # Pydantic models (input/output)
 ├── schemas.py        # Pandera validation schemas
-├── pipeline_builder.py  # Pipeline construction
-└── service.py        # Lightweight orchestrator
+├── pipeline_builder.py  # Pipeline construction using infra steps
+├── service.py        # Lightweight orchestrator
+└── helpers.py        # Domain-specific helper functions
 ```
 
 ### Step 3: Define Pydantic Models
@@ -56,7 +57,7 @@ class DomainRecordOut(BaseModel):
 
 ### Step 4: Create Pandera Schemas
 
-Define validation schemas in `schemas.py`:
+Define validation schemas in `schemas.py`. Use `infrastructure.validation.schema_steps` validation classes in the pipeline.
 
 ```python
 import pandera as pa
@@ -76,12 +77,16 @@ class GoldSchema(pa.DataFrameModel):
 
 ### Step 5: Build Pipeline Using Infrastructure Steps
 
-Create `pipeline_builder.py`:
+Create `pipeline_builder.py` utilizing standard steps and validation steps:
 
 ```python
 from work_data_hub.infrastructure.transforms.base import Pipeline
 from work_data_hub.infrastructure.transforms.standard_steps import (
     MappingStep, ReplacementStep, CleansingStep, DropStep
+)
+from work_data_hub.infrastructure.transforms.projection_step import GoldProjectionStep
+from work_data_hub.infrastructure.validation.schema_steps import (
+    BronzeSchemaValidationStep
 )
 from work_data_hub.infrastructure.enrichment.company_id_resolver import (
     CompanyIdResolver, ResolutionStrategy
@@ -94,6 +99,7 @@ def build_bronze_to_silver_pipeline(
     """Build the transformation pipeline."""
 
     steps = [
+        BronzeSchemaValidationStep(),
         MappingStep(column_mapping=COLUMN_MAPPING),
         ReplacementStep(column="status", replacements=STATUS_MAPPING),
         CleansingStep(domain="your_domain"),
@@ -101,7 +107,7 @@ def build_bronze_to_silver_pipeline(
             enrichment_service=enrichment_service,
             plan_override_mapping=plan_override_mapping or {},
         ),
-        DropStep(columns=COLUMNS_TO_DROP),
+        GoldProjectionStep(), # Projects to Gold schema columns
     ]
 
     return Pipeline(steps=steps)
@@ -109,12 +115,13 @@ def build_bronze_to_silver_pipeline(
 
 ### Step 6: Create Service Orchestrator
 
-Create lightweight `service.py` (~100-200 lines):
+Create lightweight `service.py` (<200 lines):
 
 ```python
 from work_data_hub.domain.pipelines.types import (
     DomainPipelineResult, PipelineContext
 )
+from .helpers import convert_dataframe_to_models
 
 def process_domain(
     month: str,
@@ -149,10 +156,14 @@ def process_domain(
         domain="your_domain",
     )
     result_df = pipeline.execute(discovery_result.dataframe, context)
+    
+    # Convert to models if needed
+    records, unknown_names = convert_dataframe_to_models(result_df)
+    dataframe = _records_to_dataframe(records)
 
     # 3. Load to warehouse
-    load_result = warehouse_loader.load(
-        result_df,
+    load_result = warehouse_loader.load_dataframe(
+        dataframe,
         table="your_domain_table",
         upsert_keys=["month", "plan_code", "company_id"],
     )
@@ -189,12 +200,13 @@ The `annuity_performance` domain demonstrates all patterns:
 
 | Component | File | Lines |
 |-----------|------|-------|
-| Constants | `constants.py` | ~150 |
-| Models | `models.py` | ~200 |
-| Schemas | `schemas.py` | ~300 |
-| Pipeline Builder | `pipeline_builder.py` | ~150 |
-| Service | `service.py` | ~100 |
-| **Total** | | **~900** |
+| Constants | `constants.py` | ~95 |
+| Models | `models.py` | ~340 |
+| Schemas | `schemas.py` | ~210 |
+| Pipeline Builder | `pipeline_builder.py` | ~135 |
+| Service | `service.py` | ~160 |
+| Helpers | `helpers.py` | ~130 |
+| **Total** | | **~1,100** |
 
 ## Common Patterns
 
@@ -242,10 +254,10 @@ strategy = ResolutionStrategy(
 
 ## Checklist
 
-- [ ] Domain directory created with all required files
+- [ ] Domain directory created with 6 standard files (including `helpers.py`)
 - [ ] Pydantic models defined for input/output
 - [ ] Pandera schemas created for Bronze/Gold validation
-- [ ] Pipeline builder using infrastructure steps
+- [ ] Pipeline builder using infrastructure steps (schema_steps, projection_step)
 - [ ] Service orchestrator (<200 lines)
 - [ ] Unit tests for models and schemas
 - [ ] Integration tests for pipeline

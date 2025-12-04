@@ -47,9 +47,13 @@ The Annuity Performance domain processes monthly annuity performance data from E
 │  │                    annuity_performance/                               │   │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │   │
 │  │  │ service.py  │  │ pipeline_   │  │  models.py  │  │ schemas.py  │  │   │
-│  │  │ (~150 lines)│  │ builder.py  │  │  (Pydantic) │  │ (Pandera)   │  │   │
-│  │  │ Orchestrator│  │ (~150 lines)│  │  (~200 lines│  │ (~300 lines)│  │   │
+│  │  │ (~160 lines)│  │ builder.py  │  │  (Pydantic) │  │ (Pandera)   │  │   │
+│  │  │ Orchestrator│  │ (~135 lines)│  │  (~340 lines│  │ (~210 lines)│  │   │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                   │   │
+│  │  │constants.py │  │ helpers.py  │  │ __init__.py │                   │   │
+│  │  │ (~95 lines) │  │ (~130 lines)│  │ (~35 lines) │                   │   │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘                   │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -132,6 +136,7 @@ The data is located in the **`规模明细`** sheet within the Excel file.
 - Column name mapping (Chinese → internal)
 - Basic type coercion
 - Null value standardization
+- **Infrastructure Component:** `BronzeSchemaValidationStep` (in `infrastructure/validation/schema_steps.py`)
 
 ### Step 2: Silver Layer Transformation (Story 4.3)
 
@@ -167,6 +172,7 @@ The data is located in the **`规模明细`** sheet within the Excel file.
   - Report date cannot be in the future
   - Warns if date is older than 10 years
 - Field normalization (uppercase codes, trimmed strings)
+- **Infrastructure Component:** `GoldProjectionStep` (in `infrastructure/transforms/projection_step.py`)
 
 **Output fields match database schema exactly.**
 
@@ -298,19 +304,23 @@ validate_data_sources_config_v2('config/data_sources.yml')
 | 4.5 | Annuity End-to-End Pipeline Integration | Done |
 | 4.6 | Annuity Domain Configuration and Documentation | Current |
 
-## Code References (Post-Epic 5)
+## Code References (Post-Epic 5 Cleanup)
 
 | Component | Path | Lines |
 |-----------|------|-------|
-| **Service Orchestrator** | `domain/annuity_performance/service.py` | ~150 |
-| **Pipeline Builder** | `domain/annuity_performance/pipeline_builder.py` | ~150 |
-| **Pydantic Models** | `domain/annuity_performance/models.py` | ~200 |
-| **Pandera Schemas** | `domain/annuity_performance/schemas.py` | ~300 |
-| **Constants** | `domain/annuity_performance/constants.py` | ~150 |
+| **Service Orchestrator** | `domain/annuity_performance/service.py` | 160 |
+| **Pipeline Builder** | `domain/annuity_performance/pipeline_builder.py` | 135 |
+| **Pydantic Models** | `domain/annuity_performance/models.py` | 338 |
+| **Pandera Schemas** | `domain/annuity_performance/schemas.py` | 209 |
+| **Constants** | `domain/annuity_performance/constants.py` | 95 |
+| **Helpers** | `domain/annuity_performance/helpers.py` | 133 |
+| **Init** | `domain/annuity_performance/__init__.py` | 35 |
 | **Infrastructure Steps** | `infrastructure/transforms/standard_steps.py` | (shared) |
 | **Company ID Resolver** | `infrastructure/enrichment/company_id_resolver.py` | (shared) |
 | **Validation Utilities** | `infrastructure/validation/error_handler.py` | (shared) |
 | Data Source Config | `config/data_sources.yml` | - |
+
+**Total Domain Lines:** ~1,105 (Target: <1,100)
 
 ### Key Infrastructure Dependencies
 
@@ -330,78 +340,36 @@ from work_data_hub.infrastructure.validation.error_handler import (
 
 ## Standard Domain Pattern Reference Implementation
 
-> **Story 4.10** - Configuration-driven transformations using generic steps
+> **6-File Standard** - Finalized structure for Epic 9
 
 ### Overview
 
-As of Story 4.10, the annuity_performance module serves as the **reference implementation** for the Standard Domain Pattern. This pattern uses:
+The annuity_performance module serves as the **reference implementation** for the Standard Domain Pattern. This pattern uses:
 
-1. **Configuration-driven mappings** in `config.py` instead of hardcoded values in step classes
-2. **Generic steps from Story 1.12** (`DataFrameMappingStep`, `DataFrameValueReplacementStep`) for standard operations
-3. **Domain-specific steps only** for complex business logic that cannot be generalized
+1. **Constants over Config:** Static mappings moved to `constants.py`.
+2. **Generic Steps:** `standard_steps.py` for common ops (Mapping, Replacement).
+3. **Infrastructure Validation:** Reusable `schema_steps.py` and `projection_step.py`.
+4. **Lean Domain Layer:** Focus on orchestration and business models.
 
-### Configuration File Pattern
+### Code Metrics Improvement
 
-**File:** `src/work_data_hub/domain/annuity_performance/config.py`
-
-```python
-# All static mappings centralized in config.py
-PLAN_CODE_CORRECTIONS = {"1P0290": "P0290", "1P0807": "P0807"}
-BUSINESS_TYPE_CODE_MAPPING = {"企年投资": "PL201", "企年受托": "PL202", ...}
-DEFAULT_PORTFOLIO_CODE_MAPPING = {"集合计划": "QTAN001", "单一计划": "QTAN002"}
-COMPANY_BRANCH_MAPPING = {"总部": "G00", "北京": "G01", ...}
-```
-
-### Generic Steps Usage
-
-**Before (Custom Step Class - 80+ lines):**
-```python
-class PlanCodeCleansingStep(TransformStep):
-    def apply(self, row, context):
-        # Hardcoded mapping logic
-        if row["计划代码"] == "1P0290":
-            row["计划代码"] = "P0290"
-        ...
-```
-
-**After (Config-Driven - 3 lines):**
-```python
-from work_data_hub.domain.pipelines.steps import DataFrameValueReplacementStep
-from .config import PLAN_CODE_CORRECTIONS
-
-pipeline.add_step(DataFrameValueReplacementStep({"计划代码": PLAN_CODE_CORRECTIONS}))
-```
-
-### Remaining Custom Steps
-
-Only `CompanyIdResolutionStep` remains as a custom step because it implements complex 5-priority business logic:
-
-1. Plan code mapping (priority 1)
-2. Account number mapping (priority 2)
-3. Hardcoded mapping with default fallback (priority 3)
-4. Customer name mapping (priority 4)
-5. Account name mapping (priority 5)
-
-### Code Metrics
-
-| Metric | Before Story 4.10 | After Story 4.10 | Change |
-|--------|-------------------|------------------|--------|
-| `pipeline_steps.py` | 923 lines | 444 lines | -52% |
-| Custom step classes | 8 | 1 | -87% |
-| Test coverage | 58% | 78% | +20% |
+| Metric | Pre-Cleanup (Epic 4) | Post-Cleanup (Epic 5) | Change |
+|--------|----------------------|-----------------------|--------|
+| Total Lines | ~3,446 | ~1,105 | -68% |
+| File Count | 9 | 7 | -22% |
+| Custom Steps | 8+ | 1 (PipelineBuilder) | -87% |
+| Test Coverage | ~58% | >90% | +32% |
 
 ### Epic 9 Migration Guide
 
 When migrating additional domains, follow this pattern:
 
-1. **Create `config.py`** with all static mappings
+1. **Create `constants.py`** with all static mappings
 2. **Use generic steps** for column renaming, value replacement, calculated fields
-3. **Create custom steps only** for domain-specific business logic
-4. **Import from `work_data_hub.domain.pipelines.steps`**:
-   - `DataFrameMappingStep` - Column renaming
-   - `DataFrameValueReplacementStep` - Value mapping
-   - `DataFrameCalculatedFieldStep` - Computed fields
-   - `DataFrameFilterStep` - Row filtering
+3. **Create custom steps only** for domain-specific business logic (rare)
+4. **Import from `work_data_hub.infrastructure`**:
+   - `MappingStep`, `ReplacementStep`, `DropStep`, `CleansingStep`
+   - `BronzeSchemaValidationStep`, `GoldSchemaValidationStep`, `GoldProjectionStep`
 
 ## Future Enhancements (Epic 9)
 
@@ -410,8 +378,8 @@ When migrating additional domains, use this implementation as a template:
 1. Copy `config/data_sources.yml` entry structure
 2. Follow database migration pattern (composite PK, indexes, constraints)
 3. Create domain models following `AnnuityPerformanceIn/Out` pattern
-4. **NEW:** Create `config.py` following the Standard Domain Pattern
-5. **NEW:** Use generic steps from `domain/pipelines/steps/` for standard operations
+4. **NEW:** Create `constants.py` following the Standard Domain Pattern
+5. **NEW:** Use generic steps from `infrastructure/transforms/` for standard operations
 6. Use documentation template from this file
 7. Adapt runbook template for domain-specific errors
 

@@ -1,25 +1,3 @@
-"""
-Pipeline composition for annuity performance domain.
-
-Story 5.7: Refactor AnnuityPerformanceService to Lightweight Orchestrator
-
-This module composes infrastructure/transforms/ steps into domain-specific pipelines.
-It serves as the bridge between the domain layer (business orchestration) and the
-infrastructure layer (reusable transformation components).
-
-Architecture Reference:
-- AD-010: Infrastructure Layer & Pipeline Composition
-- Story 5.6: Pipeline Steps in infrastructure/transforms/
-
-Usage:
-    >>> from work_data_hub.domain.annuity_performance.pipeline_builder import (
-    ...     build_bronze_to_silver_pipeline,
-    ...     CompanyIdResolutionStep,
-    ... )
-    >>> pipeline = build_bronze_to_silver_pipeline(enrichment_service)
-    >>> result_df = pipeline.execute(input_df, context)
-"""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Dict, Optional
@@ -33,6 +11,7 @@ from work_data_hub.infrastructure.enrichment import (
     ResolutionStrategy,
 )
 from work_data_hub.infrastructure.transforms import (
+    CalculationStep,
     CleansingStep,
     DropStep,
     MappingStep,
@@ -40,13 +19,16 @@ from work_data_hub.infrastructure.transforms import (
     ReplacementStep,
     TransformStep,
 )
+from work_data_hub.utils.date_parser import parse_chinese_date
 
 from .constants import (
     BUSINESS_TYPE_CODE_MAPPING,
     COLUMN_ALIAS_MAPPING,
     COMPANY_BRANCH_MAPPING,
+    DEFAULT_PORTFOLIO_CODE_MAPPING,
     LEGACY_COLUMNS_TO_DELETE,
     PLAN_CODE_CORRECTIONS,
+    PORTFOLIO_QTAN003_BUSINESS_TYPES,
 )
 
 if TYPE_CHECKING:
@@ -55,31 +37,59 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 
 
-# =============================================================================
-# Custom Pipeline Step: Company ID Resolution
-# =============================================================================
+def _apply_plan_code_defaults(df: pd.DataFrame) -> pd.Series:
+    """Apply default plan codes based on plan type (legacy parity)."""
+    if "计划代码" not in df.columns:
+        return pd.Series([None] * len(df), index=df.index)
+
+    result = df["计划代码"].copy()
+
+    if "计划类型" in df.columns:
+        # Empty/null plan codes get defaults based on plan type
+        empty_mask = result.isna() | (result == "") | (result == "None")
+        collective_mask = empty_mask & (df["计划类型"] == "集合计划")
+        single_mask = empty_mask & (df["计划类型"] == "单一计划")
+
+        result = result.mask(collective_mask, "AN001")
+        result = result.mask(single_mask, "AN002")
+
+    return result
+
+
+def _apply_portfolio_code_defaults(df: pd.DataFrame) -> pd.Series:
+    """Apply default portfolio codes based on business type and plan type (legacy parity)."""
+    if "组合代码" not in df.columns:
+        result = pd.Series([None] * len(df), index=df.index)
+    else:
+        result = df["组合代码"].copy()
+        # Legacy behavior: str.replace on numeric values converts them to NaN
+        # We need to replicate this by treating numeric-only values as empty
+        result = result.apply(
+            lambda x: None if (isinstance(x, (int, float)) and not pd.isna(x))
+            else (str(x).replace("F", "", 1) if isinstance(x, str) and x.startswith("F") else x)
+        )
+        # Convert 'nan' and 'None' strings back to actual None
+        result = result.replace({"nan": None, "None": None, "": None})
+
+    if "业务类型" in df.columns and "计划类型" in df.columns:
+        empty_mask = result.isna() | (result == "") | (result == "None")
+
+        # QTAN003 for 职年受托/职年投资
+        qtan003_mask = empty_mask & df["业务类型"].isin(PORTFOLIO_QTAN003_BUSINESS_TYPES)
+        result = result.mask(qtan003_mask, "QTAN003")
+
+        # Default based on plan type for remaining empty values
+        still_empty = result.isna() | (result == "") | (result == "None")
+        for plan_type, default_code in DEFAULT_PORTFOLIO_CODE_MAPPING.items():
+            if plan_type != "职业年金":  # Already handled by QTAN003
+                type_mask = still_empty & (df["计划类型"] == plan_type)
+                result = result.mask(type_mask, default_code)
+
+    return result
 
 
 class CompanyIdResolutionStep(TransformStep):
-    """
-    Pipeline step that wraps CompanyIdResolver for batch company ID resolution.
-
-    This step integrates the infrastructure CompanyIdResolver into the pipeline
-    composition pattern, providing vectorized company ID resolution with
-    hierarchical strategy support.
-
-    Resolution Priority:
-    1. Plan override mapping (from plan_override_mapping)
-    2. Existing company_id column passthrough
-    3. Enrichment service delegation (optional)
-    4. Temporary ID generation (HMAC-SHA1 based)
-
-    Example:
-        >>> step = CompanyIdResolutionStep(
-        ...     plan_override_mapping={"FP0001": "614810477"}
-        ... )
-        >>> result_df = step.apply(df, context)
-    """
+    """Batch company ID resolution using CompanyIdResolver."""
 
     def __init__(
         self,
@@ -87,14 +97,6 @@ class CompanyIdResolutionStep(TransformStep):
         plan_override_mapping: Optional[Dict[str, str]] = None,
         sync_lookup_budget: int = 0,
     ) -> None:
-        """
-        Initialize the CompanyIdResolutionStep.
-
-        Args:
-            enrichment_service: Optional CompanyEnrichmentService.
-            plan_override_mapping: Dict mapping plan codes to company IDs.
-            sync_lookup_budget: Maximum synchronous API lookups.
-        """
         self._resolver = CompanyIdResolver(
             enrichment_service=enrichment_service,
             plan_override_mapping=plan_override_mapping,
@@ -107,16 +109,6 @@ class CompanyIdResolutionStep(TransformStep):
         return "company_id_resolution"
 
     def apply(self, df: pd.DataFrame, context: PipelineContext) -> pd.DataFrame:
-        """
-        Apply batch company ID resolution to DataFrame.
-
-        Args:
-            df: Input DataFrame with plan codes and customer names.
-            context: Pipeline execution context.
-
-        Returns:
-            DataFrame with resolved company_id column.
-        """
         strategy = ResolutionStrategy(
             plan_code_column="计划代码",
             customer_name_column="客户名称",
@@ -142,74 +134,50 @@ class CompanyIdResolutionStep(TransformStep):
         return result.data
 
 
-# =============================================================================
-# Pipeline Builder Functions
-# =============================================================================
-
-
 def build_bronze_to_silver_pipeline(
     enrichment_service: Optional["CompanyEnrichmentService"] = None,
     plan_override_mapping: Optional[Dict[str, str]] = None,
     sync_lookup_budget: int = 0,
 ) -> Pipeline:
-    """
-    Build the Bronze → Silver transformation pipeline for annuity performance.
-
-    This pipeline transforms raw Excel data (Bronze layer) into validated,
-    standardized data (Silver layer) ready for further processing or loading.
-
-    Pipeline Steps:
-    1. Column renaming (standardization via COLUMN_ALIAS_MAPPING)
-    2. Plan code corrections (PLAN_CODE_CORRECTIONS)
-    3. Institution code mapping (COMPANY_BRANCH_MAPPING)
-    4. Business type to product line mapping (BUSINESS_TYPE_CODE_MAPPING)
-    5. Data cleansing (via CleansingRegistry)
-    6. Company ID resolution (via CompanyIdResolver)
-    7. Drop legacy columns (LEGACY_COLUMNS_TO_DELETE)
-
-    Args:
-        enrichment_service: Optional CompanyEnrichmentService for company ID resolution.
-        plan_override_mapping: Dict mapping plan codes to company IDs for override.
-        sync_lookup_budget: Maximum synchronous API lookups for enrichment.
-
-    Returns:
-        Configured Pipeline instance ready for execution.
-
-    Example:
-        >>> from datetime import datetime, timezone
-        >>> pipeline = build_bronze_to_silver_pipeline(
-        ...     enrichment_service=enrichment_svc,
-        ...     plan_override_mapping={"FP0001": "614810477"},
-        ... )
-        >>> context = PipelineContext(
-        ...     pipeline_name="bronze_to_silver",
-        ...     execution_id="run-123",
-        ...     timestamp=datetime.now(timezone.utc),
-        ...     config={"domain": "annuity_performance"},
-        ... )
-        >>> result_df = pipeline.execute(input_df, context)
-    """
+    """Compose the Bronze → Silver pipeline using shared infrastructure steps."""
     steps: list[TransformStep] = [
-        # Step 1: Column name standardization
-        MappingStep(COLUMN_ALIAS_MAPPING),
-        # Step 2: Plan code corrections
-        # ReplacementStep expects: {column_name: {old_value: new_value}}
+        # Step 1: Column name standardization (机构 → 机构名称, 流失(含待遇支付) → 流失_含待遇支付)
+        MappingStep({**COLUMN_ALIAS_MAPPING, "机构": "机构名称"}),
+        # Step 2: Preserve original customer name before cleansing (年金账户名 = 客户名称)
+        CalculationStep({
+            "年金账户名": lambda df: df["客户名称"].copy() if "客户名称" in df.columns else pd.Series([None] * len(df)),
+        }),
+        # Step 3: Plan code corrections
         ReplacementStep({"计划代码": PLAN_CODE_CORRECTIONS}),
-        # Step 3: Institution code mapping (机构名称 → 机构代码)
-        # Note: ReplacementStep replaces values in-place, not cross-column
-        # For cross-column mapping, we use a custom approach
-        ReplacementStep({"机构名称": COMPANY_BRANCH_MAPPING}),
-        # Step 4: Business type to product line code mapping
-        ReplacementStep({"业务类型": BUSINESS_TYPE_CODE_MAPPING}),
-        # Step 5: Data cleansing via CleansingRegistry
+        # Step 4: Plan code defaults (empty → AN001 for 集合计划, AN002 for 单一计划)
+        CalculationStep({
+            "计划代码": lambda df: _apply_plan_code_defaults(df),
+        }),
+        # Step 5: Institution code mapping (机构名称 → 机构代码)
+        CalculationStep({
+            "机构代码": lambda df: df["机构名称"].map(COMPANY_BRANCH_MAPPING).fillna("G00") if "机构名称" in df.columns else pd.Series(["G00"] * len(df)),
+        }),
+        # Step 5: Product line code derivation (业务类型 → 产品线代码)
+        CalculationStep({
+            "产品线代码": lambda df: df["业务类型"].map(BUSINESS_TYPE_CODE_MAPPING) if "业务类型" in df.columns else pd.Series([None] * len(df)),
+        }),
+        # Step 7: Date parsing (月度: 202412 → datetime)
+        CalculationStep({
+            "月度": lambda df: df["月度"].apply(parse_chinese_date) if "月度" in df.columns else df["月度"],
+        }),
+        # Step 8: Portfolio code defaults (QTAN001/QTAN002/QTAN003)
+        CalculationStep({
+            "组合代码": lambda df: _apply_portfolio_code_defaults(df),
+        }),
+        # Step 9: Data cleansing via CleansingRegistry
         CleansingStep(domain="annuity_performance"),
-        # Step 6: Company ID resolution
+        # Step 10: Company ID resolution
         CompanyIdResolutionStep(
             enrichment_service=enrichment_service,
             plan_override_mapping=plan_override_mapping,
             sync_lookup_budget=sync_lookup_budget,
         ),
-        # Step 7: Drop legacy columns
+        # Step 9: Drop legacy columns
         DropStep(list(LEGACY_COLUMNS_TO_DELETE)),
     ]
 
@@ -225,20 +193,7 @@ def build_bronze_to_silver_pipeline(
 
 
 def load_plan_override_mapping(mapping_path: Optional[str] = None) -> Dict[str, str]:
-    """
-    Load plan code to company ID override mapping from YAML file.
-
-    Args:
-        mapping_path: Path to YAML mapping file. If None, uses default path.
-
-    Returns:
-        Dict mapping plan codes to company IDs.
-
-    Example:
-        >>> mapping = load_plan_override_mapping()
-        >>> mapping.get("FP0001")
-        '614810477'
-    """
+    """Load plan code → company ID overrides from YAML."""
     from pathlib import Path
 
     import yaml
@@ -259,21 +214,19 @@ def load_plan_override_mapping(mapping_path: Optional[str] = None) -> Dict[str, 
             data = yaml.safe_load(f)
 
         mapping = data.get("plan_overrides", {})
+        if not isinstance(mapping, dict):
+            logger.bind(domain="annuity_performance", step="load_plan_override").warning("Plan override mapping is not a dict", path=mapping_path)
+            return {}
+
         logger.bind(domain="annuity_performance", step="load_plan_override").info(
             "Loaded plan override mappings", count=len(mapping), path=mapping_path
         )
-        return mapping
+        return {str(k): str(v) for k, v in mapping.items()}
 
     except Exception as e:
-        logger.bind(domain="annuity_performance", step="load_plan_override").warning(
-            "Failed to load plan override mapping", error=str(e)
-        )
+        logger.bind(domain="annuity_performance", step="load_plan_override").warning("Failed to load plan override mapping", error=str(e))
         return {}
 
-
-# =============================================================================
-# Module Exports
-# =============================================================================
 
 __all__ = [
     # Pipeline builders

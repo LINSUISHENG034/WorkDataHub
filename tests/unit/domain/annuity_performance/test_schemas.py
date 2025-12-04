@@ -2,15 +2,15 @@ import pandas as pd
 import pytest
 from pandera.errors import SchemaError
 
-from work_data_hub.domain.annuity_performance.pipeline_steps import (
-    BronzeSchemaValidationStep,
-    GoldSchemaValidationStep,
-)
 from work_data_hub.domain.annuity_performance.schemas import (
     validate_bronze_dataframe,
     validate_gold_dataframe,
 )
 from work_data_hub.domain.pipelines.types import PipelineContext
+from work_data_hub.infrastructure.validation.schema_steps import (
+    BronzeSchemaValidationStep,
+    GoldSchemaValidationStep,
+)
 
 
 def _build_bronze_df() -> pd.DataFrame:

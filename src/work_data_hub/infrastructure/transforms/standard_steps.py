@@ -18,7 +18,7 @@ Steps:
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
 import pandas as pd
 import structlog
@@ -341,3 +341,37 @@ class RenameStep(TransformStep):
     def apply(self, df: pd.DataFrame, context: PipelineContext) -> pd.DataFrame:
         """Rename columns using underlying MappingStep."""
         return self._mapping_step.apply(df, context)
+
+
+def coerce_numeric_columns(
+    dataframe: pd.DataFrame,
+    columns: Sequence[str],
+    *,
+    cleaner: Callable[[Any, str], Optional[float]],
+) -> Dict[str, List[int]]:
+    """
+    Clean and coerce numeric columns using provided cleaner.
+
+    Returns a mapping of column name -> list of row indices that failed cleaning.
+    """
+    invalid_rows: Dict[str, List[int]] = {}
+    for column in columns:
+        if column not in dataframe.columns:
+            continue
+        series = dataframe[column]
+        cleaned_values: List[float | None] = []
+        column_invalid_indices: List[int] = []
+        for idx, value in series.items():
+            try:
+                cleaned = cleaner(value, column)
+            except ValueError:
+                cleaned = None
+                column_invalid_indices.append(idx)
+            cleaned_values.append(cleaned)
+
+        converted = pd.to_numeric(cleaned_values, errors="coerce")
+        dataframe[column] = converted
+
+        if column_invalid_indices:
+            invalid_rows[column] = column_invalid_indices
+    return invalid_rows

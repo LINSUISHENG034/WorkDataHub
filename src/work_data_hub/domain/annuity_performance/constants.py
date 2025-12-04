@@ -1,34 +1,7 @@
-"""
-Annuity Performance Domain Constants.
-
-Consolidated from config.py (Story 4.10) and constants.py (Story 4.4) in Story 5.3.
-
-This module centralizes all static mappings and configuration constants that were
-previously hardcoded in pipeline_steps.py and other modules. This enables:
-- Configuration-driven generic steps (MappingStep, ReplacementStep)
-- Single source of truth for domain-specific mappings
-- Easy maintenance and updates without code changes
-- Reference implementation for Epic 9 domain migrations
-
-Usage:
-    from work_data_hub.domain.annuity_performance.constants import (
-        PLAN_CODE_CORRECTIONS,
-        BUSINESS_TYPE_CODE_MAPPING,
-        DEFAULT_PORTFOLIO_CODE_MAPPING,
-        DEFAULT_ALLOWED_GOLD_COLUMNS,
-    )
-"""
-
 from __future__ import annotations
 
 from typing import Dict, Sequence
 
-# =============================================================================
-# Gold Layer Column Definition (from original constants.py - Story 4.4)
-# =============================================================================
-# Columns that exist in the annuity performance gold table. This mirrors the
-# structure enforced by Story 4.4 and is reused by both the legacy service path
-# and the pipeline-based Gold projection step.
 DEFAULT_ALLOWED_GOLD_COLUMNS: Sequence[str] = (
     "月度",
     "业务类型",
@@ -55,27 +28,9 @@ DEFAULT_ALLOWED_GOLD_COLUMNS: Sequence[str] = (
     "company_id",
 )
 
+PLAN_CODE_CORRECTIONS: Dict[str, str] = {"1P0290": "P0290", "1P0807": "P0807"}
+PLAN_CODE_DEFAULTS: Dict[str, str] = {"集合计划": "AN001", "单一计划": "AN002"}
 
-# =============================================================================
-# Plan Code Corrections (PlanCodeCleansingStep)
-# =============================================================================
-# Specific plan code replacements from legacy cleaner
-PLAN_CODE_CORRECTIONS: Dict[str, str] = {
-    "1P0290": "P0290",
-    "1P0807": "P0807",
-}
-
-# Default plan codes based on plan type when plan code is empty
-PLAN_CODE_DEFAULTS: Dict[str, str] = {
-    "集合计划": "AN001",
-    "单一计划": "AN002",
-}
-
-
-# =============================================================================
-# Business Type to Product Line Code Mapping (BusinessTypeCodeMappingStep)
-# =============================================================================
-# Maps business types to product line codes from legacy MySQL 产品线 table
 BUSINESS_TYPE_CODE_MAPPING: Dict[str, str] = {
     "企年投资": "PL201",
     "企年受托": "PL202",
@@ -91,25 +46,13 @@ BUSINESS_TYPE_CODE_MAPPING: Dict[str, str] = {
     "其他": "PL301",
 }
 
-
-# =============================================================================
-# Portfolio Code Defaults (PortfolioCodeDefaultStep)
-# =============================================================================
-# Default portfolio codes used when source is blank, based on plan type
 DEFAULT_PORTFOLIO_CODE_MAPPING: Dict[str, str] = {
     "集合计划": "QTAN001",
     "单一计划": "QTAN002",
     "职业年金": "QTAN003",
 }
-
-# Business types that trigger QTAN003 portfolio code
 PORTFOLIO_QTAN003_BUSINESS_TYPES: Sequence[str] = ("职年受托", "职年投资")
 
-
-# =============================================================================
-# Institution/Branch Code Mapping (InstitutionCodeMappingStep)
-# =============================================================================
-# Maps institution names to branch codes
 COMPANY_BRANCH_MAPPING: Dict[str, str] = {
     "总部": "G00",
     "北京": "G01",
@@ -132,15 +75,8 @@ COMPANY_BRANCH_MAPPING: Dict[str, str] = {
     "广州": "G04",
     "青岛": "G11",
 }
-
-# Default institution code when null or empty
 DEFAULT_INSTITUTION_CODE: str = "G00"
 
-
-# =============================================================================
-# Legacy Columns to Delete (GoldProjectionStep)
-# =============================================================================
-# Columns that should never reach the Gold layer
 LEGACY_COLUMNS_TO_DELETE: Sequence[str] = (
     "id",
     "备注",
@@ -150,43 +86,20 @@ LEGACY_COLUMNS_TO_DELETE: Sequence[str] = (
     "集团企业客户名称",
 )
 
+COLUMN_ALIAS_MAPPING: Dict[str, str] = {"流失(含待遇支付)": "流失_含待遇支付"}
 
-# =============================================================================
-# Column Alias Mappings (GoldProjectionStep)
-# =============================================================================
-# Column name standardization for database compatibility
-COLUMN_ALIAS_MAPPING: Dict[str, str] = {
-    "流失(含待遇支付)": "流失_含待遇支付",
-}
-
-
-# =============================================================================
-# Company ID Resolution Constants (CompanyIdResolutionStep)
-# =============================================================================
-# Default company ID when customer name is empty/null
 DEFAULT_COMPANY_ID: str = "600866980"
 
-
-# =============================================================================
-# Module Exports
-# =============================================================================
 __all__: list[str] = [
-    # Gold layer columns (from original constants.py)
     "DEFAULT_ALLOWED_GOLD_COLUMNS",
-    # Plan code configuration
     "PLAN_CODE_CORRECTIONS",
     "PLAN_CODE_DEFAULTS",
-    # Business type mapping
     "BUSINESS_TYPE_CODE_MAPPING",
-    # Portfolio code configuration
     "DEFAULT_PORTFOLIO_CODE_MAPPING",
     "PORTFOLIO_QTAN003_BUSINESS_TYPES",
-    # Institution/branch mapping
     "COMPANY_BRANCH_MAPPING",
     "DEFAULT_INSTITUTION_CODE",
-    # Gold layer configuration
     "LEGACY_COLUMNS_TO_DELETE",
     "COLUMN_ALIAS_MAPPING",
-    # Company ID resolution
     "DEFAULT_COMPANY_ID",
 ]

@@ -62,6 +62,7 @@ src/work_data_hub/infrastructure/
 ├── transforms/
 │   ├── __init__.py
 │   ├── base.py                  # TransformStep ABC, Pipeline class
+│   ├── projection_step.py       # Gold layer projection & validation
 │   ├── standard_steps.py        # MappingStep, ReplacementStep, etc.
 │   └── cleansing_step.py        # CleansingStep integration
 └── validation/
@@ -69,6 +70,7 @@ src/work_data_hub/infrastructure/
     ├── error_handler.py         # handle_validation_errors()
     ├── report_generator.py      # Validation report generation
     ├── schema_helpers.py        # Schema utility functions
+    ├── schema_steps.py          # Reusable schema validation steps
     └── types.py                 # ValidationErrorDetail, etc.
 ```
 
@@ -89,6 +91,11 @@ The transform pipeline provides a composable framework for data transformations.
 - `FilterStep` - Row filtering with predicates
 - `DropStep` - Column removal
 - `CleansingStep` - Registry-based data cleansing
+- `GoldProjectionStep` - Column projection + Gold schema validation
+
+**Validation Steps (`validation/schema_steps.py`):**
+- `BronzeSchemaValidationStep` - DataFrame-level validation for Bronze schema
+- `GoldSchemaValidationStep` - Gold-layer schema validation
 
 **Usage Example:**
 ```python
@@ -195,18 +202,21 @@ def process_annuity_performance(
 |--------|--------|----------|
 | 1000 rows processing | <3s | ~1.5s |
 | Memory usage (1K rows) | <200MB | ~150MB |
-| Code lines (domain) | <500 | ~400 |
+| Code lines (domain) | <1,100 | ~1,100 |
 
-## Migration Guide for New Domains
+## Migration Guide for New Domains (6-File Standard)
 
-1. **Create domain directory** with models, schemas, constants
-2. **Define Pydantic models** for input/output data
-3. **Create Pandera schemas** for validation
-4. **Build pipeline** using infrastructure steps
-5. **Create service orchestrator** (lightweight, ~100-200 lines)
-6. **Add tests** using existing fixtures as templates
+Follow the standard 6-file domain structure:
 
-See `src/work_data_hub/domain/annuity_performance/` as reference implementation.
+1. **`__init__.py`** - Module exports
+2. **`service.py`** - Lightweight orchestration (<200 lines)
+3. **`models.py`** - Pydantic models for input/output (<400 lines)
+4. **`schemas.py`** - Pandera schemas only (<250 lines)
+5. **`constants.py`** - Business constants (~200 lines)
+6. **`pipeline_builder.py`** - Pipeline assembly using infra steps (<150 lines)
+7. **`helpers.py`** - Domain-specific helpers (<150 lines)
+
+See `src/work_data_hub/domain/annuity_performance/` as the reference implementation.
 
 ## Related Documentation
 

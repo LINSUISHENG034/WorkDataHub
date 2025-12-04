@@ -13,16 +13,18 @@ for exact parity validation.
 import logging
 from pathlib import Path
 from typing import Any, Dict, List
+from datetime import datetime, timezone
 
 import pandas as pd
 import pytest
 
 pytestmark = pytest.mark.e2e_suite
 
-from work_data_hub.domain.annuity_performance.pipeline_steps import (
-    build_annuity_pipeline,
-    load_mappings_from_json_fixture,
+from work_data_hub.domain.annuity_performance.pipeline_builder import (
+    build_bronze_to_silver_pipeline,
+    load_plan_override_mapping,
 )
+from work_data_hub.domain.pipelines.types import PipelineContext
 from work_data_hub.io.readers.excel_reader import read_excel_rows
 
 logger = logging.getLogger(__name__)
@@ -152,43 +154,20 @@ def process_with_pipeline(test_rows: List[Dict[str, Any]]) -> pd.DataFrame:
         Exception: If pipeline processing fails
     """
     try:
-        # Load mappings using the same fixture as baseline
-        mappings = load_mappings_from_json_fixture(str(MAPPING_FIXTURE_PATH))
-        pipeline = build_annuity_pipeline(mappings)
-
-        logger.info(f"Built pipeline with {len(pipeline.steps)} steps")
-
-        # Process each row through pipeline
-        pipeline_results = []
-        total_warnings = 0
-        total_errors = 0
-
-        for i, row in enumerate(test_rows):
-            try:
-                # Execute pipeline transformation
-                result = pipeline.execute(row)
-
-                if not result.errors:
-                    pipeline_results.append(result.row)
-                    total_warnings += len(result.warnings)
-                else:
-                    total_errors += len(result.errors)
-                    logger.warning(f"Pipeline errors for row {i}: {result.errors}")
-
-            except Exception as e:
-                total_errors += 1
-                logger.error(f"Pipeline execution failed for row {i}: {e}")
-
-        logger.info(
-            f"Pipeline processing completed: {len(pipeline_results)} successful rows, "
-            f"{total_warnings} warnings, {total_errors} errors"
+        plan_overrides = load_plan_override_mapping(str(MAPPING_FIXTURE_PATH))
+        pipeline = build_bronze_to_silver_pipeline(
+            plan_override_mapping=plan_overrides,
+        )
+        context = PipelineContext(
+            pipeline_name="bronze_to_silver_e2e",
+            execution_id="e2e-run",
+            config={"domain": "annuity_performance"},
+            timestamp=datetime.now(timezone.utc),
         )
 
-        if not pipeline_results:
+        pipeline_df = pipeline.execute(pd.DataFrame(test_rows), context)
+        if pipeline_df.empty:
             raise Exception("Pipeline produced no successful output")
-
-        # Convert to DataFrame with deterministic sorting (same as baseline)
-        pipeline_df = pd.DataFrame(pipeline_results)
 
         # Apply same sorting as golden baseline for consistent comparison
         sort_columns = [col for col in ("月度", "计划代码", "company_id") if col in pipeline_df.columns]

@@ -8,7 +8,9 @@ Chinese date formats commonly found in Excel files and business data.
 import logging
 import re
 from datetime import date, datetime
-from typing import Callable, Optional, Pattern, Tuple, Union
+from typing import Callable, List, Optional, Pattern, Tuple, Union
+
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +158,73 @@ def normalize_date_for_database(value: Union[str, int, date, None]) -> Optional[
     if parsed_date:
         return parsed_date.isoformat()
     return None
+
+
+def parse_report_period(report_period: str) -> Optional[Tuple[int, int]]:
+    """
+    Parse year and month from common report period formats.
+    """
+    if not report_period:
+        return None
+
+    patterns = [
+        r"(\d{4})[年\-/](\d{1,2})",  # 2024年11月 / 2024-11 / 2024/11
+        r"(\d{4})(\d{2})",  # 202411
+        r"(\d{2})年(\d{1,2})",  # 24年11月
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, report_period)
+        if not match:
+            continue
+        try:
+            year, month = int(match.group(1)), int(match.group(2))
+            if year < 50:
+                year += 2000
+            elif 50 <= year < 100:
+                year += 1900
+            return (year, month)
+        except ValueError:
+            continue
+
+    return None
+
+
+def parse_report_date(value: Union[str, int, date, None]) -> Optional[date]:
+    """
+    Parse a single value into a date using the shared Chinese date parser.
+    """
+    if value is None:
+        return None
+
+    try:
+        parsed = parse_chinese_date(value)
+        if hasattr(parsed, "date"):
+            return parsed.date()
+        return parsed
+    except Exception:  # pragma: no cover - defensive logging
+        logger.debug("Unable to parse report date value %r", value)
+        return None
+
+
+def parse_bronze_dates(series: pd.Series) -> Tuple[pd.Series, List[int]]:
+    """
+    Parse date column using shared date parser; return parsed series and invalid indices.
+    """
+    parsed_values: List[pd.Timestamp | pd.NaT] = []
+    invalid_rows: List[int] = []
+    for idx, value in series.items():
+        if value is None or (isinstance(value, str) and not value.strip()):
+            parsed_values.append(pd.NaT)
+            continue
+
+        try:
+            parsed = parse_yyyymm_or_chinese(value)
+            parsed_values.append(pd.Timestamp(parsed))
+        except (ValueError, TypeError):
+            parsed_values.append(pd.NaT)
+            invalid_rows.append(idx)
+    return pd.Series(parsed_values, index=series.index), invalid_rows
 
 
 def _parse_digits(value: str, fmt: str) -> date:

@@ -7,9 +7,13 @@
 
 import unicodedata
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
-from work_data_hub.infrastructure.cleansing.registry import RuleCategory, rule
+from work_data_hub.infrastructure.cleansing.registry import (
+    RuleCategory,
+    get_cleansing_registry,
+    rule,
+)
 
 # 字段精度配置 - 可以通过配置文件外部化
 DEFAULT_PRECISION_CONFIG = {
@@ -34,6 +38,13 @@ NULL_PLACEHOLDERS = {"", "-", "N/A", "无", "暂无", "null", "NULL", "None"}
 
 # 货币符号 - 可扩展
 CURRENCY_SYMBOLS = {"¥", "$", "￥", "€", "£", "₽"}
+
+DEFAULT_SCHEMA_NUMERIC_RULES: List[Any] = [
+    "standardize_null_values",
+    "remove_currency_symbols",
+    "clean_comma_separated_number",
+    {"name": "handle_percentage_conversion"},
+]
 
 
 @rule(
@@ -291,6 +302,45 @@ def comprehensive_decimal_cleaning(
         raise ValueError(
             f"Invalid numeric value for field '{field_name}': {value} - {e}"
         )
+
+
+def clean_numeric_for_schema(
+    value: Any,
+    field_name: str,
+    *,
+    domain: str = "annuity_performance",
+    registry=None,
+    fallback_rules: Optional[List[Any]] = None,
+) -> Optional[float]:
+    """
+    Shared cleansing helper that mirrors Pydantic validators.
+    """
+    registry = registry or get_cleansing_registry()
+    rules = registry.get_domain_rules(domain, field_name)
+    if not rules:
+        rules = fallback_rules or DEFAULT_SCHEMA_NUMERIC_RULES
+
+    cleaned = registry.apply_rules(
+        value,
+        rules,
+        field_name=field_name,
+    )
+
+    if cleaned is None:
+        return None
+
+    if isinstance(cleaned, Decimal):
+        return float(cleaned)
+
+    if isinstance(cleaned, (int, float)):
+        return float(cleaned)
+
+    try:
+        return float(cleaned)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"Cannot convert value '{value}' in column '{field_name}' to number"
+        ) from exc
 
 
 # 便捷函数 - 为特定领域提供预配置的清洗函数

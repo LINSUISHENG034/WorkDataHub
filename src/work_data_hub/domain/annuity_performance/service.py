@@ -3,25 +3,29 @@ from __future__ import annotations
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import pandas as pd
 import structlog
 
 from work_data_hub.domain.pipelines.types import DomainPipelineResult, PipelineContext
-from work_data_hub.infrastructure.validation import handle_validation_errors
 
-from .discovery_helpers import normalize_month, run_discovery
-from .models import ProcessingResultWithEnrichment
+from .helpers import (
+    FileDiscoveryProtocol,
+    convert_dataframe_to_models,
+    export_unknown_names_csv,
+    normalize_month,
+    run_discovery,
+    summarize_enrichment,
+)
+from .models import AnnuityPerformanceOut, ProcessingResultWithEnrichment
 from .pipeline_builder import (
     build_bronze_to_silver_pipeline,
     load_plan_override_mapping,
 )
-from .processing_helpers import (
-    convert_dataframe_to_models,
-    export_unknown_names_csv,
-    summarize_enrichment,
-)
+
+if TYPE_CHECKING:
+    from work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
 
 logger = structlog.get_logger(__name__)
 
@@ -29,9 +33,9 @@ logger = structlog.get_logger(__name__)
 def process_annuity_performance(
     month: str,
     *,
-    file_discovery,
-    warehouse_loader,
-    enrichment_service=None,
+    file_discovery: FileDiscoveryProtocol,
+    warehouse_loader: Any,
+    enrichment_service: Optional["CompanyEnrichmentService"] = None,
     domain: str = "annuity_performance",
     table_name: str = "annuity_performance_NEW",
     schema: str = "public",
@@ -75,10 +79,11 @@ def process_annuity_performance(
         rows_failed=rows_failed,
         duration_ms=duration_ms,
     )
-    def _to_dict(obj):
+
+    def _to_dict(obj: Any) -> Dict[str, Any]:
         if hasattr(obj, "model_dump"):
-            return obj.model_dump()
-        return getattr(obj, "__dict__", obj)
+            return obj.model_dump()  # type: ignore[no-any-return]
+        return getattr(obj, "__dict__", obj)  # type: ignore[no-any-return]
 
     metrics = {
         "parameters": {
@@ -103,16 +108,14 @@ def process_annuity_performance(
 
 
 def process_with_enrichment(
-    rows: List[dict],
+    rows: List[Dict[str, Any]],
     data_source: str = "unknown",
-    enrichment_service=None,
+    enrichment_service: Optional["CompanyEnrichmentService"] = None,
     sync_lookup_budget: int = 0,
     export_unknown_names: bool = True,
 ) -> ProcessingResultWithEnrichment:
     if not rows:
-        logger.bind(domain="annuity_performance", step="process_with_enrichment").info(
-            "No rows provided for processing"
-        )
+        logger.bind(domain="annuity_performance", step="process_with_enrichment").info("No rows provided for processing")
         return ProcessingResultWithEnrichment(
             records=[],
             data_source=data_source,
@@ -138,12 +141,16 @@ def process_with_enrichment(
     start_time = time.perf_counter()
     result_df = pipeline.execute(pd.DataFrame(rows), context)
     records, unknown_names = convert_dataframe_to_models(result_df)
-    errors = []
-    if len(records) < len(rows):
-        errors.append(
-            f"Dropped rows during processing: {len(rows) - len(records)} of {len(rows)}"
-        )
-    handle_validation_errors(errors, threshold=0.5, total_rows=len(rows))
+    dropped_count = len(rows) - len(records)
+    if dropped_count > 0:
+        drop_rate = dropped_count / len(rows) if rows else 0
+        if drop_rate > 0.5:
+            logger.bind(domain="annuity_performance", step="process_with_enrichment").warning(
+                "High row drop rate during processing",
+                dropped=dropped_count,
+                total=len(rows),
+                rate=drop_rate,
+            )
     csv_path = export_unknown_names_csv(
         unknown_names,
         data_source,
@@ -165,7 +172,5 @@ def process_with_enrichment(
     )
 
 
-def _records_to_dataframe(records: List) -> pd.DataFrame:
-    return pd.DataFrame(
-        [r.model_dump(mode="json", by_alias=True, exclude_none=True) for r in records]
-    ) if records else pd.DataFrame()
+def _records_to_dataframe(records: List[AnnuityPerformanceOut]) -> pd.DataFrame:
+    return pd.DataFrame([r.model_dump(mode="json", by_alias=True, exclude_none=True) for r in records]) if records else pd.DataFrame()

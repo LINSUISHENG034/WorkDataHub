@@ -5,15 +5,14 @@ from datetime import date
 import pandas as pd
 import pytest
 
-from work_data_hub.domain.annuity_performance.discovery_helpers import normalize_month
-from work_data_hub.domain.annuity_performance.processing_helpers import (
+from work_data_hub.domain.annuity_performance.helpers import (
     convert_dataframe_to_models,
     export_unknown_names_csv,
-    parse_report_date,
-    parse_report_period,
+    normalize_month,
     summarize_enrichment,
 )
 from work_data_hub.domain.pipelines.types import ErrorContext
+from work_data_hub.utils.date_parser import parse_report_date, parse_report_period
 
 
 class TestErrorContext:
