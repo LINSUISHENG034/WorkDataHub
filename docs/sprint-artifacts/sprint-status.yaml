@@ -102,6 +102,17 @@ development_status:
   5-9-epic5-migration-cleanup: done
   epic-5-retrospective: completed
 
+  # Epic 5.5: Pipeline Architecture Validation (AnnuityIncome Domain)
+  # Added 2025-12-04 via Correct-Course workflow
+  # BLOCKING: Must complete before Epic 6 to validate architecture generality
+  # Validates Infrastructure Layer with second domain, establishes cleansing documentation standard
+  epic-5.5: backlog
+  5.5-1-legacy-cleansing-rules-documentation: backlog
+  5.5-2-annuity-income-domain-implementation: backlog
+  5.5-3-legacy-parity-validation: backlog
+  5.5-4-multi-domain-integration-test-and-optimization: backlog
+  epic-5.5-retrospective: optional
+
   # Epic 6: Company Enrichment Service
   epic-6: backlog
   6-1-enterpriseinfoprovider-protocol-and-stub-implementation: backlog
