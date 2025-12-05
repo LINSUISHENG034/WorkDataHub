@@ -23,9 +23,12 @@
 | 6 | 客户名称 | 客户名称 | `clean_company_name()` | Normalized in-place |
 | 7 | 计划号 | company_id | `_update_company_id(plan_code_col='计划号')` | Standard resolution chain |
 | 8 | 组合代码 | 组合代码 | Regex + conditional default | See CR-005, CR-006 |
-| 9 | 收入金额 | 收入金额 | None | Domain-specific numeric field |
-| 10 | 计划类型 | 计划类型 | None (used for conditional logic) | Input to DEFAULT_PORTFOLIO_CODE_MAPPING |
-| 11 | N/A | company_id | **DEPRECATED** ID5 fallback | See Section 4 - Dropped in Migration |
+| 9 | 固费 | 固费 | None | Fixed fee income (numeric) |
+| 10 | 浮费 | 浮费 | None | Variable fee income (numeric) |
+| 11 | 回补 | 回补 | None | Rebate income (numeric) |
+| 12 | 税 | 税 | None | Tax amount (numeric) |
+| 13 | 计划类型 | 计划类型 | None (used for conditional logic) | Input to DEFAULT_PORTFOLIO_CODE_MAPPING |
+| 14 | N/A | company_id | **DEPRECATED** ID5 fallback | See Section 4 - Dropped in Migration |
 
 ---
 
@@ -143,10 +146,13 @@ df.loc[mask, 'company_id'] = company_id_from_account[mask]
 
 - [x] 月度 (date)
 - [x] 机构代码 (string, defaults to 'G00')
-- [x] 计划号 (string)
+- [x] 计划号 or 计划代码 (string) - column name varies by data source version
 - [x] 客户名称 (string)
 - [x] 业务类型 (string)
-- [x] 收入金额 (numeric)
+- [x] 固费 (numeric) - Fixed fee income
+- [x] 浮费 (numeric) - Variable fee income
+- [x] 回补 (numeric) - Rebate income
+- [x] 税 (numeric) - Tax amount
 
 ### Data Type Constraints
 
@@ -154,12 +160,15 @@ df.loc[mask, 'company_id'] = company_id_from_account[mask]
 |-------|---------------|------------|-------|
 | 月度 | `datetime` | Format: YYYY-MM-DD | Standardized from Chinese formats |
 | 机构代码 | `string` | Pattern: G\d{2} | Branch code |
-| 计划号 | `string` | Non-empty | Used for company_id resolution |
+| 计划号/计划代码 | `string` | Non-empty | Used for company_id resolution; column name varies |
 | 客户名称 | `string` | Normalized | After clean_company_name() |
 | 年金账户名 | `string` | Original value | Before normalization |
 | 组合代码 | `string` | Pattern: QTAN\d{3} or custom | After regex/conditional |
 | 产品线代码 | `string` | From mapping | Derived from 业务类型 |
-| 收入金额 | `numeric` | Decimal | Domain-specific |
+| 固费 | `numeric` | Decimal | Fixed fee income |
+| 浮费 | `numeric` | Decimal | Variable fee income |
+| 回补 | `numeric` | Decimal | Rebate income |
+| 税 | `numeric` | Decimal | Tax amount |
 | company_id | `string` | 9-digit or empty | Enterprise ID |
 
 ### Business Rules

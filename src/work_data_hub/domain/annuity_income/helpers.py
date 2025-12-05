@@ -29,30 +29,8 @@ class FileDiscoveryProtocol(Protocol):
     def discover_and_load(self, *, domain: str, month: str) -> Any: ...
 
 
-# TODO(5.5.4): Extract to infrastructure/helpers/shared.py
-# Duplicated from: annuity_performance/helpers.py
-# Reuse potential: HIGH (used by 2+ domains)
-def normalize_month(month: str) -> str:
-    """
-    Validate YYYYMM format and return zero-padded text.
-
-    Raises:
-        ValueError: If month format is invalid
-    """
-    if month is None:
-        raise ValueError("month is required (YYYYMM)")
-
-    text = str(month).strip()
-    if len(text) != 6 or not text.isdigit():
-        raise ValueError("month must be a 6-digit string in YYYYMM format")
-
-    yyyy = int(text[:4])
-    mm = int(text[4:])
-    if yyyy < 2000 or yyyy > 2100:
-        raise ValueError("month year component must be between 2000 and 2100")
-    if mm < 1 or mm > 12:
-        raise ValueError("month component must be between 01 and 12")
-    return text
+# Shared helper imported from infrastructure (Story 5.5.4 extraction)
+from work_data_hub.infrastructure.helpers import normalize_month
 
 
 def run_discovery(*, file_discovery: FileDiscoveryProtocol, domain: str, month: str) -> Any:
@@ -72,9 +50,11 @@ def run_discovery(*, file_discovery: FileDiscoveryProtocol, domain: str, month: 
         raise
 
 
-# TODO(5.5.4): Extract to infrastructure/helpers/shared.py
+# NOTE(5.5.4-deferred): Extraction deferred to Epic 6
+# Reason: Requires generic factory pattern with type parameters (model class + required keys)
+# See: docs/sprint-artifacts/epic-5.5-optimization-recommendations.md "Reuse Candidates" table
 # Duplicated from: annuity_performance/helpers.py (with model type change)
-# Reuse potential: MEDIUM (similar pattern, different model types)
+# Reuse potential: MEDIUM - Epic 6 will implement generic version
 def convert_dataframe_to_models(
     df: pd.DataFrame,
 ) -> Tuple[List[AnnuityIncomeOut], List[str]]:

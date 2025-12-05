@@ -224,9 +224,11 @@ class AnnuityIncomeOut(BaseModel):
         return self
 
 
-# TODO(5.5.4): Consider extracting EnrichmentStats to infrastructure/models/shared.py
+# NOTE(5.5.4-deferred): Extraction deferred to Epic 6
+# Reason: Low risk, but bundled with other model extractions for consistency
+# See: docs/sprint-artifacts/epic-5.5-optimization-recommendations.md "Reuse Candidates" table
 # Duplicated from: annuity_performance/models.py
-# Reuse potential: HIGH (used by 2+ domains)
+# Reuse potential: HIGH - Epic 6 will extract to infrastructure/models/shared.py
 class EnrichmentStats(BaseModel):
     """Statistics for company ID enrichment process."""
 

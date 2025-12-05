@@ -4,6 +4,7 @@ db_migration/
 reference/claude-code-full-guide/
 reference/patoken/
 real_data/
+fixtures/
 
 /node_modules/
 /package-lock.json
@@ -38,7 +39,7 @@ backend/.venv/
 env/
 venv/
 test-results/
-fixtures/
+tests/fixtures/
 reference/
 
 # Python

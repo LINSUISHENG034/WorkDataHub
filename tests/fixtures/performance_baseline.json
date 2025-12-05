@@ -1,0 +1,35 @@
+{
+  "generated_at": "2025-12-06T00:03:17.444506",
+  "environment": {
+    "python_version": "3.12.10",
+    "platform": "Windows-AMD64",
+    "cpu_count": 16,
+    "pandas_version": "2.3.2",
+    "pandera_version": "0.26.1",
+    "pydantic_version": "2.11.7"
+  },
+  "metrics": [
+    {
+      "domain": "annuity_performance",
+      "processing_time_ms": 24187.72,
+      "memory_mb_peak": 102.8,
+      "rows_processed": 33267,
+      "throughput_rows_per_sec": 1375.37,
+      "timestamp": "2025-12-06T00:03:16.303753"
+    },
+    {
+      "domain": "annuity_income",
+      "processing_time_ms": 1141.31,
+      "memory_mb_peak": 2.36,
+      "rows_processed": 1291,
+      "throughput_rows_per_sec": 1131.16,
+      "timestamp": "2025-12-06T00:03:17.444506"
+    }
+  ],
+  "regression_threshold_percent": 10,
+  "data_sources": {
+    "annuity_performance": "tests\\fixtures\\real_data\\202311\\数据采集\\V1\\【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx",
+    "annuity_income": "tests\\fixtures\\real_data\\202411\\收集数据\\数据采集\\V1\\【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx"
+  },
+  "note": "Generated with real production data (202411 V1 for income, 202311/202412 for performance)"
+}

@@ -191,6 +191,7 @@ class AnnuityPerformanceOut(BaseModel):
         validate_default=True,
         use_enum_values=True,
         from_attributes=True,
+        populate_by_name=True,
     )
     计划代码: str = Field(..., min_length=1, max_length=255, description="Plan code identifier")
     company_id: Optional[str] = Field(
