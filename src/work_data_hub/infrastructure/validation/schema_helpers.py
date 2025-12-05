@@ -32,7 +32,7 @@ import pandas as pd
 from pandera.errors import SchemaError, SchemaErrors
 
 if TYPE_CHECKING:
-    import pandera as pa
+    import pandera.pandas as pa
 
 
 def raise_schema_error(

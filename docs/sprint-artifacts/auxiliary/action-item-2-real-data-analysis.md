@@ -16,7 +16,7 @@ Action Item #2 (from Epic 2 Retrospective) has been completed. Real data analysi
 
 1. **Base Path Correction:**
    - ❌ **Assumed:** `reference/monthly/{YYYYMM}/收集数据/业务收集`
-   - ✅ **Actual:** `reference/monthly/{YYYYMM}/收集数据/数据采集`
+   - ✅ **Actual:** `tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集`
 
 2. **File Pattern Correction:**
    - ❌ **Assumed:** `["*年金*.xlsx"]`
@@ -118,7 +118,7 @@ reference/archive/monthly/202411/收集数据/数据采集/V1/【for年金分战
 
 ```yaml
 annuity_performance:
-  base_path: "reference/monthly/{YYYYMM}/收集数据/数据采集"  # ⚠️ CORRECTED from 业务收集
+  base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集"  # ⚠️ CORRECTED from 业务收集
   file_patterns: ["*年金终稿*.xlsx"]                      # ⚠️ CORRECTED from *年金*.xlsx
   exclude_patterns: ["~$*", "*回复*"]
   sheet_name: "规模明细"                                   # ✅ VALIDATED
@@ -396,7 +396,7 @@ Based on Epic 2 Retrospective guidance:
 # config/data_sources.yml
 domains:
   annuity_performance:
-    base_path: "reference/monthly/{YYYYMM}/收集数据/数据采集"  # ⚠️ CORRECTED
+    base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集"  # ⚠️ CORRECTED
     file_patterns: ["*年金终稿*.xlsx"]                      # ⚠️ CORRECTED
     exclude_patterns: ["~$*", "*回复*", "*.eml"]            # ⚠️ Added .eml
     sheet_name: "规模明细"                                   # ✅ VALIDATED
@@ -631,7 +631,7 @@ annuity_bronze_schema = pa.DataFrameSchema(
 
 ```yaml
 annuity_performance:
-  base_path: "reference/monthly/{YYYYMM}/收集数据/数据采集"  # ⚠️ NOT 业务收集
+  base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集"  # ⚠️ NOT 业务收集
   file_patterns: ["*年金终稿*.xlsx"]                      # ⚠️ NOT *年金*.xlsx
   exclude_patterns: ["~$*", "*回复*", "*.eml"]
   sheet_name: "规模明细"

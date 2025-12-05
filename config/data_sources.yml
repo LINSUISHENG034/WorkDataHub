@@ -19,11 +19,11 @@ schema_version: "1.0"
 domains:
   # Annuity Performance Domain
   # ✅ VALIDATED with real 202411 data (Epic 3 Tech Spec Action Item #2)
-  # Path structure: reference/monthly/202411/收集数据/数据采集/V1/*.xlsx
+  # Path structure: tests/fixtures/real_data/202411/收集数据/数据采集/V1/*.xlsx
   annuity_performance:
     # Base path with template variable {YYYYMM} (e.g., 202501)
     # Corrected from 业务收集 to 数据采集 based on real data validation
-    base_path: "reference/monthly/{YYYYMM}/收集数据/数据采集"
+    base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集"
 
     # File patterns to match (glob syntax)
     # Pattern validated: matches exactly 1 file in V1 directory
@@ -49,6 +49,33 @@ domains:
     # Fallback behavior when version detection ambiguous:
     # - error: Raise error and halt (default, safest)
     # - use_latest_modified: Fall back to timestamp-based selection
+    fallback: "error"
+
+  # Annuity Income Domain (Epic 5.5 - Pipeline Architecture Validation)
+  # Story 5.5.2: Second domain to validate Infrastructure Layer architecture
+  annuity_income:
+    # Base path with template variable {YYYYMM}
+    # Uses same directory structure as annuity_performance
+    base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集"
+
+    # File patterns to match (glob syntax)
+    # Same source file as annuity_performance, different sheet
+    file_patterns:
+      - "*年金终稿*.xlsx"
+
+    # Patterns to exclude (temp files, emails, etc.)
+    exclude_patterns:
+      - "~$*"         # Excel temp files
+      - "*回复*"      # Email reply files
+      - "*.eml"       # Email message files
+
+    # Excel sheet name to load (different from annuity_performance)
+    sheet_name: "收入明细"
+
+    # Version selection strategy
+    version_strategy: "highest_number"
+
+    # Fallback behavior when version detection ambiguous
     fallback: "error"
 
   # Future domains (Epic 9) can be added here:

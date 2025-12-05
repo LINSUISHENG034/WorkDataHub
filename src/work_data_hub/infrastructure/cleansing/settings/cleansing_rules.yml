@@ -44,3 +44,17 @@ domains:
       - remove_currency_symbols
       - clean_comma_separated_number
       - handle_percentage_conversion
+
+  # Annuity Income Domain (Epic 5.5 - Pipeline Architecture Validation)
+  # Story 5.5.2: Second domain to validate Infrastructure Layer architecture
+  annuity_income:
+    客户名称:
+      - trim_whitespace
+      - normalize_company_name
+    计划号:
+      - trim_whitespace
+    company_id:
+      - trim_whitespace
+    收入金额:
+      - remove_currency_symbols
+      - clean_comma_separated_number

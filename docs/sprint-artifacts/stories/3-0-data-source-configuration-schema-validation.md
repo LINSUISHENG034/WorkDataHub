@@ -219,7 +219,7 @@ class DomainConfig(BaseModel):
     base_path: str = Field(
         ...,
         description="Path template with {YYYYMM}, {YYYY}, {MM} placeholders",
-        examples=["reference/monthly/{YYYYMM}/收集数据/数据采集"]
+        examples=["tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集"]
     )
 
     file_patterns: List[str] = Field(
@@ -396,7 +396,7 @@ domains:
   # ✅ VALIDATED with real 202411 data (Action Item #2)
   annuity_performance:
     # Base path with template variable {YYYYMM} (e.g., 202501)
-    base_path: "reference/monthly/{YYYYMM}/收集数据/数据采集"
+    base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集"
 
     # File patterns to match (glob syntax)
     # Pattern validated: matches exactly 1 file in V1 directory
@@ -483,7 +483,7 @@ class TestDomainConfig:
     def test_valid_config_with_all_fields(self):
         """AC: Valid configuration passes validation"""
         config = DomainConfig(
-            base_path="reference/monthly/{YYYYMM}/收集数据/数据采集",
+            base_path="tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集",
             file_patterns=["*年金终稿*.xlsx"],
             exclude_patterns=["~$*", "*回复*"],
             sheet_name="规模明细",
@@ -491,7 +491,7 @@ class TestDomainConfig:
             fallback="error"
         )
 
-        assert config.base_path == "reference/monthly/{YYYYMM}/收集数据/数据采集"
+        assert config.base_path == "tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集"
         assert config.file_patterns == ["*年金终稿*.xlsx"]
         assert config.version_strategy == "highest_number"
 

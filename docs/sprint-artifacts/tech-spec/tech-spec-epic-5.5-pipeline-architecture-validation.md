@@ -323,7 +323,7 @@ COMPANY_BRANCH_MAPPING = {
   - Add to `config/data_sources.yml`:
     ```yaml
     annuity_income:
-      base_path: "reference/monthly/{YYYYMM}/收集数据/数据采集"
+      base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集"
       file_patterns:
         - "*年金终稿*.xlsx"
       exclude_patterns:
@@ -484,7 +484,7 @@ COMPANY_BRANCH_MAPPING = {
 
 | 数据需求 | 来源 | 状态 | 备注 |
 |----------|------|------|------|
-| 收入明细 Excel 文件 | `reference/monthly/{YYYYMM}/收集数据/数据采集/` | 待确认 | 需要确认文件路径和 sheet 名称 |
+| 收入明细 Excel 文件 | `tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集/` | 待确认 | 需要确认文件路径和 sheet 名称 |
 | Legacy 输出基线 | 运行 `AnnuityIncomeCleaner` 生成 | 待生成 | Story 5.5.3 Task 3.1 |
 | COMPANY_ID5_MAPPING | `legacy/annuity_hub/data_handler/mappings.py` | 可用 | 需要提取到 constants.py |
 

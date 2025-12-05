@@ -316,6 +316,21 @@ while changed:
             break
 ```
 
+### 6. Annuity Income Domain 决策
+
+**问题**: Legacy 系统在 `annuity_income` domain 中有 `COMPANY_ID5_MAPPING` fallback 逻辑，但新架构中决定移除。
+
+**解决**: 这是一个架构决策（Architecture Decision），不视为 Parity 失败，而是预期的行为差异。
+
+- **Legacy**: 尝试 ID1 -> ID2 -> ID3 -> ID4 -> **ID5** -> NULL
+- **Pipeline**: 尝试 ID1 -> ID2 -> ID3 -> ID4 -> NULL
+- **验证**: 在比较时，排除 `company_id` 列的差异，并在报告中单独统计因缺少 ID5 fallback 导致的 NULL 增加数量。
+
+```python
+# 在比较脚本中记录差异原因
+print(f"Intentionally missing ID5 resolutions: {count_legacy_id5_resolved}")
+```
+
 ## 验证检查清单
 
 ### Pre-Validation

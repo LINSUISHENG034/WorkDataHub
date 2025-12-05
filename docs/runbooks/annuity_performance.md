@@ -75,7 +75,7 @@ else:
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| `DiscoveryError: No files found matching pattern` | File missing or wrong path | 1. Verify folder exists: `reference/monthly/{YYYYMM}/收集数据/数据采集/`<br>2. Check version folders (V1, V2, etc.) exist<br>3. Verify file matches pattern `*年金终稿*.xlsx` |
+| `DiscoveryError: No files found matching pattern` | File missing or wrong path | 1. Verify folder exists: `tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集/`<br>2. Check version folders (V1, V2, etc.) exist<br>3. Verify file matches pattern `*年金终稿*.xlsx` |
 | `DiscoveryError: Multiple version folders found` | Ambiguous version selection | 1. Check `version_strategy` in config<br>2. Remove duplicate version folders<br>3. Set `fallback: "use_latest_modified"` if acceptable |
 | `SchemaError: Missing required column '计划代码'` | Excel structure changed | 1. Open Excel file and verify column names<br>2. Check sheet name is `规模明细`<br>3. Update Bronze schema if columns renamed |
 | `ValidationError: company_id cannot be empty` | Company enrichment failed | 1. Check `WDH_ALIAS_SALT` environment variable is set<br>2. Verify company name is not empty in source data<br>3. Check Epic 5 enrichment service status |
@@ -264,7 +264,7 @@ uv run dagster job execute -j annuity_performance_job \
 # config/data_sources.yml
 domains:
   annuity_performance:
-    base_path: "reference/monthly/{YYYYMM}/收集数据/数据采集"
+    base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集"
     file_patterns:
       - "*年金终稿*.xlsx"
     exclude_patterns:

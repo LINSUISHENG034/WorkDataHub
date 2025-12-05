@@ -247,7 +247,7 @@ This Epic 3 tech-spec has been enhanced based on Epic 2 Retrospective findings:
 
 🚨 **PATH CORRECTIONS APPLIED:**
 - ❌ **Previous Assumption:** `reference/monthly/{YYYYMM}/收集数据/业务收集`
-- ✅ **Real Data Location:** `reference/monthly/{YYYYMM}/收集数据/数据采集`
+- ✅ **Real Data Location:** `tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集`
 
 🚨 **PATTERN CORRECTIONS APPLIED:**
 - ❌ **Previous Pattern:** `["*年金*.xlsx"]` (too broad, would match multiple files)
@@ -280,7 +280,7 @@ This Epic 3 tech-spec has been enhanced based on Epic 2 Retrospective findings:
 ```yaml
 # ✅ VALIDATED with real 202411 data
 annuity_performance:
-  base_path: "reference/monthly/{YYYYMM}/收集数据/数据采集"  # ✅ CORRECTED from 业务收集
+  base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集"  # ✅ CORRECTED from 业务收集
   file_patterns: ["*年金终稿*.xlsx"]                      # ✅ CORRECTED from *年金*.xlsx
   exclude_patterns: ["~$*", "*回复*", "*.eml"]            # ✅ Added .eml exclusion
   sheet_name: "规模明细"                                   # ✅ CONFIRMED exists
@@ -427,7 +427,7 @@ def discover_and_load(
 # config/data_sources.yml - MVP focuses on annuity only
 domains:
   annuity_performance:  # ✅ Validated with real 202411 data
-    base_path: "reference/monthly/{YYYYMM}/收集数据/数据采集"  # ⚠️ CORRECTED
+    base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集"  # ⚠️ CORRECTED
     file_patterns: ["*年金终稿*.xlsx"]                      # ⚠️ CORRECTED
     exclude_patterns: ["~$*", "*回复*", "*.eml"]
     sheet_name: "规模明细"

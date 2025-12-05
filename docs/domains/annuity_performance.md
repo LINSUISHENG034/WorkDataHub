@@ -78,7 +78,7 @@ Excel File → FileDiscoveryService → Bronze Validation → Pipeline Execution
 Files are discovered using the Epic 3 file discovery system with version-aware folder scanning:
 
 ```
-reference/monthly/{YYYYMM}/收集数据/数据采集/V{n}/*年金终稿*.xlsx
+tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集/V{n}/*年金终稿*.xlsx
 ```
 
 **Example paths:**
@@ -253,7 +253,7 @@ The `annuity_performance_new` table is a **shadow table** for Epic 6 parallel ex
 domains:
   annuity_performance:
     # Base path with template variable {YYYYMM}
-    base_path: "reference/monthly/{YYYYMM}/收集数据/数据采集"
+    base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集"
 
     # File patterns to match (glob syntax)
     file_patterns:

@@ -269,7 +269,7 @@ DEFAULT_PORTFOLIO_CODE_MAPPING = {
 
 ### Execution Steps
 
-1. **Prepare test data:** Extract sample from `reference/monthly/{YYYYMM}/收集数据/数据采集/*年金终稿*.xlsx` Sheet `收入明细`
+1. **Prepare test data:** Extract sample from `tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集/*年金终稿*.xlsx` Sheet `收入明细`
 2. **Run legacy cleaner:** Execute `AnnuityIncomeCleaner` on test data
 3. **Run new pipeline:** Execute new AnnuityIncome domain pipeline on same data
 4. **Compare outputs:**
