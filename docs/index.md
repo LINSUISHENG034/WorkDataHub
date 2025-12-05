@@ -1,7 +1,7 @@
 # WorkDataHub Documentation
 
 **Project:** WorkDataHub Data Engineering Platform
-**Last Updated:** 2025-12-01
+**Last Updated:** 2025-12-06
 
 ---
 
@@ -54,7 +54,8 @@ docs/
 │   ├── epic-2-multi-layer-data-quality-framework.md
 │   ├── epic-3-intelligent-file-discovery-version-detection.md
 │   ├── epic-4-annuity-performance-domain-migration-mvp.md
-│   ├── epic-5-epic-5-infrastructure-layer.md
+│   ├── epic-5-infrastructure-layer.md
+│   ├── epic-5.5-pipeline-architecture-validation.md
 │   └── epic-6-company-enrichment-service.md
 ├── backlog.md                 # Product backlog
 │
@@ -86,4 +87,4 @@ Start with [BMM Index](./bmm-index.md) - it contains complete project context, c
 
 ---
 
-**Generated:** 2025-12-01
+**Generated:** 2025-12-06

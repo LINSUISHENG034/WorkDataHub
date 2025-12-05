@@ -1,8 +1,9 @@
 # Source Tree Analysis
 
 **Project:** WorkDataHub Data Platform
-**Generated:** 2025-12-03
+**Generated:** 2025-12-06
 **Architecture:** Domain-Driven Design (DDD) with Layered Architecture
+**Last Rescan:** Epic 5.5 - Added annuity_income domain
 
 ---
 
@@ -51,12 +52,17 @@ domain/
 │   ├── models.py               # Pydantic models (In/Out)
 │   ├── schemas.py              # Pandera validation schemas
 │   ├── service.py              # Domain service (orchestration)
-│   ├── pipeline_steps.py       # Pipeline step implementations
-│   ├── processing_helpers.py   # Business logic helpers
-│   ├── discovery_helpers.py    # File discovery logic
-│   ├── config.py               # Domain-specific configuration
-│   ├── constants.py            # Domain constants
-│   └── csv_export.py           # CSV export functionality
+│   ├── pipeline_builder.py     # Pipeline builder configuration
+│   ├── helpers.py              # Business logic helpers
+│   └── constants.py            # Domain constants
+│
+├── annuity_income/             # 📊 Annuity income domain (Epic 5.5) ✨NEW
+│   ├── models.py               # Pydantic models (In/Out)
+│   ├── schemas.py              # Pandera validation schemas
+│   ├── service.py              # Domain service (orchestration)
+│   ├── pipeline_builder.py     # Pipeline builder configuration
+│   ├── helpers.py              # Business logic helpers
+│   └── constants.py            # Domain constants
 │
 ├── sample_trustee_performance/ # 📊 Trustee performance domain (sample)
 │   ├── models.py               # Sample domain models
@@ -419,11 +425,13 @@ docs/
 - **Orchestration** coordinates workflows
 
 ### 2. Standard Domain Pattern (Story 1.12)
-Each domain follows consistent structure:
-- `models.py` - Data models (In/Out)
-- `schemas.py` - Validation schemas (optional)
+Each domain follows consistent 6-file structure:
+- `models.py` - Pydantic data models (In/Out)
+- `schemas.py` - Pandera validation schemas
 - `service.py` - Domain service orchestration
-- `config.py` - Domain configuration
+- `pipeline_builder.py` - Pipeline builder configuration
+- `helpers.py` - Business logic helpers
+- `constants.py` - Domain constants
 
 ### 3. Pipeline Framework (Epic 1)
 - Reusable steps in `domain/pipelines/steps/`
@@ -497,5 +505,5 @@ uv run <command>        # Run in environment
 ---
 
 **Document Status:** ✅ Complete
-**Last Updated:** 2025-12-03
+**Last Updated:** 2025-12-06
 **Maintained By:** Development Team

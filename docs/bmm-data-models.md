@@ -1,8 +1,9 @@
 # Data Models Documentation
 
 **Project:** WorkDataHub Data Platform
-**Generated:** 2025-12-03
+**Generated:** 2025-12-06
 **Scan Level:** Exhaustive
+**Last Rescan:** Epic 5.5 - Added annuity_income domain
 
 ---
 
@@ -131,7 +132,40 @@ Key Fields:
 
 ---
 
-### Trustee Performance Domain
+### Annuity Income Domain (Epic 5.5)
+
+#### `AnnuityIncomeIn` (Bronze Layer)
+**Purpose:** Raw input validation for annuity income data
+**Added:** Epic 5.5 - Pipeline Architecture Validation
+
+**Layer:** Bronze (post-read validation)
+**Validation:** Basic type coercion, required fields
+
+Key Fields:
+- All raw columns from Excel source (年金收入数据)
+- Customer name (raw, before cleansing)
+- Date fields (flexible parsing with Chinese date support)
+- Income-related numeric fields
+
+#### `AnnuityIncomeOut` (Gold Layer)
+**Purpose:** Final validated output ready for database loading
+
+**Layer:** Gold (pre-database validation)
+**Validation:** Pandera schema enforcement, business rules
+
+Key Fields:
+- Composite key fields (domain-specific)
+- Enriched `company_id` (from enrichment service)
+- Cleansed `customer_name`
+- Validated income metrics
+
+**Pandera Schemas:**
+- `BronzeAnnuityIncomeSchema` - Bronze layer DataFrame validation
+- `GoldAnnuityIncomeSchema` - Gold layer DataFrame validation
+
+---
+
+### Sample Trustee Performance Domain
 
 #### `TrusteePerformanceIn` (Bronze Layer)
 **Purpose:** Sample domain for testing standard pattern
@@ -295,5 +329,5 @@ Current migrations:
 ---
 
 **Document Status:** ✅ Complete
-**Last Updated:** 2025-12-03
+**Last Updated:** 2025-12-06
 **Maintained By:** Development Team

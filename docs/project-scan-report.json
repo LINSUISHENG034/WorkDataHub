@@ -1,9 +1,9 @@
 {
   "workflow_version": "1.2.0",
   "timestamps": {
-    "started": "2025-12-03T10:00:00",
-    "last_updated": "2025-12-03T10:30:00",
-    "completed": "2025-12-03T10:30:00"
+    "started": "2025-12-06T17:15:00",
+    "last_updated": "2025-12-06T17:45:00",
+    "completed": "2025-12-06T17:45:00"
   },
   "mode": "full_rescan",
   "scan_level": "exhaustive",
@@ -13,56 +13,50 @@
     {
       "step": "step_1",
       "status": "completed",
-      "timestamp": "2025-12-03T10:05:00",
-      "summary": "Classified as monolith with 1 part (data engineering platform)"
+      "timestamp": "2025-12-06T17:20:00",
+      "summary": "Classified as monolith with 1 part (data engineering platform), 6 domains detected"
     },
     {
       "step": "step_2",
       "status": "completed",
-      "timestamp": "2025-12-03T10:08:00",
-      "summary": "Found 100+ existing docs in docs/ folder"
+      "timestamp": "2025-12-06T17:25:00",
+      "summary": "Found 150+ existing docs in docs/ folder across 15 subdirectories"
     },
     {
       "step": "step_3",
       "status": "completed",
-      "timestamp": "2025-12-03T10:12:00",
-      "summary": "Tech stack: Python 3.12/Dagster/Pandas/PostgreSQL"
+      "timestamp": "2025-12-06T17:30:00",
+      "summary": "Tech stack: Python 3.12/Dagster/Pandas/Pandera/PostgreSQL, CI: GitHub Actions with quality gates"
     },
     {
       "step": "step_4",
       "status": "completed",
-      "timestamp": "2025-12-03T10:18:00",
-      "summary": "Conditional analysis complete, data models documented"
+      "timestamp": "2025-12-06T17:35:00",
+      "summary": "Data models documented: annuity_performance, annuity_income (new), pipelines framework"
     },
     {
       "step": "step_5",
       "status": "completed",
-      "timestamp": "2025-12-03T10:22:00",
-      "summary": "Source tree documented with infrastructure layer additions"
+      "timestamp": "2025-12-06T17:38:00",
+      "summary": "Source tree documented with annuity_income domain addition"
     },
     {
       "step": "step_6",
       "status": "completed",
-      "timestamp": "2025-12-03T10:24:00",
-      "summary": "Dev setup and deployment documented (existing docs referenced)"
+      "timestamp": "2025-12-06T17:40:00",
+      "summary": "Dev setup docs verified (existing developer-guide.md is comprehensive)"
     },
     {
       "step": "step_10",
       "status": "completed",
-      "timestamp": "2025-12-03T10:26:00",
-      "summary": "Master index updated: bmm-index.md"
+      "timestamp": "2025-12-06T17:43:00",
+      "summary": "Master index (bmm-index.md) updated with Epic 5.5 and annuity_income domain"
     },
     {
       "step": "step_11",
       "status": "completed",
-      "timestamp": "2025-12-03T10:28:00",
-      "summary": "Validation complete - no incomplete markers detected"
-    },
-    {
-      "step": "step_12",
-      "status": "completed",
-      "timestamp": "2025-12-03T10:30:00",
-      "summary": "Workflow complete"
+      "timestamp": "2025-12-06T17:45:00",
+      "summary": "Validation complete - all documentation updated and verified"
     }
   ],
   "current_step": "completed",
@@ -70,7 +64,8 @@
     "project_classification": {
       "repository_type": "monolith",
       "parts_count": 1,
-      "primary_tech": "Python/Dagster/Pandas"
+      "primary_tech": "Python/Dagster/Pandas",
+      "architecture_pattern": "Domain-Driven Design + Clean Architecture"
     },
     "project_types": [
       {
@@ -79,18 +74,63 @@
         "display_name": "WorkDataHub Data Platform"
       }
     ],
+    "domains_detected": [
+      "annuity_performance",
+      "annuity_income",
+      "company_enrichment",
+      "reference_backfill",
+      "sample_trustee_performance",
+      "pipelines"
+    ],
+    "layers": {
+      "domain": "src/work_data_hub/domain/",
+      "infrastructure": "src/work_data_hub/infrastructure/",
+      "orchestration": "src/work_data_hub/orchestration/",
+      "io": "src/work_data_hub/io/",
+      "config": "src/work_data_hub/config/"
+    },
+    "existing_docs": {
+      "total_count": 150,
+      "key_directories": [
+        "docs/architecture/",
+        "docs/prd/",
+        "docs/epics/",
+        "docs/sprint-artifacts/stories/",
+        "docs/sprint-artifacts/tech-spec/"
+      ],
+      "entry_points": [
+        "docs/index.md",
+        "docs/bmm-index.md",
+        "docs/architecture/index.md",
+        "docs/prd/index.md"
+      ]
+    },
     "technology_stack": {
       "language": "Python 3.12.10",
+      "package_manager": "uv",
       "framework": "Dagster",
-      "data_processing": "Pandas + Pandera",
-      "database": "PostgreSQL",
-      "orm": "SQLAlchemy 2.0",
-      "migrations": "Alembic",
-      "architecture": "Domain-Driven Design + Clean Architecture"
+      "data_processing": ["Pandas", "Pandera >=0.18.0", "PyArrow >=21.0.0"],
+      "validation": ["Pydantic >=2.11.7", "Pandera"],
+      "database": "PostgreSQL 15",
+      "orm": "SQLAlchemy >=2.0",
+      "migrations": "Alembic 1.16.5",
+      "logging": "structlog",
+      "config": "pydantic-settings >=2.10.1",
+      "dev_tools": {
+        "linting": "Ruff",
+        "type_checking": "MyPy (strict)",
+        "testing": "Pytest + pytest-cov"
+      },
+      "ci_cd": {
+        "platform": "GitHub Actions",
+        "quality_gates": ["ruff-lint", "ruff-format", "mypy"],
+        "test_suites": ["unit (<30s)", "integration (<3min)"],
+        "security": "gitleaks"
+      }
     },
     "epic_status": {
-      "completed": ["Epic 1", "Epic 2", "Epic 3", "Epic 4"],
-      "in_progress": "Epic 5 (Infrastructure Layer)",
+      "completed": ["Epic 1", "Epic 2", "Epic 3", "Epic 4", "Epic 5"],
+      "in_progress": "Epic 5.5 (Pipeline Architecture Validation)",
       "backlog": ["Epic 6", "Epic 7"]
     }
   },
