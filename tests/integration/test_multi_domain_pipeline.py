@@ -181,33 +181,12 @@ def create_mock_annuity_performance_data(month: str = DEFAULT_MONTH, rows: int =
 def create_mock_annuity_income_data(month: str = DEFAULT_MONTH, rows: int = 1000) -> pd.DataFrame:
     """Create mock data for annuity_income domain using factory."""
     factory = AnnuityTestDataFactory()
-    # Annuity income has different column requirements, we adapt the factory output
-    df = factory.create_valid_sample(n=rows)
-    df["月度"] = int(month)
-    
-    # Adapt columns for annuity_income
-    if "计划号" not in df.columns:
-        if "计划代码" in df.columns:
-             df = df.rename(columns={"计划代码": "计划号"})
-        else:
-             df["计划号"] = [f"PLAN{i}" for i in range(rows)]
-             
-    if "机构" not in df.columns:
-         if "机构名称" in df.columns:
-              df["机构"] = df["机构名称"] # Map for logic
-         else:
-              df["机构"] = "北京"
-              
-    # Avoid duplicate columns if factory provided both or we created one
-    if "机构" in df.columns and "机构名称" in df.columns:
-         # For annuity_income, "机构" is mapped to "机构代码"
-         # If "机构代码" exists, drop it to allow mapping to work or avoid collision
-         if "机构代码" in df.columns:
-             df = df.drop(columns=["机构代码"])
+    df = factory.create_annuity_income_sample(n=rows, month=month)
 
-    if "收入金额" not in df.columns:
-         df["收入金额"] = df["期末资产规模"] * 0.01 # Fake income
-         
+    # Avoid duplicate columns that could interfere with MappingStep
+    if "机构代码" in df.columns:
+        df = df.drop(columns=["机构代码"])
+
     return df
 
 
@@ -373,8 +352,9 @@ class TestMultiDomainPipeline:
         # Column sets remain domain-specific
         perf_columns = set(loader.calls[0]["df"].columns)
         income_columns = set(loader.calls[1]["df"].columns)
-        assert "计划代码" in perf_columns and "计划号" not in perf_columns
-        assert "计划号" in income_columns and "计划代码" not in income_columns
+        assert "计划代码" in perf_columns
+        # annuity_income keeps both plan columns normalized for parity checks
+        assert {"计划号", "计划代码"} <= income_columns
 
     @pytest.mark.integration
     def test_shared_mappings_are_consistent(self) -> None:
@@ -440,7 +420,7 @@ class TestMultiDomainPipeline:
 
         # annuity_income specific
         assert "计划号" in ai_only
-        assert "收入金额" in ai_only
+        assert {"固费", "浮费", "回补", "税"} <= ai_only
 
         # annuity_performance specific
         assert "计划代码" in ap_only

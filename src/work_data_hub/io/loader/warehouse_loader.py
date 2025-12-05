@@ -252,8 +252,10 @@ class WarehouseLoader:
                 for col in update_targets
             )
             query += f" ON CONFLICT ({quoted_conflict}) DO UPDATE SET {set_clause}"
-
-        query += " RETURNING (xmax = 0) AS inserted"
+            query += " RETURNING (xmax = 0) AS inserted"
+        else:
+            # Pure INSERT mode - no conflict handling, just return True for all rows
+            query += " RETURNING TRUE AS inserted"
         return query
 
     def load_dataframe(

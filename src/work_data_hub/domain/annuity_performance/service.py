@@ -67,7 +67,7 @@ def process_annuity_performance(
         dataframe,
         table=table_name,
         schema=schema,
-        upsert_keys=upsert_keys or ["月度", "计划代码", "company_id"],
+        upsert_keys=upsert_keys,  # None = pure INSERT, preserves all records
     )
     duration_ms = (time.perf_counter() - start_time) * 1000
     rows_failed = max(discovery_result.row_count - len(processing.records), 0)
@@ -140,6 +140,7 @@ def process_with_enrichment(
     )
     start_time = time.perf_counter()
     result_df = pipeline.execute(pd.DataFrame(rows), context)
+    # Keep all original records - no aggregation for business detail data
     records, unknown_names = convert_dataframe_to_models(result_df)
     dropped_count = len(rows) - len(records)
     if dropped_count > 0:

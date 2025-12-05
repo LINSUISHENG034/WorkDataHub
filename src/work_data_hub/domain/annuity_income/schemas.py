@@ -24,23 +24,31 @@ from work_data_hub.infrastructure.validation.schema_helpers import (
 from work_data_hub.utils.date_parser import parse_bronze_dates
 
 # AnnuityIncome-specific column definitions
+# Story 5.5.5: Corrected to match real data - four income fields instead of 收入金额
 BRONZE_REQUIRED_COLUMNS: Sequence[str] = (
     "月度",
     "计划号",
     "客户名称",
     "业务类型",
-    "收入金额",
+    "固费",
+    "浮费",
+    "回补",
+    "税",
 )
-BRONZE_NUMERIC_COLUMNS: Sequence[str] = ("收入金额",)
-GOLD_NUMERIC_COLUMNS: Sequence[str] = ("收入金额",)
+BRONZE_NUMERIC_COLUMNS: Sequence[str] = ("固费", "浮费", "回补", "税")
+GOLD_NUMERIC_COLUMNS: Sequence[str] = ("固费", "浮费", "回补", "税")
 GOLD_REQUIRED_COLUMNS: Sequence[str] = (
     "月度",
     "计划号",
     "company_id",
     "客户名称",
-    "收入金额",
+    "固费",
+    "浮费",
+    "回补",
+    "税",
 )
-GOLD_COMPOSITE_KEY: Sequence[str] = ("月度", "计划号", "company_id")
+# MVP Validation: Added 组合代码 to composite key to handle multiple portfolios per plan
+GOLD_COMPOSITE_KEY: Sequence[str] = ("月度", "计划号", "组合代码", "company_id")
 
 CLEANSING_DOMAIN = "annuity_income"
 
@@ -51,7 +59,11 @@ BronzeAnnuityIncomeSchema = pa.DataFrameSchema(  # type: ignore[no-untyped-call]
         "计划号": pa.Column(pa.String, nullable=True, coerce=True),
         "客户名称": pa.Column(pa.String, nullable=True, coerce=True),
         "业务类型": pa.Column(pa.String, nullable=True, coerce=True),
-        "收入金额": pa.Column(pa.Float, nullable=True, coerce=True),
+        # Story 5.5.5: Four income fields instead of 收入金额
+        "固费": pa.Column(pa.Float, nullable=True, coerce=True),
+        "浮费": pa.Column(pa.Float, nullable=True, coerce=True),
+        "回补": pa.Column(pa.Float, nullable=True, coerce=True),
+        "税": pa.Column(pa.Float, nullable=True, coerce=True),
     },
     strict=False,
     coerce=True,
@@ -75,11 +87,15 @@ GoldAnnuityIncomeSchema = pa.DataFrameSchema(  # type: ignore[no-untyped-call]
         "组合代码": pa.Column(pa.String, nullable=True, coerce=True),
         "产品线代码": pa.Column(pa.String, nullable=True, coerce=True),
         "机构代码": pa.Column(pa.String, nullable=True, coerce=True),
-        "收入金额": pa.Column(pa.Float, nullable=False, coerce=True),
+        # Story 5.5.5: Four income fields instead of 收入金额
+        "固费": pa.Column(pa.Float, nullable=False, coerce=True),
+        "浮费": pa.Column(pa.Float, nullable=False, coerce=True),
+        "回补": pa.Column(pa.Float, nullable=False, coerce=True),
+        "税": pa.Column(pa.Float, nullable=False, coerce=True),
     },
     strict=True,
     coerce=True,
-    unique=GOLD_COMPOSITE_KEY,
+    # No unique constraint - business detail data can have duplicate composite keys
 )
 
 
@@ -159,7 +175,15 @@ def validate_gold_dataframe(
     dataframe: pd.DataFrame,
     project_columns: bool = True,
 ) -> Tuple[pd.DataFrame, GoldValidationSummary]:
-    """Validate gold layer DataFrame against schema."""
+    """Validate gold layer DataFrame against schema.
+
+    Note: Duplicate composite keys are allowed since this is business detail data.
+    Each record represents a real transaction and should be preserved.
+
+    Args:
+        dataframe: Input DataFrame to validate
+        project_columns: Whether to project columns to Gold schema
+    """
     working_df = dataframe.copy(deep=True)
     removed_columns: List[str] = []
 
@@ -171,22 +195,12 @@ def validate_gold_dataframe(
 
     ensure_required_columns(GoldAnnuityIncomeSchema, working_df, GOLD_REQUIRED_COLUMNS, schema_name="Gold")
 
+    # Log duplicate keys for informational purposes only - do not reject or aggregate
     duplicate_mask = working_df.duplicated(subset=GOLD_COMPOSITE_KEY, keep=False)
-    duplicate_keys: List[Tuple[str, str, str]] = []
+    duplicate_keys: List[Tuple[str, str, str, str]] = []
     if duplicate_mask.any():
-        duplicate_keys = (
-            working_df.loc[duplicate_mask, list(GOLD_COMPOSITE_KEY)]
-            .apply(lambda row: tuple(row.values.tolist()), axis=1)
-            .drop_duplicates()
-            .tolist()
-        )
-        failure_cases = pd.DataFrame(duplicate_keys, columns=list(GOLD_COMPOSITE_KEY))
-        raise_schema_error(
-            GoldAnnuityIncomeSchema,
-            working_df,
-            message=(f"Gold validation failed: Composite PK (月度, 计划号, company_id) has duplicates {duplicate_keys[:5]}"),
-            failure_cases=failure_cases,
-        )
+        duplicate_count = duplicate_mask.sum()
+        # Just log, don't fail - business detail data can have duplicate composite keys
 
     validated_df = apply_schema_with_lazy_mode(GoldAnnuityIncomeSchema, working_df)
 

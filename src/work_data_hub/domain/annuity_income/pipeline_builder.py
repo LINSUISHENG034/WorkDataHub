@@ -38,6 +38,19 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 
 
+def _fill_customer_name(df: pd.DataFrame) -> pd.Series:
+    """Fallback customer name to 计划名称, then UNKNOWN."""
+    if "客户名称" in df.columns:
+        base = df["客户名称"]
+    else:
+        base = pd.Series([pd.NA] * len(df), index=df.index)
+
+    plan_names = df.get("计划名称", pd.Series([pd.NA] * len(df), index=df.index))
+    base = base.combine_first(plan_names)
+
+    return base.fillna("UNKNOWN")
+
+
 def _apply_portfolio_code_defaults(df: pd.DataFrame) -> pd.Series:
     """
     Apply default portfolio codes based on business type and plan type.
@@ -134,53 +147,74 @@ def build_bronze_to_silver_pipeline(
 
     Pipeline steps (per Story 5.5.2 Task 6):
     1. MappingStep: Column rename (机构 → 机构代码)
-    2. CalculationStep: 机构代码 from 机构名称 via COMPANY_BRANCH_MAPPING
-    3. CalculationStep: Date parsing for 月度 (parse_chinese_date)
-    4. CalculationStep: 机构代码 default to 'G00' (replace 'null' string + fillna)
-    5. CalculationStep: 组合代码 regex replace '^F' → '' + conditional default
-    6. CalculationStep: 产品线代码 from 业务类型 via BUSINESS_TYPE_CODE_MAPPING
-    7. CalculationStep: Preserve 年金账户名 = 客户名称 (BEFORE normalization)
-    8. CleansingStep: Normalizes 客户名称
-    9. CompanyIdResolutionStep: Standard ID resolution (NO ID5 fallback)
-    10. DropStep: Remove legacy columns
+    2. CalculationStep: Plan code normalization (计划号/计划代码 → uppercase; keeps both)
+    3. CalculationStep: 机构代码 from 机构名称 via COMPANY_BRANCH_MAPPING
+    4. CalculationStep: Date parsing for 月度 (parse_chinese_date)
+    5. CalculationStep: 机构代码 default to 'G00' (replace 'null' string + fillna)
+    6. CalculationStep: Customer/income defaults (客户名称 fallback to 计划名称, income nulls → 0)
+    7. CalculationStep: 组合代码 regex replace '^F' → '' + conditional default
+    8. CalculationStep: 产品线代码 from 业务类型 via BUSINESS_TYPE_CODE_MAPPING
+    9. CalculationStep: Preserve 年金账户名 = 客户名称 (BEFORE normalization)
+    10. CleansingStep: Normalizes 客户名称
+    11. CompanyIdResolutionStep: Standard ID resolution (NO ID5 fallback)
+    12. DropStep: Remove legacy columns
     """
     steps: list[TransformStep] = [
         # Step 1: Column name standardization (机构 → 机构代码)
         MappingStep(COLUMN_ALIAS_MAPPING),
-        # Step 2: Institution code mapping (机构名称 → 机构代码)
+        # Step 2: Plan code normalization (keep both 计划号 + 计划代码 upper-cased)
+        CalculationStep({
+            "计划号": lambda df: (
+                df.get("计划号", pd.Series([pd.NA] * len(df), index=df.index))
+                .combine_first(df.get("计划代码", pd.Series([pd.NA] * len(df), index=df.index)))
+            ).astype("string").str.upper(),
+            "计划代码": lambda df: (
+                df.get("计划代码", pd.Series([pd.NA] * len(df), index=df.index))
+                .combine_first(df.get("计划号", pd.Series([pd.NA] * len(df), index=df.index)))
+            ).astype("string").str.upper(),
+        }),
+        # Step 3: Institution code mapping (机构名称 → 机构代码)
         CalculationStep({
             "机构代码": lambda df: df["机构名称"].map(COMPANY_BRANCH_MAPPING) if "机构名称" in df.columns else df.get("机构代码"),
         }),
-        # Step 3: Date parsing (月度: Chinese format → datetime)
+        # Step 4: Date parsing (月度: Chinese format → datetime)
         CalculationStep({
             "月度": lambda df: df["月度"].apply(parse_chinese_date) if "月度" in df.columns else df["月度"],
         }),
-        # Step 4: Institution code default (replace 'null' string + fillna with 'G00')
+        # Step 5: Institution code default (replace 'null' string + fillna with 'G00')
         CalculationStep({
             "机构代码": lambda df: df["机构代码"].replace("null", None).fillna(DEFAULT_INSTITUTION_CODE) if "机构代码" in df.columns else pd.Series([DEFAULT_INSTITUTION_CODE] * len(df)),
         }),
-        # Step 5: Portfolio code processing (regex '^F' removal + conditional defaults)
+        # Step 6: Customer/income defaults (fallback names + zero missing income)
+        CalculationStep({
+            "客户名称": _fill_customer_name,
+            "固费": lambda df: df["固费"].fillna(0) if "固费" in df.columns else pd.Series([0] * len(df)),
+            "浮费": lambda df: df["浮费"].fillna(0) if "浮费" in df.columns else pd.Series([0] * len(df)),
+            "回补": lambda df: df["回补"].fillna(0) if "回补" in df.columns else pd.Series([0] * len(df)),
+            "税": lambda df: df["税"].fillna(0) if "税" in df.columns else pd.Series([0] * len(df)),
+        }),
+        # Step 7: Portfolio code processing (regex '^F' removal + conditional defaults)
         CalculationStep({
             "组合代码": lambda df: _apply_portfolio_code_defaults(df),
         }),
-        # Step 6: Product line code derivation (业务类型 → 产品线代码)
+        # Step 8: Product line code derivation (业务类型 → 产品线代码)
         CalculationStep({
             "产品线代码": lambda df: df["业务类型"].map(BUSINESS_TYPE_CODE_MAPPING) if "业务类型" in df.columns else pd.Series([None] * len(df)),
         }),
-        # Step 7: Preserve original customer name BEFORE cleansing (年金账户名 = 客户名称)
+        # Step 9: Preserve original customer name BEFORE cleansing (年金账户名 = 客户名称)
         CalculationStep({
             "年金账户名": lambda df: df["客户名称"].copy() if "客户名称" in df.columns else pd.Series([None] * len(df)),
         }),
-        # Step 8: Data cleansing via CleansingRegistry (normalizes 客户名称)
+        # Step 10: Data cleansing via CleansingRegistry (normalizes 客户名称)
         CleansingStep(domain="annuity_income"),
-        # Step 9: Company ID resolution (standard chain, NO ID5 fallback per Tech Spec)
+        # Step 11: Company ID resolution (standard chain, NO ID5 fallback per Tech Spec)
         CompanyIdResolutionStep(
             enrichment_service=enrichment_service,
             plan_override_mapping=plan_override_mapping,
             sync_lookup_budget=sync_lookup_budget,
             generate_temp_ids=generate_temp_ids,
         ),
-        # Step 10: Drop legacy columns
+        # Step 12: Drop legacy columns
         DropStep(list(LEGACY_COLUMNS_TO_DELETE)),
     ]
 

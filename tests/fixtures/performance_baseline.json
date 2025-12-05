@@ -1,8 +1,8 @@
 {
-  "generated_at": "2025-12-06T00:03:17.444506",
+  "generated_at": "2025-12-06T06:39:54.747937",
   "environment": {
-    "python_version": "3.12.10",
-    "platform": "Windows-AMD64",
+    "python_version": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26200-SP0",
     "cpu_count": 16,
     "pandas_version": "2.3.2",
     "pandera_version": "0.26.1",
@@ -11,25 +11,20 @@
   "metrics": [
     {
       "domain": "annuity_performance",
-      "processing_time_ms": 24187.72,
-      "memory_mb_peak": 102.8,
-      "rows_processed": 33267,
-      "throughput_rows_per_sec": 1375.37,
-      "timestamp": "2025-12-06T00:03:16.303753"
+      "processing_time_ms": 311.6210999432951,
+      "memory_mb_peak": 0.0,
+      "rows_processed": 500,
+      "throughput_rows_per_sec": 1604.5126600573058,
+      "timestamp": "2025-12-06T06:39:54.422119"
     },
     {
       "domain": "annuity_income",
-      "processing_time_ms": 1141.31,
-      "memory_mb_peak": 2.36,
-      "rows_processed": 1291,
-      "throughput_rows_per_sec": 1131.16,
-      "timestamp": "2025-12-06T00:03:17.444506"
+      "processing_time_ms": 256.6412000451237,
+      "memory_mb_peak": 0.0,
+      "rows_processed": 500,
+      "throughput_rows_per_sec": 1948.2452541216608,
+      "timestamp": "2025-12-06T06:39:54.678439"
     }
   ],
-  "regression_threshold_percent": 10,
-  "data_sources": {
-    "annuity_performance": "tests\\fixtures\\real_data\\202311\\数据采集\\V1\\【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx",
-    "annuity_income": "tests\\fixtures\\real_data\\202411\\收集数据\\数据采集\\V1\\【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx"
-  },
-  "note": "Generated with real production data (202411 V1 for income, 202311/202412 for performance)"
+  "regression_threshold_percent": 10
 }

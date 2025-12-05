@@ -23,6 +23,7 @@ from .pipeline_builder import (
     build_bronze_to_silver_pipeline,
     load_plan_override_mapping,
 )
+from .schemas import validate_gold_dataframe
 
 if TYPE_CHECKING:
     from work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
@@ -62,7 +63,8 @@ def process_annuity_income(
 
     Expected Inputs:
         Bronze DataFrame from discovered Excel file (sheet: 收入明细)
-        Required columns: 月度, 机构, 机构名称, 计划号, 客户名称, 业务类型, 计划类型, 组合代码, 收入金额
+        Required columns: 月度, 机构/机构代码, 机构名称, 计划号/计划代码, 客户名称, 业务类型,
+        计划类型, 组合代码, 固费, 浮费, 回补, 税
 
     Outputs:
         DomainPipelineResult containing:
@@ -107,7 +109,7 @@ def process_annuity_income(
         dataframe,
         table=table_name,
         schema=schema,
-        upsert_keys=upsert_keys or ["月度", "计划号", "company_id"],
+        upsert_keys=upsert_keys or ["月度", "计划号", "组合代码", "company_id"],
     )
     duration_ms = (time.perf_counter() - start_time) * 1000
     rows_failed = max(discovery_result.row_count - len(processing.records), 0)
@@ -199,6 +201,11 @@ def process_with_enrichment(
     )
     start_time = time.perf_counter()
     result_df = pipeline.execute(pd.DataFrame(rows), context)
+
+    # Story 5.5.5: Enforce Gold schema validation (checks uniqueness of composite key)
+    # This catches issues that Pydantic row-by-row validation misses
+    result_df, _ = validate_gold_dataframe(result_df)
+
     records, unknown_names = convert_dataframe_to_models(result_df)
     dropped_count = len(rows) - len(records)
     if dropped_count > 0:
@@ -233,4 +240,11 @@ def process_with_enrichment(
 
 def _records_to_dataframe(records: List[AnnuityIncomeOut]) -> pd.DataFrame:
     """Convert list of AnnuityIncomeOut models to DataFrame for warehouse loading."""
-    return pd.DataFrame([r.model_dump(mode="json", by_alias=True, exclude_none=True) for r in records]) if records else pd.DataFrame()
+    if not records:
+        return pd.DataFrame()
+
+    df = pd.DataFrame([r.model_dump(mode="json", by_alias=True, exclude_none=True) for r in records])
+    # Keep both plan columns for parity with annuity_performance
+    if "计划代码" not in df.columns and "计划号" in df.columns:
+        df["计划代码"] = df["计划号"]
+    return df

@@ -108,11 +108,7 @@ class Settings(BaseSettings):
     """
 
     # Story 1.4 required fields (no prefix, uppercase names)
-    DATABASE_URL: Optional[str] = Field(
-        default=None,
-        validation_alias="DATABASE_URL",
-        description="Database connection string (required for Story 1.4)",
-    )
+    # NOTE: DATABASE_URL removed - use WDH_DATABASE__URI in .env instead
     ENVIRONMENT: Literal["dev", "staging", "prod"] = Field(
         default="dev",
         validation_alias="ENVIRONMENT",
@@ -243,28 +239,26 @@ class Settings(BaseSettings):
     database_user: str = Field(default="user", description="Database user")
     database_password: str = Field(default="password", description="Database password")
     database_db: str = Field(default="database", description="Database name")
+    database_schema: str = Field(default="wdh_dev", description="Database schema for all domains")
     database_uri: Optional[str] = Field(
         default=None, description="Complete database URI"
     )
 
     def get_database_connection_string(self) -> str:
-        """Get PostgreSQL connection string.
+        """Get PostgreSQL connection string from .env file only.
 
-        Unifies environment variable usage by preferring a single canonical URI
-        while maintaining backward compatibility with prior naming.
+        Configuration is read exclusively from .env file to ensure single source of truth.
         Priority order:
-        1) DATABASE_URL field (if provided directly)
-        2) WDH_DATABASE__URI (canonical)
-        3) WDH_DATABASE_URI (alternate)
-        4) self.database_uri (settings field)
-        5) Construct from individual components
+        1) WDH_DATABASE__URI (canonical, from .env)
+        2) WDH_DATABASE_URI (alternate, from .env)
+        3) Construct from individual WDH_DATABASE_* components (from .env)
+
+        Note: System environment variable DATABASE_URL is intentionally ignored
+        to prevent configuration conflicts.
         """
-        if self.DATABASE_URL:
-            return self.DATABASE_URL
-        # Canonical and alternate environment variable overrides
-        env_uri = os.getenv("WDH_DATABASE__URI") or os.getenv("WDH_DATABASE_URI")
-        if env_uri:
-            return env_uri
+        # Only read from .env file via pydantic settings
+        if self.database_uri:
+            return self.database_uri
         return self.database.get_connection_string()
 
     @property
@@ -296,22 +290,16 @@ class Settings(BaseSettings):
             The validated Settings instance
 
         Raises:
-            ValueError: If ENVIRONMENT is 'prod' and DATABASE_URL is not PostgreSQL
+            ValueError: If ENVIRONMENT is 'prod' and database URL is not PostgreSQL
         """
-        if not self.DATABASE_URL:
-            if ENV_FILE_OVERRIDE:
-                # Custom env files can omit DATABASE_URL; fall back to derived URI.
-                self.DATABASE_URL = self.database.get_connection_string()
-            else:
-                raise ValueError(
-                    "DATABASE_URL is required. Set it in the environment or .env file."
-                )
+        # Get database URL from .env file configuration
+        db_url = self.get_database_connection_string()
 
-        if self.ENVIRONMENT == "prod" and not self.DATABASE_URL.startswith("postgresql://"):
-            db_url_preview = self.DATABASE_URL[:20]
+        if self.ENVIRONMENT == "prod" and not db_url.startswith("postgresql://"):
+            db_url_preview = db_url[:20]
             raise ValueError(
                 "Production environment requires PostgreSQL database. "
-                f"DATABASE_URL must start with 'postgresql://', "
+                f"Database URL must start with 'postgresql://', "
                 f"got: {db_url_preview}..."
             )
 

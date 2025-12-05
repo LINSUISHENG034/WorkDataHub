@@ -217,6 +217,49 @@ class AnnuityTestDataFactory:
 
         return sample
 
+    def create_annuity_income_sample(
+        self,
+        n: int = 100,
+        month: str = "202412",
+        include_edge_cases: bool = True,
+    ) -> pd.DataFrame:
+        """Create sample data aligned to annuity_income schema (four income fields).
+
+        - Provides plan code under 计划号 (falls back to 计划代码 or generated)
+        - Ensures 机构 / 机构名称 present for alias mapping
+        - Generates 固费/浮费/回补/税 from asset scale to avoid artificial 收入金额
+        """
+        df = self.create_valid_sample(n=n, include_edge_cases=include_edge_cases).copy()
+        df["月度"] = int(month)
+
+        if "计划号" not in df.columns:
+            if "计划代码" in df.columns:
+                df = df.rename(columns={"计划代码": "计划号"})
+            else:
+                df["计划号"] = [f"PLAN{i:04d}" for i in range(n)]
+
+        if "机构名称" not in df.columns:
+            df["机构名称"] = "北京"
+        if "机构" not in df.columns:
+            df["机构"] = df["机构名称"]
+
+        if "业务类型" not in df.columns:
+            df["业务类型"] = "企年投资"
+        if "计划类型" not in df.columns:
+            df["计划类型"] = "单一计划"
+        if "组合代码" not in df.columns:
+            df["组合代码"] = [f"QTAN{i:03d}" for i in range(n)]
+
+        # Generate four income fields from a stable numeric base
+        base = df["期末资产规模"] if "期末资产规模" in df.columns else pd.Series([1_000_000] * n)
+        base = base.fillna(1_000_000).abs()
+        df["固费"] = (base * 0.015).round(2)
+        df["浮费"] = (base * 0.01).round(2)
+        df["回补"] = (base * 0.005).round(2)
+        df["税"] = ((df["固费"] + df["浮费"] + df["回补"]) * 0.05).round(2)
+
+        return df
+
     def create_invalid_sample(
         self,
         n: int = 50,

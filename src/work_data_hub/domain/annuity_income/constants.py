@@ -11,7 +11,11 @@ from work_data_hub.infrastructure.mappings import (
 )
 
 # AnnuityIncome-specific: Column alias for 收入明细 sheet
-COLUMN_ALIAS_MAPPING: Dict[str, str] = {"机构": "机构代码"}
+# Story 5.5.5: Added 计划代码 → 计划号 mapping for 202412+ data sources
+COLUMN_ALIAS_MAPPING: Dict[str, str] = {
+    "机构": "机构代码",
+    "计划代码": "计划号",  # 202412+ uses 计划代码, normalize to legacy name
+}
 
 # AnnuityIncome-specific: Columns to delete after processing
 LEGACY_COLUMNS_TO_DELETE: Sequence[str] = (
@@ -24,6 +28,7 @@ LEGACY_COLUMNS_TO_DELETE: Sequence[str] = (
 DEFAULT_INSTITUTION_CODE: str = "G00"
 
 # AnnuityIncome-specific: Gold layer output columns
+# Story 5.5.5: Four income fields instead of 收入金额
 DEFAULT_ALLOWED_GOLD_COLUMNS: Sequence[str] = (
     "月度",
     "计划号",
@@ -35,7 +40,10 @@ DEFAULT_ALLOWED_GOLD_COLUMNS: Sequence[str] = (
     "组合代码",
     "产品线代码",
     "机构代码",
-    "收入金额",
+    "固费",
+    "浮费",
+    "回补",
+    "税",
 )
 
 # DEPRECATED: COMPANY_ID5_MAPPING

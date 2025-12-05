@@ -51,8 +51,8 @@ class TestBuildBronzeToSilverPipeline:
         """Pipeline contains all expected transformation steps."""
         pipeline = build_bronze_to_silver_pipeline()
 
-        # Should have 10 steps as documented in Story 5.5.2 Task 6
-        assert len(pipeline.steps) == 10
+        # Should have 12 steps as documented in Story 5.5.2 Task 6
+        assert len(pipeline.steps) == 12
 
         # Verify step names
         step_names = [s.name.lower() for s in pipeline.steps]
@@ -70,7 +70,7 @@ class TestBuildBronzeToSilverPipeline:
         )
 
         assert isinstance(pipeline, Pipeline)
-        assert len(pipeline.steps) == 10
+        assert len(pipeline.steps) == 12
 
     def test_pipeline_with_plan_override_mapping(self):
         """Pipeline uses plan override mapping for company ID resolution."""
@@ -240,6 +240,7 @@ class TestPipelineExecution:
     @pytest.fixture
     def sample_bronze_df(self):
         """Create sample Bronze layer DataFrame for AnnuityIncome."""
+        # Story 5.5.5: Updated to use four income fields instead of 收入金额
         return pd.DataFrame({
             "月度": ["202411", "202411"],
             "计划号": ["FP0001", "FP0002"],
@@ -250,7 +251,10 @@ class TestPipelineExecution:
             "机构名称": ["北京", "上海"],
             "机构": ["北京", "上海"],  # Will be renamed to 机构代码
             "组合代码": ["FQTAN001", None],  # F prefix to remove, None to default
-            "收入金额": [1000000.0, 2000000.0],
+            "固费": [500000.0, 1000000.0],
+            "浮费": [300000.0, 600000.0],
+            "回补": [200000.0, 400000.0],
+            "税": [50000.0, 100000.0],
             "id": [1, 2],  # Legacy column to be dropped
             "备注": ["备注1", "备注2"],  # Legacy column to be dropped
         })
@@ -321,10 +325,44 @@ class TestPipelineExecution:
 
     def test_pipeline_preserves_data_integrity(self, sample_bronze_df, context):
         """Pipeline preserves original data values."""
+        # Story 5.5.5: Updated to use four income fields instead of 收入金额
         pipeline = build_bronze_to_silver_pipeline()
 
         result_df = pipeline.execute(sample_bronze_df, context)
 
         # Financial values should be preserved
-        assert result_df.loc[0, "收入金额"] == 1000000.0
-        assert result_df.loc[1, "收入金额"] == 2000000.0
+        assert result_df.loc[0, "固费"] == 500000.0
+        assert result_df.loc[1, "固费"] == 1000000.0
+        assert result_df.loc[0, "浮费"] == 300000.0
+        assert result_df.loc[1, "浮费"] == 600000.0
+
+    def test_pipeline_handles_column_aliases(self, context):
+        """Pipeline normalizes 计划代码→计划号 and 机构→机构代码 before processing."""
+        alias_df = pd.DataFrame({
+            "月度": ["202412"],
+            "计划代码": ["fp0003"],  # Alias column that should become 计划号
+            "客户名称": ["测试公司C"],
+            "年金账户名": ["账户C"],
+            "业务类型": ["企年投资"],
+            "计划类型": ["单一计划"],
+            "机构": ["北京"],  # Alias that should become 机构代码
+            "机构名称": ["北京"],
+            "组合代码": ["FQTAN010"],
+            "固费": [120000.0],
+            "浮费": [34000.0],
+            "回补": [5600.0],
+            "税": [1700.0],
+        })
+
+        pipeline = build_bronze_to_silver_pipeline()
+        result_df = pipeline.execute(alias_df, context)
+
+        # Aliases should be normalized (both plan columns uppercase and aligned)
+        assert "计划号" in result_df.columns
+        assert "计划代码" in result_df.columns
+        assert result_df.loc[0, "计划号"] == "FP0003"
+        assert result_df.loc[0, "计划代码"] == "FP0003"
+
+        assert "机构代码" in result_df.columns
+        assert "机构" not in result_df.columns
+        assert result_df.loc[0, "机构代码"] == "G01"  # Derived from mapping

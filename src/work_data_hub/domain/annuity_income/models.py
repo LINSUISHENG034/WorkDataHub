@@ -57,7 +57,11 @@ class AnnuityIncomeIn(BaseModel):
     业务类型: Optional[str] = Field(None, description="Business type (业务类型)")
     计划类型: Optional[str] = Field(None, description="Plan type (计划类型)")
     组合代码: Optional[str] = Field(None, description="Portfolio code (组合代码)")
-    收入金额: Optional[Union[Decimal, float, int, str]] = Field(None, description="Income amount (收入金额)")
+    # Story 5.5.5: Four income fields instead of 收入金额
+    固费: Optional[Union[Decimal, float, int, str]] = Field(None, description="Fixed fee income (固费)")
+    浮费: Optional[Union[Decimal, float, int, str]] = Field(None, description="Variable fee income (浮费)")
+    回补: Optional[Union[Decimal, float, int, str]] = Field(None, description="Rebate income (回补)")
+    税: Optional[Union[Decimal, float, int, str]] = Field(None, description="Tax amount (税)")
     年金账户名: Optional[str] = Field(None, description="Pension account name (年金账户名)")
     产品线代码: Optional[str] = Field(None, description="Product line code (产品线代码)")
     company_id: Optional[str] = Field(None, description="Company identifier")
@@ -79,7 +83,8 @@ class AnnuityIncomeIn(BaseModel):
                 result[key] = value
         return result
 
-    @field_validator("收入金额", mode="before")
+    # Story 5.5.5: Validator for four income fields instead of 收入金额
+    @field_validator("固费", "浮费", "回补", "税", mode="before")
     @classmethod
     def clean_numeric_fields(cls, v: Any, info: ValidationInfo) -> Optional[float]:
         if v is None:
@@ -155,7 +160,11 @@ class AnnuityIncomeOut(BaseModel):
     客户名称: str = Field(..., max_length=255, description="Customer name (normalized)")
     产品线代码: str = Field(..., max_length=255, description="Product line code")
     机构代码: str = Field(..., max_length=255, description="Institution code")
-    收入金额: Decimal | float = Field(..., decimal_places=4, description="Income amount")
+    # Story 5.5.5: Four income fields instead of 收入金额
+    固费: Decimal | float = Field(..., decimal_places=4, description="Fixed fee income (固费)")
+    浮费: Decimal | float = Field(..., decimal_places=4, description="Variable fee income (浮费)")
+    回补: Decimal | float = Field(..., decimal_places=4, description="Rebate income (回补)")
+    税: Decimal | float = Field(..., decimal_places=4, description="Tax amount (税)")
 
     # Optional fields
     id: Optional[int] = Field(None, description="Auto-generated ID (handled by DB)")
@@ -201,7 +210,8 @@ class AnnuityIncomeOut(BaseModel):
             raise ValueError(f"company_id cannot be empty after normalization: {v}")
         return normalized
 
-    @field_validator("收入金额", mode="before")
+    # Story 5.5.5: Validator for four income fields instead of 收入金额
+    @field_validator("固费", "浮费", "回补", "税", mode="before")
     @classmethod
     def clean_decimal_fields_output(cls, v: Any, info: ValidationInfo) -> Decimal | float:
         field_name = info.field_name or "numeric_field"

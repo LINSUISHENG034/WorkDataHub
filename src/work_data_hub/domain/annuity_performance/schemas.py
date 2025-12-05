@@ -57,7 +57,8 @@ GOLD_REQUIRED_COLUMNS: Sequence[str] = (
     "期末资产规模",
     "投资收益",
 )
-GOLD_COMPOSITE_KEY: Sequence[str] = ("月度", "计划代码", "company_id")
+# MVP Validation: Added 组合代码 to composite key to handle multiple portfolios per plan
+GOLD_COMPOSITE_KEY: Sequence[str] = ("月度", "计划代码", "组合代码", "company_id")
 
 CLEANSING_DOMAIN = "annuity_performance"
 
@@ -183,7 +184,16 @@ def validate_bronze_dataframe(dataframe: pd.DataFrame, failure_threshold: float 
 def validate_gold_dataframe(
     dataframe: pd.DataFrame,
     project_columns: bool = True,
+    aggregate_duplicates: bool = True,
 ) -> Tuple[pd.DataFrame, GoldValidationSummary]:
+    """Validate gold layer DataFrame against schema.
+
+    Args:
+        dataframe: Input DataFrame to validate
+        project_columns: Whether to project columns to Gold schema
+        aggregate_duplicates: If True, aggregate duplicate keys by summing numeric fields.
+                            If False, raise error on duplicates.
+    """
     working_df = dataframe.copy(deep=True)
     removed_columns: List[str] = []
 
@@ -196,7 +206,7 @@ def validate_gold_dataframe(
     ensure_required_columns(GoldAnnuitySchema, working_df, GOLD_REQUIRED_COLUMNS, schema_name="Gold")
 
     duplicate_mask = working_df.duplicated(subset=GOLD_COMPOSITE_KEY, keep=False)
-    duplicate_keys: List[Tuple[str, str, str]] = []
+    duplicate_keys: List[Tuple[str, str, str, str]] = []
     if duplicate_mask.any():
         duplicate_keys = (
             working_df.loc[duplicate_mask, list(GOLD_COMPOSITE_KEY)]
@@ -204,13 +214,27 @@ def validate_gold_dataframe(
             .drop_duplicates()
             .tolist()
         )
-        failure_cases = pd.DataFrame(duplicate_keys, columns=list(GOLD_COMPOSITE_KEY))
-        raise_schema_error(
-            GoldAnnuitySchema,
-            working_df,
-            message=(f"Gold validation failed: Composite PK (月度, 计划代码, company_id) has duplicates {duplicate_keys[:5]}"),
-            failure_cases=failure_cases,
-        )
+
+        if aggregate_duplicates:
+            # MVP Validation: Aggregate duplicates by summing numeric fields
+            numeric_cols = list(GOLD_NUMERIC_COLUMNS)
+            non_numeric_cols = [c for c in working_df.columns if c not in numeric_cols]
+
+            # Group by composite key and aggregate
+            agg_dict = {col: "sum" for col in numeric_cols if col in working_df.columns}
+            for col in non_numeric_cols:
+                if col not in GOLD_COMPOSITE_KEY:
+                    agg_dict[col] = "first"  # Take first value for non-numeric columns
+
+            working_df = working_df.groupby(list(GOLD_COMPOSITE_KEY), as_index=False).agg(agg_dict)
+        else:
+            failure_cases = pd.DataFrame(duplicate_keys, columns=list(GOLD_COMPOSITE_KEY))
+            raise_schema_error(
+                GoldAnnuitySchema,
+                working_df,
+                message=(f"Gold validation failed: Composite PK has duplicates {duplicate_keys[:5]}"),
+                failure_cases=failure_cases,
+            )
 
     validated_df = apply_schema_with_lazy_mode(GoldAnnuitySchema, working_df)
 

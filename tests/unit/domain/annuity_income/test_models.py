@@ -31,16 +31,21 @@ class TestAnnuityIncomeIn:
 
     def test_accepts_valid_data(self):
         """Model accepts valid input data."""
+        # Story 5.5.5: Updated to use four income fields instead of 收入金额
         data = {
             "月度": "202412",
             "计划号": "FP0001",
             "客户名称": "测试公司",
             "业务类型": "企年投资",
-            "收入金额": 1000000.0,
+            "固费": 500000.0,
+            "浮费": 300000.0,
+            "回补": 200000.0,
+            "税": 50000.0,
         }
         model = AnnuityIncomeIn(**data)
         assert model.计划号 == "FP0001"
         assert model.客户名称 == "测试公司"
+        assert model.固费 == 500000.0
 
     def test_allows_extra_fields(self):
         """Model allows extra fields (extra='allow')."""
@@ -66,21 +71,27 @@ class TestAnnuityIncomeIn:
     def test_converts_nan_to_none(self):
         """Model converts NaN values to None."""
         import math
+        # Story 5.5.5: Updated to use 固费 instead of 收入金额
         data = {
             "计划号": "FP0001",
-            "收入金额": float("nan"),
+            "固费": float("nan"),
         }
         model = AnnuityIncomeIn(**data)
-        assert model.收入金额 is None
+        assert model.固费 is None
 
     def test_cleans_numeric_fields(self):
         """Model cleans numeric fields with currency symbols."""
+        # Story 5.5.5: Updated to use four income fields instead of 收入金额
         data = {
             "计划号": "FP0001",
-            "收入金额": "1,000,000.00",
+            "固费": "1,000,000.00",
+            "浮费": "500,000.00",
+            "回补": "200,000.00",
+            "税": "50,000.00",
         }
         model = AnnuityIncomeIn(**data)
-        assert model.收入金额 == 1000000.0
+        assert model.固费 == 1000000.0
+        assert model.浮费 == 500000.0
 
     def test_preprocesses_report_date(self):
         """Model preprocesses YYYYMM integer to string."""
@@ -130,6 +141,7 @@ class TestAnnuityIncomeOut:
 
     def test_parses_date_field(self):
         """Model parses various date formats."""
+        # Story 5.5.5: Updated to use four income fields instead of 收入金额
         data = {
             "月度": "202412",
             "计划号": "FP0001",
@@ -137,7 +149,10 @@ class TestAnnuityIncomeOut:
             "客户名称": "测试公司",
             "产品线代码": "PL201",
             "机构代码": "G00",
-            "收入金额": 100.0,
+            "固费": 100.0,
+            "浮费": 50.0,
+            "回补": 30.0,
+            "税": 10.0,
         }
         model = AnnuityIncomeOut(**data)
         assert isinstance(model.月度, date)
@@ -146,6 +161,7 @@ class TestAnnuityIncomeOut:
 
     def test_normalizes_plan_code(self):
         """Model normalizes plan code to uppercase."""
+        # Story 5.5.5: Updated to use four income fields instead of 收入金额
         data = {
             "月度": "2024-12-01",
             "计划号": "fp0001",
@@ -153,13 +169,17 @@ class TestAnnuityIncomeOut:
             "客户名称": "测试公司",
             "产品线代码": "PL201",
             "机构代码": "G00",
-            "收入金额": 10.0,
+            "固费": 10.0,
+            "浮费": 5.0,
+            "回补": 3.0,
+            "税": 1.0,
         }
         model = AnnuityIncomeOut(**data)
         assert model.计划号 == "FP0001"
 
     def test_normalizes_company_id(self):
         """Model normalizes company_id to uppercase."""
+        # Story 5.5.5: Updated to use four income fields instead of 收入金额
         data = {
             "月度": "2024-12-01",
             "计划号": "FP0001",
@@ -167,28 +187,36 @@ class TestAnnuityIncomeOut:
             "客户名称": "测试公司",
             "产品线代码": "PL201",
             "机构代码": "G00",
-            "收入金额": 10.0,
+            "固费": 10.0,
+            "浮费": 5.0,
+            "回补": 3.0,
+            "税": 1.0,
         }
         model = AnnuityIncomeOut(**data)
         assert model.company_id == "COMP123"
 
     def test_cleans_decimal_fields(self):
         """Model cleans decimal fields."""
+        # Story 5.5.5: Updated to use four income fields instead of 收入金额
         data = {
             "月度": "2024-12-01",
             "计划号": "FP0001",
             "company_id": "COMP123",
-            "收入金额": "1,000,000.00",
+            "固费": "1,000,000.00",
+            "浮费": "500,000.00",
+            "回补": "200,000.00",
+            "税": "50,000.00",
             "客户名称": "测试公司",
             "产品线代码": "PL201",
             "机构代码": "G00",
         }
         model = AnnuityIncomeOut(**data)
-        assert isinstance(model.收入金额, Decimal)
+        assert isinstance(model.固费, Decimal)
 
     def test_validates_future_date(self):
         """Model rejects future dates."""
         from datetime import timedelta
+        # Story 5.5.5: Updated to use four income fields instead of 收入金额
         future_date = date.today() + timedelta(days=30)
         data = {
             "月度": future_date.isoformat(),
@@ -197,7 +225,10 @@ class TestAnnuityIncomeOut:
             "客户名称": "测试公司",
             "产品线代码": "PL201",
             "机构代码": "G00",
-            "收入金额": 10.0,
+            "固费": 10.0,
+            "浮费": 5.0,
+            "回补": 3.0,
+            "税": 1.0,
         }
         with pytest.raises(ValidationError) as exc_info:
             AnnuityIncomeOut(**data)
@@ -205,6 +236,7 @@ class TestAnnuityIncomeOut:
 
     def test_accepts_valid_complete_data(self):
         """Model accepts valid complete data."""
+        # Story 5.5.5: Updated to use four income fields instead of 收入金额
         data = {
             "月度": "2024-12-01",
             "计划号": "FP0001",
@@ -212,7 +244,10 @@ class TestAnnuityIncomeOut:
             "客户名称": "测试公司",
             "产品线代码": "PL201",
             "机构代码": "G00",
-            "收入金额": 1000000.0,
+            "固费": 500000.0,
+            "浮费": 300000.0,
+            "回补": 200000.0,
+            "税": 50000.0,
             "业务类型": "企年投资",
             "计划类型": "单一计划",
             "组合代码": "QTAN001",
@@ -221,6 +256,7 @@ class TestAnnuityIncomeOut:
         model = AnnuityIncomeOut(**data)
         assert model.计划号 == "FP0001"
         assert model.company_id == "COMP123"
+        assert model.固费 == 500000.0
 
 
 class TestEnrichmentStats:
@@ -268,6 +304,7 @@ class TestProcessingResultWithEnrichment:
 
     def test_accepts_records(self):
         """Result accepts list of AnnuityIncomeOut records."""
+        # Story 5.5.5: Updated to use four income fields instead of 收入金额
         record = AnnuityIncomeOut(
             月度="2024-12-01",
             计划号="FP0001",
@@ -275,7 +312,10 @@ class TestProcessingResultWithEnrichment:
             客户名称="测试公司",
             产品线代码="PL201",
             机构代码="G00",
-            收入金额=1.0,
+            固费=1.0,
+            浮费=0.5,
+            回补=0.3,
+            税=0.1,
         )
         result = ProcessingResultWithEnrichment(
             records=[record],
