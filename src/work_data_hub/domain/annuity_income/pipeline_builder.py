@@ -82,6 +82,7 @@ class CompanyIdResolutionStep(TransformStep):
         enrichment_service: Optional["CompanyEnrichmentService"] = None,
         plan_override_mapping: Optional[Dict[str, str]] = None,
         sync_lookup_budget: int = 0,
+        generate_temp_ids: bool = True,
     ) -> None:
         self._resolver = CompanyIdResolver(
             enrichment_service=enrichment_service,
@@ -89,6 +90,7 @@ class CompanyIdResolutionStep(TransformStep):
         )
         self._sync_lookup_budget = sync_lookup_budget
         self._use_enrichment = enrichment_service is not None
+        self._generate_temp_ids = generate_temp_ids
 
     @property
     def name(self) -> str:
@@ -104,7 +106,7 @@ class CompanyIdResolutionStep(TransformStep):
             output_column="company_id",
             use_enrichment_service=self._use_enrichment,
             sync_lookup_budget=self._sync_lookup_budget,
-            generate_temp_ids=True,
+            generate_temp_ids=self._generate_temp_ids,
         )
 
         result = self._resolver.resolve_batch(df, strategy)
@@ -125,6 +127,7 @@ def build_bronze_to_silver_pipeline(
     enrichment_service: Optional["CompanyEnrichmentService"] = None,
     plan_override_mapping: Optional[Dict[str, str]] = None,
     sync_lookup_budget: int = 0,
+    generate_temp_ids: bool = True,
 ) -> Pipeline:
     """
     Compose the Bronze → Silver pipeline for AnnuityIncome domain.
@@ -175,6 +178,7 @@ def build_bronze_to_silver_pipeline(
             enrichment_service=enrichment_service,
             plan_override_mapping=plan_override_mapping,
             sync_lookup_budget=sync_lookup_budget,
+            generate_temp_ids=generate_temp_ids,
         ),
         # Step 10: Drop legacy columns
         DropStep(list(LEGACY_COLUMNS_TO_DELETE)),

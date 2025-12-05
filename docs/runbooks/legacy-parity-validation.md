@@ -8,22 +8,42 @@
 
 ## Quick Reference
 
+| Domain | 验证脚本 | Legacy 基线 |
+|--------|----------|-------------|
+| **AnnuityPerformance** | `scripts/tools/parity/validate_annuity_performance_parity.py` | `scripts/tools/run_legacy_annuity_performance_cleaner.py` |
+| **AnnuityIncome** | `scripts/tools/parity/validate_annuity_income_parity.py` | `scripts/tools/run_legacy_annuity_income_cleaner.py` |
+
 | Item | Value |
 |------|-------|
-| **验证脚本** | `scripts/tools/validate_real_data_parity.py` |
 | **结果目录** | `tests/fixtures/validation_results/` |
-| **Legacy 基线** | `scripts/tools/run_legacy_annuity_cleaner.py` |
 | **比较方法** | Set-based 行签名比较 |
+
+## AnnuityIncome Parity Quickstart（Story 5.5.3）
+- 前置：5.5-2 域已实现；真实 收入明细 Excel 位于 `tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集/`; legacy mappings 可用；环境 Python 3.12（pandas/pandera/pydantic）。
+- 命令：`uv run python scripts/tools/parity/validate_annuity_income_parity.py`
+- 成功门槛：除 company_id intentional 差异外 100% 行/列/值匹配；company_id 差异（ID5 去除、plan override 改进）统一延期至 Epic-6 处理，仅记录。
+- 产物：legacy/pipeline parquet、json 报告、xlsx 对比 → `tests/fixtures/validation_results/`.
+- 若失败：先比对数据源一致性 → 列/映射配置 → 清洗规则 → company_id 解析。
+
+### IO Contract（AnnuityIncome）
+- 输入：Excel `收入明细` sheet；必备列 月度, 机构, 机构名称, 计划号, 客户名称, 业务类型, 计划类型, 组合代码, 收入金额（及 cleaner 使用的元数据列）；类型：月度=string date，计划号/组合代码=string，收入金额=numeric。
+- 输出：比较列同上；新增 产品线代码、company_id、年金账户名、`_source`、`_source_file`（后两者不比较；company_id 仅做意图差异统计）。
+- 配置护栏：`config/data_sources.yml` 中 annuity_income（sheet=收入明细，pattern=`*年金终稿*.xlsx`，version strategy=highest_number）；`src/work_data_hub/infrastructure/cleansing/settings/cleansing_rules.yml` 包含 annuity_income 规则。
+- 错误处理：禁止静默丢行；形状/类型不符需显式失败；允许差异（company_id ID5 去除等）须在报告记录。
 
 ## 验证脚本架构
 
 ### 核心组件
 
 ```
+scripts/tools/parity/
+├── validate_annuity_performance_parity.py   # parity（annuity_performance）
+├── validate_annuity_income_parity.py        # parity（annuity_income）
+└── common.py                                # shared compare/report utilities
+
 scripts/tools/
-├── validate_real_data_parity.py    # 主验证脚本
-├── run_legacy_annuity_cleaner.py   # Legacy 清洗器提取
-└── ...
+├── run_legacy_annuity_performance_cleaner.py # legacy 提取（performance）
+└── run_legacy_annuity_income_cleaner.py     # legacy 提取（income）
 
 tests/fixtures/
 ├── real_data/202412/               # 真实测试数据
@@ -74,7 +94,7 @@ tests/fixtures/
 
 ```bash
 cd E:\Projects\WorkDataHub
-uv run python scripts/tools/validate_real_data_parity.py
+uv run python scripts/tools/parity/validate_annuity_performance_parity.py
 ```
 
 ### 2. 查看结果
@@ -179,6 +199,17 @@ MAPPING_FIXTURE_PATH = Path("tests/fixtures/sample_legacy_mappings.json")
 OUTPUT_DIR = Path("tests/fixtures/validation_results")
 SHEET_NAME = "数据Sheet名"
 
+# 必要列与比较设置（示例）
+REQUIRED_COLUMNS = ["月度", "机构", "机构名称", "计划号", "客户名称", "业务类型", "计划类型", "组合代码", "收入金额"]
+EXCLUDED_COLS = ("_source", "_source_file", "company_id")
+
+def load_input() -> pd.DataFrame:
+    df = pd.read_excel(REAL_DATA_PATH, sheet_name=SHEET_NAME)
+    missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
+    if missing:
+        raise ValueError(f"missing required columns: {missing}")
+    return df
+
 
 def compare_dataframes(
     legacy_df: pd.DataFrame,
@@ -192,7 +223,7 @@ def compare_dataframes(
     }
 
     # 2. 排除不参与比较的列
-    excluded_cols = ("_source", "_source_file", "company_id")
+    excluded_cols = EXCLUDED_COLS
 
     # 3. 创建行签名用于 set 比较
     comparison_cols = [

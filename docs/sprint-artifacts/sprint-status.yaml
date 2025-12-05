@@ -109,7 +109,7 @@ development_status:
   epic-5.5: in-progress
   5.5-1-legacy-cleansing-rules-documentation: done  
   5.5-2-annuity-income-domain-implementation: done
-  5.5-3-legacy-parity-validation: backlog
+  5.5-3-legacy-parity-validation: review
   5.5-4-multi-domain-integration-test-and-optimization: backlog
   epic-5.5-retrospective: optional
 

@@ -4,15 +4,33 @@ from __future__ import annotations
 
 from typing import Any
 
+import re
+
 from work_data_hub.infrastructure.cleansing.registry import RuleCategory, rule
 
 _DECORATIVE_CHARS = "「」『』\"""《》"
 
-# Legacy parity: suffixes to remove from company names
+# Legacy parity: suffixes / markers to remove from company names
 _COMPANY_NAME_SUFFIXES_TO_REMOVE = (
-    "已转出", "待转出", "终止", "转出", "转移终止", "已作废", "已终止",
-    "保留", "保留账户", "存量", "已转移终止", "本部", "未使用", "集合", "原",
+    "已转出",
+    "待转出",
+    "终止",
+    "转出",
+    "转移终止",
+    "已作废",
+    "已终止",
+    "保留",
+    "保留账户",
+    "存量",
+    "已转移终止",
+    "本部",
+    "未使用",
+    "集合",
+    "原",
 )
+
+# Legacy parity: marker set used by legacy common_utils.clean_company_name
+_CORE_REPLACE_STRING = set(_COMPANY_NAME_SUFFIXES_TO_REMOVE)
 
 
 @rule(
@@ -38,33 +56,43 @@ def trim_whitespace(value: Any) -> Any:
     description="公司名称规范化：去装饰字符、压缩多余空格、半角括号转全角、移除特定后缀",
 )
 def normalize_company_name(value: Any) -> Any:
-    """根据 AC2 要求规范化公司名称（含 legacy parity 后缀移除）。"""
+    """
+    Legacy-compatible公司名称规范化（对齐 legacy/annuity_hub/common_utils.clean_company_name）。
+    """
     if value is None:
         return None
 
     if not isinstance(value, str):
         return value
 
-    normalized = value.replace("\u3000", " ")
-
+    # Remove all whitespace (legacy behavior) and decorative chars
+    normalized = re.sub(r"\s+", "", value.replace("\u3000", " "))
     for char in _DECORATIVE_CHARS:
         normalized = normalized.replace(char, "")
 
-    # Normalize half-width parentheses to full-width (Chinese standard)
+    # Remove specific patterns from legacy cleaner
+    normalized = re.sub(r"及下属子企业", "", normalized)
+    normalized = re.sub(r"(?:\(团托\)|-[A-Za-z]+|-\d+|-养老|-福利)$", "", normalized)
+
+    # Remove core status markers from start/end (sorted desc by length)
+    sorted_core = sorted(_CORE_REPLACE_STRING, key=lambda s: -len(s))
+    for core_str in sorted_core:
+        pattern_start = rf'^([\(\（]?){re.escape(core_str)}([\)\）]?)(?=[^\u4e00-\u9fff]|$)'
+        normalized = re.sub(pattern_start, "", normalized)
+
+        pattern_end = rf'(?<![\u4e00-\u9fff])([\-\(\（]?){re.escape(core_str)}([\)\）]?)[\-\(\（\)\）]*$'
+        normalized = re.sub(pattern_end, "", normalized)
+
+    # Trim trailing hyphens/brackets
+    normalized = re.sub(r"[\-\(\（\)\）]+$", "", normalized)
+
+    # Convert full-width ASCII to half-width (legacy default to_fullwidth=False)
+    normalized = "".join(
+        [chr(ord(char) - 0xFEE0) if 0xFF01 <= ord(char) <= 0xFF5E else char for char in normalized]
+    )
+
+    # Normalize parentheses to full-width (Chinese standard)
     normalized = normalized.replace("(", "（").replace(")", "）")
-
-    # Collapse excessive whitespace between characters
-    normalized = " ".join(normalized.split())
-
-    # Legacy parity: remove specific suffixes from company names (recursive)
-    changed = True
-    while changed:
-        changed = False
-        for suffix in _COMPANY_NAME_SUFFIXES_TO_REMOVE:
-            if normalized.endswith(suffix):
-                normalized = normalized[: -len(suffix)]
-                changed = True
-                break
 
     return normalized
 

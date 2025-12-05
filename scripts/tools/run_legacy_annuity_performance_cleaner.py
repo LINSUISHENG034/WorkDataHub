@@ -7,7 +7,7 @@ from the real `AnnuityPerformanceCleaner` against curated Excel fixtures.
 This avoids legacy MySQL dependencies by containing only the transformation logic.
 
 Usage:
-    python scripts/tools/run_legacy_annuity_cleaner.py \
+    python scripts/tools/run_legacy_annuity_performance_cleaner.py \
         --inputs tests/fixtures/sample_data/annuity_subsets \
         --output tests/fixtures/annuity_performance/golden_legacy.parquet \
         --mappings tests/fixtures/sample_legacy_mappings.json
