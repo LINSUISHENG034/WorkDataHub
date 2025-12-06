@@ -112,6 +112,15 @@ def _drop_database(admin_dsn: str, db_name: str) -> None:
     conn.autocommit = True
     try:
         with conn.cursor() as cursor:
+            # Terminate any remaining connections to allow DROP DATABASE
+            cursor.execute(
+                """
+                SELECT pg_terminate_backend(pid)
+                FROM pg_stat_activity
+                WHERE datname = %s AND pid <> pg_backend_pid();
+                """,
+                (db_name,),
+            )
             cursor.execute(
                 sql.SQL("DROP DATABASE IF EXISTS {}").format(sql.Identifier(db_name))
             )

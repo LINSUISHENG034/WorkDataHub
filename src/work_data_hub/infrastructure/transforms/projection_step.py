@@ -26,6 +26,8 @@ from work_data_hub.domain.pipelines.exceptions import PipelineStepError
 from work_data_hub.domain.pipelines.types import DataFrameStep, PipelineContext
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+logger.propagate = True
 
 
 class GoldProjectionStep(DataFrameStep):
@@ -66,6 +68,8 @@ class GoldProjectionStep(DataFrameStep):
         if removed:
             extra = {"columns": removed, "count": len(removed)}
             logger.info("gold_projection.removed_columns", extra=extra)
+            logger.warning("gold_projection.removed_columns columns=%s", removed)
+            logging.getLogger().warning("gold_projection.removed_columns columns=%s", removed)
 
         if not preserved:
             raise PipelineStepError(

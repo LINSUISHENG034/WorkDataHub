@@ -174,15 +174,14 @@ def validate_bronze_dataframe(dataframe: pd.DataFrame, failure_threshold: float 
 def validate_gold_dataframe(
     dataframe: pd.DataFrame,
     project_columns: bool = True,
+    enforce_unique: bool = False,
 ) -> Tuple[pd.DataFrame, GoldValidationSummary]:
     """Validate gold layer DataFrame against schema.
-
-    Note: Duplicate composite keys are allowed since this is business detail data.
-    Each record represents a real transaction and should be preserved.
 
     Args:
         dataframe: Input DataFrame to validate
         project_columns: Whether to project columns to Gold schema
+        enforce_unique: If True, raise when composite key duplicates exist.
     """
     working_df = dataframe.copy(deep=True)
     removed_columns: List[str] = []
@@ -193,14 +192,30 @@ def validate_gold_dataframe(
         if removed_columns:
             working_df = working_df.drop(columns=removed_columns, errors="ignore")
 
+    # Ensure composite key columns exist for duplicate detection
+    if "组合代码" not in working_df.columns:
+        working_df["组合代码"] = None
+
     ensure_required_columns(GoldAnnuityIncomeSchema, working_df, GOLD_REQUIRED_COLUMNS, schema_name="Gold")
 
-    # Log duplicate keys for informational purposes only - do not reject or aggregate
     duplicate_mask = working_df.duplicated(subset=GOLD_COMPOSITE_KEY, keep=False)
     duplicate_keys: List[Tuple[str, str, str, str]] = []
     if duplicate_mask.any():
-        duplicate_count = duplicate_mask.sum()
-        # Just log, don't fail - business detail data can have duplicate composite keys
+        duplicate_keys = (
+            working_df.loc[duplicate_mask, list(GOLD_COMPOSITE_KEY)]
+            .apply(lambda row: tuple(row.values.tolist()), axis=1)
+            .drop_duplicates()
+            .tolist()
+        )
+        if enforce_unique:
+            failure_cases = pd.DataFrame(duplicate_keys, columns=list(GOLD_COMPOSITE_KEY))
+            raise_schema_error(
+                GoldAnnuityIncomeSchema,
+                working_df,
+                message="Gold validation failed: Composite PK has duplicates",
+                failure_cases=failure_cases,
+            )
+        # When enforce_unique is False, keep detail rows as-is (no aggregation/error)
 
     validated_df = apply_schema_with_lazy_mode(GoldAnnuityIncomeSchema, working_df)
 

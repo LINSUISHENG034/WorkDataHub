@@ -32,7 +32,6 @@ Example:
 
 from .base import Pipeline, TransformStep
 from .cleansing_step import CleansingStep
-from .projection_step import GoldProjectionStep
 from .standard_steps import (
     CalculationStep,
     coerce_numeric_columns,
@@ -55,6 +54,5 @@ __all__ = [
     "CleansingStep",
     "DropStep",
     "RenameStep",
-    "GoldProjectionStep",
     "coerce_numeric_columns",
 ]

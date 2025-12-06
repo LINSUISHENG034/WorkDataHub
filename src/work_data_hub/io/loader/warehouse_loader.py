@@ -352,6 +352,167 @@ class WarehouseLoader:
             duration_ms=duration_ms,
             execution_id=execution_id,
         )
+
+    def load_with_refresh(
+        self,
+        df: pd.DataFrame,
+        table: str,
+        schema: str = "public",
+        refresh_keys: Optional[List[str]] = None,
+    ) -> LoadResult:
+        """
+        Load DataFrame using DELETE + INSERT pattern (Legacy-compatible refresh mode).
+
+        This mode deletes all existing records matching the refresh_keys combinations
+        in the input data, then inserts all new records. Suitable for detail tables
+        where the same key combination can have multiple records.
+
+        Unlike UPSERT mode (load_dataframe with upsert_keys), this does NOT require
+        UNIQUE constraints on the database table.
+
+        Args:
+            df: DataFrame to load
+            table: Target table name
+            schema: Database schema (default: "public")
+            refresh_keys: Columns defining the refresh scope. All existing records
+                         matching unique combinations of these columns in the input
+                         data will be deleted before inserting new records.
+                         (Legacy equivalent: update_based_on_field)
+
+        Returns:
+            LoadResult with rows_inserted (new records) and rows_updated (deleted count)
+
+        Example:
+            # Refresh all records for specific month/business_type/plan_type combinations
+            loader.load_with_refresh(
+                df,
+                table="annuity_performance_NEW",
+                refresh_keys=["月度", "业务类型", "计划类型"],
+            )
+        """
+        if not isinstance(df, pd.DataFrame):
+            raise DataWarehouseLoaderError("load_with_refresh() requires a pandas DataFrame")
+
+        execution_id = uuid.uuid4().hex
+        if df.empty:
+            self._logger.info(
+                "database.load.skipped",
+                reason="empty_dataframe",
+                table=table,
+                schema=schema,
+                execution_id=execution_id,
+            )
+            return LoadResult(True, 0, 0, 0.0, execution_id)
+
+        if not refresh_keys:
+            raise DataWarehouseLoaderError("refresh_keys is required for load_with_refresh()")
+
+        # Validate refresh_keys exist in DataFrame
+        missing_keys = [k for k in refresh_keys if k not in df.columns]
+        if missing_keys:
+            raise DataWarehouseLoaderError(
+                f"refresh_keys {missing_keys} not found in DataFrame columns"
+            )
+
+        projected_df = self.project_columns(df, table, schema)
+        columns = list(projected_df.columns)
+
+        # Extract unique combinations of refresh_keys from input data
+        unique_combinations = df[refresh_keys].drop_duplicates().to_dict(orient="records")
+
+        conn = self._get_connection_with_retry()
+        start_time = time.perf_counter()
+        rows_deleted = 0
+        rows_inserted = 0
+
+        self._logger.info(
+            "database.refresh.started",
+            table=table,
+            schema=schema,
+            rows=len(projected_df.index),
+            refresh_keys=refresh_keys,
+            unique_combinations=len(unique_combinations),
+            execution_id=execution_id,
+        )
+
+        try:
+            with conn.cursor() as cursor:
+                # Step 1: DELETE existing records matching refresh_keys combinations
+                if unique_combinations:
+                    qualified_table = quote_qualified(schema, table)
+                    for combo in unique_combinations:
+                        conditions = []
+                        values = []
+                        for key in refresh_keys:
+                            val = combo[key]
+                            if val is None:
+                                conditions.append(f"{quote_ident(key)} IS NULL")
+                            else:
+                                conditions.append(f"{quote_ident(key)} = %s")
+                                values.append(val)
+
+                        delete_sql = f"DELETE FROM {qualified_table} WHERE {' AND '.join(conditions)}"
+                        cursor.execute(delete_sql, values)
+                        rows_deleted += cursor.rowcount if cursor.rowcount > 0 else 0
+
+                # Step 2: INSERT all new records
+                insert_query = self._build_insert_query(columns, table, schema, upsert_keys=None)
+                for batch in self._chunk_dataframe(projected_df):
+                    values = list(batch.itertuples(index=False, name=None))
+                    if not values:
+                        continue
+
+                    execute_values(
+                        cursor,
+                        insert_query,
+                        values,
+                        page_size=min(len(values), self.batch_size),
+                    )
+                    # For pure INSERT, all rows are inserted
+                    result_flags = cursor.fetchall()
+                    rows_inserted += len(result_flags)
+
+            conn.commit()
+        except Exception as exc:
+            try:
+                conn.rollback()
+            except Exception:  # pragma: no cover - best-effort rollback
+                pass
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            self._logger.error(
+                "database.refresh.failed",
+                table=table,
+                schema=schema,
+                execution_id=execution_id,
+                duration_ms=duration_ms,
+                error=str(exc),
+            )
+            raise DataWarehouseLoaderError(
+                f"Refresh load failed for {schema}.{table}: {exc}"
+            ) from exc
+        finally:
+            self._pool.putconn(conn)
+
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        self._logger.info(
+            "database.refresh.completed",
+            table=table,
+            schema=schema,
+            execution_id=execution_id,
+            rows_deleted=rows_deleted,
+            rows_inserted=rows_inserted,
+            duration_ms=duration_ms,
+        )
+        # Use rows_updated to report deleted count for consistency with LoadResult structure
+        return LoadResult(
+            success=True,
+            rows_inserted=rows_inserted,
+            rows_updated=rows_deleted,  # Repurpose as "rows affected by refresh"
+            duration_ms=duration_ms,
+            execution_id=execution_id,
+        )
+
+
 def quote_ident(name: str) -> str:
     """
     Quote PostgreSQL identifier with double quotes and escape internal quotes.

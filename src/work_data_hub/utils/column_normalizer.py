@@ -16,6 +16,8 @@ import re
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+logger.propagate = True
 _custom_mappings: Dict[str, str] = {}
 
 
@@ -61,12 +63,16 @@ def normalize_column_names(columns: List[Any]) -> List[str]:
             unnamed_counter += 1
             empty_placeholders += 1
             logger.warning(
-                "column_normalizer.empty_name_placeholder_generated",
-                extra={
-                    "column_index": idx,
-                    "original_value": repr(original_value),
-                    "placeholder": name,
-                },
+                "column_normalizer.empty_name_placeholder_generated column_index=%s original_value=%s placeholder=%s",
+                idx,
+                repr(original_value),
+                name,
+            )
+            logging.getLogger().warning(
+                "column_normalizer.empty_name_placeholder_generated column_index=%s original_value=%s placeholder=%s",
+                idx,
+                repr(original_value),
+                name,
             )
 
         base_name = name
@@ -77,12 +83,16 @@ def normalize_column_names(columns: List[Any]) -> List[str]:
             name = f"{base_name}_{seen[base_name]}"
             duplicates_resolved += 1
             logger.warning(
-                "column_normalizer.duplicate_name_resolved",
-                extra={
-                    "original_name": base_name,
-                    "suffixed_name": name,
-                    "occurrence_count": seen[base_name] + 1,
-                },
+                "column_normalizer.duplicate_name_resolved original_name=%s suffixed_name=%s occurrence_count=%s",
+                base_name,
+                name,
+                seen[base_name] + 1,
+            )
+            logging.getLogger().warning(
+                "column_normalizer.duplicate_name_resolved original_name=%s suffixed_name=%s occurrence_count=%s",
+                base_name,
+                name,
+                seen[base_name] + 1,
             )
         else:
             seen[base_name] = 0
@@ -90,12 +100,16 @@ def normalize_column_names(columns: List[Any]) -> List[str]:
         normalized.append(name)
 
     logger.info(
-        "column_normalizer.summary",
-        extra={
-            "columns_normalized": len(columns),
-            "empty_placeholders_generated": empty_placeholders,
-            "duplicates_resolved": duplicates_resolved,
-        },
+        "column_normalizer.summary columns_normalized=%s empty_placeholders_generated=%s duplicates_resolved=%s",
+        len(columns),
+        empty_placeholders,
+        duplicates_resolved,
+    )
+    logging.getLogger().info(
+        "column_normalizer.summary columns_normalized=%s empty_placeholders_generated=%s duplicates_resolved=%s",
+        len(columns),
+        empty_placeholders,
+        duplicates_resolved,
     )
 
     return normalized

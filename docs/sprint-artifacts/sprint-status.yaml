@@ -29,7 +29,7 @@
 # - SM typically drafts next story ONLY after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', dev reviews, then Dev moves to 'done'
 
-generated: 2025-12-02
+generated: 2025-12-06
 project: WorkDataHub
 project_key: WorkDataHub
 tracking_system: file-system
@@ -114,6 +114,19 @@ development_status:
   5.5-4-multi-domain-integration-test-and-optimization: done
   5.5-5-annuity-income-schema-correction: done
   epic-5.5-retrospective: optional
+
+  # Epic 5.6: Post-MVP Optimizations (Independent Stories)
+  # Added 2025-12-06 via Correct-Course workflow
+  # Contains 4 optimization items discovered during Epic 5.5 MVP validation
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-06-post-mvp-optimizations.md
+  # Stories drafted 2025-12-06 via create-story workflow
+  # Story 5.6.3 redesigned 2025-12-06 via Correct-Course workflow (UPSERT → REFRESH mode)
+  epic-5.6: done
+  5.6-1-dry-run-failed-records-export: done  # OPT-001: Export validation failures to CSV
+  5.6-2-normalize-company-name-bracket-fix: done  # OPT-002: HIGH PRIORITY - Fix bracket handling bug
+  5.6-3-domain-data-loading-mode-configuration: done  # OPT-003: Redesigned - REFRESH mode for detail tables
+  5.6-4-domain-development-guide: done  # OPT-004: Create domain development documentation (updated with loading modes)
+  epic-5.6-retrospective: optional
 
   # Epic 6: Company Enrichment Service
   epic-6: backlog

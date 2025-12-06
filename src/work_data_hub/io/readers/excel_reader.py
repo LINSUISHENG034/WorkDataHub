@@ -25,6 +25,8 @@ from work_data_hub.utils.column_normalizer import (
 )
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+logger.propagate = True
 
 
 @dataclass
@@ -343,7 +345,13 @@ class ExcelReader:
                 empty_count = original_count - len(df)
 
                 if empty_count > 0:
-                    logger.info(
+                    logger.warning(
+                        "excel_reading.empty_rows_skipped empty_rows_skipped=%s file_path=%s sheet_name=%s",
+                        empty_count,
+                        file_path,
+                        actual_sheet_name,
+                    )
+                    logging.getLogger().warning(
                         "excel_reading.empty_rows_skipped empty_rows_skipped=%s file_path=%s sheet_name=%s",
                         empty_count,
                         file_path,

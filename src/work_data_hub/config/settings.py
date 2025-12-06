@@ -108,7 +108,6 @@ class Settings(BaseSettings):
     """
 
     # Story 1.4 required fields (no prefix, uppercase names)
-    # NOTE: DATABASE_URL removed - use WDH_DATABASE__URI in .env instead
     ENVIRONMENT: Literal["dev", "staging", "prod"] = Field(
         default="dev",
         validation_alias="ENVIRONMENT",
@@ -252,11 +251,7 @@ class Settings(BaseSettings):
         1) WDH_DATABASE__URI (canonical, from .env)
         2) WDH_DATABASE_URI (alternate, from .env)
         3) Construct from individual WDH_DATABASE_* components (from .env)
-
-        Note: System environment variable DATABASE_URL is intentionally ignored
-        to prevent configuration conflicts.
         """
-        # Only read from .env file via pydantic settings
         if self.database_uri:
             return self.database_uri
         return self.database.get_connection_string()

@@ -321,6 +321,10 @@ When creating a **brownfield PRD** for new features:
 - **Sample Trustee Performance:** Reference source code (`domain/sample_trustee_performance/`)
 - **Pipeline Framework:** Read [Pipeline Integration Guide](./architecture-patterns/pipeline-integration-guide.md)
 
+### For Creating New Domains
+
+- **[Domain Development Guide](./guides/domain-development-guide.md)** - Comprehensive guide for implementing new data domains, based on Epic 5.5 learnings
+
 ---
 
 ## 🔗 External Resources

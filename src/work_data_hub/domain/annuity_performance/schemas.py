@@ -110,7 +110,6 @@ GoldAnnuitySchema = pa.DataFrameSchema(  # type: ignore[no-untyped-call]
     },
     strict=True,
     coerce=True,
-    unique=GOLD_COMPOSITE_KEY,
 )
 
 
@@ -184,7 +183,7 @@ def validate_bronze_dataframe(dataframe: pd.DataFrame, failure_threshold: float 
 def validate_gold_dataframe(
     dataframe: pd.DataFrame,
     project_columns: bool = True,
-    aggregate_duplicates: bool = True,
+    aggregate_duplicates: bool = False,
 ) -> Tuple[pd.DataFrame, GoldValidationSummary]:
     """Validate gold layer DataFrame against schema.
 
@@ -192,7 +191,7 @@ def validate_gold_dataframe(
         dataframe: Input DataFrame to validate
         project_columns: Whether to project columns to Gold schema
         aggregate_duplicates: If True, aggregate duplicate keys by summing numeric fields.
-                            If False, raise error on duplicates.
+                            If False, retain all detail rows (no aggregation, no error).
     """
     working_df = dataframe.copy(deep=True)
     removed_columns: List[str] = []
@@ -202,6 +201,10 @@ def validate_gold_dataframe(
         removed_columns = [column for column in working_df.columns if column not in gold_cols]
         if removed_columns:
             working_df = working_df.drop(columns=removed_columns, errors="ignore")
+
+    # Ensure composite key columns exist for duplicate detection
+    if "组合代码" not in working_df.columns:
+        working_df["组合代码"] = None
 
     ensure_required_columns(GoldAnnuitySchema, working_df, GOLD_REQUIRED_COLUMNS, schema_name="Gold")
 
@@ -227,14 +230,7 @@ def validate_gold_dataframe(
                     agg_dict[col] = "first"  # Take first value for non-numeric columns
 
             working_df = working_df.groupby(list(GOLD_COMPOSITE_KEY), as_index=False).agg(agg_dict)
-        else:
-            failure_cases = pd.DataFrame(duplicate_keys, columns=list(GOLD_COMPOSITE_KEY))
-            raise_schema_error(
-                GoldAnnuitySchema,
-                working_df,
-                message=(f"Gold validation failed: Composite PK has duplicates {duplicate_keys[:5]}"),
-                failure_cases=failure_cases,
-            )
+        # When aggregate_duplicates is False, keep detail rows as-is (no error/aggregation)
 
     validated_df = apply_schema_with_lazy_mode(GoldAnnuitySchema, working_df)
 

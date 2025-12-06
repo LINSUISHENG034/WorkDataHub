@@ -394,8 +394,9 @@ class TestGoldSchemaValidation:
 
     def test_duplicate_composite_key(self):
         df = pd.concat([_build_gold_df()] * 2, ignore_index=True)
-        with pytest.raises(SchemaError, match="Composite PK"):
-            validate_gold_dataframe(df)
+        validated, summary = validate_gold_dataframe(df, aggregate_duplicates=False)
+        assert len(validated) == 2  # detail rows retained
+        assert summary.duplicate_keys  # duplicates are reported, not rejected
 
     def test_pipeline_step_records_metadata(self):
         step = GoldSchemaValidationStep()

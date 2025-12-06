@@ -9,6 +9,7 @@ import pandas as pd
 import structlog
 
 from work_data_hub.domain.pipelines.types import DomainPipelineResult, PipelineContext
+from work_data_hub.infrastructure.validation import export_error_csv
 
 from .helpers import (
     FileDiscoveryProtocol,
@@ -30,6 +31,30 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger(__name__)
 
+# =============================================================================
+# Data Loading Configuration
+# =============================================================================
+# This domain uses REFRESH mode (DELETE + INSERT) because it contains detail
+# records (明细数据) where the same key combination can have multiple rows.
+#
+# UPSERT mode (ON CONFLICT DO UPDATE) is NOT suitable for detail tables.
+# UPSERT is only appropriate for aggregate tables with unique key combinations.
+#
+# Legacy equivalent: annuity_mapping.update_based_on_field = "月度"
+# Updated to: "月度+业务类型+计划类型" per Sprint Change Proposal 2025-12-06
+# =============================================================================
+
+# Enable/disable UPSERT mode (requires UNIQUE constraint on upsert_keys)
+ENABLE_UPSERT_MODE = False  # Detail table - use refresh mode instead
+
+# UPSERT keys (only used when ENABLE_UPSERT_MODE = True)
+# For aggregate tables with unique records per key combination
+DEFAULT_UPSERT_KEYS: Optional[List[str]] = ["月度", "计划号", "组合代码", "company_id"]
+
+# REFRESH keys (used when ENABLE_UPSERT_MODE = False)
+# Defines scope for DELETE before INSERT (Legacy: update_based_on_field)
+DEFAULT_REFRESH_KEYS = ["月度", "业务类型", "计划类型"]
+
 
 def process_annuity_income(
     month: str,
@@ -43,6 +68,7 @@ def process_annuity_income(
     sync_lookup_budget: int = 0,
     export_unknown_names: bool = True,
     upsert_keys: Optional[List[str]] = None,
+    refresh_keys: Optional[List[str]] = None,
 ) -> DomainPipelineResult:
     """
     Process AnnuityIncome domain data from bronze to gold layer.
@@ -105,12 +131,26 @@ def process_annuity_income(
         export_unknown_names=export_unknown_names,
     )
     dataframe = _records_to_dataframe(processing.records)
-    load_result = warehouse_loader.load_dataframe(
-        dataframe,
-        table=table_name,
-        schema=schema,
-        upsert_keys=upsert_keys or ["月度", "计划号", "组合代码", "company_id"],
-    )
+
+    # Choose loading mode based on configuration
+    if ENABLE_UPSERT_MODE:
+        # UPSERT mode: ON CONFLICT DO UPDATE (for aggregate tables)
+        actual_upsert_keys = upsert_keys if upsert_keys is not None else DEFAULT_UPSERT_KEYS
+        load_result = warehouse_loader.load_dataframe(
+            dataframe,
+            table=table_name,
+            schema=schema,
+            upsert_keys=actual_upsert_keys,
+        )
+    else:
+        # REFRESH mode: DELETE + INSERT (for detail tables)
+        actual_refresh_keys = refresh_keys if refresh_keys is not None else DEFAULT_REFRESH_KEYS
+        load_result = warehouse_loader.load_with_refresh(
+            dataframe,
+            table=table_name,
+            schema=schema,
+            refresh_keys=actual_refresh_keys,
+        )
     duration_ms = (time.perf_counter() - start_time) * 1000
     rows_failed = max(discovery_result.row_count - len(processing.records), 0)
     rows_loaded = load_result.rows_inserted + load_result.rows_updated
@@ -200,7 +240,8 @@ def process_with_enrichment(
         extra={"data_source": data_source},
     )
     start_time = time.perf_counter()
-    result_df = pipeline.execute(pd.DataFrame(rows), context)
+    input_df = pd.DataFrame(rows)
+    result_df = pipeline.execute(input_df.copy(), context)
 
     # Story 5.5.5: Enforce Gold schema validation (checks uniqueness of composite key)
     # This catches issues that Pydantic row-by-row validation misses
@@ -216,6 +257,27 @@ def process_with_enrichment(
                 dropped=dropped_count,
                 total=len(rows),
                 rate=drop_rate,
+            )
+        # Export failed rows to CSV for debugging (Story 5.6.1)
+        success_pairs = {(r.计划号, getattr(r, "组合代码", None)) for r in records}
+        if {"计划号", "组合代码"}.issubset(input_df.columns):
+            key_series = pd.Series(list(zip(input_df["计划号"], input_df["组合代码"])))
+            failed_df = input_df[~key_series.isin(success_pairs)]
+        elif "计划号" in input_df.columns:
+            success_codes = {pair[0] for pair in success_pairs}
+            failed_df = input_df[~input_df["计划号"].isin(success_codes)]
+        else:
+            failed_df = input_df
+        if not failed_df.empty:
+            csv_path = export_error_csv(
+                failed_df,
+                filename_prefix=f"failed_records_{Path(data_source).stem}",
+                output_dir=Path("logs"),
+            )
+            logger.bind(domain="annuity_income", step="process_with_enrichment").info(
+                "Exported failed records to CSV",
+                csv_path=str(csv_path),
+                count=len(failed_df),
             )
     csv_path = export_unknown_names_csv(
         unknown_names,
