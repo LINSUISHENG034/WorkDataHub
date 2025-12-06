@@ -16,8 +16,8 @@ import pytest
 import yaml
 from dagster import build_op_context
 
-from src.work_data_hub.io.loader.warehouse_loader import DataWarehouseLoaderError
-from src.work_data_hub.orchestration.ops import (
+from work_data_hub.io.loader.warehouse_loader import DataWarehouseLoaderError
+from work_data_hub.orchestration.ops import (
     BackfillRefsConfig,
     DiscoverFilesConfig,
     LoadConfig,
@@ -457,7 +457,7 @@ class TestLoadOp:
         processed_rows = [{"col": "value", "id": 1}]  # Add missing id field
 
         # Mock psycopg2 module to be None (simulating ImportError at module level)
-        with patch("src.work_data_hub.orchestration.ops.psycopg2", None):
+        with patch("work_data_hub.orchestration.ops.psycopg2", None):
             context = build_op_context()
             config = LoadConfig(plan_only=False, table="test_table", pk=["id"])
 
@@ -473,7 +473,7 @@ class TestLoadOp:
         processed_rows = [{"col": "value"}]
 
         with patch(
-            "src.work_data_hub.orchestration.ops.psycopg2", create=True
+            "work_data_hub.orchestration.ops.psycopg2", create=True
         ) as mock_psycopg2:
             mock_psycopg2.connect.side_effect = Exception("Connection refused")
 

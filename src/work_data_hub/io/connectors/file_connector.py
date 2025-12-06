@@ -94,8 +94,22 @@ class DataSourceConnector:
         """
         Lazily resolve settings so tests can patch get_settings easily.
         """
-        if self.settings is None:
-            self.settings = settings_module.get_settings()
+        if self.settings is not None:
+            return self.settings
+
+        try:
+            getter = settings_module.get_settings  # type: ignore[attr-defined]
+        except AttributeError:
+            getter = None
+
+        if callable(getter):
+            self.settings = getter()
+        elif hasattr(settings_module, "data_base_dir"):
+            # Fallback: settings_module may already be a Settings instance in tests
+            self.settings = settings_module
+        else:
+            raise AttributeError("Configuration settings unavailable")
+
         return self.settings
 
     def discover(self, domain: Optional[str] = None) -> List[DiscoveredFile]:

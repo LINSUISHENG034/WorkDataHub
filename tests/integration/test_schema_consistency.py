@@ -141,7 +141,11 @@ def get_test_engine() -> Engine | None:
         url = settings.get_database_connection_string()
         if "sqlite" in url.lower():
             return None
-        return create_engine(url)
+        engine = create_engine(url)
+        # Verify connectivity; skip if unreachable
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return engine
     except Exception:
         return None
 
@@ -152,6 +156,11 @@ def db_engine():
     engine = get_test_engine()
     if engine is None:
         pytest.skip("PostgreSQL database not available for schema consistency tests")
+
+    inspector = inspect(engine)
+    tables = {t.lower() for t in inspector.get_table_names()}
+    if "annuity_performance_new" not in tables:
+        pytest.skip("Required table annuity_performance_new not present; run migrations to enable schema checks")
     return engine
 
 

@@ -142,7 +142,7 @@ class TestDataSourceConnector:
     @pytest.mark.skip(
         reason="Test depends on deprecated sample_trustee_performance domain - pending Epic 5"
     )
-    @patch("src.work_data_hub.config.settings.get_settings")
+    @patch("work_data_hub.config.settings.get_settings")
     def test_discover_sample_trustee_performance_files(
         self, mock_settings, config_file, test_data_dir
     ):
@@ -172,7 +172,7 @@ class TestDataSourceConnector:
             if file.month:
                 assert 1 <= file.month <= 12
 
-    @patch("src.work_data_hub.config.settings.get_settings")
+    @patch("work_data_hub.config.settings.get_settings")
     def test_discover_ignores_temp_files(
         self, mock_settings, config_file, test_data_dir
     ):
@@ -188,7 +188,7 @@ class TestDataSourceConnector:
         assert not any(".eml" in p for p in paths)
         assert not any("~$" in p for p in paths)
 
-    @patch("src.work_data_hub.config.settings.get_settings")
+    @patch("work_data_hub.config.settings.get_settings")
     def test_discover_excludes_directories(
         self, mock_settings, config_file, test_data_dir
     ):
@@ -205,7 +205,7 @@ class TestDataSourceConnector:
     @pytest.mark.skip(
         reason="Test depends on deprecated trustee_performance domain config - pending Epic 5"
     )
-    @patch("src.work_data_hub.config.settings.get_settings")
+    @patch("work_data_hub.config.settings.get_settings")
     def test_latest_by_year_month_selection(self, mock_settings, config_file, tmp_path):
         """Test selection of latest version by year/month."""
         # Create test files with different dates
@@ -231,7 +231,7 @@ class TestDataSourceConnector:
     @pytest.mark.skip(
         reason="Test depends on deprecated trustee_performance domain config - pending Epic 5"
     )
-    @patch("src.work_data_hub.config.settings.get_settings")
+    @patch("work_data_hub.config.settings.get_settings")
     def test_latest_by_mtime_fallback(self, mock_settings, config_file, tmp_path):
         """Test fallback to mtime when year/month not available."""
         # Create files without date patterns
@@ -284,7 +284,7 @@ class TestDataSourceConnector:
     @pytest.mark.skip(
         reason="Test depends on deprecated trustee_performance domain config - pending Epic 5"
     )
-    @patch("src.work_data_hub.config.settings.get_settings")
+    @patch("work_data_hub.config.settings.get_settings")
     def test_discover_all_domains(self, mock_settings, config_file, tmp_path):
         """Test discovery across all domains."""
         # Create files for different domains
@@ -301,7 +301,7 @@ class TestDataSourceConnector:
         assert "trustee_performance" in domains
         assert "simple_test" in domains
 
-    @patch("src.work_data_hub.config.settings.get_settings")
+    @patch("work_data_hub.config.settings.get_settings")
     def test_discover_empty_directory(self, mock_settings, config_file, tmp_path):
         """Test discovery in empty directory."""
         mock_settings.return_value.data_base_dir = str(tmp_path)
@@ -311,7 +311,7 @@ class TestDataSourceConnector:
 
         assert files == []
 
-    @patch("src.work_data_hub.config.settings.get_settings")
+    @patch("work_data_hub.config.settings.get_settings")
     def test_discover_nonexistent_directory(self, mock_settings, config_file):
         """Test discovery with non-existent base directory."""
         mock_settings.return_value.data_base_dir = "/nonexistent/directory"
@@ -328,7 +328,7 @@ class TestDataSourceConnector:
         test_file = tmp_path / "2024_11_受托业绩.xlsx"
         test_file.write_text("test content")
 
-        with patch("src.work_data_hub.config.settings.get_settings") as mock_settings:
+        with patch("work_data_hub.config.settings.get_settings") as mock_settings:
             mock_settings.return_value.data_base_dir = str(tmp_path)
 
             connector = DataSourceConnector(config_path=config_file)
@@ -344,7 +344,7 @@ class TestDataSourceConnector:
     @pytest.mark.skip(
         reason="Test depends on deprecated trustee_performance domain config - pending Epic 5"
     )
-    @patch("src.work_data_hub.config.settings.get_settings")
+    @patch("work_data_hub.config.settings.get_settings")
     def test_latest_by_year_month_and_version_selection(self, mock_settings, tmp_path):
         """Test selection of latest version by year/month with version-aware strategy."""
         # Create versioned directory structure with Chinese filenames

@@ -16,22 +16,19 @@ from work_data_hub.config.settings import Settings, get_settings
 
 
 @pytest.mark.unit
-def test_missing_database_url_raises_error(monkeypatch):
-    """Test that missing DATABASE_URL raises ValidationError (AC-2, AC-4)."""
-    # Clear the lru_cache to ensure fresh Settings instance
+def test_database_url_defaults_from_env(monkeypatch):
+    """Settings should derive DB connection from .env/.env vars without DATABASE_URL."""
     get_settings.cache_clear()
 
-    # Remove DATABASE_URL from environment
+    # Ensure legacy env vars are absent; rely on defaults/WDH_* only
     monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("WDH_DATABASE__URI", raising=False)
 
-    # Attempt to create Settings without DATABASE_URL should raise ValidationError
-    with pytest.raises(ValidationError) as exc_info:
-        Settings()
+    settings_instance = Settings()
+    # Default connection string should be PostgreSQL-style (built from components)
+    db_url = settings_instance.get_database_connection_string()
+    assert db_url.startswith("postgresql://")
 
-    # Verify error message mentions DATABASE_URL
-    assert "DATABASE_URL" in str(exc_info.value)
-
-    # Cleanup
     get_settings.cache_clear()
 
 
@@ -43,15 +40,14 @@ def test_production_requires_postgresql(monkeypatch):
 
     # Set ENVIRONMENT to prod with non-PostgreSQL URL
     monkeypatch.setenv("ENVIRONMENT", "prod")
-    monkeypatch.setenv("DATABASE_URL", "sqlite:///test.db")
+    monkeypatch.setenv("WDH_DATABASE__URI", "sqlite:///test.db")
 
-    # Should raise ValidationError for non-PostgreSQL URL in production
-    with pytest.raises(ValidationError) as exc_info:
+    # Should raise ValueError for non-PostgreSQL URL in production
+    with pytest.raises(ValueError) as exc_info:
         Settings()
 
-    # Verify error message mentions PostgreSQL requirement
     error_msg = str(exc_info.value)
-    assert "PostgreSQL" in error_msg or "postgresql://" in error_msg
+    assert "PostgreSQL" in error_msg
 
     # Cleanup
     get_settings.cache_clear()
@@ -65,12 +61,14 @@ def test_production_accepts_postgresql_url(monkeypatch):
 
     # Set ENVIRONMENT to prod with valid PostgreSQL URL
     monkeypatch.setenv("ENVIRONMENT", "prod")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/db")
+    monkeypatch.setenv("WDH_DATABASE__URI", "postgresql://user:pass@localhost:5432/db")
 
     # Should not raise any error
     settings_instance = Settings()
     assert settings_instance.ENVIRONMENT == "prod"
-    assert settings_instance.DATABASE_URL.startswith("postgresql://")
+    assert settings_instance.get_database_connection_string().startswith(
+        "postgresql://"
+    )
 
     # Cleanup
     get_settings.cache_clear()
@@ -82,8 +80,8 @@ def test_settings_singleton(monkeypatch):
     # Clear cache first to start fresh
     get_settings.cache_clear()
 
-    # Set required DATABASE_URL
-    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/db")
+    # Set required DB URI
+    monkeypatch.setenv("WDH_DATABASE__URI", "postgresql://user:pass@localhost:5432/db")
 
     # Get settings instance twice
     settings1 = get_settings()
@@ -104,7 +102,7 @@ def test_optional_fields_defaults(monkeypatch):
     get_settings.cache_clear()
 
     # Set only required field
-    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/db")
+    monkeypatch.setenv("WDH_DATABASE__URI", "postgresql://user:pass@localhost:5432/db")
 
     # Clear optional fields to test defaults
     optional_keys = [
@@ -139,27 +137,29 @@ def test_settings_model_structure(monkeypatch):
     get_settings.cache_clear()
 
     # Set required field
-    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/db")
+    monkeypatch.setenv("WDH_DATABASE_URI", "postgresql://user:pass@localhost:5432/db")
 
     settings_instance = Settings()
 
-    # Verify all required fields exist (AC-1, AC-2, AC-3)
-    assert hasattr(settings_instance, "DATABASE_URL")
+    # Verify key fields exist (AC-1, AC-2, AC-3)
     assert hasattr(settings_instance, "ENVIRONMENT")
     assert hasattr(settings_instance, "LOG_LEVEL")
     assert hasattr(settings_instance, "DAGSTER_HOME")
     assert hasattr(settings_instance, "MAX_WORKERS")
     assert hasattr(settings_instance, "DB_POOL_SIZE")
     assert hasattr(settings_instance, "DB_BATCH_SIZE")
+    assert hasattr(settings_instance, "database_host")
+    assert hasattr(settings_instance, "database_uri")
+    assert hasattr(settings_instance, "get_database_connection_string")
 
     # Verify field types
-    assert isinstance(settings_instance.DATABASE_URL, str)
     assert settings_instance.ENVIRONMENT in ["dev", "staging", "prod"]
     assert isinstance(settings_instance.LOG_LEVEL, str)
     assert isinstance(settings_instance.DAGSTER_HOME, str)
     assert isinstance(settings_instance.MAX_WORKERS, int)
     assert isinstance(settings_instance.DB_POOL_SIZE, int)
     assert isinstance(settings_instance.DB_BATCH_SIZE, int)
+    assert isinstance(settings_instance.database_host, str)
 
     # Cleanup
     get_settings.cache_clear()
@@ -172,7 +172,7 @@ def test_settings_import_patterns(monkeypatch):
     get_settings.cache_clear()
 
     # Set required field
-    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/db")
+    monkeypatch.setenv("WDH_DATABASE__URI", "postgresql://user:pass@localhost:5432/db")
 
     # Test factory function import - using direct import from settings module
     from work_data_hub.config.settings import get_settings as imported_get_settings
@@ -195,7 +195,7 @@ def test_logging_integration(monkeypatch):
     get_settings.cache_clear()
 
     # Set custom log level
-    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/db")
+    monkeypatch.setenv("WDH_DATABASE__URI", "postgresql://user:pass@localhost:5432/db")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
 
     # The logging module should use settings.LOG_LEVEL
@@ -212,7 +212,7 @@ def test_environment_values_accepted(monkeypatch):
     """Test that all valid ENVIRONMENT values are accepted (AC-2)."""
     get_settings.cache_clear()
 
-    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/db")
+    monkeypatch.setenv("WDH_DATABASE__URI", "postgresql://user:pass@localhost:5432/db")
 
     for env_value in ["dev", "staging", "prod"]:
         monkeypatch.setenv("ENVIRONMENT", env_value)
@@ -243,17 +243,17 @@ def test_custom_validator_postgresql(monkeypatch):
     ]
 
     for url in valid_urls:
-        monkeypatch.setenv("DATABASE_URL", url)
+        monkeypatch.setenv("WDH_DATABASE__URI", url)
         monkeypatch.setenv("ENVIRONMENT", "prod")
         settings_instance = Settings()
-        assert settings_instance.DATABASE_URL == url
+        assert settings_instance.get_database_connection_string() == url
         get_settings.cache_clear()
 
     # Test that non-prod environments accept non-PostgreSQL URLs
     monkeypatch.setenv("ENVIRONMENT", "dev")
-    monkeypatch.setenv("DATABASE_URL", "sqlite:///test.db")
+    monkeypatch.setenv("WDH_DATABASE__URI", "sqlite:///test.db")
     settings_instance = Settings()
-    assert settings_instance.DATABASE_URL == "sqlite:///test.db"
+    assert settings_instance.get_database_connection_string() == "sqlite:///test.db"
 
     # Cleanup
     get_settings.cache_clear()

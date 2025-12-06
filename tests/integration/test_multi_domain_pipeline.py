@@ -169,6 +169,18 @@ class StubWarehouseLoader:
             execution_id=f"exec-{table}",
         )
 
+    def load_with_refresh(  # type: ignore[override]
+        self,
+        df: pd.DataFrame,
+        table: str,
+        schema: str = "public",
+        refresh_keys: Optional[List[str]] = None,
+    ) -> LoadResult:
+        # Reuse load_dataframe semantics for refresh mode
+        return self.load_dataframe(
+            df, table=table, schema=schema, upsert_keys=refresh_keys
+        )
+
 
 def create_mock_annuity_performance_data(
     month: str = DEFAULT_MONTH, rows: int = 1000
@@ -367,9 +379,9 @@ class TestMultiDomainPipeline:
 
         # Loader captured two distinct tables with domain-specific upsert keys
         assert loader.calls[0]["table"] == "annuity_performance_NEW"
-        assert loader.calls[0]["upsert_keys"] == ["月度", "计划代码", "company_id"]
+        assert loader.calls[0]["upsert_keys"] == ["月度", "业务类型", "计划类型"]
         assert loader.calls[1]["table"] == "annuity_income_NEW"
-        assert loader.calls[1]["upsert_keys"] == ["月度", "计划号", "company_id"]
+        assert loader.calls[1]["upsert_keys"] == ["月度", "业务类型", "计划类型"]
 
         # Column sets remain domain-specific
         perf_columns = set(loader.calls[0]["df"].columns)

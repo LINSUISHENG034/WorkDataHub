@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 
 from work_data_hub.domain.annuity_performance.service import (
+    DEFAULT_REFRESH_KEYS,
     process_annuity_performance,
 )
 from work_data_hub.domain.pipelines.types import DomainPipelineResult
@@ -77,6 +78,16 @@ class StubWarehouseLoader:
         result_idx = min(call_index - 1, len(self.results) - 1)
         return self.results[result_idx]
 
+    def load_with_refresh(  # type: ignore[override]
+        self,
+        df: pd.DataFrame,
+        table: str,
+        schema: str = "public",
+        refresh_keys: Optional[List[str]] = None,
+    ) -> LoadResult:
+        """Alias to mirror refresh-mode loader contract used by the pipeline."""
+        return self.load_dataframe(df, table=table, schema=schema, upsert_keys=refresh_keys)
+
 
 def _build_source_dataframe(valid: int = 4, invalid: int = 1) -> pd.DataFrame:
     """Create a deterministic DataFrame resembling normalized Excel rows."""
@@ -143,7 +154,7 @@ class TestProcessAnnuityPerformance:
         assert result.rows_failed == 1  # 1 intentionally invalid row dropped
         assert result.metrics["discovery"]["row_count"] == len(df.index)
         assert loader.calls[0]["table"] == "annuity_performance_NEW"
-        assert loader.calls[0]["upsert_keys"] == ["月度", "计划代码", "company_id"]
+        assert loader.calls[0]["upsert_keys"] == DEFAULT_REFRESH_KEYS
 
     def test_idempotent_re_run_tracks_updates(self):
         df = _build_source_dataframe()

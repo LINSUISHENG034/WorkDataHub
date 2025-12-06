@@ -15,7 +15,7 @@ from typing import Literal, Optional
 
 import structlog
 import yaml
-from pydantic import Field, model_validator
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from work_data_hub.infrastructure.settings.data_source_schema import (
@@ -242,7 +242,9 @@ class Settings(BaseSettings):
         default="wdh_dev", description="Database schema for all domains"
     )
     database_uri: Optional[str] = Field(
-        default=None, description="Complete database URI"
+        default=None,
+        description="Complete database URI",
+        validation_alias=AliasChoices("DATABASE__URI", "DATABASE_URI"),
     )
 
     def get_database_connection_string(self) -> str:
@@ -255,9 +257,43 @@ class Settings(BaseSettings):
         2) WDH_DATABASE_URI (alternate, from .env)
         3) Construct from individual WDH_DATABASE_* components (from .env)
         """
+        env_uri = os.getenv("WDH_DATABASE__URI") or os.getenv("WDH_DATABASE_URI")
+        if env_uri:
+            return env_uri
+
         if self.database_uri:
             return self.database_uri
         return self.database.get_connection_string()
+
+    @model_validator(mode="before")
+    @classmethod
+    def _inject_database_uri(cls, values: dict[str, object]) -> dict[str, object]:
+        """
+        Ensure database_uri honors both environment and .env (double-underscore) keys.
+
+        Priority:
+        1) WDH_DATABASE__URI environment variable
+        2) WDH_DATABASE_URI environment variable
+        3) .env file entries for either name (if not already set)
+        """
+        env_uri = os.getenv("WDH_DATABASE__URI") or os.getenv("WDH_DATABASE_URI")
+
+        if not env_uri and isinstance(SETTINGS_ENV_FILE, Path) and SETTINGS_ENV_FILE.exists():
+            for line in SETTINGS_ENV_FILE.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.startswith("WDH_DATABASE__URI="):
+                    env_uri = line.split("=", 1)[1].strip()
+                    break
+                if line.startswith("WDH_DATABASE_URI="):
+                    env_uri = line.split("=", 1)[1].strip()
+                    break
+
+        if env_uri and "database_uri" not in values:
+            values["database_uri"] = env_uri
+
+        return values
 
     @property
     def database(self) -> DatabaseSettings:
