@@ -13,6 +13,11 @@ Usage:
     >>> settings = get_settings()
 """
 
+from work_data_hub.config.mapping_loader import (
+    PRIORITY_LEVELS,
+    get_flat_overrides,
+    load_company_id_overrides,
+)
 from work_data_hub.config.settings import Settings, get_settings
 
 # Pre-instantiated singleton for convenient module-level import
@@ -25,4 +30,11 @@ except Exception:
     # settings will be None and users should call get_settings() directly
     settings = None  # type: ignore
 
-__all__ = ["Settings", "get_settings", "settings"]
+__all__ = [
+    "Settings",
+    "get_settings",
+    "settings",
+    "load_company_id_overrides",
+    "get_flat_overrides",
+    "PRIORITY_LEVELS",
+]

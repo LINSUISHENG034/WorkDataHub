@@ -1,0 +1,10 @@
+# Company ID Overrides - Hardcoded Special Cases (Priority 3)
+# Story 6.3: Internal Mapping Tables and Database Schema
+#
+# Format: special_key: company_id
+# Example:
+#   "SPECIAL_CASE_001": "600000001"
+#
+# This file contains hardcoded mappings for special cases
+# that don't fit into other priority categories.
+# Use sparingly - prefer structured mappings when possible.

@@ -1,0 +1,10 @@
+# Company ID Overrides - Customer Name Mappings (Priority 4)
+# Story 6.3: Internal Mapping Tables and Database Schema
+#
+# Format: customer_name: company_id
+# Example:
+#   "中国平安": "600866980"
+#   "平安保险": "600866980"
+#
+# This file maps customer names to company IDs.
+# Names should be normalized (trimmed, consistent encoding).

@@ -16,6 +16,11 @@ Architecture Reference:
 """
 
 from .company_id_resolver import CompanyIdResolver
+from .mapping_repository import (
+    CompanyMappingRepository,
+    InsertBatchResult,
+    MatchResult,
+)
 from .normalizer import generate_temp_company_id, normalize_for_temp_id
 from .types import (
     ResolutionResult,
@@ -26,6 +31,9 @@ from .types import (
 
 __all__ = [
     "CompanyIdResolver",
+    "CompanyMappingRepository",
+    "MatchResult",
+    "InsertBatchResult",
     "ResolutionStrategy",
     "ResolutionStatistics",
     "ResolutionResult",
