@@ -18,7 +18,6 @@ from work_data_hub.domain.annuity_performance.constants import (
     LEGACY_COLUMNS_TO_DELETE,
 )
 from work_data_hub.domain.annuity_performance.schemas import (
-    GoldAnnuitySchema,
     gold_summary_to_dict,
     validate_gold_dataframe,
 )
@@ -45,7 +44,8 @@ class GoldProjectionStep(DataFrameStep):
         self._allowed_columns_provider = allowed_columns_provider
         self._allowed_columns: Optional[List[str]] = None
         self.legacy_columns_to_remove = (
-            list(legacy_columns_to_remove) if legacy_columns_to_remove is not None
+            list(legacy_columns_to_remove)
+            if legacy_columns_to_remove is not None
             else list(LEGACY_COLUMNS_TO_DELETE)
         )
 
@@ -69,7 +69,9 @@ class GoldProjectionStep(DataFrameStep):
             extra = {"columns": removed, "count": len(removed)}
             logger.info("gold_projection.removed_columns", extra=extra)
             logger.warning("gold_projection.removed_columns columns=%s", removed)
-            logging.getLogger().warning("gold_projection.removed_columns columns=%s", removed)
+            logging.getLogger().warning(
+                "gold_projection.removed_columns columns=%s", removed
+            )
 
         if not preserved:
             raise PipelineStepError(

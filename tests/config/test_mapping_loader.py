@@ -143,7 +143,9 @@ class TestLoadYamlMapping:
 
     def test_load_yaml_mapping_invalid_value_types(self, invalid_value_types_file):
         """Test error with invalid value types."""
-        with pytest.raises(MappingLoaderError, match="Mapping value must be string or int"):
+        with pytest.raises(
+            MappingLoaderError, match="Mapping value must be string or int"
+        ):
             load_yaml_mapping(invalid_value_types_file)
 
     def test_load_yaml_mapping_empty_file(self, tmp_path):
@@ -246,7 +248,8 @@ class TestSpecificLoaderFunctions:
             raise MappingLoaderError(f"Mapping file not found: {path}")
 
         monkeypatch.setattr(
-            "src.work_data_hub.infrastructure.settings.loader.load_yaml_mapping", mock_load_yaml_mapping
+            "src.work_data_hub.infrastructure.settings.loader.load_yaml_mapping",
+            mock_load_yaml_mapping,
         )
 
         with pytest.raises(MappingLoaderError, match="Mapping file not found"):
@@ -370,9 +373,7 @@ class TestPortabilityAndEnvironmentOverride:
         mappings_dir = get_mappings_dir()
 
         # Should be project root / data / mappings (Story 5.3)
-        expected_path = (
-            Path(__file__).parent.parent.parent / "data" / "mappings"
-        )
+        expected_path = Path(__file__).parent.parent.parent / "data" / "mappings"
 
         # Check that both paths exist and resolve to same location
         assert mappings_dir.exists()

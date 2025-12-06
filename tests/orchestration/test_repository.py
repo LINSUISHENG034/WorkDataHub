@@ -13,7 +13,9 @@ from dagster import Definitions, JobDefinition, ScheduleDefinition, SensorDefini
 
 from src.work_data_hub.orchestration.repository import defs
 
-pytestmark = pytest.mark.skip(reason="Tests depend on deprecated trustee_performance jobs - pending Epic 5")
+pytestmark = pytest.mark.skip(
+    reason="Tests depend on deprecated trustee_performance jobs - pending Epic 5"
+)
 
 
 class TestDefinitionsModule:
@@ -31,10 +33,15 @@ class TestDefinitionsModule:
         job_names = [job.name for job in jobs]
 
         # Verify expected jobs are present
-        expected_jobs = ["trustee_performance_job", "trustee_performance_multi_file_job"]
+        expected_jobs = [
+            "trustee_performance_job",
+            "trustee_performance_multi_file_job",
+        ]
 
         for expected_job in expected_jobs:
-            assert expected_job in job_names, f"Job '{expected_job}' not found in definitions"
+            assert expected_job in job_names, (
+                f"Job '{expected_job}' not found in definitions"
+            )
 
         # Verify jobs are actual JobDefinition objects
         for job in jobs:
@@ -95,7 +102,10 @@ class TestDefinitionsModule:
         job_names = [job.name for job in jobs]
 
         for sensor in sensors:
-            if sensor.name in ["trustee_new_files_sensor", "trustee_data_quality_sensor"]:
+            if sensor.name in [
+                "trustee_new_files_sensor",
+                "trustee_data_quality_sensor",
+            ]:
                 # Verify sensor targets the correct job
                 assert sensor.job_name == "sample_trustee_performance_multi_file_job"
                 assert sensor.job_name in job_names
@@ -103,9 +113,13 @@ class TestDefinitionsModule:
     def test_definitions_completeness(self):
         """Test that all defined components are included in definitions."""
         # Verify we have the expected number of components
-        assert len(defs.jobs) == 2  # sample_trustee_performance_job, sample_trustee_performance_multi_file_job
+        assert (
+            len(defs.jobs) == 2
+        )  # sample_trustee_performance_job, sample_trustee_performance_multi_file_job
         assert len(defs.schedules) == 1  # trustee_daily_schedule
-        assert len(defs.sensors) == 2  # trustee_new_files_sensor, trustee_data_quality_sensor
+        assert (
+            len(defs.sensors) == 2
+        )  # trustee_new_files_sensor, trustee_data_quality_sensor
 
     def test_schedule_configuration(self):
         """Test schedule configuration properties."""
@@ -186,8 +200,12 @@ class TestDefinitionsIntegration:
 
         # Schedule names should be unique
         schedule_names = [schedule.name for schedule in defs.schedules]
-        assert len(schedule_names) == len(set(schedule_names)), "Duplicate schedule names found"
+        assert len(schedule_names) == len(set(schedule_names)), (
+            "Duplicate schedule names found"
+        )
 
         # Sensor names should be unique
         sensor_names = [sensor.name for sensor in defs.sensors]
-        assert len(sensor_names) == len(set(sensor_names)), "Duplicate sensor names found"
+        assert len(sensor_names) == len(set(sensor_names)), (
+            "Duplicate sensor names found"
+        )

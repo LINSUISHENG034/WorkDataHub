@@ -26,7 +26,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable, List
+from typing import TYPE_CHECKING, Any, Iterable, List, NoReturn
 
 import pandas as pd
 from pandera.errors import SchemaError, SchemaErrors
@@ -40,7 +40,7 @@ def raise_schema_error(
     data: pd.DataFrame,
     message: str,
     failure_cases: pd.DataFrame | None = None,
-) -> SchemaError:
+) -> NoReturn:
     """Raise SchemaError with consistent formatting.
 
     This helper ensures all schema validation errors across domains have
@@ -64,7 +64,7 @@ def raise_schema_error(
             ...
         pandera.errors.SchemaError: Type mismatch
     """
-    raise SchemaError(
+    raise SchemaError(  # type: ignore[no-untyped-call]
         schema=schema,
         data=data,
         failure_cases=failure_cases,
@@ -143,7 +143,7 @@ def ensure_not_empty(
         pandera.errors.SchemaError: TestSchema validation failed: ...
     """
     if dataframe.empty:
-        raise SchemaError(
+        raise SchemaError(  # type: ignore[no-untyped-call]
             schema=schema,
             data=dataframe,
             message=f"{schema_name} validation failed: DataFrame cannot be empty",
@@ -152,7 +152,10 @@ def ensure_not_empty(
 
 def get_schema_name(schema: "pa.DataFrameSchema") -> str:
     """Return a short schema name for error messages."""
-    return getattr(schema, "name", None) or getattr(schema, "__class__", type("", (), {})).__name__
+    return (
+        getattr(schema, "name", None)
+        or getattr(schema, "__class__", type("", (), {})).__name__
+    )
 
 
 def format_schema_error_message(
@@ -180,7 +183,7 @@ def format_schema_error_message(
 
 def track_invalid_ratio(
     column: str,
-    invalid_rows: List[int],
+    invalid_rows: List[Any],
     dataframe: pd.DataFrame,
     schema: "pa.DataFrameSchema",
     threshold: float,
@@ -212,11 +215,16 @@ def ensure_non_null_columns(
         if column in dataframe.columns and dataframe[column].notna().sum() == 0:
             empty_columns.append(column)
     if empty_columns:
-        failure_cases = pd.DataFrame({"column": empty_columns, "failure": "all values null"})
+        failure_cases = pd.DataFrame(
+            {"column": empty_columns, "failure": "all values null"}
+        )
         raise_schema_error(
             schema,
             dataframe,
-            message=f"{get_schema_name(schema)} validation failed: columns have no non-null values {empty_columns}",
+            message=(
+                f"{get_schema_name(schema)} validation failed: columns have no "
+                f"non-null values {empty_columns}"
+            ),
             failure_cases=failure_cases,
         )
     return empty_columns

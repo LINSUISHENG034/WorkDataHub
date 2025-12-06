@@ -17,17 +17,11 @@ from typing import Any, Dict, List, Optional, Pattern
 import pandas as pd
 import yaml
 
-import src.work_data_hub.config.settings as settings_module
-from src.work_data_hub.infrastructure.settings.data_source_schema import (
+import work_data_hub.config.settings as settings_module
+from work_data_hub.infrastructure.settings.data_source_schema import (
     DataSourceConfigV2,
     DataSourcesValidationError,
     DomainConfigV2,
-)
-from src.work_data_hub.utils.types import (
-    DiscoveredFile,
-    extract_file_metadata,
-    is_temporary_file,
-    validate_excel_file,
 )
 from work_data_hub.io.connectors.exceptions import DiscoveryError
 from work_data_hub.io.connectors.file_pattern_matcher import (
@@ -36,6 +30,12 @@ from work_data_hub.io.connectors.file_pattern_matcher import (
 from work_data_hub.io.connectors.version_scanner import VersionedPath, VersionScanner
 from work_data_hub.io.readers.excel_reader import ExcelReader
 from work_data_hub.utils.logging import get_logger
+from work_data_hub.utils.types import (
+    DiscoveredFile,
+    extract_file_metadata,
+    is_temporary_file,
+    validate_excel_file,
+)
 
 
 class DataSourceConnectorError(Exception):
@@ -146,7 +146,9 @@ class DataSourceConnector:
             )
             discovered_files.extend(domain_files)
 
-            self.logger.info(f"Found {len(domain_files)} files for domain '{domain_name}'")
+            self.logger.info(
+                f"Found {len(domain_files)} files for domain '{domain_name}'"
+            )
 
         # Apply selection strategies to discovered files
         selected_files = self._apply_selection_strategies(discovered_files)
@@ -229,9 +231,7 @@ class DataSourceConnector:
         return compiled
 
     @staticmethod
-    def _canonicalize_domain(
-        domain_name: str, domain_config: Dict[str, Any]
-    ) -> str:
+    def _canonicalize_domain(domain_name: str, domain_config: Dict[str, Any]) -> str:
         """
         Determine the canonical domain name for reporting and API usage.
         """
@@ -604,7 +604,8 @@ class FileDiscoveryService:
         Args:
             domain: Domain identifier (e.g., 'annuity_performance')
             version_override: Optional manual version (e.g., "V1")
-            **template_vars: Template variables for path resolution (e.g., month="202501")
+            **template_vars: Template variables for path resolution (e.g.,
+            month="202501")
 
         Returns:
             DataDiscoveryResult with loaded DataFrame and metadata
@@ -613,7 +614,9 @@ class FileDiscoveryService:
             DiscoveryError: With structured context if any stage fails
         """
         start_time = time.perf_counter()
-        self.logger.info("discovery.started", domain=domain, template_vars=template_vars)
+        self.logger.info(
+            "discovery.started", domain=domain, template_vars=template_vars
+        )
 
         try:
             domain_config = self._load_domain_config(domain)
@@ -796,7 +799,8 @@ class FileDiscoveryService:
             path_str: The resolved path string to validate.
 
         Raises:
-            ValueError: If path contains traversal sequences or is outside allowed scope.
+            ValueError: If path contains traversal sequences or is outside allowed
+            scope.
         """
         # Check for directory traversal patterns
         if ".." in path_str:
@@ -807,9 +811,7 @@ class FileDiscoveryService:
         # Normalize and check for traversal via different separators
         normalized = path_str.replace("\\", "/")
         if "../" in normalized or "/.." in normalized:
-            raise ValueError(
-                f"Path traversal detected in normalized path: {path_str}"
-            )
+            raise ValueError(f"Path traversal detected in normalized path: {path_str}")
 
         # Check for absolute paths that could escape the reference directory
         path_obj = Path(path_str)
@@ -820,9 +822,7 @@ class FileDiscoveryService:
 
         # Check for null bytes (path injection)
         if "\x00" in path_str:
-            raise ValueError(
-                f"Null byte injection detected in path: {path_str!r}"
-            )
+            raise ValueError(f"Null byte injection detected in path: {path_str!r}")
 
     def _identify_failed_stage(self, error: Exception) -> str:
         """Map exceptions to discovery stages for structured errors."""

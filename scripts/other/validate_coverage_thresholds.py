@@ -11,10 +11,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 from typing import Dict, Tuple
-
 
 # Coverage enforcement date (30 days from 2025-11-16 = 2025-12-16)
 # After this date, coverage below threshold will BLOCK CI (not just warn)
@@ -125,7 +124,9 @@ def main() -> None:
                     f"::notice::Coverage warnings (grace period: {days_until_enforcement} days until enforcement on {ENFORCEMENT_DATE})"
                 )
             else:
-                print("::notice::Coverage warnings (enforcement overridden by --warn-only)")
+                print(
+                    "::notice::Coverage warnings (enforcement overridden by --warn-only)"
+                )
             for warning in warnings:
                 emit_warning(warning)
             print("Coverage thresholds NOT met. Warnings issued (grace period):")

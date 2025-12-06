@@ -34,12 +34,12 @@ from .base import Pipeline, TransformStep
 from .cleansing_step import CleansingStep
 from .standard_steps import (
     CalculationStep,
-    coerce_numeric_columns,
     DropStep,
     FilterStep,
     MappingStep,
     RenameStep,
     ReplacementStep,
+    coerce_numeric_columns,
 )
 
 __all__ = [

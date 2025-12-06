@@ -21,7 +21,9 @@ from src.work_data_hub.orchestration.sensors import (
 )
 from src.work_data_hub.utils.types import DiscoveredFile
 
-pytestmark = pytest.mark.skip(reason="Tests depend on deprecated trustee_performance sensors - pending Epic 5")
+pytestmark = pytest.mark.skip(
+    reason="Tests depend on deprecated trustee_performance sensors - pending Epic 5"
+)
 
 
 class TestSensorRunConfig:
@@ -44,7 +46,9 @@ class TestSensorRunConfig:
             yaml.dump(config_data, f)
 
         # Mock get_settings to use test config file
-        with patch("src.work_data_hub.orchestration.sensors.get_settings") as mock_settings:
+        with patch(
+            "src.work_data_hub.orchestration.sensors.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             result = _build_sensor_run_config()
@@ -52,8 +56,12 @@ class TestSensorRunConfig:
             # Verify structure matches expected op config schemas
             expected = {
                 "ops": {
-            "discover_files_op": {"config": {"domain": "sample_trustee_performance"}},
-                    "read_and_process_trustee_files_op": {"config": {"sheet": 0, "max_files": 5}},
+                    "discover_files_op": {
+                        "config": {"domain": "sample_trustee_performance"}
+                    },
+                    "read_and_process_trustee_files_op": {
+                        "config": {"sheet": 0, "max_files": 5}
+                    },
                     "load_op": {
                         "config": {
                             "table": "sample_trustee_performance",
@@ -151,7 +159,9 @@ class TestFileDiscoverySensor:
             patch(
                 "src.work_data_hub.orchestration.sensors.DataSourceConnector"
             ) as mock_connector_class,
-            patch("src.work_data_hub.orchestration.sensors.get_settings") as mock_settings,
+            patch(
+                "src.work_data_hub.orchestration.sensors.get_settings"
+            ) as mock_settings,
         ):
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.return_value = new_files
@@ -198,7 +208,9 @@ class TestFileDiscoverySensor:
             patch(
                 "src.work_data_hub.orchestration.sensors.DataSourceConnector"
             ) as mock_connector_class,
-            patch("src.work_data_hub.orchestration.sensors.get_settings") as mock_settings,
+            patch(
+                "src.work_data_hub.orchestration.sensors.get_settings"
+            ) as mock_settings,
         ):
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.return_value = files
@@ -289,7 +301,9 @@ class TestDataQualitySensor:
                 "src.work_data_hub.orchestration.sensors.DataSourceConnector"
             ) as mock_connector_class,
             patch("pathlib.Path.exists", return_value=True),
-            patch("src.work_data_hub.orchestration.sensors.build_insert_sql") as mock_build_sql,
+            patch(
+                "src.work_data_hub.orchestration.sensors.build_insert_sql"
+            ) as mock_build_sql,
         ):
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.return_value = [mock_file]
@@ -324,7 +338,9 @@ class TestDataQualitySensor:
                 "src.work_data_hub.orchestration.sensors.DataSourceConnector"
             ) as mock_connector_class,
             patch("pathlib.Path.exists", return_value=True),
-            patch("src.work_data_hub.orchestration.sensors.build_insert_sql") as mock_build_sql,
+            patch(
+                "src.work_data_hub.orchestration.sensors.build_insert_sql"
+            ) as mock_build_sql,
         ):
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.return_value = [mock_file]

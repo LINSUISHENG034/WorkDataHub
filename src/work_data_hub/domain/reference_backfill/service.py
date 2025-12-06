@@ -79,17 +79,9 @@ def derive_plan_candidates(
                 ),
                 # BUSINESS RULE: From row with max 期末资产规模
                 # 优先取该行的 主拓代码 / 主拓机构，若缺失则回退到 机构代码 / 机构名称
-                "主拓代码": (
-                    _to_str(max_row.get("主拓代码"))
-                    if max_row
-                    else None
-                )
+                "主拓代码": (_to_str(max_row.get("主拓代码")) if max_row else None)
                 or (_to_str(max_row.get("机构代码")) if max_row else None),
-                "主拓机构": (
-                    _to_str(max_row.get("主拓机构"))
-                    if max_row
-                    else None
-                )
+                "主拓机构": (_to_str(max_row.get("主拓机构")) if max_row else None)
                 or (_to_str(max_row.get("机构名称")) if max_row else None),
                 # BUSINESS RULE: Format as YYMM_新建 from 月度 (first non-null)
                 "备注": _format_remark_from_date(month_value),

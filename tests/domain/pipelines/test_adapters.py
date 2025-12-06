@@ -9,7 +9,10 @@ import pytest
 from decimal import Decimal
 from unittest.mock import Mock, patch
 
-from src.work_data_hub.domain.pipelines.adapters import CleansingRuleStep, FieldMapperStep
+from src.work_data_hub.domain.pipelines.adapters import (
+    CleansingRuleStep,
+    FieldMapperStep,
+)
 from src.work_data_hub.domain.pipelines.exceptions import PipelineAssemblyError
 from src.work_data_hub.domain.pipelines.types import StepResult
 from work_data_hub.infrastructure.cleansing.registry import CleansingRule, RuleCategory
@@ -24,14 +27,14 @@ class TestCleansingRuleStepInitialization:
             name="test_rule",
             category=RuleCategory.NUMERIC,
             func=lambda x: x,
-            description="Test rule"
+            description="Test rule",
         )
 
         step = CleansingRuleStep(
             rule=mock_rule,
             target_fields=["field1", "field2"],
             step_name="custom_step",
-            precision=2
+            precision=2,
         )
 
         assert step.rule == mock_rule
@@ -45,7 +48,7 @@ class TestCleansingRuleStepInitialization:
             name="decimal_quantization",
             category=RuleCategory.NUMERIC,
             func=lambda x: x,
-            description="Test rule"
+            description="Test rule",
         )
 
         step = CleansingRuleStep(rule=mock_rule)
@@ -57,21 +60,19 @@ class TestCleansingRuleStepInitialization:
 class TestCleansingRuleStepFromRegistry:
     """Test CleansingRuleStep.from_registry class method."""
 
-    @patch('src.work_data_hub.domain.pipelines.adapters.registry')
+    @patch("src.work_data_hub.domain.pipelines.adapters.registry")
     def test_from_registry_success(self, mock_registry):
         """Test successful creation from registry."""
         mock_rule = CleansingRule(
             name="decimal_quantization",
             category=RuleCategory.NUMERIC,
             func=lambda x, precision=4: x,
-            description="Decimal quantization rule"
+            description="Decimal quantization rule",
         )
         mock_registry.get_rule.return_value = mock_rule
 
         step = CleansingRuleStep.from_registry(
-            "decimal_quantization",
-            target_fields=["amount"],
-            precision=2
+            "decimal_quantization", target_fields=["amount"], precision=2
         )
 
         assert step.rule == mock_rule
@@ -79,13 +80,13 @@ class TestCleansingRuleStepFromRegistry:
         assert step.options["precision"] == 2
         mock_registry.get_rule.assert_called_once_with("decimal_quantization")
 
-    @patch('src.work_data_hub.domain.pipelines.adapters.registry')
+    @patch("src.work_data_hub.domain.pipelines.adapters.registry")
     def test_from_registry_rule_not_found(self, mock_registry):
         """Test from_registry with non-existent rule."""
         mock_registry.get_rule.return_value = None
         mock_registry.list_all_rules.return_value = [
             Mock(name="rule1"),
-            Mock(name="rule2")
+            Mock(name="rule2"),
         ]
 
         with pytest.raises(PipelineAssemblyError, match="not found in registry"):
@@ -93,20 +94,19 @@ class TestCleansingRuleStepFromRegistry:
 
         mock_registry.get_rule.assert_called_once_with("nonexistent_rule")
 
-    @patch('src.work_data_hub.domain.pipelines.adapters.registry')
+    @patch("src.work_data_hub.domain.pipelines.adapters.registry")
     def test_from_registry_with_custom_step_name(self, mock_registry):
         """Test from_registry with custom step name."""
         mock_rule = CleansingRule(
             name="decimal_quantization",
             category=RuleCategory.NUMERIC,
             func=lambda x: x,
-            description="Test rule"
+            description="Test rule",
         )
         mock_registry.get_rule.return_value = mock_rule
 
         step = CleansingRuleStep.from_registry(
-            "decimal_quantization",
-            step_name="custom_decimal_step"
+            "decimal_quantization", step_name="custom_decimal_step"
         )
 
         assert step.name == "custom_decimal_step"
@@ -117,6 +117,7 @@ class TestCleansingRuleStepExecution:
 
     def test_apply_to_all_fields_when_no_target_specified(self):
         """Test applying rule to all fields when target_fields is None."""
+
         # Create a simple rule that adds "_processed" suffix
         def test_rule(value):
             if isinstance(value, str):
@@ -127,14 +128,11 @@ class TestCleansingRuleStepExecution:
             name="test_rule",
             category=RuleCategory.STRING,
             func=test_rule,
-            description="Test rule"
+            description="Test rule",
         )
 
         step = CleansingRuleStep(rule=mock_rule)
-        result = step.apply(
-            {"field1": "value1", "field2": "value2", "field3": 123},
-            {}
-        )
+        result = step.apply({"field1": "value1", "field2": "value2", "field3": 123}, {})
 
         assert result.row["field1"] == "value1_processed"
         assert result.row["field2"] == "value2_processed"
@@ -144,6 +142,7 @@ class TestCleansingRuleStepExecution:
 
     def test_apply_to_specific_fields_only(self):
         """Test applying rule only to specified target fields."""
+
         def test_rule(value):
             return value.upper() if isinstance(value, str) else value
 
@@ -151,17 +150,13 @@ class TestCleansingRuleStepExecution:
             name="uppercase_rule",
             category=RuleCategory.STRING,
             func=test_rule,
-            description="Uppercase rule"
+            description="Uppercase rule",
         )
 
-        step = CleansingRuleStep(
-            rule=mock_rule,
-            target_fields=["field1", "field3"]
-        )
+        step = CleansingRuleStep(rule=mock_rule, target_fields=["field1", "field3"])
 
         result = step.apply(
-            {"field1": "test", "field2": "unchanged", "field3": "another"},
-            {}
+            {"field1": "test", "field2": "unchanged", "field3": "another"}, {}
         )
 
         assert result.row["field1"] == "TEST"
@@ -173,6 +168,7 @@ class TestCleansingRuleStepExecution:
 
     def test_apply_with_field_name_parameter(self):
         """Test rule that expects field_name parameter."""
+
         def field_aware_rule(value, field_name=""):
             if "amount" in field_name:
                 return float(value) * 2
@@ -182,20 +178,20 @@ class TestCleansingRuleStepExecution:
             name="field_aware_rule",
             category=RuleCategory.NUMERIC,
             func=field_aware_rule,
-            description="Field-aware rule"
+            description="Field-aware rule",
         )
 
         step = CleansingRuleStep(rule=mock_rule)
-        result = step.apply(
-            {"amount_field": "10", "other_field": "5"},
-            {}
-        )
+        result = step.apply({"amount_field": "10", "other_field": "5"}, {})
 
-        assert result.row["amount_field"] == 20.0  # Doubled because "amount" in field name
+        assert (
+            result.row["amount_field"] == 20.0
+        )  # Doubled because "amount" in field name
         assert result.row["other_field"] == "5"  # Unchanged
 
     def test_apply_handles_rule_exceptions(self):
         """Test handling of exceptions raised by cleansing rules."""
+
         def failing_rule(value):
             if value == "fail":
                 raise ValueError("Rule failed")
@@ -205,14 +201,11 @@ class TestCleansingRuleStepExecution:
             name="failing_rule",
             category=RuleCategory.STRING,
             func=failing_rule,
-            description="Failing rule"
+            description="Failing rule",
         )
 
         step = CleansingRuleStep(rule=mock_rule)
-        result = step.apply(
-            {"good_field": "success", "bad_field": "fail"},
-            {}
-        )
+        result = step.apply({"good_field": "success", "bad_field": "fail"}, {})
 
         assert result.row["good_field"] == "success_processed"
         assert result.row["bad_field"] == "fail"  # Original value preserved
@@ -227,12 +220,11 @@ class TestCleansingRuleStepExecution:
             name="test_rule",
             category=RuleCategory.STRING,
             func=lambda x: x,
-            description="Test rule"
+            description="Test rule",
         )
 
         step = CleansingRuleStep(
-            rule=mock_rule,
-            target_fields=["existing_field", "missing_field"]
+            rule=mock_rule, target_fields=["existing_field", "missing_field"]
         )
 
         result = step.apply({"existing_field": "value"}, {})
@@ -244,6 +236,7 @@ class TestCleansingRuleStepExecution:
 
     def test_apply_preserves_row_immutability(self):
         """Test that apply doesn't mutate the original row."""
+
         def modifying_rule(value):
             return value + "_modified"
 
@@ -251,7 +244,7 @@ class TestCleansingRuleStepExecution:
             name="modifying_rule",
             category=RuleCategory.STRING,
             func=modifying_rule,
-            description="Modifying rule"
+            description="Modifying rule",
         )
 
         step = CleansingRuleStep(rule=mock_rule)
@@ -267,6 +260,7 @@ class TestCleansingRuleStepExecution:
 
     def test_apply_with_rule_options(self):
         """Test passing options to the cleansing rule."""
+
         def configurable_rule(value, multiplier=1, suffix=""):
             if isinstance(value, (int, float)):
                 return value * multiplier
@@ -276,14 +270,10 @@ class TestCleansingRuleStepExecution:
             name="configurable_rule",
             category=RuleCategory.NUMERIC,
             func=configurable_rule,
-            description="Configurable rule"
+            description="Configurable rule",
         )
 
-        step = CleansingRuleStep(
-            rule=mock_rule,
-            multiplier=3,
-            suffix="_custom"
-        )
+        step = CleansingRuleStep(rule=mock_rule, multiplier=3, suffix="_custom")
 
         result = step.apply({"number": 5, "text": "hello"}, {})
 
@@ -294,24 +284,24 @@ class TestCleansingRuleStepExecution:
 class TestCleansingRuleStepWithRealRules:
     """Test CleansingRuleStep with actual cleansing rules."""
 
-    @patch('src.work_data_hub.domain.pipelines.adapters.registry')
+    @patch("src.work_data_hub.domain.pipelines.adapters.registry")
     def test_with_decimal_quantization_rule(self, mock_registry, decimal_test_data):
         """Test CleansingRuleStep with decimal quantization rule."""
         # Import the real rule function
-        from work_data_hub.infrastructure.cleansing.rules.numeric_rules import decimal_quantization
+        from work_data_hub.infrastructure.cleansing.rules.numeric_rules import (
+            decimal_quantization,
+        )
 
         mock_rule = CleansingRule(
             name="decimal_quantization",
             category=RuleCategory.NUMERIC,
             func=decimal_quantization,
-            description="Decimal quantization"
+            description="Decimal quantization",
         )
         mock_registry.get_rule.return_value = mock_rule
 
         step = CleansingRuleStep.from_registry(
-            "decimal_quantization",
-            target_fields=["规模", "净值"],
-            precision=2
+            "decimal_quantization", target_fields=["规模", "净值"], precision=2
         )
 
         result = step.apply(decimal_test_data, {})
@@ -353,8 +343,7 @@ class TestFieldMapperStep:
         step = FieldMapperStep(mapping)
 
         result = step.apply(
-            {"old_name": "test", "old_amount": 123, "unchanged": "value"},
-            {}
+            {"old_name": "test", "old_amount": 123, "unchanged": "value"}, {}
         )
 
         assert result.row["new_name"] == "test"
@@ -382,8 +371,7 @@ class TestFieldMapperStep:
         step = FieldMapperStep(mapping)
 
         result = step.apply(
-            {"map_this": "value", "keep_this": "data", "and_this": 123},
-            {}
+            {"map_this": "value", "keep_this": "data", "and_this": 123}, {}
         )
 
         assert result.row["mapped"] == "value"

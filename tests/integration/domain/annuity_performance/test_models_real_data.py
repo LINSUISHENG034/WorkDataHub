@@ -21,7 +21,9 @@ from src.work_data_hub.domain.annuity_performance.models import (
 
 
 # Real data file path from tech-spec-epic-4.md
-REAL_DATA_FILE = Path("reference/archive/monthly/202412/收集数据/数据采集/V1/【for年金分战区经营分析】24年12月年金终稿数据0109采集.xlsx")
+REAL_DATA_FILE = Path(
+    "reference/archive/monthly/202412/收集数据/数据采集/V1/【for年金分战区经营分析】24年12月年金终稿数据0109采集.xlsx"
+)
 
 
 @pytest.mark.integration
@@ -68,11 +70,9 @@ class TestAnnuityModelsWithRealData:
                 model = AnnuityPerformanceIn(**row_dict)
                 successful_parses += 1
             except Exception as e:
-                failed_parses.append({
-                    "row_index": idx,
-                    "error": str(e),
-                    "row_data": row.to_dict()
-                })
+                failed_parses.append(
+                    {"row_index": idx, "error": str(e), "row_data": row.to_dict()}
+                )
 
         # AC Task 7: Should accept all rows (or at least >95%)
         success_rate = successful_parses / len(df)
@@ -178,14 +178,16 @@ class TestAnnuityModelsWithRealData:
 
                     # Check that value was converted to numeric
                     converted_val = getattr(model, field)
-                    assert converted_val is None or isinstance(converted_val, (int, float)), (
-                        f"Expected numeric type for {field}, got {type(converted_val)}"
-                    )
+                    assert converted_val is None or isinstance(
+                        converted_val, (int, float)
+                    ), f"Expected numeric type for {field}, got {type(converted_val)}"
 
                     successful_conversions += 1
 
                 except Exception as e:
-                    print(f"⚠️ Failed to convert {field}='{val}' (type: {type(val)}): {e}")
+                    print(
+                        f"⚠️ Failed to convert {field}='{val}' (type: {type(val)}): {e}"
+                    )
 
             # Should successfully convert most values
             if len(sample_values) > 0:
@@ -193,7 +195,9 @@ class TestAnnuityModelsWithRealData:
                 assert success_rate >= 0.8, (
                     f"Expected >80% success rate for {field}, got {success_rate:.1%}"
                 )
-                print(f"✅ {field}: {successful_conversions}/{len(sample_values)} conversions successful")
+                print(
+                    f"✅ {field}: {successful_conversions}/{len(sample_values)} conversions successful"
+                )
 
     def test_edge_cases_documentation(self, real_data_path):
         """
@@ -225,7 +229,7 @@ class TestAnnuityModelsWithRealData:
                 edge_cases["null_values"][col] = null_count
 
             # Check for zero values in numeric columns
-            if df[col].dtype in ['float64', 'int64']:
+            if df[col].dtype in ["float64", "int64"]:
                 zero_count = (df[col] == 0).sum()
                 if zero_count > 0:
                     edge_cases["zero_values"][col] = zero_count
@@ -236,10 +240,12 @@ class TestAnnuityModelsWithRealData:
                     edge_cases["negative_values"][col] = negative_count
 
             # Check for special characters in string columns
-            if df[col].dtype == 'object':
+            if df[col].dtype == "object":
                 sample_values = df[col].dropna().head(5)
                 for val in sample_values:
-                    if isinstance(val, str) and any(char in val for char in ['¥', '%', ',', '（', '）']):
+                    if isinstance(val, str) and any(
+                        char in val for char in ["¥", "%", ",", "（", "）"]
+                    ):
                         if col not in edge_cases["special_characters"]:
                             edge_cases["special_characters"][col] = []
                         edge_cases["special_characters"][col].append(val)
@@ -306,4 +312,6 @@ class TestAnnuityModelsWithRealData:
             f"Expected >95% parse success rate, got {success_rate:.1%}"
         )
 
-        print(f"\n✅ Input model parsing: {successful_parses}/{len(df)} rows successful")
+        print(
+            f"\n✅ Input model parsing: {successful_parses}/{len(df)} rows successful"
+        )

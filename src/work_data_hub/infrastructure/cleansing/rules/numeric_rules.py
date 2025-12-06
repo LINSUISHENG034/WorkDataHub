@@ -7,7 +7,7 @@
 
 import unicodedata
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from work_data_hub.infrastructure.cleansing.registry import (
     RuleCategory,
@@ -148,7 +148,7 @@ def handle_percentage_conversion(value: Any, field_name: str = "") -> Union[floa
             # 如果转换失败，继续返回原值
             pass
 
-    return value
+    return value  # type: ignore[no-any-return]
 
 
 @rule(
@@ -309,7 +309,7 @@ def clean_numeric_for_schema(
     field_name: str,
     *,
     domain: str = "annuity_performance",
-    registry=None,
+    registry: Optional[Any] = None,
     fallback_rules: Optional[List[Any]] = None,
 ) -> Optional[float]:
     """
@@ -344,7 +344,9 @@ def clean_numeric_for_schema(
 
 
 # 便捷函数 - 为特定领域提供预配置的清洗函数
-def create_domain_decimal_cleaner(precision_config: Dict[str, int]):
+def create_domain_decimal_cleaner(
+    precision_config: Dict[str, int],
+) -> Callable[[Any, str], Optional[Decimal]]:
     """
     为特定域创建预配置的数值清洗函数
 

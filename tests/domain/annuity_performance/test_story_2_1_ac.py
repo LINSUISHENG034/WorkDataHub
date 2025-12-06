@@ -106,9 +106,9 @@ class TestAC2_StrictValidationModel:
             AnnuityPerformanceOut()
 
         errors = exc_info.value.errors()
-        error_fields = {e['loc'][0] for e in errors}
+        error_fields = {e["loc"][0] for e in errors}
         # 计划代码 is the only required field; company_id is Optional (Epic 5 enrichment)
-        assert '计划代码' in error_fields
+        assert "计划代码" in error_fields
 
     def test_non_negative_constraints(self):
         """AC2: Asset fields must be non-negative (>= 0)"""
@@ -129,7 +129,7 @@ class TestAC2_StrictValidationModel:
                 company_id="COMP001",
                 期初资产规模=Decimal("-1000"),
             )
-        assert '期初资产规模' in str(exc_info.value)
+        assert "期初资产规模" in str(exc_info.value)
 
     def test_business_rule_zero_asset_no_return(self):
         """AC2: When 期末资产规模=0, 当期收益率 must be None"""
@@ -215,14 +215,20 @@ class TestAC3_CustomValidators:
         assert parse_yyyymm_or_chinese("2025-01") == date(2025, 1, 1)
 
         # Test CleansingRegistry string rules
-        assert registry.apply_rules(
-            "  测试　ABC  ",
-            ["trim_whitespace", "normalize_company_name"],
-        ) == "测试 ABC"
-        assert registry.apply_rules(
-            "「测试」",
-            ["trim_whitespace", "normalize_company_name"],
-        ) == "测试"
+        assert (
+            registry.apply_rules(
+                "  测试　ABC  ",
+                ["trim_whitespace", "normalize_company_name"],
+            )
+            == "测试 ABC"
+        )
+        assert (
+            registry.apply_rules(
+                "「测试」",
+                ["trim_whitespace", "normalize_company_name"],
+            )
+            == "测试"
+        )
 
         numeric_rules = [
             "standardize_null_values",

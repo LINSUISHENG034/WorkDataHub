@@ -72,7 +72,9 @@ class TestNormalizeNameFunction:
         """Test Unicode normalization (NFKC)."""
         # Test with various Unicode forms
         assert normalize_name("测试公司") == "测试公司"
-        assert normalize_name("Ｔｅｓｔ Ｃｏｍｐａｎｙ") == "test company"  # Full-width characters
+        assert (
+            normalize_name("Ｔｅｓｔ Ｃｏｍｐａｎｙ") == "test company"
+        )  # Full-width characters
 
     def test_normalize_empty_and_none(self):
         """Test handling of empty strings and None."""
@@ -112,14 +114,14 @@ class TestEnqueueOperations:
         # Setup cursor mock to return a row
         mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
         mock_cursor.fetchone.return_value = {
-            'id': 1,
-            'name': 'Test Company',
-            'normalized_name': 'test company',
-            'status': 'pending',
-            'attempts': 0,
-            'last_error': None,
-            'created_at': datetime.now(timezone.utc),
-            'updated_at': datetime.now(timezone.utc)
+            "id": 1,
+            "name": "Test Company",
+            "normalized_name": "test company",
+            "status": "pending",
+            "attempts": 0,
+            "last_error": None,
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc),
         }
 
         result = lookup_queue.enqueue("Test Company", "test company")
@@ -144,14 +146,14 @@ class TestEnqueueOperations:
         """Test enqueue with automatic normalization."""
         mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
         mock_cursor.fetchone.return_value = {
-            'id': 1,
-            'name': 'Test Company',
-            'normalized_name': 'test company',
-            'status': 'pending',
-            'attempts': 0,
-            'last_error': None,
-            'created_at': datetime.now(timezone.utc),
-            'updated_at': datetime.now(timezone.utc)
+            "id": 1,
+            "name": "Test Company",
+            "normalized_name": "test company",
+            "status": "pending",
+            "attempts": 0,
+            "last_error": None,
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc),
         }
 
         # Call without providing normalized_name
@@ -208,25 +210,25 @@ class TestDequeueAtomicOperations:
         mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
         mock_rows = [
             {
-                'id': 1,
-                'name': 'Company 1',
-                'normalized_name': 'company 1',
-                'status': 'processing',
-                'attempts': 0,
-                'last_error': None,
-                'created_at': datetime.now(timezone.utc),
-                'updated_at': datetime.now(timezone.utc)
+                "id": 1,
+                "name": "Company 1",
+                "normalized_name": "company 1",
+                "status": "processing",
+                "attempts": 0,
+                "last_error": None,
+                "created_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc),
             },
             {
-                'id': 2,
-                'name': 'Company 2',
-                'normalized_name': 'company 2',
-                'status': 'processing',
-                'attempts': 0,
-                'last_error': None,
-                'created_at': datetime.now(timezone.utc),
-                'updated_at': datetime.now(timezone.utc)
-            }
+                "id": 2,
+                "name": "Company 2",
+                "normalized_name": "company 2",
+                "status": "processing",
+                "attempts": 0,
+                "last_error": None,
+                "created_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc),
+            },
         ]
         mock_cursor.fetchall.return_value = mock_rows
 
@@ -314,7 +316,9 @@ class TestMarkDoneAndFailedOperations:
         mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
         mock_cursor.rowcount = 0  # No rows updated
 
-        with pytest.raises(LookupQueueError, match="not found or not in processing state"):
+        with pytest.raises(
+            LookupQueueError, match="not found or not in processing state"
+        ):
             lookup_queue.mark_done(request_id=999)
 
     def test_mark_failed_successful(self, lookup_queue, mock_connection):
@@ -323,9 +327,7 @@ class TestMarkDoneAndFailedOperations:
         mock_cursor.rowcount = 1
 
         lookup_queue.mark_failed(
-            request_id=456,
-            error_message="EQC lookup failed",
-            attempts=2
+            request_id=456, error_message="EQC lookup failed", attempts=2
         )
 
         # Verify SQL execution
@@ -395,7 +397,9 @@ class TestTempIdGeneration:
         assert temp_id == "TEMP_000007"
         mock_cursor.execute.assert_called_once()
 
-    def test_get_next_temp_id_bootstraps_empty_sequence(self, lookup_queue, mock_connection):
+    def test_get_next_temp_id_bootstraps_empty_sequence(
+        self, lookup_queue, mock_connection
+    ):
         """Test sequence table is seeded when empty."""
         mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
         mock_cursor.fetchone.side_effect = [None, {"last_number": 1}]
@@ -403,11 +407,17 @@ class TestTempIdGeneration:
         temp_id = lookup_queue.get_next_temp_id()
 
         assert temp_id == "TEMP_000001"
-        sql_calls = [call_args[0][0] for call_args in mock_cursor.execute.call_args_list]
-        assert any("INSERT INTO enterprise.temp_id_sequence" in sql for sql in sql_calls)
+        sql_calls = [
+            call_args[0][0] for call_args in mock_cursor.execute.call_args_list
+        ]
+        assert any(
+            "INSERT INTO enterprise.temp_id_sequence" in sql for sql in sql_calls
+        )
         assert mock_cursor.execute.call_count == 3
 
-    def test_get_next_temp_id_uniqueness_sequential(self, lookup_queue, mock_connection):
+    def test_get_next_temp_id_uniqueness_sequential(
+        self, lookup_queue, mock_connection
+    ):
         """Test temp ID generation produces unique sequential IDs."""
         mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
 
@@ -447,8 +457,12 @@ class TestTempIdGeneration:
         with pytest.raises(LookupQueueError, match="no sequence value returned"):
             lookup_queue.get_next_temp_id()
 
-        sql_calls = [call_args[0][0] for call_args in mock_cursor.execute.call_args_list]
-        assert any("INSERT INTO enterprise.temp_id_sequence" in sql for sql in sql_calls)
+        sql_calls = [
+            call_args[0][0] for call_args in mock_cursor.execute.call_args_list
+        ]
+        assert any(
+            "INSERT INTO enterprise.temp_id_sequence" in sql for sql in sql_calls
+        )
         assert mock_cursor.execute.call_count == 3
 
 
@@ -498,9 +512,18 @@ class TestConcurrentAccess:
         def mock_fetchall():
             # Return different batches for each call
             if call_count == 1:
-                return [{'id': 1, 'name': 'Company 1', 'normalized_name': 'company 1',
-                        'status': 'processing', 'attempts': 0, 'last_error': None,
-                        'created_at': datetime.now(timezone.utc), 'updated_at': datetime.now(timezone.utc)}]
+                return [
+                    {
+                        "id": 1,
+                        "name": "Company 1",
+                        "normalized_name": "company 1",
+                        "status": "processing",
+                        "attempts": 0,
+                        "last_error": None,
+                        "created_at": datetime.now(timezone.utc),
+                        "updated_at": datetime.now(timezone.utc),
+                    }
+                ]
             else:
                 return []  # Subsequent calls return empty
 
@@ -529,10 +552,10 @@ class TestQueueStatistics:
         """Test successful queue statistics retrieval."""
         mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
         mock_cursor.fetchall.return_value = [
-            ('pending', 15),
-            ('processing', 3),
-            ('done', 250),
-            ('failed', 7)
+            ("pending", 15),
+            ("processing", 3),
+            ("done", 250),
+            ("failed", 7),
         ]
 
         stats = lookup_queue.get_queue_stats()
@@ -545,30 +568,20 @@ class TestQueueStatistics:
         assert "GROUP BY status" in sql_call[0]
 
         # Verify results
-        assert stats == {
-            "pending": 15,
-            "processing": 3,
-            "done": 250,
-            "failed": 7
-        }
+        assert stats == {"pending": 15, "processing": 3, "done": 250, "failed": 7}
 
     def test_get_queue_stats_missing_statuses(self, lookup_queue, mock_connection):
         """Test queue stats fills in missing status types."""
         mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
         mock_cursor.fetchall.return_value = [
-            ('pending', 5),
-            ('done', 100)
+            ("pending", 5),
+            ("done", 100),
         ]  # Missing 'processing' and 'failed'
 
         stats = lookup_queue.get_queue_stats()
 
         # Should include all status types with zero counts
-        assert stats == {
-            "pending": 5,
-            "processing": 0,
-            "done": 100,
-            "failed": 0
-        }
+        assert stats == {"pending": 5, "processing": 0, "done": 100, "failed": 0}
 
     def test_get_queue_stats_plan_only_mode(self, plan_only_queue):
         """Test queue stats in plan-only mode."""
@@ -599,20 +612,32 @@ class TestIntegrationPatterns:
 
         # Enqueue phase
         mock_cursor.fetchone.return_value = {
-            'id': 1, 'name': 'Test Company', 'normalized_name': 'test company',
-            'status': 'pending', 'attempts': 0, 'last_error': None,
-            'created_at': datetime.now(timezone.utc), 'updated_at': datetime.now(timezone.utc)
+            "id": 1,
+            "name": "Test Company",
+            "normalized_name": "test company",
+            "status": "pending",
+            "attempts": 0,
+            "last_error": None,
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc),
         }
 
         enqueued = lookup_queue.enqueue("Test Company")
         assert enqueued.status == "pending"
 
         # Dequeue phase
-        mock_cursor.fetchall.return_value = [{
-            'id': 1, 'name': 'Test Company', 'normalized_name': 'test company',
-            'status': 'processing', 'attempts': 0, 'last_error': None,
-            'created_at': datetime.now(timezone.utc), 'updated_at': datetime.now(timezone.utc)
-        }]
+        mock_cursor.fetchall.return_value = [
+            {
+                "id": 1,
+                "name": "Test Company",
+                "normalized_name": "test company",
+                "status": "processing",
+                "attempts": 0,
+                "last_error": None,
+                "created_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc),
+            }
+        ]
 
         dequeued = lookup_queue.dequeue(batch_size=1)
         assert len(dequeued) == 1
@@ -632,12 +657,17 @@ class TestIntegrationPatterns:
         # First attempt fails
         mock_cursor.execute.side_effect = [
             psycopg2.Error("Transient error"),
-            None  # Second attempt succeeds
+            None,  # Second attempt succeeds
         ]
         mock_cursor.fetchone.return_value = {
-            'id': 1, 'name': 'Retry Company', 'normalized_name': 'retry company',
-            'status': 'pending', 'attempts': 0, 'last_error': None,
-            'created_at': datetime.now(timezone.utc), 'updated_at': datetime.now(timezone.utc)
+            "id": 1,
+            "name": "Retry Company",
+            "normalized_name": "retry company",
+            "status": "pending",
+            "attempts": 0,
+            "last_error": None,
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc),
         }
 
         # First call should raise error

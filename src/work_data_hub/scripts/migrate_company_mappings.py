@@ -24,15 +24,15 @@ from pathlib import Path
 
 import psycopg2
 
-# Add project root to path for imports
+# Add project root/src to path for imports
 project_root = Path(__file__).parent.parent.parent.parent
-sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(project_root / "src"))
 
-from src.work_data_hub.config.settings import get_settings  # noqa: E402
-from src.work_data_hub.domain.company_enrichment.service import (  # noqa: E402
+from work_data_hub.config.settings import get_settings  # noqa: E402
+from work_data_hub.domain.company_enrichment.service import (  # noqa: E402
     validate_mapping_consistency,
 )
-from src.work_data_hub.io.loader.company_mapping_loader import (  # noqa: E402
+from work_data_hub.io.loader.company_mapping_loader import (  # noqa: E402
     CompanyMappingLoaderError,
     extract_legacy_mappings,
     generate_load_plan,

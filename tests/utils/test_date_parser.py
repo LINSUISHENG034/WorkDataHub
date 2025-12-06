@@ -102,8 +102,12 @@ class TestParseChineseDate:
         assert parse_chinese_date("2024年") is None  # Missing month
         assert parse_chinese_date("11月") is None  # Missing year
         assert parse_chinese_date("2024-11-15-extra") is None
-        assert parse_chinese_date("2024-02-30") is None  # Invalid day returns None via wrapper
-        assert parse_chinese_date("2024/13/01") is None  # Invalid month returns None via wrapper
+        assert (
+            parse_chinese_date("2024-02-30") is None
+        )  # Invalid day returns None via wrapper
+        assert (
+            parse_chinese_date("2024/13/01") is None
+        )  # Invalid month returns None via wrapper
 
 
 class TestExtractYearMonth:
@@ -196,7 +200,9 @@ class TestParseYYYYMMOrChinese:
         assert parse_yyyymm_or_chinese(202501) == date(2025, 1, 1)
         assert parse_yyyymm_or_chinese(20250115) == date(2025, 1, 15)
         assert parse_yyyymm_or_chinese("2025年1月") == date(2025, 1, 1)
-        assert parse_yyyymm_or_chinese("２０２５年０１月") == date(2025, 1, 1)  # full-width digits
+        assert parse_yyyymm_or_chinese("２０２５年０１月") == date(
+            2025, 1, 1
+        )  # full-width digits
         assert parse_yyyymm_or_chinese("2025-01") == date(2025, 1, 1)
         assert parse_yyyymm_or_chinese("2025-01-15") == date(2025, 1, 15)
         assert parse_yyyymm_or_chinese("25年1月") == date(2025, 1, 1)

@@ -75,7 +75,9 @@ def run_migrations_online() -> None:
         with context.begin_transaction():
             context.run_migrations()
 
-    logger.info("migrations.completed_online", url=config.get_main_option("sqlalchemy.url"))
+    logger.info(
+        "migrations.completed_online", url=config.get_main_option("sqlalchemy.url")
+    )
 
 
 if context.is_offline_mode():

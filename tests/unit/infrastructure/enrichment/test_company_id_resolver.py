@@ -48,10 +48,12 @@ class TestPlanOverrideResolution:
 
     def test_plan_override_hit(self, resolver_with_overrides, default_strategy):
         """Test that plan override mapping is applied correctly."""
-        df = pd.DataFrame({
-            "计划代码": ["FP0001", "FP0002"],
-            "客户名称": ["公司A", "公司B"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["FP0001", "FP0002"],
+                "客户名称": ["公司A", "公司B"],
+            }
+        )
 
         result = resolver_with_overrides.resolve_batch(df, default_strategy)
         result_df = result.data
@@ -65,10 +67,12 @@ class TestPlanOverrideResolution:
         self, resolver_with_overrides, default_strategy
     ):
         """Test that unknown plan codes get temp IDs."""
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN_PLAN"],
-            "客户名称": ["中国平安保险公司"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN_PLAN"],
+                "客户名称": ["中国平安保险公司"],
+            }
+        )
 
         result = resolver_with_overrides.resolve_batch(df, default_strategy)
         result_df = result.data
@@ -100,11 +104,13 @@ class TestExistingColumnPassthrough:
 
     def test_existing_company_id_preserved(self, resolver_standalone, default_strategy):
         """Test that existing company_id values are preserved."""
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司A"],
-            "公司代码": ["existing_123"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司A"],
+                "公司代码": ["existing_123"],
+            }
+        )
 
         result = resolver_standalone.resolve_batch(df, default_strategy)
         result_df = result.data
@@ -117,11 +123,13 @@ class TestExistingColumnPassthrough:
         self, resolver_standalone, default_strategy
     ):
         """Test that empty existing company_id values are ignored."""
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司A"],
-            "公司代码": [""],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司A"],
+                "公司代码": [""],
+            }
+        )
 
         result = resolver_standalone.resolve_batch(df, default_strategy)
         result_df = result.data
@@ -135,11 +143,13 @@ class TestExistingColumnPassthrough:
         self, resolver_with_overrides, default_strategy
     ):
         """Test that plan override takes priority over existing column."""
-        df = pd.DataFrame({
-            "计划代码": ["FP0001"],
-            "客户名称": ["公司A"],
-            "公司代码": ["should_be_ignored"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["FP0001"],
+                "客户名称": ["公司A"],
+                "公司代码": ["should_be_ignored"],
+            }
+        )
 
         result = resolver_with_overrides.resolve_batch(df, default_strategy)
         result_df = result.data
@@ -149,16 +159,38 @@ class TestExistingColumnPassthrough:
         assert stats.plan_override_hits == 1
         assert stats.existing_column_hits == 0
 
+    def test_yaml_only_mode_works_without_repository(self, default_strategy, tmp_path):
+        """Backwards-compatible YAML-only mode resolves plan overrides without DB."""
+        mappings_dir = tmp_path / "mappings"
+        mappings_dir.mkdir()
+        (mappings_dir / "company_id_overrides_plan.yml").write_text(
+            'FP0001: "614810477"\n', encoding="utf-8"
+        )
+        from work_data_hub.config.mapping_loader import load_company_id_overrides
+
+        overrides = load_company_id_overrides(mappings_dir)
+        resolver = CompanyIdResolver(plan_override_mapping=overrides["plan"])
+
+        df = pd.DataFrame({
+            "计划代码": ["FP0001"],
+            "客户名称": ["公司A"],
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+        assert result.data.loc[0, "company_id"] == "614810477"
+
 
 class TestTempIdGeneration:
     """Tests for temporary ID generation (AC 5.4.4)."""
 
     def test_temp_id_format(self, resolver_standalone, default_strategy):
         """Test temp ID format is IN_<16-char-Base32>."""
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["中国平安保险公司"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["中国平安保险公司"],
+            }
+        )
 
         result = resolver_standalone.resolve_batch(df, default_strategy)
         result_df = result.data
@@ -169,14 +201,18 @@ class TestTempIdGeneration:
 
     def test_temp_id_consistency(self, resolver_standalone, default_strategy):
         """Test same input produces same temp ID."""
-        df1 = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["中国平安保险公司"],
-        })
-        df2 = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["中国平安保险公司"],
-        })
+        df1 = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["中国平安保险公司"],
+            }
+        )
+        df2 = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["中国平安保险公司"],
+            }
+        )
 
         result1 = resolver_standalone.resolve_batch(df1, default_strategy)
         result2 = resolver_standalone.resolve_batch(df2, default_strategy)
@@ -187,10 +223,12 @@ class TestTempIdGeneration:
         self, resolver_standalone, default_strategy
     ):
         """Test different names produce different temp IDs."""
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN", "UNKNOWN"],
-            "客户名称": ["公司A", "公司B"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN", "UNKNOWN"],
+                "客户名称": ["公司A", "公司B"],
+            }
+        )
 
         result = resolver_standalone.resolve_batch(df, default_strategy)
         result_df = result.data
@@ -200,10 +238,12 @@ class TestTempIdGeneration:
     def test_temp_id_disabled(self, resolver_standalone):
         """Test temp ID generation can be disabled."""
         strategy = ResolutionStrategy(generate_temp_ids=False)
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司A"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司A"],
+            }
+        )
 
         result = resolver_standalone.resolve_batch(df, strategy)
         result_df = result.data
@@ -227,11 +267,13 @@ class TestEnrichmentServiceIntegration:
             generate_temp_ids=False,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司A"],
-            "年金账户名": ["账户1"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司A"],
+                "年金账户名": ["账户1"],
+            }
+        )
 
         result = resolver.resolve_batch(df, strategy)
         result_df = result.data
@@ -248,10 +290,12 @@ class TestEnrichmentServiceIntegration:
         resolver = CompanyIdResolver(enrichment_service=mock_enrichment_service)
         # default_strategy has use_enrichment_service=False
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司A"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司A"],
+            }
+        )
 
         resolver.resolve_batch(df, default_strategy)
 
@@ -266,11 +310,13 @@ class TestEnrichmentServiceIntegration:
             generate_temp_ids=False,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"] * 5,
-            "客户名称": [f"公司{i}" for i in range(5)],
-            "年金账户名": [f"账户{i}" for i in range(5)],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"] * 5,
+                "客户名称": [f"公司{i}" for i in range(5)],
+                "年金账户名": [f"账户{i}" for i in range(5)],
+            }
+        )
 
         result = resolver.resolve_batch(df, strategy)
         result_df = result.data
@@ -292,11 +338,13 @@ class TestEnrichmentServiceIntegration:
             generate_temp_ids=True,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司A"],
-            "年金账户名": ["账户1"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司A"],
+                "年金账户名": ["账户1"],
+            }
+        )
 
         # Should not raise, should fall back to temp ID
         result = resolver.resolve_batch(df, strategy)
@@ -311,10 +359,12 @@ class TestEmptyNullHandling:
 
     def test_null_plan_code(self, resolver_with_overrides, default_strategy):
         """Test null plan code is handled."""
-        df = pd.DataFrame({
-            "计划代码": [None],
-            "客户名称": ["公司A"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": [None],
+                "客户名称": ["公司A"],
+            }
+        )
 
         result = resolver_with_overrides.resolve_batch(df, default_strategy)
         result_df = result.data
@@ -323,10 +373,12 @@ class TestEmptyNullHandling:
 
     def test_empty_customer_name(self, resolver_standalone, default_strategy):
         """Test empty customer name generates consistent temp ID."""
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": [""],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": [""],
+            }
+        )
 
         result = resolver_standalone.resolve_batch(df, default_strategy)
         result_df = result.data
@@ -336,22 +388,28 @@ class TestEmptyNullHandling:
 
     def test_null_customer_name(self, resolver_standalone, default_strategy):
         """Test null customer name generates consistent temp ID."""
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": [None],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": [None],
+            }
+        )
 
         result = resolver_standalone.resolve_batch(df, default_strategy)
         result_df = result.data
 
         assert result_df.loc[0, "company_id"].startswith("IN_")
 
-    def test_missing_required_column_raises(self, resolver_standalone, default_strategy):
+    def test_missing_required_column_raises(
+        self, resolver_standalone, default_strategy
+    ):
         """Test missing required column raises ValueError."""
-        df = pd.DataFrame({
-            "计划代码": ["FP0001"],
-            # Missing 客户名称
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["FP0001"],
+                # Missing 客户名称
+            }
+        )
 
         with pytest.raises(ValueError, match="missing required columns"):
             resolver_standalone.resolve_batch(df, default_strategy)
@@ -413,10 +471,12 @@ class TestResolutionStatistics:
 
     def test_statistics_to_dict(self, resolver_standalone, default_strategy):
         """Test statistics can be converted to dict."""
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司A"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司A"],
+            }
+        )
 
         result = resolver_standalone.resolve_batch(df, default_strategy)
         stats = result.statistics
@@ -438,10 +498,12 @@ class TestCustomStrategy:
             output_column="resolved_id",
         )
 
-        df = pd.DataFrame({
-            "plan_code": ["UNKNOWN"],
-            "customer_name": ["Test Company"],
-        })
+        df = pd.DataFrame(
+            {
+                "plan_code": ["UNKNOWN"],
+                "customer_name": ["Test Company"],
+            }
+        )
 
         result = resolver_standalone.resolve_batch(df, strategy)
         result_df = result.data
@@ -453,10 +515,12 @@ class TestCustomStrategy:
         """Test custom output column name."""
         strategy = ResolutionStrategy(output_column="company_identifier")
 
-        df = pd.DataFrame({
-            "计划代码": ["FP0001"],
-            "客户名称": ["公司A"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["FP0001"],
+                "客户名称": ["公司A"],
+            }
+        )
 
         result = resolver_with_overrides.resolve_batch(df, strategy)
         result_df = result.data

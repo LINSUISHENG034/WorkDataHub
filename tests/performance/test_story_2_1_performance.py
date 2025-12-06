@@ -24,7 +24,9 @@ from src.work_data_hub.domain.annuity_performance.models import (
     AnnuityPerformanceOut,
 )
 
-pytestmark = pytest.mark.skip(reason="Performance tests need recalibration after Epic 5 infrastructure refactoring")
+pytestmark = pytest.mark.skip(
+    reason="Performance tests need recalibration after Epic 5 infrastructure refactoring"
+)
 
 
 def generate_test_data(num_rows: int = 10000) -> List[dict]:
@@ -130,15 +132,15 @@ class TestAC6_Performance:
         rows_per_second = total_rows / duration
 
         # Report results
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Performance Test: AnnuityPerformanceIn Validation")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"Total rows: {total_rows:,}")
         print(f"Valid rows: {valid_count:,}")
         print(f"Invalid rows: {invalid_count:,}")
         print(f"Duration: {duration:.3f} seconds")
         print(f"Throughput: {rows_per_second:.0f} rows/s")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         # AC-PERF-1: Assert ≥1000 rows/s
         assert rows_per_second >= 1000, (
@@ -148,9 +150,13 @@ class TestAC6_Performance:
 
         # Target: 1500+ rows/s (50% above minimum)
         if rows_per_second >= 1500:
-            print(f"✓ EXCELLENT: Throughput {rows_per_second:.0f} rows/s exceeds target (1500 rows/s)")
+            print(
+                f"✓ EXCELLENT: Throughput {rows_per_second:.0f} rows/s exceeds target (1500 rows/s)"
+            )
         else:
-            print(f"⚠ WARNING: Throughput {rows_per_second:.0f} rows/s below target (1500 rows/s)")
+            print(
+                f"⚠ WARNING: Throughput {rows_per_second:.0f} rows/s below target (1500 rows/s)"
+            )
 
     def test_output_model_throughput_1000_rows_per_second(self):
         """
@@ -186,13 +192,13 @@ class TestAC6_Performance:
         # Calculate throughput
         rows_per_second = len(test_data) / duration
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Performance Test: AnnuityPerformanceOut Validation")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"Total rows: {len(test_data):,}")
         print(f"Duration: {duration:.3f} seconds")
         print(f"Throughput: {rows_per_second:.0f} rows/s")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         # AC-PERF-1: Assert ≥1000 rows/s
         assert rows_per_second >= 1000, (
@@ -247,13 +253,13 @@ class TestAC6_Performance:
         time.sleep(6.0)
 
         # 2b. Data processing (transformations, filtering, column operations)
-        processed = df_loaded[['月度', '计划代码', '客户名称', '期末资产规模']].copy()
+        processed = df_loaded[["月度", "计划代码", "客户名称", "期末资产规模"]].copy()
         processed = processed.dropna()
-        processed['computed_field'] = processed['计划代码'].str[:4]
-        summary = processed.groupby('计划代码').size()
+        processed["computed_field"] = processed["计划代码"].str[:4]
+        summary = processed.groupby("计划代码").size()
 
         # 2c. Simulate database operations (INSERT with network latency)
-        records = processed.to_dict('records')
+        records = processed.to_dict("records")
         # Conservative network/db latency observed in recent perf baselines (~6s worst-case)
         time.sleep(6.0)
         df_final = pd.DataFrame(records)
@@ -265,15 +271,15 @@ class TestAC6_Performance:
         total_time = validation_duration + pipeline_duration
         overhead_pct = (validation_duration / total_time) * 100
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Performance Test: Validation Overhead (Simulated Pipeline)")
-        print(f"{'='*60}")
-        print(f"Validation time: {validation_duration*1000:.0f} ms")
-        print(f"Pipeline operations time: {pipeline_duration*1000:.0f} ms")
+        print(f"{'=' * 60}")
+        print(f"Validation time: {validation_duration * 1000:.0f} ms")
+        print(f"Pipeline operations time: {pipeline_duration * 1000:.0f} ms")
         print(f"  (includes simulated disk I/O and database latency)")
-        print(f"Total pipeline time: {total_time*1000:.0f} ms")
+        print(f"Total pipeline time: {total_time * 1000:.0f} ms")
         print(f"Validation overhead: {overhead_pct:.1f}%")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         # AC-PERF-2: Assert <20% with realistic pipeline simulation
         # Note: In production with real Excel file I/O and PostgreSQL writes,
@@ -281,16 +287,20 @@ class TestAC6_Performance:
         assert overhead_pct < 20.0, (
             f"AC-PERF-2: Validation overhead {overhead_pct:.1f}% >= 20% threshold. "
             f"NOTE: This is with simulated I/O. Real pipeline would have lower overhead. "
-            f"Validation: {validation_duration*1000:.0f}ms, "
-            f"Pipeline: {pipeline_duration*1000:.0f}ms"
+            f"Validation: {validation_duration * 1000:.0f}ms, "
+            f"Pipeline: {pipeline_duration * 1000:.0f}ms"
         )
 
         if overhead_pct < 15.0:
-            print(f"✓ EXCELLENT: Overhead {overhead_pct:.1f}% is well below 20% threshold")
+            print(
+                f"✓ EXCELLENT: Overhead {overhead_pct:.1f}% is well below 20% threshold"
+            )
         elif overhead_pct < 18.0:
             print(f"✓ GOOD: Overhead {overhead_pct:.1f}% is below 20% threshold")
         else:
-            print(f"⚠ WARNING: Overhead {overhead_pct:.1f}% is approaching 20% threshold")
+            print(
+                f"⚠ WARNING: Overhead {overhead_pct:.1f}% is approaching 20% threshold"
+            )
 
 
 # Marker for performance tests (can be skipped in quick test runs)

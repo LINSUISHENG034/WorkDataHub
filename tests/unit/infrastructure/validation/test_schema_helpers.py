@@ -213,9 +213,7 @@ class TestEnsureNotEmpty:
 class TestSchemaHelpersIntegration:
     """Integration tests for schema helpers."""
 
-    def test_combined_validation_flow(
-        self, sample_schema: pa.DataFrameSchema
-    ) -> None:
+    def test_combined_validation_flow(self, sample_schema: pa.DataFrameSchema) -> None:
         """Test typical validation flow using multiple helpers."""
         df = pd.DataFrame(
             {
@@ -227,9 +225,7 @@ class TestSchemaHelpersIntegration:
 
         # Should pass all checks
         ensure_not_empty(sample_schema, df, "TestSchema")
-        ensure_required_columns(
-            sample_schema, df, ["col_a", "col_b"], "TestSchema"
-        )
+        ensure_required_columns(sample_schema, df, ["col_a", "col_b"], "TestSchema")
 
     def test_validation_with_chinese_column_names(self) -> None:
         """Test validation with Chinese column names."""
@@ -252,8 +248,6 @@ class TestSchemaHelpersIntegration:
 
         # Should fail with Chinese column name in error
         with pytest.raises(SchemaError) as exc_info:
-            ensure_required_columns(
-                schema, df, ["月度", "缺失列"], "中文Schema"
-            )
+            ensure_required_columns(schema, df, ["月度", "缺失列"], "中文Schema")
 
         assert "缺失列" in str(exc_info.value)

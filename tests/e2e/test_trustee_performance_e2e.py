@@ -100,7 +100,9 @@ class TestTrusteePerformanceE2E:
 
                 # Step 1: Discover files
                 context = build_op_context()
-                discover_config = DiscoverFilesConfig(domain="sample_trustee_performance")
+                discover_config = DiscoverFilesConfig(
+                    domain="sample_trustee_performance"
+                )
                 file_paths = discover_files_op(context, discover_config)
 
                 assert len(file_paths) == 1
@@ -115,7 +117,9 @@ class TestTrusteePerformanceE2E:
                 assert excel_rows[0]["计划代码"] == "PLAN001"
 
                 # Step 3: Process domain data
-                processed_rows = process_sample_trustee_performance_op(context, excel_rows, file_paths)
+                processed_rows = process_sample_trustee_performance_op(
+                    context, excel_rows, file_paths
+                )
 
                 assert len(processed_rows) == 3
                 assert processed_rows[0]["plan_code"] == "PLAN001"
@@ -277,7 +281,9 @@ class TestTrusteePerformanceE2E:
 
         # Process should handle errors gracefully
         # Some rows should be filtered out, others should be processed successfully
-        with patch("src.work_data_hub.domain.sample_trustee_performance.service.logger") as mock_logger:
+        with patch(
+            "src.work_data_hub.domain.sample_trustee_performance.service.logger"
+        ) as mock_logger:
             processed_models = process(excel_rows, data_source=str(excel_file))
 
             # Should process at least some valid data (not all rows are completely invalid)
@@ -368,7 +374,11 @@ class TestTrusteePerformanceE2E:
         processed_dicts = [model.model_dump() for model in processed_models]
 
         # Test load operation in specified mode
-        pk = ["report_date", "plan_code", "company_code"] if mode == "delete_insert" else []
+        pk = (
+            ["report_date", "plan_code", "company_code"]
+            if mode == "delete_insert"
+            else []
+        )
 
         load_result = load(
             table="sample_trustee_performance",
@@ -594,10 +604,10 @@ class TestTrusteePerformanceE2EIntegration:
                 table="test_trustee_performance", mode="append", pk=[], plan_only=False
             )
 
-            with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
-                mock_settings.return_value.get_database_connection_string.return_value = (
-                    "mocked_dsn"
-                )
+            with patch(
+                "src.work_data_hub.orchestration.ops.get_settings"
+            ) as mock_settings:
+                mock_settings.return_value.get_database_connection_string.return_value = "mocked_dsn"
 
                 result = load_op(context, config, test_data)
 

@@ -130,7 +130,9 @@ class TestDomainConfigV2:
 
         assert "version_strategy" in str(exc_info.value)
         # Pydantic v2 error message includes valid options
-        assert "highest_number" in str(exc_info.value) or "Input should be" in str(exc_info.value)
+        assert "highest_number" in str(exc_info.value) or "Input should be" in str(
+            exc_info.value
+        )
 
     def test_invalid_fallback_raises_error(self):
         """AC-3: Invalid fallback enum value raises ValidationError."""
@@ -356,7 +358,9 @@ class TestDataSourceConfigV2:
                 },
             )
 
-        assert "schema_version" in str(exc_info.value) or "Unsupported" in str(exc_info.value)
+        assert "schema_version" in str(exc_info.value) or "Unsupported" in str(
+            exc_info.value
+        )
 
 
 class TestValidateDataSourcesConfigV2:
@@ -369,7 +373,9 @@ class TestValidateDataSourcesConfigV2:
 
     def test_validate_file_not_found(self):
         """AC-2: Missing config file raises error."""
-        with pytest.raises(DataSourcesValidationError, match="Configuration file not found"):
+        with pytest.raises(
+            DataSourcesValidationError, match="Configuration file not found"
+        ):
             validate_data_sources_config_v2("/nonexistent/config.yml")
 
     def test_validate_invalid_yaml(self, tmp_path):
@@ -433,12 +439,16 @@ class TestGetDomainConfigV2:
 
     def test_get_domain_config_not_found(self, config_file_v2):
         """AC-2: Error when requested domain doesn't exist."""
-        with pytest.raises(DataSourcesValidationError, match="Domain 'nonexistent' not found"):
+        with pytest.raises(
+            DataSourcesValidationError, match="Domain 'nonexistent' not found"
+        ):
             get_domain_config_v2("nonexistent", config_file_v2)
 
     def test_get_domain_config_invalid_file(self):
         """AC-2: Error when config file doesn't exist."""
-        with pytest.raises(DataSourcesValidationError, match="Configuration file not found"):
+        with pytest.raises(
+            DataSourcesValidationError, match="Configuration file not found"
+        ):
             get_domain_config_v2("any_domain", "/nonexistent/config.yml")
 
 

@@ -170,9 +170,7 @@ class Pipeline:
         )
 
         for index, step in enumerate(self.steps):
-            step_result = self._run_step(
-                index, step, current_df, pipeline_context
-            )
+            step_result = self._run_step(index, step, current_df, pipeline_context)
 
             # Unpack enhanced step result
             step_df = step_result["df"]
@@ -196,10 +194,7 @@ class Pipeline:
                 )
 
         total_duration_ms = int(
-        (
-                datetime.now(timezone.utc) - start_time
-            ).total_seconds()
-            * 1000
+            (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
         )
 
         metrics = PipelineMetrics(
@@ -325,6 +320,7 @@ class Pipeline:
             import os
 
             import psutil
+
             process = psutil.Process(os.getpid())
             memory_before = process.memory_info().rss
         except ImportError:
@@ -336,9 +332,7 @@ class Pipeline:
 
         try:
             updated_df, warnings, errors, error_rows, rows_processed = (
-                self._execute_step_with_retry(
-                    step, step_index, current_df, context
-                )
+                self._execute_step_with_retry(step, step_index, current_df, context)
             )
 
         except StepSkipped as skip_exc:
@@ -368,6 +362,7 @@ class Pipeline:
             import os
 
             import psutil
+
             process = psutil.Process(os.getpid())
             memory_after = process.memory_info().rss
             memory_delta = memory_after - memory_before

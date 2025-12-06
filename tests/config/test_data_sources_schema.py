@@ -127,7 +127,10 @@ class TestDomainConfig:
         """Test that invalid select values are rejected."""
         with pytest.raises(Exception):  # Pydantic ValidationError
             DomainConfig(
-                pattern="test", select="invalid_selection_strategy", table="test", pk=["id"]
+                pattern="test",
+                select="invalid_selection_strategy",
+                table="test",
+                pk=["id"],
             )
 
     def test_domain_config_empty_pk_list(self):
@@ -150,7 +153,11 @@ class TestDomainConfig:
 
         # String sheet name
         config2 = DomainConfig(
-            pattern="test", select="latest_by_mtime", table="test", pk=["id"], sheet="Sheet1"
+            pattern="test",
+            select="latest_by_mtime",
+            table="test",
+            pk=["id"],
+            sheet="Sheet1",
         )
         assert config2.sheet == "Sheet1"
 
@@ -224,7 +231,9 @@ class TestValidateDataSourcesConfig:
 
     def test_validate_current_data_sources_succeeds(self):
         """Test that current data_sources.yml passes validation."""
-        result = validate_data_sources_config("src/work_data_hub/config/data_sources.yml")
+        result = validate_data_sources_config(
+            "src/work_data_hub/config/data_sources.yml"
+        )
         assert result is True
 
     def test_validate_data_sources_with_custom_path(self, config_file):
@@ -234,7 +243,9 @@ class TestValidateDataSourcesConfig:
 
     def test_validate_data_sources_file_not_found(self):
         """Test validation with non-existent file."""
-        with pytest.raises(DataSourcesValidationError, match="Configuration file not found"):
+        with pytest.raises(
+            DataSourcesValidationError, match="Configuration file not found"
+        ):
             validate_data_sources_config("/nonexistent/config.yml")
 
     def test_validate_data_sources_invalid_yaml(self, tmp_path):
@@ -298,12 +309,16 @@ class TestGetDomainConfig:
 
     def test_get_domain_config_not_found(self, config_file):
         """Test error when requested domain doesn't exist."""
-        with pytest.raises(DataSourcesValidationError, match="Domain 'nonexistent' not found"):
+        with pytest.raises(
+            DataSourcesValidationError, match="Domain 'nonexistent' not found"
+        ):
             get_domain_config("nonexistent", config_file)
 
     def test_get_domain_config_invalid_file(self):
         """Test error when config file doesn't exist."""
-        with pytest.raises(DataSourcesValidationError, match="Configuration file not found"):
+        with pytest.raises(
+            DataSourcesValidationError, match="Configuration file not found"
+        ):
             get_domain_config("any_domain", "/nonexistent/config.yml")
 
 
@@ -329,7 +344,9 @@ class TestIntegration:
     def test_real_data_sources_yml_validation(self):
         """Test validation of the actual data_sources.yml file in the project."""
         # This should pass if the real file is properly structured
-        result = validate_data_sources_config("src/work_data_hub/config/data_sources.yml")
+        result = validate_data_sources_config(
+            "src/work_data_hub/config/data_sources.yml"
+        )
         assert result is True
 
         # Test getting the sample_trustee_performance domain

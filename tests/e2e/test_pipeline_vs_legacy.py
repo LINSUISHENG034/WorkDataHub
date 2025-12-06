@@ -31,7 +31,9 @@ logger = logging.getLogger(__name__)
 
 # Test data paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-GOLDEN_BASELINE_PATH = PROJECT_ROOT / "tests/fixtures/annuity_performance/golden_legacy.parquet"
+GOLDEN_BASELINE_PATH = (
+    PROJECT_ROOT / "tests/fixtures/annuity_performance/golden_legacy.parquet"
+)
 SAMPLE_DATA_DIR = PROJECT_ROOT / "tests/fixtures/sample_data/annuity_subsets"
 MAPPING_FIXTURE_PATH = PROJECT_ROOT / "tests/fixtures/sample_legacy_mappings.json"
 
@@ -41,6 +43,7 @@ SHEET_NAME = "规模明细"
 
 class PipelineParityTestError(Exception):
     """Raised when pipeline output doesn't match legacy baseline."""
+
     pass
 
 
@@ -65,7 +68,9 @@ def load_golden_baseline() -> pd.DataFrame:
 
     try:
         df = pd.read_parquet(GOLDEN_BASELINE_PATH)
-        logger.info(f"Loaded golden baseline: {len(df)} rows, {len(df.columns)} columns")
+        logger.info(
+            f"Loaded golden baseline: {len(df)} rows, {len(df.columns)} columns"
+        )
         return df
     except Exception as e:
         raise Exception(f"Failed to load golden baseline: {e}") from e
@@ -136,7 +141,9 @@ def load_test_data() -> List[Dict[str, Any]]:
     if not all_rows:
         raise Exception("No test data was successfully loaded from any Excel files")
 
-    logger.info(f"Loaded {len(all_rows)} total rows from {len(excel_files)} Excel files")
+    logger.info(
+        f"Loaded {len(all_rows)} total rows from {len(excel_files)} Excel files"
+    )
     return all_rows
 
 
@@ -170,20 +177,28 @@ def process_with_pipeline(test_rows: List[Dict[str, Any]]) -> pd.DataFrame:
             raise Exception("Pipeline produced no successful output")
 
         # Apply same sorting as golden baseline for consistent comparison
-        sort_columns = [col for col in ("月度", "计划代码", "company_id") if col in pipeline_df.columns]
+        sort_columns = [
+            col
+            for col in ("月度", "计划代码", "company_id")
+            if col in pipeline_df.columns
+        ]
         if sort_columns:
             pipeline_df = pipeline_df.sort_values(sort_columns, na_position="last")
 
         pipeline_df = pipeline_df.reset_index(drop=True)
 
-        logger.info(f"Pipeline output: {len(pipeline_df)} rows, {len(pipeline_df.columns)} columns")
+        logger.info(
+            f"Pipeline output: {len(pipeline_df)} rows, {len(pipeline_df.columns)} columns"
+        )
         return pipeline_df
 
     except Exception as e:
         raise Exception(f"Pipeline processing failed: {e}") from e
 
 
-def normalize_dataframes_for_comparison(legacy_df: pd.DataFrame, pipeline_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+def normalize_dataframes_for_comparison(
+    legacy_df: pd.DataFrame, pipeline_df: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Normalize DataFrames for accurate comparison.
 
@@ -229,9 +244,11 @@ def normalize_dataframes_for_comparison(legacy_df: pd.DataFrame, pipeline_df: pd
             logger.debug(f"Converting {col}: {pipeline_dtype} -> {legacy_dtype}")
             try:
                 # Try to convert pipeline column to match legacy dtype
-                if legacy_dtype == 'object' and pipeline_dtype != 'object':
+                if legacy_dtype == "object" and pipeline_dtype != "object":
                     pipeline_norm[col] = pipeline_norm[col].astype(str)
-                elif pd.api.types.is_numeric_dtype(legacy_dtype) and pd.api.types.is_numeric_dtype(pipeline_dtype):
+                elif pd.api.types.is_numeric_dtype(
+                    legacy_dtype
+                ) and pd.api.types.is_numeric_dtype(pipeline_dtype):
                     pipeline_norm[col] = pipeline_norm[col].astype(legacy_dtype)
                 elif pd.api.types.is_datetime64_any_dtype(legacy_dtype):
                     pipeline_norm[col] = pd.to_datetime(pipeline_norm[col])
@@ -242,11 +259,15 @@ def normalize_dataframes_for_comparison(legacy_df: pd.DataFrame, pipeline_df: pd
     legacy_norm = legacy_norm.reset_index(drop=True)
     pipeline_norm = pipeline_norm.reset_index(drop=True)
 
-    logger.info(f"Normalized DataFrames for comparison: {len(common_cols_ordered)} common columns")
+    logger.info(
+        f"Normalized DataFrames for comparison: {len(common_cols_ordered)} common columns"
+    )
     return legacy_norm, pipeline_norm
 
 
-def generate_detailed_diff_report(legacy_df: pd.DataFrame, pipeline_df: pd.DataFrame) -> str:
+def generate_detailed_diff_report(
+    legacy_df: pd.DataFrame, pipeline_df: pd.DataFrame
+) -> str:
     """
     Generate detailed difference report for failed parity test.
 
@@ -260,24 +281,28 @@ def generate_detailed_diff_report(legacy_df: pd.DataFrame, pipeline_df: pd.DataF
     report_lines = ["=" * 80, "PIPELINE PARITY FAILURE REPORT", "=" * 80]
 
     # Shape comparison
-    report_lines.extend([
-        f"Shape Comparison:",
-        f"  Legacy:   {legacy_df.shape} (rows, columns)",
-        f"  Pipeline: {pipeline_df.shape} (rows, columns)",
-        ""
-    ])
+    report_lines.extend(
+        [
+            f"Shape Comparison:",
+            f"  Legacy:   {legacy_df.shape} (rows, columns)",
+            f"  Pipeline: {pipeline_df.shape} (rows, columns)",
+            "",
+        ]
+    )
 
     # Column comparison
     legacy_cols = set(legacy_df.columns)
     pipeline_cols = set(pipeline_df.columns)
 
     if legacy_cols != pipeline_cols:
-        report_lines.extend([
-            "Column Differences:",
-            f"  Legacy only:   {sorted(legacy_cols - pipeline_cols)}",
-            f"  Pipeline only: {sorted(pipeline_cols - legacy_cols)}",
-            ""
-        ])
+        report_lines.extend(
+            [
+                "Column Differences:",
+                f"  Legacy only:   {sorted(legacy_cols - pipeline_cols)}",
+                f"  Pipeline only: {sorted(pipeline_cols - legacy_cols)}",
+                "",
+            ]
+        )
 
     # Data comparison for common columns and rows
     common_cols = sorted(legacy_cols.intersection(pipeline_cols))
@@ -302,10 +327,14 @@ def generate_detailed_diff_report(legacy_df: pd.DataFrame, pipeline_df: pd.DataF
                 if legacy_is_na and pipeline_is_na:
                     continue  # Both NaN, considered equal
                 elif legacy_is_na != pipeline_is_na:
-                    report_lines.append(f"  Row {i}, {col}: Legacy='{legacy_val}' vs Pipeline='{pipeline_val}' (NaN mismatch)")
+                    report_lines.append(
+                        f"  Row {i}, {col}: Legacy='{legacy_val}' vs Pipeline='{pipeline_val}' (NaN mismatch)"
+                    )
                     diff_count += 1
                 elif str(legacy_val) != str(pipeline_val):
-                    report_lines.append(f"  Row {i}, {col}: Legacy='{legacy_val}' vs Pipeline='{pipeline_val}'")
+                    report_lines.append(
+                        f"  Row {i}, {col}: Legacy='{legacy_val}' vs Pipeline='{pipeline_val}'"
+                    )
                     diff_count += 1
 
                 if diff_count >= 10:
@@ -369,7 +398,9 @@ def test_pipeline_vs_legacy_parity():
                 atol=1e-8,  # Absolute tolerance for numeric comparison
             )
 
-            logger.info("✅ PARITY TEST PASSED: Pipeline output matches legacy baseline exactly")
+            logger.info(
+                "✅ PARITY TEST PASSED: Pipeline output matches legacy baseline exactly"
+            )
 
         except AssertionError as e:
             # Generate detailed diff report for debugging
@@ -419,12 +450,16 @@ def test_pipeline_basic_functionality():
 
         # Verify expected columns exist (basic sanity check)
         expected_columns = ["月度", "计划代码", "company_id", "_source_file"]
-        missing_columns = [col for col in expected_columns if col not in pipeline_output.columns]
+        missing_columns = [
+            col for col in expected_columns if col not in pipeline_output.columns
+        ]
 
         if missing_columns:
             logger.warning(f"Missing expected columns: {missing_columns}")
 
-        logger.info(f"✅ Pipeline basic functionality test passed: {len(pipeline_output)} rows processed")
+        logger.info(
+            f"✅ Pipeline basic functionality test passed: {len(pipeline_output)} rows processed"
+        )
 
     except Exception as e:
         logger.error(f"❌ Pipeline basic functionality test failed: {e}")
@@ -436,8 +471,7 @@ if __name__ == "__main__":
     import sys
 
     logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+        level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
     )
 
     try:

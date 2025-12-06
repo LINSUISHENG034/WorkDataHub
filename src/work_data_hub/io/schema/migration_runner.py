@@ -30,21 +30,29 @@ def upgrade(database_url: Optional[str] = None, revision: str = "head") -> None:
     """Run ``alembic upgrade`` programmatically."""
     cfg = _build_config(database_url)
     command.upgrade(cfg, revision)
-    LOGGER.info("alembic.upgrade", revision=revision, url=cfg.get_main_option("sqlalchemy.url"))
+    LOGGER.info(
+        "alembic.upgrade", revision=revision, url=cfg.get_main_option("sqlalchemy.url")
+    )
 
 
 def downgrade(database_url: Optional[str] = None, revision: str = "-1") -> None:
     """Run ``alembic downgrade`` programmatically."""
     cfg = _build_config(database_url)
     command.downgrade(cfg, revision)
-    LOGGER.info("alembic.downgrade", revision=revision, url=cfg.get_main_option("sqlalchemy.url"))
+    LOGGER.info(
+        "alembic.downgrade",
+        revision=revision,
+        url=cfg.get_main_option("sqlalchemy.url"),
+    )
 
 
 def stamp(database_url: Optional[str] = None, revision: str = "head") -> None:
     """Mark the database with a specific revision without running migrations."""
     cfg = _build_config(database_url)
     command.stamp(cfg, revision)
-    LOGGER.info("alembic.stamp", revision=revision, url=cfg.get_main_option("sqlalchemy.url"))
+    LOGGER.info(
+        "alembic.stamp", revision=revision, url=cfg.get_main_option("sqlalchemy.url")
+    )
 
 
 def get_default_database_url() -> str:

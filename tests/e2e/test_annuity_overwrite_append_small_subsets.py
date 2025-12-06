@@ -42,7 +42,9 @@ class TestAnnuityOverwriteAppendSmallSubsets:
     @pytest.fixture
     def mock_connector_for_distinct_file(self, subset_dir):
         """Mock DataSourceConnector to return distinct_5 subset file."""
-        distinct_file = os.path.join(subset_dir, "2024年11月年金终稿数据_subset_distinct_5.xlsx")
+        distinct_file = os.path.join(
+            subset_dir, "2024年11月年金终稿数据_subset_distinct_5.xlsx"
+        )
 
         mock_discovered = Mock()
         mock_discovered.path = distinct_file
@@ -57,7 +59,9 @@ class TestAnnuityOverwriteAppendSmallSubsets:
     @pytest.fixture
     def mock_connector_for_overlap_file(self, subset_dir):
         """Mock DataSourceConnector to return overlap_pk_6 subset file."""
-        overlap_file = os.path.join(subset_dir, "2024年11月年金终稿数据_subset_overlap_pk_6.xlsx")
+        overlap_file = os.path.join(
+            subset_dir, "2024年11月年金终稿数据_subset_overlap_pk_6.xlsx"
+        )
 
         mock_discovered = Mock()
         mock_discovered.path = overlap_file
@@ -72,7 +76,9 @@ class TestAnnuityOverwriteAppendSmallSubsets:
     @pytest.fixture
     def mock_connector_for_append_file(self, subset_dir):
         """Mock DataSourceConnector to return append_3 subset file."""
-        append_file = os.path.join(subset_dir, "2024年11月年金终稿数据_subset_append_3.xlsx")
+        append_file = os.path.join(
+            subset_dir, "2024年11月年金终稿数据_subset_append_3.xlsx"
+        )
 
         mock_discovered = Mock()
         mock_discovered.path = append_file
@@ -91,7 +97,9 @@ class TestAnnuityOverwriteAppendSmallSubsets:
         # Environment isolation - point to subset directory
         monkeypatch.setenv("WDH_DATA_BASE_DIR", subset_dir)
 
-        with patch("src.work_data_hub.orchestration.ops.DataSourceConnector") as mock_connector_class:
+        with patch(
+            "src.work_data_hub.orchestration.ops.DataSourceConnector"
+        ) as mock_connector_class:
             mock_connector_class.return_value = mock_connector_for_distinct_file
 
             # Build configuration for delete_insert mode with default PK
@@ -106,44 +114,86 @@ class TestAnnuityOverwriteAppendSmallSubsets:
 
             # Step 2: Read Excel data (mocked)
             read_config = ReadExcelConfig(sheet=0)
-            
+
             # Mock the Excel reader to return sample data
-            with patch("src.work_data_hub.orchestration.ops.read_excel_rows") as mock_read_excel:
+            with patch(
+                "src.work_data_hub.orchestration.ops.read_excel_rows"
+            ) as mock_read_excel:
                 # Mock sample Excel data for distinct subset
                 mock_read_excel.return_value = [
-                    {"年": "2024", "月": "11", "计划代码": "PLAN001", "客户名称": "公司A", "期初资产规模": "1000000"},
-                    {"年": "2024", "月": "11", "计划代码": "PLAN002", "客户名称": "公司B", "期初资产规模": "2000000"},
-                    {"年": "2024", "月": "11", "计划代码": "PLAN003", "客户名称": "公司C", "期初资产规模": "1500000"},
-                    {"年": "2024", "月": "11", "计划代码": "PLAN004", "客户名称": "公司D", "期初资产规模": "800000"},
-                    {"年": "2024", "月": "11", "计划代码": "PLAN005", "客户名称": "公司E", "期初资产规模": "1200000"},
+                    {
+                        "年": "2024",
+                        "月": "11",
+                        "计划代码": "PLAN001",
+                        "客户名称": "公司A",
+                        "期初资产规模": "1000000",
+                    },
+                    {
+                        "年": "2024",
+                        "月": "11",
+                        "计划代码": "PLAN002",
+                        "客户名称": "公司B",
+                        "期初资产规模": "2000000",
+                    },
+                    {
+                        "年": "2024",
+                        "月": "11",
+                        "计划代码": "PLAN003",
+                        "客户名称": "公司C",
+                        "期初资产规模": "1500000",
+                    },
+                    {
+                        "年": "2024",
+                        "月": "11",
+                        "计划代码": "PLAN004",
+                        "客户名称": "公司D",
+                        "期初资产规模": "800000",
+                    },
+                    {
+                        "年": "2024",
+                        "月": "11",
+                        "计划代码": "PLAN005",
+                        "客户名称": "公司E",
+                        "期初资产规模": "1200000",
+                    },
                 ]
-                
+
                 excel_rows = read_excel_op(context, read_config, file_paths)
 
             assert len(excel_rows) >= 1  # Should have some rows
 
             # Step 3: Process through domain service
-            processed_rows = process_annuity_performance_op(context, excel_rows, file_paths)
+            processed_rows = process_annuity_performance_op(
+                context, excel_rows, file_paths
+            )
 
             assert len(processed_rows) >= 1
             # Verify expected structure
             if processed_rows:
                 assert "月度" in processed_rows[0] or "report_date" in processed_rows[0]
-                assert "计划代码" in processed_rows[0] or "plan_code" in processed_rows[0]
+                assert (
+                    "计划代码" in processed_rows[0] or "plan_code" in processed_rows[0]
+                )
                 assert "company_id" in processed_rows[0]
 
             # Step 4: Load with default PK (plan-only mode)
             load_config = LoadConfig(
                 table="规模明细",
                 mode="delete_insert",
-                pk=["月度", "计划代码", "company_id"],  # Default PK from data_sources.yml
+                pk=[
+                    "月度",
+                    "计划代码",
+                    "company_id",
+                ],  # Default PK from data_sources.yml
                 plan_only=True,
             )
             load_result = load_op(context, load_config, processed_rows)
 
             # Validation: Expected counts based on distinct subset characteristics
             assert load_result["mode"] == "delete_insert"
-            assert load_result["deleted"] == len(processed_rows)  # Unique PK combinations
+            assert load_result["deleted"] == len(
+                processed_rows
+            )  # Unique PK combinations
             assert load_result["inserted"] == len(processed_rows)
             assert "sql_plans" in load_result  # Plan-only mode
 
@@ -159,7 +209,9 @@ class TestAnnuityOverwriteAppendSmallSubsets:
         """Test delete_insert with overlapping PKs using default configuration."""
         monkeypatch.setenv("WDH_DATA_BASE_DIR", subset_dir)
 
-        with patch("src.work_data_hub.orchestration.ops.DataSourceConnector") as mock_connector_class:
+        with patch(
+            "src.work_data_hub.orchestration.ops.DataSourceConnector"
+        ) as mock_connector_class:
             mock_connector_class.return_value = mock_connector_for_overlap_file
 
             context = build_op_context()
@@ -172,7 +224,9 @@ class TestAnnuityOverwriteAppendSmallSubsets:
             excel_rows = read_excel_op(context, read_config, file_paths)
 
             # Process data
-            processed_rows = process_annuity_performance_op(context, excel_rows, file_paths)
+            processed_rows = process_annuity_performance_op(
+                context, excel_rows, file_paths
+            )
 
             # Load with default PK
             load_config = LoadConfig(
@@ -190,11 +244,15 @@ class TestAnnuityOverwriteAppendSmallSubsets:
             assert load_result["deleted"] <= load_result["inserted"]
             assert "sql_plans" in load_result
 
-    def test_delete_insert_with_pk_override(self, monkeypatch, subset_dir, mock_connector_for_overlap_file):
+    def test_delete_insert_with_pk_override(
+        self, monkeypatch, subset_dir, mock_connector_for_overlap_file
+    ):
         """Test delete_insert with runtime PK override."""
         monkeypatch.setenv("WDH_DATA_BASE_DIR", subset_dir)
 
-        with patch("src.work_data_hub.orchestration.ops.DataSourceConnector") as mock_connector_class:
+        with patch(
+            "src.work_data_hub.orchestration.ops.DataSourceConnector"
+        ) as mock_connector_class:
             mock_connector_class.return_value = mock_connector_for_overlap_file
 
             context = build_op_context()
@@ -206,7 +264,9 @@ class TestAnnuityOverwriteAppendSmallSubsets:
             read_config = ReadExcelConfig(sheet=0)
             excel_rows = read_excel_op(context, read_config, file_paths)
 
-            processed_rows = process_annuity_performance_op(context, excel_rows, file_paths)
+            processed_rows = process_annuity_performance_op(
+                context, excel_rows, file_paths
+            )
 
             # Load with PK override (two-column grouping)
             load_config = LoadConfig(
@@ -232,13 +292,20 @@ class TestAnnuityOverwriteAppendSmallSubsets:
             assert '"月度"' in delete_sql
             assert '"计划代码"' in delete_sql
             # Should not include company_id in WHERE clause
-            assert '"company_id"' not in delete_sql or delete_sql.count('"company_id"') <= 1
+            assert (
+                '"company_id"' not in delete_sql
+                or delete_sql.count('"company_id"') <= 1
+            )
 
-    def test_append_mode_validation(self, monkeypatch, subset_dir, mock_connector_for_append_file):
+    def test_append_mode_validation(
+        self, monkeypatch, subset_dir, mock_connector_for_append_file
+    ):
         """Test append mode validation - should ignore PK requirements."""
         monkeypatch.setenv("WDH_DATA_BASE_DIR", subset_dir)
 
-        with patch("src.work_data_hub.orchestration.ops.DataSourceConnector") as mock_connector_class:
+        with patch(
+            "src.work_data_hub.orchestration.ops.DataSourceConnector"
+        ) as mock_connector_class:
             mock_connector_class.return_value = mock_connector_for_append_file
 
             context = build_op_context()
@@ -250,7 +317,9 @@ class TestAnnuityOverwriteAppendSmallSubsets:
             read_config = ReadExcelConfig(sheet=0)
             excel_rows = read_excel_op(context, read_config, file_paths)
 
-            processed_rows = process_annuity_performance_op(context, excel_rows, file_paths)
+            processed_rows = process_annuity_performance_op(
+                context, excel_rows, file_paths
+            )
 
             # Test append mode - should work without PK requirement
             load_config = LoadConfig(
@@ -272,11 +341,15 @@ class TestAnnuityOverwriteAppendSmallSubsets:
             assert len(operations) == 1  # Only INSERT
             assert operations[0][0] == "INSERT"
 
-    def test_complete_job_execution_plan_only(self, monkeypatch, subset_dir, mock_connector_for_distinct_file):
+    def test_complete_job_execution_plan_only(
+        self, monkeypatch, subset_dir, mock_connector_for_distinct_file
+    ):
         """Test complete annuity_performance_job execution in plan-only mode."""
         monkeypatch.setenv("WDH_DATA_BASE_DIR", subset_dir)
 
-        with patch("src.work_data_hub.orchestration.ops.DataSourceConnector") as mock_connector_class:
+        with patch(
+            "src.work_data_hub.orchestration.ops.DataSourceConnector"
+        ) as mock_connector_class:
             mock_connector_class.return_value = mock_connector_for_distinct_file
 
             # Build run config for job execution
@@ -285,14 +358,13 @@ class TestAnnuityOverwriteAppendSmallSubsets:
                 mode="delete_insert",
                 plan_only=True,
                 max_files=1,
-                sheet=0
+                sheet=0,
             )
             run_config = build_run_config(args)
 
             # Execute complete job
             result = annuity_performance_job.execute_in_process(
-                run_config=run_config,
-                instance=None
+                run_config=run_config, instance=None
             )
 
             # Verify successful execution
@@ -306,11 +378,15 @@ class TestAnnuityOverwriteAppendSmallSubsets:
             assert load_result["deleted"] >= 1
             assert "sql_plans" in load_result
 
-    def test_job_execution_with_pk_override_via_cli_args(self, monkeypatch, subset_dir, mock_connector_for_overlap_file):
+    def test_job_execution_with_pk_override_via_cli_args(
+        self, monkeypatch, subset_dir, mock_connector_for_overlap_file
+    ):
         """Test job execution with --pk CLI parameter override."""
         monkeypatch.setenv("WDH_DATA_BASE_DIR", subset_dir)
 
-        with patch("src.work_data_hub.orchestration.ops.DataSourceConnector") as mock_connector_class:
+        with patch(
+            "src.work_data_hub.orchestration.ops.DataSourceConnector"
+        ) as mock_connector_class:
             mock_connector_class.return_value = mock_connector_for_overlap_file
 
             # Simulate CLI args with PK override
@@ -320,14 +396,13 @@ class TestAnnuityOverwriteAppendSmallSubsets:
                 plan_only=True,
                 max_files=1,
                 pk="月度,计划代码",  # Override to two-column PK
-                sheet=0
+                sheet=0,
             )
             run_config = build_run_config(args)
 
             # Execute job
             result = annuity_performance_job.execute_in_process(
-                run_config=run_config,
-                instance=None
+                run_config=run_config, instance=None
             )
 
             assert result.success
@@ -347,11 +422,15 @@ class TestAnnuityOverwriteAppendSmallSubsets:
             assert '"月度"' in delete_sql
             assert '"计划代码"' in delete_sql
 
-    def test_job_execution_append_mode(self, monkeypatch, subset_dir, mock_connector_for_append_file):
+    def test_job_execution_append_mode(
+        self, monkeypatch, subset_dir, mock_connector_for_append_file
+    ):
         """Test complete job execution in append mode."""
         monkeypatch.setenv("WDH_DATA_BASE_DIR", subset_dir)
 
-        with patch("src.work_data_hub.orchestration.ops.DataSourceConnector") as mock_connector_class:
+        with patch(
+            "src.work_data_hub.orchestration.ops.DataSourceConnector"
+        ) as mock_connector_class:
             mock_connector_class.return_value = mock_connector_for_append_file
 
             # Build args for append mode
@@ -360,14 +439,13 @@ class TestAnnuityOverwriteAppendSmallSubsets:
                 mode="append",
                 plan_only=True,
                 max_files=1,
-                sheet=0
+                sheet=0,
             )
             run_config = build_run_config(args)
 
             # Execute job
             result = annuity_performance_job.execute_in_process(
-                run_config=run_config,
-                instance=None
+                run_config=run_config, instance=None
             )
 
             assert result.success
@@ -399,7 +477,9 @@ class TestAnnuityOverwriteAppendSmallSubsets:
         mock_connector = Mock()
         mock_connector.discover.return_value = [mock_discovered]
 
-        with patch("src.work_data_hub.orchestration.ops.DataSourceConnector") as mock_connector_class:
+        with patch(
+            "src.work_data_hub.orchestration.ops.DataSourceConnector"
+        ) as mock_connector_class:
             mock_connector_class.return_value = mock_connector
 
             context = build_op_context()
@@ -417,11 +497,17 @@ class TestAnnuityOverwriteAppendSmallSubsets:
             assert excel_rows == []
 
 
-def build_args(domain: str, mode: str = "delete_insert", plan_only: bool = True,
-               max_files: int = 1, pk: str = None, sheet: int = 0):
+def build_args(
+    domain: str,
+    mode: str = "delete_insert",
+    plan_only: bool = True,
+    max_files: int = 1,
+    pk: str = None,
+    sheet: int = 0,
+):
     """Helper to build mock CLI args for testing."""
     from argparse import Namespace
-    
+
     return Namespace(
         domain=domain,
         mode=mode,
@@ -431,5 +517,5 @@ def build_args(domain: str, mode: str = "delete_insert", plan_only: bool = True,
         pk=pk,
         sheet=sheet,
         debug=False,
-        raise_on_error=True
+        raise_on_error=True,
     )

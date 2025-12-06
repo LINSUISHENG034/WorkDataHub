@@ -20,20 +20,18 @@ from __future__ import annotations
 import asyncio
 import getpass
 import os
-from pathlib import Path
 from typing import Optional
 
-from playwright.async_api import async_playwright
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
 
 # 直接复用增强模块中的图像/拖拽工具
 from work_data_hub.auth.eqc_auth_opencv import (
     _capture_slider_images,  # type: ignore
-    _solve_offset_with_opencv,  # type: ignore
     _drag_by_offset,  # type: ignore
+    _solve_offset_with_opencv,  # type: ignore
 )
-
 
 LOGIN_URL = os.getenv("EQC_LOGIN_URL", "https://eqc.pingan.com/")
 EQC_AUTO_SLIDER = os.getenv("EQC_AUTO_SLIDER", "true").lower() == "true"
@@ -124,7 +122,10 @@ async def maybe_fill_otp(page, otp_env: Optional[str]) -> None:
             await otp_box.fill(otp_env)
             return
         print("🔐 检测到验证码/令牌输入框。")
-        choice = input("在终端输入(1) 或 在浏览器中手动输入后按回车(2) [默认2]: ").strip() or "2"
+        choice = (
+            input("在终端输入(1) 或 在浏览器中手动输入后按回车(2) [默认2]: ").strip()
+            or "2"
+        )
         if choice == "1":
             otp = input("请输入验证码/令牌: ").strip()
             await otp_box.fill(otp)
@@ -163,7 +164,9 @@ async def try_slider(page) -> bool:
         offset = _solve_offset_with_opencv(imgs.bg_bytes, imgs.full_bytes)
         await _drag_by_offset(page, offset, imgs.bg_width)
         try:
-            await page.wait_for_selector("div.geetest_panel", state="detached", timeout=4000)
+            await page.wait_for_selector(
+                "div.geetest_panel", state="detached", timeout=4000
+            )
             print("✅ 滑块已关闭。")
             return True
         except PlaywrightTimeoutError:
@@ -211,7 +214,9 @@ async def main():
         # 等待滑块或直接成功
         res = None
         try:
-            await page.wait_for_selector("div.geetest_panel, div.geetest_slider_button", timeout=6000)
+            await page.wait_for_selector(
+                "div.geetest_panel, div.geetest_slider_button", timeout=6000
+            )
             res = "slider"
         except PlaywrightTimeoutError:
             res = "maybe-logged"
@@ -233,4 +238,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

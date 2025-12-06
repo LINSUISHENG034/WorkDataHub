@@ -28,7 +28,7 @@ class CleanerFactory:
         :param mappings: List of dictionaries containing mapping data.
         """
         self.mappings = mappings
-        self.cleaner_module = r'data_handler.data_cleaner'
+        self.cleaner_module = r"data_handler.data_cleaner"
 
     def create_cleaner(self, cleaner_name):
         try:
@@ -36,7 +36,7 @@ class CleanerFactory:
             cleaner_class = getattr(module, cleaner_name)
             return cleaner_class
         except Exception as e:
-            logger.error(f'Error creating  cleaner {cleaner_name}. Error: {e}')
+            logger.error(f"Error creating  cleaner {cleaner_name}. Error: {e}")
             return None
 
     # TODO: 针对同一文件通过关键字匹配创建多个cleaner
@@ -49,12 +49,12 @@ class CleanerFactory:
         :return: A list of cleaner instances corresponding to the matched keyword.
         """
         if keyword:
-            matched_mappings = [m for m in self.mappings if m['keyword'] == keyword]
+            matched_mappings = [m for m in self.mappings if m["keyword"] == keyword]
             cleaners = []
             for m in matched_mappings:
                 try:
                     module = import_module(self.cleaner_module)
-                    cleaner_class = getattr(module, m['cleaner_class'])
+                    cleaner_class = getattr(module, m["cleaner_class"])
                     cleaners.append(cleaner_class)
                 except KeyError as e:
                     # 处理无法找到的类名

@@ -8,7 +8,7 @@ Chinese date formats commonly found in Excel files and business data.
 import logging
 import re
 from datetime import date, datetime
-from typing import Callable, List, Optional, Pattern, Tuple, Union
+from typing import Any, Callable, Hashable, List, Optional, Pattern, Tuple, Union
 
 import pandas as pd
 
@@ -19,7 +19,7 @@ SUPPORTED_FORMATS = (
     "YYYY-MM, YYYY-MM-DD, YY年MM月 (2-digit year)"
 )
 
-DateParser = Callable[[str, Optional[re.Match[str]]], date]
+DateParser = Callable[[str, re.Match[str]], date]
 
 
 def _normalize_fullwidth_digits(value: str) -> str:
@@ -28,11 +28,14 @@ def _normalize_fullwidth_digits(value: str) -> str:
     return value.translate(translation_table)
 
 
-def _validate_date_range(parsed: date, min_year: int = 2000, max_year: int = 2030) -> date:
+def _validate_date_range(
+    parsed: date, min_year: int = 2000, max_year: int = 2030
+) -> date:
     """Ensure parsed date falls within allowed range."""
     if not (min_year <= parsed.year <= max_year):
         raise ValueError(
-            f"Date {parsed.year}-{parsed.month:02d} outside valid range {min_year}-{max_year}"
+            f"Date {parsed.year}-{parsed.month:02d} outside valid range "
+            f"{min_year}-{max_year}"
         )
     return parsed
 
@@ -199,7 +202,13 @@ def parse_report_date(value: Union[str, int, date, None]) -> Optional[date]:
 
     try:
         parsed = parse_chinese_date(value)
-        if hasattr(parsed, "date"):
+        if parsed is None:
+            return None
+        # parse_chinese_date already returns a date object (or None)
+        # The previous logic with hasattr(parsed, "date") was redundant as
+        # parse_chinese_date returns date objects (which includes datetime objects)
+        # and we just want the date part if it is a datetime, or the date itself.
+        if isinstance(parsed, datetime):
             return parsed.date()
         return parsed
     except Exception:  # pragma: no cover - defensive logging
@@ -207,12 +216,13 @@ def parse_report_date(value: Union[str, int, date, None]) -> Optional[date]:
         return None
 
 
-def parse_bronze_dates(series: pd.Series) -> Tuple[pd.Series, List[int]]:
+def parse_bronze_dates(series: pd.Series) -> Tuple[pd.Series, List[Hashable]]:
     """
-    Parse date column using shared date parser; return parsed series and invalid indices.
+    Parse date column using shared date parser; return parsed series and invalid
+    indices.
     """
-    parsed_values: List[pd.Timestamp | pd.NaT] = []
-    invalid_rows: List[int] = []
+    parsed_values: List[Any] = []
+    invalid_rows: List[Hashable] = []
     for idx, value in series.items():
         if value is None or (isinstance(value, str) and not value.strip()):
             parsed_values.append(pd.NaT)
@@ -269,11 +279,29 @@ def _parse_two_digit_year_month_day(match: re.Match[str]) -> date:
 _DATE_PATTERNS: list[Tuple[Pattern[str], DateParser]] = [
     (re.compile(r"^\d{8}$"), lambda value, _: _parse_digits(value, "%Y%m%d")),
     (re.compile(r"^\d{6}$"), lambda value, _: _parse_digits(f"{value}01", "%Y%m%d")),
-    (re.compile(r"^\d{4}-\d{2}-\d{2}$"), lambda value, _: _parse_digits(value, "%Y-%m-%d")),
-    (re.compile(r"^\d{4}-\d{2}$"), lambda value, _: _parse_digits(f"{value}-01", "%Y-%m-%d")),
-    (re.compile(r"^(\d{4})年(\d{1,2})月(\d{1,2})日$"), lambda _, match: _parse_year_month_day(match)),
-    (re.compile(r"^(\d{4})年(\d{1,2})月(\d{1,2})$"), lambda _, match: _parse_year_month_day(match)),
+    (
+        re.compile(r"^\d{4}-\d{2}-\d{2}$"),
+        lambda value, _: _parse_digits(value, "%Y-%m-%d"),
+    ),
+    (
+        re.compile(r"^\d{4}-\d{2}$"),
+        lambda value, _: _parse_digits(f"{value}-01", "%Y-%m-%d"),
+    ),
+    (
+        re.compile(r"^(\d{4})年(\d{1,2})月(\d{1,2})日$"),
+        lambda _, match: _parse_year_month_day(match),
+    ),
+    (
+        re.compile(r"^(\d{4})年(\d{1,2})月(\d{1,2})$"),
+        lambda _, match: _parse_year_month_day(match),
+    ),
     (re.compile(r"^(\d{4})年(\d{1,2})月$"), lambda _, match: _parse_year_month(match)),
-    (re.compile(r"^(\d{2})年(\d{1,2})月(\d{1,2})日$"), lambda _, match: _parse_two_digit_year_month_day(match)),
-    (re.compile(r"^(\d{2})年(\d{1,2})月$"), lambda _, match: _parse_two_digit_year_month(match)),
+    (
+        re.compile(r"^(\d{2})年(\d{1,2})月(\d{1,2})日$"),
+        lambda _, match: _parse_two_digit_year_month_day(match),
+    ),
+    (
+        re.compile(r"^(\d{2})年(\d{1,2})月$"),
+        lambda _, match: _parse_two_digit_year_month(match),
+    ),
 ]

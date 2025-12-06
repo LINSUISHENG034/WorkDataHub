@@ -18,7 +18,9 @@ from src.work_data_hub.orchestration.schedules import (
     trustee_daily_schedule,
 )
 
-pytestmark = pytest.mark.skip(reason="Tests depend on deprecated trustee_performance schedules - pending Epic 5")
+pytestmark = pytest.mark.skip(
+    reason="Tests depend on deprecated trustee_performance schedules - pending Epic 5"
+)
 
 
 class TestScheduleRunConfig:
@@ -41,7 +43,9 @@ class TestScheduleRunConfig:
             yaml.dump(config_data, f)
 
         # Mock get_settings to use test config file
-        with patch("src.work_data_hub.orchestration.schedules.get_settings") as mock_settings:
+        with patch(
+            "src.work_data_hub.orchestration.schedules.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             result = _build_schedule_run_config()
@@ -49,8 +53,12 @@ class TestScheduleRunConfig:
             # Verify structure matches expected op config schemas
             expected = {
                 "ops": {
-            "discover_files_op": {"config": {"domain": "sample_trustee_performance"}},
-                    "read_and_process_trustee_files_op": {"config": {"sheet": 0, "max_files": 5}},
+                    "discover_files_op": {
+                        "config": {"domain": "sample_trustee_performance"}
+                    },
+                    "read_and_process_trustee_files_op": {
+                        "config": {"sheet": 0, "max_files": 5}
+                    },
                     "load_op": {
                         "config": {
                             "table": "sample_trustee_performance",
@@ -73,7 +81,9 @@ class TestScheduleRunConfig:
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
-        with patch("src.work_data_hub.orchestration.schedules.get_settings") as mock_settings:
+        with patch(
+            "src.work_data_hub.orchestration.schedules.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             result = _build_schedule_run_config()
@@ -95,7 +105,9 @@ class TestScheduleRunConfig:
 
     def test_build_schedule_run_config_error_handling(self):
         """Test schedule run config building with config file errors."""
-        with patch("src.work_data_hub.orchestration.schedules.get_settings") as mock_settings:
+        with patch(
+            "src.work_data_hub.orchestration.schedules.get_settings"
+        ) as mock_settings:
             # Simulate config file not found
             mock_settings.return_value.data_sources_config = "nonexistent.yml"
 
@@ -108,13 +120,19 @@ class TestScheduleRunConfig:
 
     def test_build_schedule_run_config_execution_mode(self, tmp_path):
         """Test that schedule always configures execution mode (plan_only=False)."""
-        config_data = {"domains": {"sample_trustee_performance": {"table": "test_table", "pk": ["id"]}}}
+        config_data = {
+            "domains": {
+                "sample_trustee_performance": {"table": "test_table", "pk": ["id"]}
+            }
+        }
 
         config_file = tmp_path / "test_config.yml"
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
-        with patch("src.work_data_hub.orchestration.schedules.get_settings") as mock_settings:
+        with patch(
+            "src.work_data_hub.orchestration.schedules.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             result = _build_schedule_run_config()
@@ -138,7 +156,9 @@ class TestTrusteeSchedule:
         assert schedule.execution_timezone == "Asia/Shanghai"
 
         # Verify the job is correctly configured
-        from src.work_data_hub.orchestration.jobs import sample_trustee_performance_multi_file_job
+        from src.work_data_hub.orchestration.jobs import (
+            sample_trustee_performance_multi_file_job,
+        )
 
         assert schedule.job == sample_trustee_performance_multi_file_job
 
@@ -161,7 +181,9 @@ class TestTrusteeSchedule:
         # Mock context (schedule functions receive context as first parameter)
         mock_context = None  # Schedule function doesn't use context currently
 
-        with patch("src.work_data_hub.orchestration.schedules.get_settings") as mock_settings:
+        with patch(
+            "src.work_data_hub.orchestration.schedules.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             # Call the schedule function

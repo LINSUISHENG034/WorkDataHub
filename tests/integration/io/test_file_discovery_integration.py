@@ -21,15 +21,22 @@ from work_data_hub.io.connectors.file_connector import FileDiscoveryService
 from work_data_hub.io.connectors.file_pattern_matcher import FilePatternMatcher
 from work_data_hub.io.connectors.version_scanner import VersionScanner
 from work_data_hub.io.readers.excel_reader import ExcelReader
-from src.work_data_hub.infrastructure.settings.data_source_schema import DataSourceConfigV2, DomainConfigV2
+from src.work_data_hub.infrastructure.settings.data_source_schema import (
+    DataSourceConfigV2,
+    DomainConfigV2,
+)
 
 
 # Path to realistic fixture file
 FIXTURE_DIR = Path(__file__).parent.parent.parent / "fixtures" / "sample_data"
-REALISTIC_FIXTURE = FIXTURE_DIR / "【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx"
+REALISTIC_FIXTURE = (
+    FIXTURE_DIR / "【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx"
+)
 
 
-def _build_settings(base_template: Path, sheet_name: str = "规模明细") -> SimpleNamespace:
+def _build_settings(
+    base_template: Path, sheet_name: str = "规模明细"
+) -> SimpleNamespace:
     domain_cfg = DomainConfigV2(
         base_path=str(base_template),
         file_patterns=["*年金终稿*.xlsx"],
@@ -46,9 +53,7 @@ def _build_settings(base_template: Path, sheet_name: str = "规模明细") -> Si
     )
 
 
-def _build_multi_domain_settings(
-    base_a: Path, base_b: Path
-) -> SimpleNamespace:
+def _build_multi_domain_settings(base_a: Path, base_b: Path) -> SimpleNamespace:
     """Build settings with two domains for multi-domain tests."""
     domain_cfg_a = DomainConfigV2(
         base_path=str(base_a),
@@ -85,7 +90,9 @@ def _build_multi_domain_settings(
 def test_discover_and_load_end_to_end(tmp_path):
     """Test end-to-end discovery with synthetic data."""
     # Arrange: build versioned folder with a simple Excel file
-    base = tmp_path / "reference" / "monthly" / "202501" / "收集数据" / "数据采集" / "V1"
+    base = (
+        tmp_path / "reference" / "monthly" / "202501" / "收集数据" / "数据采集" / "V1"
+    )
     base.mkdir(parents=True)
     excel_path = base / "年金终稿数据.xlsx"
 
@@ -93,7 +100,12 @@ def test_discover_and_load_end_to_end(tmp_path):
     df.to_excel(excel_path, sheet_name="规模明细", index=False)
 
     settings = _build_settings(
-        base_template=tmp_path / "reference" / "monthly" / "{YYYYMM}" / "收集数据" / "数据采集"
+        base_template=tmp_path
+        / "reference"
+        / "monthly"
+        / "{YYYYMM}"
+        / "收集数据"
+        / "数据采集"
     )
     service = FileDiscoveryService(
         settings=settings,
@@ -116,7 +128,9 @@ def test_discover_and_load_end_to_end(tmp_path):
 
 def test_discover_missing_sheet_raises_excel_stage(tmp_path):
     """Test that missing sheet raises DiscoveryError with excel_reading stage."""
-    base = tmp_path / "reference" / "monthly" / "202501" / "收集数据" / "数据采集" / "V1"
+    base = (
+        tmp_path / "reference" / "monthly" / "202501" / "收集数据" / "数据采集" / "V1"
+    )
     base.mkdir(parents=True)
     excel_path = base / "年金终稿数据.xlsx"
 
@@ -125,7 +139,12 @@ def test_discover_missing_sheet_raises_excel_stage(tmp_path):
     )
 
     settings = _build_settings(
-        base_template=tmp_path / "reference" / "monthly" / "{YYYYMM}" / "收集数据" / "数据采集",
+        base_template=tmp_path
+        / "reference"
+        / "monthly"
+        / "{YYYYMM}"
+        / "收集数据"
+        / "数据采集",
         sheet_name="不存在的表",
     )
     service = FileDiscoveryService(
@@ -142,14 +161,21 @@ def test_discover_missing_sheet_raises_excel_stage(tmp_path):
 
 def test_discovery_performance_under_threshold(tmp_path):
     """Test that discovery completes within performance threshold (<2s)."""
-    base = tmp_path / "reference" / "monthly" / "202501" / "收集数据" / "数据采集" / "V1"
+    base = (
+        tmp_path / "reference" / "monthly" / "202501" / "收集数据" / "数据采集" / "V1"
+    )
     base.mkdir(parents=True)
     excel_path = base / "年金终稿数据.xlsx"
     df = pd.DataFrame({"计划代码": list(range(10)), "值": list(range(10))})
     df.to_excel(excel_path, sheet_name="规模明细", index=False)
 
     settings = _build_settings(
-        base_template=tmp_path / "reference" / "monthly" / "{YYYYMM}" / "收集数据" / "数据采集"
+        base_template=tmp_path
+        / "reference"
+        / "monthly"
+        / "{YYYYMM}"
+        / "收集数据"
+        / "数据采集"
     )
     service = FileDiscoveryService(
         settings=settings,
@@ -170,7 +196,7 @@ def test_discovery_performance_under_threshold(tmp_path):
 
 @pytest.mark.skipif(
     not REALISTIC_FIXTURE.exists(),
-    reason=f"Realistic fixture not found: {REALISTIC_FIXTURE}"
+    reason=f"Realistic fixture not found: {REALISTIC_FIXTURE}",
 )
 class TestRealisticFixture:
     """Integration tests using realistic production-like fixture data."""
@@ -178,13 +204,28 @@ class TestRealisticFixture:
     def test_discover_with_realistic_excel_file(self, tmp_path):
         """Test discovery with realistic Excel file containing Chinese data."""
         # Setup: Copy fixture to versioned folder structure
-        base = tmp_path / "reference" / "monthly" / "202411" / "收集数据" / "数据采集" / "V1"
+        base = (
+            tmp_path
+            / "reference"
+            / "monthly"
+            / "202411"
+            / "收集数据"
+            / "数据采集"
+            / "V1"
+        )
         base.mkdir(parents=True)
-        target_file = base / "【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx"
+        target_file = (
+            base / "【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx"
+        )
         shutil.copy(REALISTIC_FIXTURE, target_file)
 
         settings = _build_settings(
-            base_template=tmp_path / "reference" / "monthly" / "{YYYYMM}" / "收集数据" / "数据采集"
+            base_template=tmp_path
+            / "reference"
+            / "monthly"
+            / "{YYYYMM}"
+            / "收集数据"
+            / "数据采集"
         )
         service = FileDiscoveryService(
             settings=settings,
@@ -212,13 +253,28 @@ class TestRealisticFixture:
     def test_discover_different_sheet_from_realistic_file(self, tmp_path):
         """Test discovery of different sheet (收入明细) from realistic file."""
         # Setup
-        base = tmp_path / "reference" / "monthly" / "202411" / "收集数据" / "数据采集" / "V1"
+        base = (
+            tmp_path
+            / "reference"
+            / "monthly"
+            / "202411"
+            / "收集数据"
+            / "数据采集"
+            / "V1"
+        )
         base.mkdir(parents=True)
-        target_file = base / "【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx"
+        target_file = (
+            base / "【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx"
+        )
         shutil.copy(REALISTIC_FIXTURE, target_file)
 
         settings = _build_settings(
-            base_template=tmp_path / "reference" / "monthly" / "{YYYYMM}" / "收集数据" / "数据采集",
+            base_template=tmp_path
+            / "reference"
+            / "monthly"
+            / "{YYYYMM}"
+            / "收集数据"
+            / "数据采集",
             sheet_name="收入明细",  # Different sheet
         )
         service = FileDiscoveryService(
@@ -276,13 +332,28 @@ class TestRealisticFixture:
     def test_column_normalization_with_realistic_chinese_headers(self, tmp_path):
         """Test that Chinese column headers are properly normalized."""
         # Setup
-        base = tmp_path / "reference" / "monthly" / "202411" / "收集数据" / "数据采集" / "V1"
+        base = (
+            tmp_path
+            / "reference"
+            / "monthly"
+            / "202411"
+            / "收集数据"
+            / "数据采集"
+            / "V1"
+        )
         base.mkdir(parents=True)
-        target_file = base / "【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx"
+        target_file = (
+            base / "【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx"
+        )
         shutil.copy(REALISTIC_FIXTURE, target_file)
 
         settings = _build_settings(
-            base_template=tmp_path / "reference" / "monthly" / "{YYYYMM}" / "收集数据" / "数据采集"
+            base_template=tmp_path
+            / "reference"
+            / "monthly"
+            / "{YYYYMM}"
+            / "收集数据"
+            / "数据采集"
         )
         service = FileDiscoveryService(
             settings=settings,
@@ -304,13 +375,28 @@ class TestRealisticFixture:
     def test_performance_with_realistic_data_size(self, tmp_path):
         """Test performance meets NFR (<2s) with realistic data size."""
         # Setup
-        base = tmp_path / "reference" / "monthly" / "202411" / "收集数据" / "数据采集" / "V1"
+        base = (
+            tmp_path
+            / "reference"
+            / "monthly"
+            / "202411"
+            / "收集数据"
+            / "数据采集"
+            / "V1"
+        )
         base.mkdir(parents=True)
-        target_file = base / "【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx"
+        target_file = (
+            base / "【for年金分战区经营分析】24年11月年金终稿数据1209采集.xlsx"
+        )
         shutil.copy(REALISTIC_FIXTURE, target_file)
 
         settings = _build_settings(
-            base_template=tmp_path / "reference" / "monthly" / "{YYYYMM}" / "收集数据" / "数据采集"
+            base_template=tmp_path
+            / "reference"
+            / "monthly"
+            / "{YYYYMM}"
+            / "收集数据"
+            / "数据采集"
         )
         service = FileDiscoveryService(
             settings=settings,
@@ -348,7 +434,15 @@ class TestErrorRecovery:
 
     def test_invalid_excel_file_raises_excel_stage_error(self, tmp_path):
         """Test that corrupted/invalid Excel file raises appropriate error."""
-        base = tmp_path / "reference" / "monthly" / "202501" / "收集数据" / "数据采集" / "V1"
+        base = (
+            tmp_path
+            / "reference"
+            / "monthly"
+            / "202501"
+            / "收集数据"
+            / "数据采集"
+            / "V1"
+        )
         base.mkdir(parents=True)
         invalid_file = base / "年金终稿数据.xlsx"
 
@@ -356,7 +450,12 @@ class TestErrorRecovery:
         invalid_file.write_text("This is not a valid Excel file")
 
         settings = _build_settings(
-            base_template=tmp_path / "reference" / "monthly" / "{YYYYMM}" / "收集数据" / "数据采集"
+            base_template=tmp_path
+            / "reference"
+            / "monthly"
+            / "{YYYYMM}"
+            / "收集数据"
+            / "数据采集"
         )
         service = FileDiscoveryService(
             settings=settings,
@@ -375,14 +474,27 @@ class TestErrorRecovery:
 
     def test_no_matching_files_raises_file_matching_error(self, tmp_path):
         """Test that no matching files raises file_matching stage error."""
-        base = tmp_path / "reference" / "monthly" / "202501" / "收集数据" / "数据采集" / "V1"
+        base = (
+            tmp_path
+            / "reference"
+            / "monthly"
+            / "202501"
+            / "收集数据"
+            / "数据采集"
+            / "V1"
+        )
         base.mkdir(parents=True)
         # Create file that doesn't match pattern
         wrong_file = base / "wrong_name.xlsx"
         pd.DataFrame({"a": [1]}).to_excel(wrong_file, index=False)
 
         settings = _build_settings(
-            base_template=tmp_path / "reference" / "monthly" / "{YYYYMM}" / "收集数据" / "数据采集"
+            base_template=tmp_path
+            / "reference"
+            / "monthly"
+            / "{YYYYMM}"
+            / "收集数据"
+            / "数据采集"
         )
         service = FileDiscoveryService(
             settings=settings,
@@ -408,7 +520,12 @@ class TestErrorRecovery:
         # No V1 folder created, no files either
 
         settings = _build_settings(
-            base_template=tmp_path / "reference" / "monthly" / "{YYYYMM}" / "收集数据" / "数据采集"
+            base_template=tmp_path
+            / "reference"
+            / "monthly"
+            / "{YYYYMM}"
+            / "收集数据"
+            / "数据采集"
         )
         service = FileDiscoveryService(
             settings=settings,
@@ -427,7 +544,12 @@ class TestErrorRecovery:
         """Test that non-existent base path raises version_detection error."""
         # Don't create the base path at all
         settings = _build_settings(
-            base_template=tmp_path / "reference" / "monthly" / "{YYYYMM}" / "收集数据" / "数据采集"
+            base_template=tmp_path
+            / "reference"
+            / "monthly"
+            / "{YYYYMM}"
+            / "收集数据"
+            / "数据采集"
         )
         service = FileDiscoveryService(
             settings=settings,

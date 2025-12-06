@@ -19,8 +19,12 @@ from work_data_hub.domain.annuity_performance.service import process_with_enrich
 class TestFailedRecordsExport:
     """Tests for failed records export in process_with_enrichment."""
 
-    @patch("work_data_hub.domain.annuity_performance.service.convert_dataframe_to_models")
-    @patch("work_data_hub.domain.annuity_performance.service.build_bronze_to_silver_pipeline")
+    @patch(
+        "work_data_hub.domain.annuity_performance.service.convert_dataframe_to_models"
+    )
+    @patch(
+        "work_data_hub.domain.annuity_performance.service.build_bronze_to_silver_pipeline"
+    )
     @patch("work_data_hub.domain.annuity_performance.service.export_error_csv")
     @patch("work_data_hub.domain.annuity_performance.service.export_unknown_names_csv")
     def test_exports_failed_rows_from_original_dataframe(
@@ -32,7 +36,9 @@ class TestFailedRecordsExport:
     ):
         """AC1/AC2: Export uses original input columns for dropped rows."""
         mock_export_unknown.return_value = None
-        mock_export_error.return_value = Path("logs/failed_records_test_20241206_120000.csv")
+        mock_export_error.return_value = Path(
+            "logs/failed_records_test_20241206_120000.csv"
+        )
 
         pipeline = MagicMock()
         # Pipeline returns a transformed DataFrame, but export should use original rows
@@ -48,20 +54,33 @@ class TestFailedRecordsExport:
 
         rows = [
             {"月度": "202412", "计划代码": "AP0001", "客户名称": "OK"},
-            {"月度": "202412", "计划代码": "AP0002", "客户名称": "FAIL", "额外列": "keep"},
+            {
+                "月度": "202412",
+                "计划代码": "AP0002",
+                "客户名称": "FAIL",
+                "额外列": "keep",
+            },
         ]
 
-        process_with_enrichment(rows, data_source="test_file.xlsx", export_unknown_names=False)
+        process_with_enrichment(
+            rows, data_source="test_file.xlsx", export_unknown_names=False
+        )
 
         mock_export_error.assert_called_once()
         failed_df = mock_export_error.call_args.args[0]
         expected_df = pd.DataFrame([rows[1]])
-        assert_frame_equal(failed_df.reset_index(drop=True), expected_df.reset_index(drop=True))
+        assert_frame_equal(
+            failed_df.reset_index(drop=True), expected_df.reset_index(drop=True)
+        )
         assert mock_export_error.call_args.kwargs["output_dir"] == Path("logs")
         assert "test_file" in mock_export_error.call_args.kwargs["filename_prefix"]
 
-    @patch("work_data_hub.domain.annuity_performance.service.convert_dataframe_to_models")
-    @patch("work_data_hub.domain.annuity_performance.service.build_bronze_to_silver_pipeline")
+    @patch(
+        "work_data_hub.domain.annuity_performance.service.convert_dataframe_to_models"
+    )
+    @patch(
+        "work_data_hub.domain.annuity_performance.service.build_bronze_to_silver_pipeline"
+    )
     @patch("work_data_hub.domain.annuity_performance.service.export_error_csv")
     @patch("work_data_hub.domain.annuity_performance.service.export_unknown_names_csv")
     def test_no_export_when_all_records_pass_validation(
@@ -82,7 +101,9 @@ class TestFailedRecordsExport:
 
         rows = [{"月度": "202412", "计划代码": "AP0001", "客户名称": "OK"}]
 
-        process_with_enrichment(rows, data_source="test_file.xlsx", export_unknown_names=False)
+        process_with_enrichment(
+            rows, data_source="test_file.xlsx", export_unknown_names=False
+        )
 
         mock_export_error.assert_not_called()
 

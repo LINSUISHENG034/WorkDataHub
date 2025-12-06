@@ -89,8 +89,8 @@ def process_annuity_income(
 
     Expected Inputs:
         Bronze DataFrame from discovered Excel file (sheet: 收入明细)
-        Required columns: 月度, 机构/机构代码, 机构名称, 计划号/计划代码, 客户名称, 业务类型,
-        计划类型, 组合代码, 固费, 浮费, 回补, 税
+        Required columns: 月度, 机构/机构代码, 机构名称, 计划号/计划代码, 客户名称,
+        业务类型, 计划类型, 组合代码, 固费, 浮费, 回补, 税
 
     Outputs:
         DomainPipelineResult containing:
@@ -106,7 +106,8 @@ def process_annuity_income(
         - FileNotFoundError: Source file not discovered
         - ValidationError: Schema validation failures
         - DatabaseError: Warehouse loading failures
-        All errors logged with domain tag 'annuity_income', PII (客户名称) scrubbed outside debug level.
+        All errors logged with domain tag 'annuity_income', PII (客户名称) scrubbed
+        outside debug level.
 
     Returns:
         DomainPipelineResult with processing metrics and status
@@ -135,7 +136,9 @@ def process_annuity_income(
     # Choose loading mode based on configuration
     if ENABLE_UPSERT_MODE:
         # UPSERT mode: ON CONFLICT DO UPDATE (for aggregate tables)
-        actual_upsert_keys = upsert_keys if upsert_keys is not None else DEFAULT_UPSERT_KEYS
+        actual_upsert_keys = (
+            upsert_keys if upsert_keys is not None else DEFAULT_UPSERT_KEYS
+        )
         load_result = warehouse_loader.load_dataframe(
             dataframe,
             table=table_name,
@@ -144,7 +147,9 @@ def process_annuity_income(
         )
     else:
         # REFRESH mode: DELETE + INSERT (for detail tables)
-        actual_refresh_keys = refresh_keys if refresh_keys is not None else DEFAULT_REFRESH_KEYS
+        actual_refresh_keys = (
+            refresh_keys if refresh_keys is not None else DEFAULT_REFRESH_KEYS
+        )
         load_result = warehouse_loader.load_with_refresh(
             dataframe,
             table=table_name,
@@ -216,7 +221,9 @@ def process_with_enrichment(
         ProcessingResultWithEnrichment containing validated records and stats
     """
     if not rows:
-        logger.bind(domain="annuity_income", step="process_with_enrichment").info("No rows provided for processing")
+        logger.bind(domain="annuity_income", step="process_with_enrichment").info(
+            "No rows provided for processing"
+        )
         return ProcessingResultWithEnrichment(
             records=[],
             data_source=data_source,
@@ -252,7 +259,9 @@ def process_with_enrichment(
     if dropped_count > 0:
         drop_rate = dropped_count / len(rows) if rows else 0
         if drop_rate > 0.5:
-            logger.bind(domain="annuity_income", step="process_with_enrichment").warning(
+            logger.bind(
+                domain="annuity_income", step="process_with_enrichment"
+            ).warning(
                 "High row drop rate during processing",
                 dropped=dropped_count,
                 total=len(rows),
@@ -269,14 +278,14 @@ def process_with_enrichment(
         else:
             failed_df = input_df
         if not failed_df.empty:
-            csv_path = export_error_csv(
+            error_csv_path = export_error_csv(
                 failed_df,
                 filename_prefix=f"failed_records_{Path(data_source).stem}",
                 output_dir=Path("logs"),
             )
             logger.bind(domain="annuity_income", step="process_with_enrichment").info(
                 "Exported failed records to CSV",
-                csv_path=str(csv_path),
+                csv_path=str(error_csv_path),
                 count=len(failed_df),
             )
     csv_path = export_unknown_names_csv(
@@ -305,7 +314,9 @@ def _records_to_dataframe(records: List[AnnuityIncomeOut]) -> pd.DataFrame:
     if not records:
         return pd.DataFrame()
 
-    df = pd.DataFrame([r.model_dump(mode="json", by_alias=True, exclude_none=True) for r in records])
+    df = pd.DataFrame(
+        [r.model_dump(mode="json", by_alias=True, exclude_none=True) for r in records]
+    )
     # Keep both plan columns for parity with annuity_performance
     if "计划代码" not in df.columns and "计划号" in df.columns:
         df["计划代码"] = df["计划号"]

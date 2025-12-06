@@ -32,15 +32,18 @@ logger.propagate = True
 @dataclass
 class ExcelReadResult:
     """Result of Excel sheet reading."""
-    df: pd.DataFrame           # Loaded DataFrame
-    sheet_name: str            # Actual sheet name loaded
-    row_count: int             # Number of data rows
-    column_count: int          # Number of columns
+
+    df: pd.DataFrame  # Loaded DataFrame
+    sheet_name: str  # Actual sheet name loaded
+    row_count: int  # Number of data rows
+    column_count: int  # Number of columns
     columns_renamed: Dict[str, str]  # Original -> normalized mapping (may be empty)
     normalization_duration_ms: Optional[int]  # Time spent normalizing column headers
-    duration_breakdown: Optional[Dict[str, int]]  # Detailed timing (read_ms, normalization_ms)
-    file_path: Path            # Source file path
-    read_at: datetime          # Timestamp of read operation
+    duration_breakdown: Optional[
+        Dict[str, int]
+    ]  # Detailed timing (read_ms, normalization_ms)
+    file_path: Path  # Source file path
+    read_at: datetime  # Timestamp of read operation
 
 
 class ExcelReadError(Exception):
@@ -281,7 +284,6 @@ class ExcelReader:
 
         return cleaned_rows
 
-
     def read_sheet(
         self,
         file_path: Path,
@@ -338,7 +340,8 @@ class ExcelReader:
                 cleaned_df = df.replace(r"^\s*$", pd.NA, regex=True)
                 df = cleaned_df.dropna(how="all")
 
-                # Drop accidental header rows that repeat column names (common in hand-crafted Excel)
+                # Drop accidental header rows that repeat column names (common in
+                # hand-crafted Excel)
                 if not df.empty and list(df.iloc[0].values) == list(df.columns):
                     df = df.iloc[1:]
 
@@ -346,13 +349,15 @@ class ExcelReader:
 
                 if empty_count > 0:
                     logger.warning(
-                        "excel_reading.empty_rows_skipped empty_rows_skipped=%s file_path=%s sheet_name=%s",
+                        "excel_reading.empty_rows_skipped empty_rows_skipped=%s "
+                        "file_path=%s sheet_name=%s",
                         empty_count,
                         file_path,
                         actual_sheet_name,
                     )
                     logging.getLogger().warning(
-                        "excel_reading.empty_rows_skipped empty_rows_skipped=%s file_path=%s sheet_name=%s",
+                        "excel_reading.empty_rows_skipped empty_rows_skipped=%s "
+                        "file_path=%s sheet_name=%s",
                         empty_count,
                         file_path,
                         actual_sheet_name,
@@ -399,11 +404,13 @@ class ExcelReader:
                 normalization_duration_ms=normalization_duration_ms,
                 duration_breakdown=duration_breakdown,
                 file_path=file_path,
-                read_at=start_time
+                read_at=start_time,
             )
 
             logger.info(
-                "excel_reading.completed file_path=%s sheet_name=%s row_count=%s column_count=%s duration_ms=%s empty_rows_skipped=%s normalization_ms=%s",
+                "excel_reading.completed file_path=%s sheet_name=%s row_count=%s "
+                "column_count=%s duration_ms=%s empty_rows_skipped=%s "
+                "normalization_ms=%s",
                 file_path,
                 actual_sheet_name,
                 result.row_count,
@@ -420,7 +427,7 @@ class ExcelReader:
                 domain="unknown",
                 failed_stage="excel_reading",
                 original_error=e,
-                message=f"Excel file not found: {file_path}"
+                message=f"Excel file not found: {file_path}",
             )
         except DiscoveryError:
             # Propagate already-wrapped discovery errors (sheet resolution, etc.)
@@ -434,21 +441,21 @@ class ExcelReader:
                 message=(
                     f"Sheet '{sheet_name}' not found in file {file_path.name}, "
                     f"available sheets: {available_sheets}"
-                )
+                ),
             )
         except Exception as e:
             raise DiscoveryError(
                 domain="unknown",
                 failed_stage="excel_reading",
                 original_error=e,
-                message=f"Failed to read Excel file {file_path}: {str(e)}"
+                message=f"Failed to read Excel file {file_path}: {str(e)}",
             )
 
     def _resolve_sheet_name(
         self,
         sheet_name: Union[str, int],
-        available_sheets: list,
-        file_path: Path
+        available_sheets: List[str],
+        file_path: Path,
     ) -> str:
         """Resolve sheet name from string or index."""
         if isinstance(sheet_name, int):
@@ -458,9 +465,11 @@ class ExcelReader:
                     failed_stage="excel_reading",
                     original_error=IndexError(f"Sheet index {sheet_name} out of range"),
                     message=(
-                        f"Sheet index {sheet_name} out of range in file {file_path.name}, "
-                        f"available sheets (0-{len(available_sheets)-1}): {available_sheets}"
-                    )
+                        f"Sheet index {sheet_name} out of range in file "
+                        f"{file_path.name}, "
+                        f"available sheets (0-{len(available_sheets) - 1}): "
+                        f"{available_sheets}"
+                    ),
                 )
             return available_sheets[sheet_name]
 
@@ -472,9 +481,9 @@ class ExcelReader:
                 message=(
                     f"Sheet '{sheet_name}' not found in file {file_path.name}, "
                     f"available sheets: {available_sheets}"
-                )
+                ),
             )
-        return sheet_name
+        return str(sheet_name)
 
 
 def read_excel_rows(

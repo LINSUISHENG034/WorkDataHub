@@ -250,9 +250,21 @@ class TestEnhancedPlanDerivation:
     def test_enhanced_plan_derivation_numeric_edge_cases(self):
         """Test numeric handling with various formats."""
         rows = [
-            {"计划代码": "PLAN001", "客户名称": "Client A", "期末资产规模": "1000000"},  # String number
-            {"计划代码": "PLAN001", "客户名称": "Client B", "期末资产规模": 2000000.5},  # Float
-            {"计划代码": "PLAN001", "客户名称": "Client C", "期末资产规模": 1500000},  # Int
+            {
+                "计划代码": "PLAN001",
+                "客户名称": "Client A",
+                "期末资产规模": "1000000",
+            },  # String number
+            {
+                "计划代码": "PLAN001",
+                "客户名称": "Client B",
+                "期末资产规模": 2000000.5,
+            },  # Float
+            {
+                "计划代码": "PLAN001",
+                "客户名称": "Client C",
+                "期末资产规模": 1500000,
+            },  # Int
         ]
 
         candidates = derive_plan_candidates(rows)
@@ -300,8 +312,14 @@ class TestDerivePortfolioCandidates:
                 "计划代码": "PLAN001",
                 "组合名称": "Valid Portfolio",
             },
-            {"组合代码": "PORT002", "组合名称": "Missing Plan Code"},  # Missing 计划代码
-            {"计划代码": "PLAN001", "组合名称": "Missing Portfolio Code"},  # Missing 组合代码
+            {
+                "组合代码": "PORT002",
+                "组合名称": "Missing Plan Code",
+            },  # Missing 计划代码
+            {
+                "计划代码": "PLAN001",
+                "组合名称": "Missing Portfolio Code",
+            },  # Missing 组合代码
             {"组合代码": "", "计划代码": "PLAN001"},  # Empty 组合代码
             {"组合代码": "PORT003", "计划代码": ""},  # Empty 计划代码
         ]

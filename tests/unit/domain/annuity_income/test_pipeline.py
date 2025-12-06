@@ -96,11 +96,13 @@ class TestApplyPortfolioCodeDefaults:
 
     def test_removes_f_prefix(self):
         """Removes 'F' prefix from portfolio codes."""
-        df = pd.DataFrame({
-            "组合代码": ["FQTAN001", "qtan002", "fqtan003"],
-            "业务类型": ["企年投资", "企年投资", "企年投资"],
-            "计划类型": ["单一计划", "单一计划", "单一计划"],
-        })
+        df = pd.DataFrame(
+            {
+                "组合代码": ["FQTAN001", "qtan002", "fqtan003"],
+                "业务类型": ["企年投资", "企年投资", "企年投资"],
+                "计划类型": ["单一计划", "单一计划", "单一计划"],
+            }
+        )
         result = _apply_portfolio_code_defaults(df)
         assert result.iloc[0] == "QTAN001"
         assert result.iloc[1] == "QTAN002"
@@ -108,43 +110,51 @@ class TestApplyPortfolioCodeDefaults:
 
     def test_applies_qtan003_for_zhinian(self):
         """Applies QTAN003 for 职年受托/职年投资 business types."""
-        df = pd.DataFrame({
-            "组合代码": [None, None],
-            "业务类型": ["职年受托", "职年投资"],
-            "计划类型": ["单一计划", "单一计划"],
-        })
+        df = pd.DataFrame(
+            {
+                "组合代码": [None, None],
+                "业务类型": ["职年受托", "职年投资"],
+                "计划类型": ["单一计划", "单一计划"],
+            }
+        )
         result = _apply_portfolio_code_defaults(df)
         assert result.iloc[0] == "QTAN003"
         assert result.iloc[1] == "QTAN003"
 
     def test_applies_default_based_on_plan_type(self):
         """Applies default portfolio code based on plan type."""
-        df = pd.DataFrame({
-            "组合代码": [None, None],
-            "业务类型": ["企年投资", "企年投资"],
-            "计划类型": ["集合计划", "单一计划"],
-        })
+        df = pd.DataFrame(
+            {
+                "组合代码": [None, None],
+                "业务类型": ["企年投资", "企年投资"],
+                "计划类型": ["集合计划", "单一计划"],
+            }
+        )
         result = _apply_portfolio_code_defaults(df)
         assert result.iloc[0] == "QTAN001"
         assert result.iloc[1] == "QTAN002"
 
     def test_applies_default_for_professional_pension_plan_type(self):
         """职业年金 plan type should default when empty and not matched by business type."""
-        df = pd.DataFrame({
-            "组合代码": [None],
-            "业务类型": ["企年投资"],
-            "计划类型": ["职业年金"],
-        })
+        df = pd.DataFrame(
+            {
+                "组合代码": [None],
+                "业务类型": ["企年投资"],
+                "计划类型": ["职业年金"],
+            }
+        )
         result = _apply_portfolio_code_defaults(df)
         assert result.iloc[0] == "QTAN003"
 
     def test_preserves_existing_codes(self):
         """Preserves existing non-empty portfolio codes."""
-        df = pd.DataFrame({
-            "组合代码": ["EXISTING", "ANOTHER"],
-            "业务类型": ["企年投资", "职年受托"],
-            "计划类型": ["单一计划", "单一计划"],
-        })
+        df = pd.DataFrame(
+            {
+                "组合代码": ["EXISTING", "ANOTHER"],
+                "业务类型": ["企年投资", "职年受托"],
+                "计划类型": ["单一计划", "单一计划"],
+            }
+        )
         result = _apply_portfolio_code_defaults(df)
         assert result.iloc[0] == "EXISTING"
         assert result.iloc[1] == "ANOTHER"
@@ -156,11 +166,13 @@ class TestCompanyIdResolutionStep:
     @pytest.fixture
     def sample_df(self):
         """Create sample DataFrame for testing."""
-        return pd.DataFrame({
-            "计划号": ["FP0001", "FP0002", "UNKNOWN"],
-            "客户名称": ["公司A", "公司B", "公司C"],
-            "年金账户名": ["账户1", "账户2", "账户3"],
-        })
+        return pd.DataFrame(
+            {
+                "计划号": ["FP0001", "FP0002", "UNKNOWN"],
+                "客户名称": ["公司A", "公司B", "公司C"],
+                "年金账户名": ["账户1", "账户2", "账户3"],
+            }
+        )
 
     @pytest.fixture
     def context(self):
@@ -241,23 +253,25 @@ class TestPipelineExecution:
     def sample_bronze_df(self):
         """Create sample Bronze layer DataFrame for AnnuityIncome."""
         # Story 5.5.5: Updated to use four income fields instead of 收入金额
-        return pd.DataFrame({
-            "月度": ["202411", "202411"],
-            "计划号": ["FP0001", "FP0002"],
-            "客户名称": ["测试公司A", "测试公司B"],
-            "年金账户名": ["账户A", "账户B"],
-            "业务类型": ["企年投资", "职年受托"],
-            "计划类型": ["单一计划", "单一计划"],
-            "机构名称": ["北京", "上海"],
-            "机构": ["北京", "上海"],  # Will be renamed to 机构代码
-            "组合代码": ["FQTAN001", None],  # F prefix to remove, None to default
-            "固费": [500000.0, 1000000.0],
-            "浮费": [300000.0, 600000.0],
-            "回补": [200000.0, 400000.0],
-            "税": [50000.0, 100000.0],
-            "id": [1, 2],  # Legacy column to be dropped
-            "备注": ["备注1", "备注2"],  # Legacy column to be dropped
-        })
+        return pd.DataFrame(
+            {
+                "月度": ["202411", "202411"],
+                "计划号": ["FP0001", "FP0002"],
+                "客户名称": ["测试公司A", "测试公司B"],
+                "年金账户名": ["账户A", "账户B"],
+                "业务类型": ["企年投资", "职年受托"],
+                "计划类型": ["单一计划", "单一计划"],
+                "机构名称": ["北京", "上海"],
+                "机构": ["北京", "上海"],  # Will be renamed to 机构代码
+                "组合代码": ["FQTAN001", None],  # F prefix to remove, None to default
+                "固费": [500000.0, 1000000.0],
+                "浮费": [300000.0, 600000.0],
+                "回补": [200000.0, 400000.0],
+                "税": [50000.0, 100000.0],
+                "id": [1, 2],  # Legacy column to be dropped
+                "备注": ["备注1", "备注2"],  # Legacy column to be dropped
+            }
+        )
 
     @pytest.fixture
     def context(self):
@@ -303,7 +317,9 @@ class TestPipelineExecution:
         assert result_df.loc[0, "产品线代码"] == "PL201"
         assert result_df.loc[1, "产品线代码"] == "PL204"
 
-    def test_pipeline_preserves_customer_name_to_account_name(self, sample_bronze_df, context):
+    def test_pipeline_preserves_customer_name_to_account_name(
+        self, sample_bronze_df, context
+    ):
         """Pipeline copies 客户名称 to 年金账户名 before cleansing."""
         pipeline = build_bronze_to_silver_pipeline()
 
@@ -338,21 +354,23 @@ class TestPipelineExecution:
 
     def test_pipeline_handles_column_aliases(self, context):
         """Pipeline normalizes 计划代码→计划号 and 机构→机构代码 before processing."""
-        alias_df = pd.DataFrame({
-            "月度": ["202412"],
-            "计划代码": ["fp0003"],  # Alias column that should become 计划号
-            "客户名称": ["测试公司C"],
-            "年金账户名": ["账户C"],
-            "业务类型": ["企年投资"],
-            "计划类型": ["单一计划"],
-            "机构": ["北京"],  # Alias that should become 机构代码
-            "机构名称": ["北京"],
-            "组合代码": ["FQTAN010"],
-            "固费": [120000.0],
-            "浮费": [34000.0],
-            "回补": [5600.0],
-            "税": [1700.0],
-        })
+        alias_df = pd.DataFrame(
+            {
+                "月度": ["202412"],
+                "计划代码": ["fp0003"],  # Alias column that should become 计划号
+                "客户名称": ["测试公司C"],
+                "年金账户名": ["账户C"],
+                "业务类型": ["企年投资"],
+                "计划类型": ["单一计划"],
+                "机构": ["北京"],  # Alias that should become 机构代码
+                "机构名称": ["北京"],
+                "组合代码": ["FQTAN010"],
+                "固费": [120000.0],
+                "浮费": [34000.0],
+                "回补": [5600.0],
+                "税": [1700.0],
+            }
+        )
 
         pipeline = build_bronze_to_silver_pipeline()
         result_df = pipeline.execute(alias_df, context)

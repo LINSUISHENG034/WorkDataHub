@@ -41,8 +41,10 @@ DEFAULT_PORTFOLIO_CODE_MAPPING: Dict[str, str] = {
 PORTFOLIO_QTAN003_BUSINESS_TYPES: Sequence[str] = ("职年受托", "职年投资")
 
 # Company branch name to institution code mapping
-# CRITICAL: This is the canonical superset including legacy overrides from annuity_income
-# The 6 legacy overrides (内蒙, 战略, 中国, 济南, 北京其他, 北分) were identified in Story 5.5-1
+# CRITICAL: This is the canonical superset including legacy overrides from
+# annuity_income
+# The 6 legacy overrides (内蒙, 战略, 中国, 济南, 北京其他, 北分) were identified in
+# Story 5.5-1
 # Used by: annuity_performance, annuity_income
 COMPANY_BRANCH_MAPPING: Dict[str, str] = {
     # Standard mappings (shared across all domains)

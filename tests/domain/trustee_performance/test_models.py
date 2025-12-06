@@ -15,7 +15,9 @@ import pytest
 
 pytestmark = pytest.mark.sample_domain
 
-from src.work_data_hub.domain.sample_trustee_performance.models import TrusteePerformanceOut
+from src.work_data_hub.domain.sample_trustee_performance.models import (
+    TrusteePerformanceOut,
+)
 
 
 class TestDecimalQuantizationEnhanced:
@@ -133,7 +135,11 @@ class TestFloatPrecisionEdgeCases:
             (0.048799999999999996, "return_rate", Decimal("0.048800")),
             (1.0512000000000001, "net_asset_value", Decimal("1.0512")),
             (12000000.003, "fund_scale", Decimal("12000000.00")),
-            (0.1 + 0.2, "return_rate", Decimal("0.300000")),  # Classic 0.30000000000000004
+            (
+                0.1 + 0.2,
+                "return_rate",
+                Decimal("0.300000"),
+            ),  # Classic 0.30000000000000004
             (1.1 + 2.2, "net_asset_value", Decimal("3.3000")),  # Should be 3.3
         ]
 
@@ -228,7 +234,9 @@ class TestFieldValidatorInfoIntegration:
 
     def test_field_validator_receives_correct_field_name(self):
         """Test that field validators receive correct field_name in ValidationInfo."""
-        from src.work_data_hub.domain.sample_trustee_performance.models import TrusteePerformanceOut
+        from src.work_data_hub.domain.sample_trustee_performance.models import (
+            TrusteePerformanceOut,
+        )
 
         # Mock ValidationInfo to test the field_name parameter
         original_validator = TrusteePerformanceOut.clean_decimal_fields
@@ -264,7 +272,9 @@ class TestFieldValidatorInfoIntegration:
 
     def test_field_precision_map_coverage(self):
         """Test that all decimal fields are covered in FIELD_PRECISION_MAP."""
-        from src.work_data_hub.domain.sample_trustee_performance.models import TrusteePerformanceOut
+        from src.work_data_hub.domain.sample_trustee_performance.models import (
+            TrusteePerformanceOut,
+        )
 
         # Extract field_precision_map from validator (this tests the actual implementation)
         field_precision_map = {
@@ -293,7 +303,9 @@ class TestFieldValidatorInfoIntegration:
 
     def test_clean_decimal_fields_direct_invocation(self):
         """Test direct invocation of clean_decimal_fields validator."""
-        from src.work_data_hub.domain.sample_trustee_performance.models import TrusteePerformanceOut
+        from src.work_data_hub.domain.sample_trustee_performance.models import (
+            TrusteePerformanceOut,
+        )
 
         # Mock ValidationInfo for testing
         mock_info = Mock(spec=ValidationInfo)

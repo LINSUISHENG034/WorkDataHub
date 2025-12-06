@@ -12,7 +12,10 @@ from work_data_hub.io.connectors.exceptions import DiscoveryError
 from work_data_hub.io.connectors.file_pattern_matcher import FileMatchResult
 from work_data_hub.io.connectors.version_scanner import VersionedPath
 from work_data_hub.io.readers.excel_reader import ExcelReadResult, ExcelReader
-from src.work_data_hub.infrastructure.settings.data_source_schema import DataSourceConfigV2, DomainConfigV2
+from src.work_data_hub.infrastructure.settings.data_source_schema import (
+    DataSourceConfigV2,
+    DomainConfigV2,
+)
 
 
 class DummyScanner:
@@ -53,7 +56,9 @@ class DummyMatcher:
         if self.raise_error:
             raise self.raise_error
         return FileMatchResult(
-            matched_file=Path("/tmp/reference/monthly/202501/收集数据/数据采集/V1/file.xlsx"),
+            matched_file=Path(
+                "/tmp/reference/monthly/202501/收集数据/数据采集/V1/file.xlsx"
+            ),
             patterns_used=include_patterns,
             exclude_patterns=exclude_patterns,
             candidates_found=[],
@@ -124,7 +129,9 @@ def test_template_variable_resolution_and_call_order():
 
     assert isinstance(result, DataDiscoveryResult)
     assert result.version == "V1"
-    assert scanner.calls[0]["base_path"] == Path("reference/monthly/202501/收集数据/数据采集")
+    assert scanner.calls[0]["base_path"] == Path(
+        "reference/monthly/202501/收集数据/数据采集"
+    )
     assert matcher.calls[0]["search_path"] == scanner.calls[0]["base_path"] / "V1"
     assert reader.calls[0]["sheet_name"] == "规模明细"
     assert result.row_count == 2
@@ -468,7 +475,10 @@ class TestTemplateVariableResolution:
             )
 
         # Schema validates only allowed placeholders
-        assert "placeholder" in str(exc.value).lower() or "custom_var" in str(exc.value).lower()
+        assert (
+            "placeholder" in str(exc.value).lower()
+            or "custom_var" in str(exc.value).lower()
+        )
 
 
 # =============================================================================
@@ -533,7 +543,9 @@ class TestVersionDetectionFallback:
             def __init__(self):
                 self.call_count = 0
 
-            def detect_version(self, base_path, file_patterns, strategy, version_override=None):
+            def detect_version(
+                self, base_path, file_patterns, strategy, version_override=None
+            ):
                 self.call_count += 1
                 if strategy == "highest_number":
                     raise DiscoveryError(
@@ -576,7 +588,9 @@ class TestVersionDetectionFallback:
         """Test that no fallback occurs when fallback='error'."""
 
         class AlwaysFailingScanner:
-            def detect_version(self, base_path, file_patterns, strategy, version_override=None):
+            def detect_version(
+                self, base_path, file_patterns, strategy, version_override=None
+            ):
                 raise DiscoveryError(
                     domain="test",
                     failed_stage="version_detection",
@@ -645,7 +659,9 @@ class TestErrorStageIdentification:
         """Test that version-related errors are identified correctly."""
 
         class VersionFailingScanner:
-            def detect_version(self, base_path, file_patterns, strategy, version_override=None):
+            def detect_version(
+                self, base_path, file_patterns, strategy, version_override=None
+            ):
                 raise ValueError("version conflict detected")
 
         domain_cfg = DomainConfigV2(
@@ -732,7 +748,11 @@ class TestDataDiscoveryResult:
             column_count=1,
             duration_ms=150,
             columns_renamed={"old": "new"},
-            stage_durations={"version_detection": 50, "file_matching": 30, "excel_reading": 70},
+            stage_durations={
+                "version_detection": 50,
+                "file_matching": 30,
+                "excel_reading": 70,
+            },
         )
 
         assert result.df is df

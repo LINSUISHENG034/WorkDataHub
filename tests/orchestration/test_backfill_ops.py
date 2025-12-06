@@ -1,7 +1,7 @@
 """
 Tests for reference backfill orchestration ops.
 
-This module tests the new backfill ops: derive_plan_refs_op, 
+This module tests the new backfill ops: derive_plan_refs_op,
 derive_portfolio_refs_op, and backfill_refs_op.
 """
 
@@ -55,16 +55,16 @@ class TestBackfillOps:
     def test_derive_plan_refs_op_success(self, sample_processed_annuity_rows):
         """Test successful plan reference derivation."""
         context = build_op_context()
-        
+
         result = derive_plan_refs_op(context, sample_processed_annuity_rows)
-        
+
         # Verify result is JSON-serializable
         json.dumps(result)
-        
+
         # Verify structure
         assert isinstance(result, list)
         assert len(result) == 2  # Two unique plans
-        
+
         # Check first plan
         plan1 = next(p for p in result if p["年金计划号"] == "PLAN001")
         assert plan1["计划全称"] == "Test Plan A"
@@ -75,24 +75,24 @@ class TestBackfillOps:
     def test_derive_plan_refs_op_empty_input(self):
         """Test plan derivation with empty input."""
         context = build_op_context()
-        
+
         result = derive_plan_refs_op(context, [])
-        
+
         assert result == []
 
     def test_derive_portfolio_refs_op_success(self, sample_processed_annuity_rows):
         """Test successful portfolio reference derivation."""
         context = build_op_context()
-        
+
         result = derive_portfolio_refs_op(context, sample_processed_annuity_rows)
-        
+
         # Verify result is JSON-serializable
         json.dumps(result)
-        
+
         # Verify structure
         assert isinstance(result, list)
         assert len(result) == 2  # Two unique portfolios
-        
+
         # Check first portfolio
         port1 = next(p for p in result if p["组合代码"] == "PORT001")
         assert port1["年金计划号"] == "PLAN001"
@@ -102,28 +102,30 @@ class TestBackfillOps:
     def test_derive_portfolio_refs_op_empty_input(self):
         """Test portfolio derivation with empty input."""
         context = build_op_context()
-        
+
         result = derive_portfolio_refs_op(context, [])
-        
+
         assert result == []
 
     def test_backfill_refs_op_plan_only_mode(self):
         """Test backfill_refs_op in plan-only mode."""
         plan_candidates = [{"年金计划号": "PLAN001", "计划全称": "Test Plan"}]
         portfolio_candidates = [{"组合代码": "PORT001", "年金计划号": "PLAN001"}]
-        
+
         context = build_op_context()
         config = BackfillRefsConfig(
             targets=["all"],
             mode="insert_missing",
             plan_only=True,
         )
-        
-        result = backfill_refs_op(context, config, plan_candidates, portfolio_candidates)
-        
+
+        result = backfill_refs_op(
+            context, config, plan_candidates, portfolio_candidates
+        )
+
         # Verify result is JSON-serializable
         json.dumps(result)
-        
+
         # Check structure
         assert result["plan_only"] is True
         assert isinstance(result["operations"], list)
@@ -133,16 +135,18 @@ class TestBackfillOps:
         """Test backfill_refs_op with no targets (disabled)."""
         plan_candidates = [{"年金计划号": "PLAN001"}]
         portfolio_candidates = [{"组合代码": "PORT001", "年金计划号": "PLAN001"}]
-        
+
         context = build_op_context()
         config = BackfillRefsConfig(
             targets=[],  # Empty targets = disabled
             mode="insert_missing",
             plan_only=True,
         )
-        
-        result = backfill_refs_op(context, config, plan_candidates, portfolio_candidates)
-        
+
+        result = backfill_refs_op(
+            context, config, plan_candidates, portfolio_candidates
+        )
+
         # Should skip operations
         assert result["plan_only"] is True
         assert len(result["operations"]) == 0
@@ -151,16 +155,18 @@ class TestBackfillOps:
         """Test backfill_refs_op with plans target only."""
         plan_candidates = [{"年金计划号": "PLAN001", "计划全称": "Test Plan"}]
         portfolio_candidates = [{"组合代码": "PORT001", "年金计划号": "PLAN001"}]
-        
+
         context = build_op_context()
         config = BackfillRefsConfig(
             targets=["plans"],
             mode="insert_missing",
             plan_only=True,
         )
-        
-        result = backfill_refs_op(context, config, plan_candidates, portfolio_candidates)
-        
+
+        result = backfill_refs_op(
+            context, config, plan_candidates, portfolio_candidates
+        )
+
         # Should only process plans
         assert len(result["operations"]) == 1
         assert result["operations"][0]["table"] == "年金计划"
@@ -169,16 +175,18 @@ class TestBackfillOps:
         """Test backfill_refs_op with portfolios target only."""
         plan_candidates = [{"年金计划号": "PLAN001"}]
         portfolio_candidates = [{"组合代码": "PORT001", "年金计划号": "PLAN001"}]
-        
+
         context = build_op_context()
         config = BackfillRefsConfig(
             targets=["portfolios"],
             mode="insert_missing",
             plan_only=True,
         )
-        
-        result = backfill_refs_op(context, config, plan_candidates, portfolio_candidates)
-        
+
+        result = backfill_refs_op(
+            context, config, plan_candidates, portfolio_candidates
+        )
+
         # Should only process portfolios
         assert len(result["operations"]) == 1
         assert result["operations"][0]["table"] == "组合计划"
@@ -199,16 +207,18 @@ class TestBackfillOps:
             }
         ]
         portfolio_candidates = []
-        
+
         context = build_op_context()
         config = BackfillRefsConfig(
             targets=["plans"],
             mode="fill_null_only",
             plan_only=True,
         )
-        
-        result = backfill_refs_op(context, config, plan_candidates, portfolio_candidates)
-        
+
+        result = backfill_refs_op(
+            context, config, plan_candidates, portfolio_candidates
+        )
+
         # Should process with fill_null_only mode
         assert len(result["operations"]) == 1
         operation = result["operations"][0]
@@ -230,7 +240,9 @@ class TestBackfillOps:
             plan_only=False,  # Execute mode
         )
 
-        with patch("src.work_data_hub.orchestration.ops.psycopg2", create=True) as mock_psycopg2:
+        with patch(
+            "src.work_data_hub.orchestration.ops.psycopg2", create=True
+        ) as mock_psycopg2:
             # Create a proper mock connection with cursor context manager
             mock_conn = Mock()
             mock_cursor = Mock()
@@ -239,9 +251,13 @@ class TestBackfillOps:
             mock_conn.cursor.return_value = mock_cursor
             mock_psycopg2.connect.return_value = mock_conn
 
-            with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
+            with patch(
+                "src.work_data_hub.orchestration.ops.get_settings"
+            ) as mock_settings:
                 mock_settings_instance = Mock()
-                mock_settings_instance.get_database_connection_string.return_value = "postgresql://test"
+                mock_settings_instance.get_database_connection_string.return_value = (
+                    "postgresql://test"
+                )
                 mock_settings_instance.data_sources_config = "test_config.yml"
                 mock_settings.return_value = mock_settings_instance
 
@@ -254,7 +270,12 @@ class TestBackfillOps:
                                     "schema": "public",
                                     "table": "年金计划",
                                     "key": ["年金计划号"],
-                                    "updatable": ["计划全称", "计划类型", "客户名称", "company_id"]
+                                    "updatable": [
+                                        "计划全称",
+                                        "计划类型",
+                                        "客户名称",
+                                        "company_id",
+                                    ],
                                 }
                             }
                         }
@@ -263,7 +284,9 @@ class TestBackfillOps:
 
                 with patch("builtins.open", create=True):
                     with patch("yaml.safe_load", return_value=mock_yaml_content):
-                        result = backfill_refs_op(context, config, plan_candidates, portfolio_candidates)
+                        result = backfill_refs_op(
+                            context, config, plan_candidates, portfolio_candidates
+                        )
 
                         # Verify insert_missing was called with schema parameter
                         mock_insert_missing.assert_called_once_with(
@@ -284,15 +307,15 @@ class TestBackfillOps:
         config = BackfillRefsConfig(targets=["plans"], mode="insert_missing")
         assert config.targets == ["plans"]
         assert config.mode == "insert_missing"
-        
+
         # Invalid target
         with pytest.raises(ValueError, match="Invalid target"):
             BackfillRefsConfig(targets=["invalid_target"])
-        
+
         # Invalid mode
         with pytest.raises(ValueError, match="not supported"):
             BackfillRefsConfig(targets=["plans"], mode="invalid_mode")
-        
+
         # Empty targets (should be allowed)
         config = BackfillRefsConfig(targets=[])
         assert config.targets == []
@@ -339,9 +362,14 @@ class TestSkipFactsAndQualifiedSQL:
     @patch("src.work_data_hub.orchestration.ops.get_settings")
     @patch("builtins.open")
     @patch("yaml.safe_load")
-    def test_qualified_sql_generation_with_schema_config(self, mock_yaml_load, mock_open, mock_get_settings):
+    def test_qualified_sql_generation_with_schema_config(
+        self, mock_yaml_load, mock_open, mock_get_settings
+    ):
         """Test qualified SQL generation uses configured schema properly."""
-        from src.work_data_hub.orchestration.ops import BackfillRefsConfig, backfill_refs_op
+        from src.work_data_hub.orchestration.ops import (
+            BackfillRefsConfig,
+            backfill_refs_op,
+        )
 
         # Mock settings to return test data sources config path
         mock_settings_instance = Mock()
@@ -357,14 +385,19 @@ class TestSkipFactsAndQualifiedSQL:
                             "schema": "public",
                             "table": "年金计划",
                             "key": ["年金计划号"],
-                            "updatable": ["计划全称", "计划类型", "客户名称", "company_id"]
+                            "updatable": [
+                                "计划全称",
+                                "计划类型",
+                                "客户名称",
+                                "company_id",
+                            ],
                         },
                         "portfolios": {
                             "schema": "custom_schema",
                             "table": "组合计划",
                             "key": ["组合代码"],
-                            "updatable": ["组合名称", "组合类型", "运作开始日"]
-                        }
+                            "updatable": ["组合名称", "组合类型", "运作开始日"],
+                        },
                     }
                 }
             }
@@ -397,15 +430,21 @@ class TestSkipFactsAndQualifiedSQL:
             plan_only=True,  # Plan-only mode to avoid database operations
         )
 
-        result = backfill_refs_op(context, config, plan_candidates, portfolio_candidates)
+        result = backfill_refs_op(
+            context, config, plan_candidates, portfolio_candidates
+        )
 
         # Verify configuration was read and used
         assert result["plan_only"] is True
         assert len(result["operations"]) == 2  # Plans and portfolios
 
         # Find the operations by table name
-        plans_op = next((op for op in result["operations"] if op["table"] == "年金计划"), None)
-        portfolios_op = next((op for op in result["operations"] if op["table"] == "组合计划"), None)
+        plans_op = next(
+            (op for op in result["operations"] if op["table"] == "年金计划"), None
+        )
+        portfolios_op = next(
+            (op for op in result["operations"] if op["table"] == "组合计划"), None
+        )
 
         assert plans_op is not None, "Plans operation not found"
         assert portfolios_op is not None, "Portfolios operation not found"
@@ -482,9 +521,14 @@ class TestSkipFactsAndQualifiedSQL:
 
     @patch("src.work_data_hub.io.loader.warehouse_loader.quote_qualified")
     @patch("src.work_data_hub.orchestration.ops.insert_missing")
-    def test_qualified_sql_generation_called_correctly(self, mock_insert_missing, mock_quote_qualified):
+    def test_qualified_sql_generation_called_correctly(
+        self, mock_insert_missing, mock_quote_qualified
+    ):
         """Test that qualified SQL generation is called with proper schema."""
-        from src.work_data_hub.orchestration.ops import BackfillRefsConfig, backfill_refs_op
+        from src.work_data_hub.orchestration.ops import (
+            BackfillRefsConfig,
+            backfill_refs_op,
+        )
 
         mock_quote_qualified.return_value = '"public"."年金计划"'
         mock_insert_missing.return_value = {"inserted": 1, "batches": 1}
@@ -507,7 +551,9 @@ class TestSkipFactsAndQualifiedSQL:
         )
 
         # Mock the settings and YAML loading for refs config
-        with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_get_settings:
+        with patch(
+            "src.work_data_hub.orchestration.ops.get_settings"
+        ) as mock_get_settings:
             mock_settings_instance = Mock()
             mock_settings_instance.data_sources_config = "test_config.yml"
             mock_get_settings.return_value = mock_settings_instance
@@ -520,7 +566,12 @@ class TestSkipFactsAndQualifiedSQL:
                                 "schema": "public",
                                 "table": "年金计划",
                                 "key": ["年金计划号"],
-                                "updatable": ["计划全称", "计划类型", "客户名称", "company_id"]
+                                "updatable": [
+                                    "计划全称",
+                                    "计划类型",
+                                    "客户名称",
+                                    "company_id",
+                                ],
                             }
                         }
                     }

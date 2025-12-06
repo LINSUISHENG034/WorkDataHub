@@ -22,7 +22,7 @@ from work_data_hub.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-VersionStrategy = Literal['highest_number', 'latest_modified', 'manual']
+VersionStrategy = Literal["highest_number", "latest_modified", "manual"]
 
 
 @dataclass
@@ -36,10 +36,11 @@ class VersionedPath:
         selected_at: Timestamp when this selection was made
         rejected_versions: List of versions that were skipped and why
     """
-    path: Path                 # Selected version path
-    version: str               # "V2" or "base" if no versions
-    strategy_used: str         # "highest_number", "latest_modified", "manual"
-    selected_at: datetime      # Timestamp of selection
+
+    path: Path  # Selected version path
+    version: str  # "V2" or "base" if no versions
+    strategy_used: str  # "highest_number", "latest_modified", "manual"
+    selected_at: datetime  # Timestamp of selection
     rejected_versions: List[str]  # Versions skipped and why
 
 
@@ -56,14 +57,14 @@ class VersionScanner:
     all domains to use the same version.
     """
 
-    VERSION_PATTERN = re.compile(r'^V(\d+)$')  # Matches V1, V2, ..., V99
+    VERSION_PATTERN = re.compile(r"^V(\d+)$")  # Matches V1, V2, ..., V99
 
     def detect_version(
         self,
         base_path: Path,
         file_patterns: List[str],
-        strategy: VersionStrategy = 'highest_number',
-        version_override: Optional[str] = None
+        strategy: VersionStrategy = "highest_number",
+        version_override: Optional[str] = None,
     ) -> VersionedPath:
         """
         Detect and select version folder from base_path.
@@ -89,8 +90,10 @@ class VersionScanner:
             raise DiscoveryError(
                 domain="unknown",
                 failed_stage="version_detection",
-                original_error=FileNotFoundError(f"Base path does not exist: {base_path}"),
-                message=f"Base path not found: {base_path}"
+                original_error=FileNotFoundError(
+                    f"Base path does not exist: {base_path}"
+                ),
+                message=f"Base path not found: {base_path}",
             )
 
         # Scan for version folders
@@ -100,28 +103,25 @@ class VersionScanner:
             logger.info(
                 "version_detection.no_folders",
                 base_path=str(base_path),
-                fallback="using base path"
+                fallback="using base path",
             )
             return VersionedPath(
                 path=base_path,
                 version="base",
                 strategy_used=strategy,
                 selected_at=datetime.now(),
-                rejected_versions=[]
+                rejected_versions=[],
             )
 
         # File-pattern-aware filtering (Decision #1)
-        filtered_folders = self._filter_by_file_patterns(
-            version_folders,
-            file_patterns
-        )
+        filtered_folders = self._filter_by_file_patterns(version_folders, file_patterns)
 
         if not filtered_folders:
             logger.warning(
                 "version_detection.no_matching_files",
                 base_path=str(base_path),
                 version_folders=[v.name for v in version_folders],
-                file_patterns=file_patterns
+                file_patterns=file_patterns,
             )
             # Fallback to base path if no versions have matching files
             return VersionedPath(
@@ -129,28 +129,28 @@ class VersionScanner:
                 version="base",
                 strategy_used=strategy,
                 selected_at=datetime.now(),
-                rejected_versions=[f"{v.name} (no matching files)" for v in version_folders]
+                rejected_versions=[
+                    f"{v.name} (no matching files)" for v in version_folders
+                ],
             )
 
         # Select version based on strategy
-        if strategy == 'highest_number':
+        if strategy == "highest_number":
             selected = self._select_highest_number(filtered_folders)
-        elif strategy == 'latest_modified':
+        elif strategy == "latest_modified":
             selected = self._select_latest_modified(filtered_folders)
         else:
             raise DiscoveryError(
                 domain="unknown",
                 failed_stage="version_detection",
                 original_error=ValueError(f"Invalid strategy: {strategy}"),
-                message=f"Unsupported version strategy: {strategy}"
+                message=f"Unsupported version strategy: {strategy}",
             )
 
-        rejected = [
-            f.name for f in filtered_folders
-            if f != selected
-        ] + [
+        rejected = [f.name for f in filtered_folders if f != selected] + [
             f"{v.name} (no matching files)"
-            for v in version_folders if v not in filtered_folders
+            for v in version_folders
+            if v not in filtered_folders
         ]
 
         logger.info(
@@ -159,7 +159,7 @@ class VersionScanner:
             strategy=strategy,
             discovered_versions=[v.name for v in version_folders],
             selected_version=selected.name,
-            rejected_versions=rejected
+            rejected_versions=rejected,
         )
 
         return VersionedPath(
@@ -167,7 +167,7 @@ class VersionScanner:
             version=selected.name,
             strategy_used=strategy,
             selected_at=datetime.now(),
-            rejected_versions=rejected
+            rejected_versions=rejected,
         )
 
     def _scan_version_folders(self, base_path: Path) -> List[Path]:
@@ -182,22 +182,20 @@ class VersionScanner:
                 domain="unknown",
                 failed_stage="version_detection",
                 original_error=e,
-                message=f"Failed to scan directory {base_path}: {e}"
+                message=f"Failed to scan directory {base_path}: {e}",
             )
 
         logger.debug(
             "version_detection.found_folders",
             base_path=str(base_path),
             folders=[v.name for v in version_folders],
-            count=len(version_folders)
+            count=len(version_folders),
         )
 
         return version_folders
 
     def _filter_by_file_patterns(
-        self,
-        version_folders: List[Path],
-        file_patterns: List[str]
+        self, version_folders: List[Path], file_patterns: List[str]
     ) -> List[Path]:
         """Filter version folders to those containing matching files (Decision #1)."""
         filtered = []
@@ -213,7 +211,7 @@ class VersionScanner:
                 logger.warning(
                     "version_detection.folder_access_error",
                     folder=folder.name,
-                    error=str(e)
+                    error=str(e),
                 )
                 continue
 
@@ -224,13 +222,14 @@ class VersionScanner:
                     "version_detection.skipped_folder",
                     folder=folder.name,
                     reason="no files matching patterns",
-                    patterns=file_patterns
+                    patterns=file_patterns,
                 )
 
         return filtered
 
     def _select_highest_number(self, folders: List[Path]) -> Path:
         """Select version with highest numeric value."""
+
         def version_number(folder: Path) -> int:
             match = self.VERSION_PATTERN.match(folder.name)
             return int(match.group(1)) if match else 0
@@ -240,14 +239,14 @@ class VersionScanner:
                 domain="unknown",
                 failed_stage="version_detection",
                 original_error=ValueError("No folders provided"),
-                message="No folders available for selection"
+                message="No folders available for selection",
             )
 
         selected = max(folders, key=version_number)
         logger.debug(
             "version_detection.highest_number_selected",
             selected=selected.name,
-            considered=[f.name for f in folders]
+            considered=[f.name for f in folders],
         )
         return selected
 
@@ -258,36 +257,30 @@ class VersionScanner:
                 domain="unknown",
                 failed_stage="version_detection",
                 original_error=ValueError("No folders provided"),
-                message="No folders available for selection"
+                message="No folders available for selection",
             )
 
         # Get modification times
         folders_with_mtime = []
         try:
-            folders_with_mtime = [
-                (f, f.stat().st_mtime)
-                for f in folders
-            ]
+            folders_with_mtime = [(f, f.stat().st_mtime) for f in folders]
         except OSError as e:
             raise DiscoveryError(
                 domain="unknown",
                 failed_stage="version_detection",
                 original_error=e,
-                message=f"Failed to get modification times: {e}"
+                message=f"Failed to get modification times: {e}",
             )
 
         # Sort by modification time, newest first
-        sorted_by_mtime = sorted(
-            folders_with_mtime,
-            key=lambda x: x[1],
-            reverse=True
-        )
+        sorted_by_mtime = sorted(folders_with_mtime, key=lambda x: x[1], reverse=True)
 
         # Check for ambiguity (folders modified within 1 second of each other)
         if len(sorted_by_mtime) > 1:
             latest_mtime = sorted_by_mtime[0][1]
             same_mtime = [
-                f.name for f, mtime in sorted_by_mtime
+                f.name
+                for f, mtime in sorted_by_mtime
                 if abs(mtime - latest_mtime) < 1  # Within 1 second
             ]
 
@@ -300,7 +293,7 @@ class VersionScanner:
                         f"Ambiguous versions: {same_mtime} "
                         f"modified at same time, configure precedence "
                         f"rule or specify --version manually"
-                    )
+                    ),
                 )
 
         selected = sorted_by_mtime[0][0]
@@ -308,15 +301,11 @@ class VersionScanner:
             "version_detection.latest_modified_selected",
             selected=selected.name,
             modification_time=datetime.fromtimestamp(sorted_by_mtime[0][1]).isoformat(),
-            considered=[f.name for f in folders]
+            considered=[f.name for f in folders],
         )
         return selected
 
-    def _handle_manual_override(
-        self,
-        base_path: Path,
-        version: str
-    ) -> VersionedPath:
+    def _handle_manual_override(self, base_path: Path, version: str) -> VersionedPath:
         """Handle manual version override."""
         version_path = base_path / version
 
@@ -325,13 +314,13 @@ class VersionScanner:
                 domain="unknown",
                 failed_stage="version_detection",
                 original_error=FileNotFoundError(f"Version {version} not found"),
-                message=f"Manual version '{version}' not found in {base_path}"
+                message=f"Manual version '{version}' not found in {base_path}",
             )
 
         logger.info(
             "version_detection.manual_override",
             base_path=str(base_path),
-            version=version
+            version=version,
         )
 
         return VersionedPath(
@@ -339,5 +328,5 @@ class VersionScanner:
             version=version,
             strategy_used="manual",
             selected_at=datetime.now(),
-            rejected_versions=["manual override - automatic detection bypassed"]
+            rejected_versions=["manual override - automatic detection bypassed"],
         )

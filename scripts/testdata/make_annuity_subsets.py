@@ -80,7 +80,9 @@ def _pick_distinct(df: pd.DataFrame, size: int) -> pd.DataFrame:
     return non_null.head(size).copy()
 
 
-def _make_overlap(df: pd.DataFrame, unique_keys: int = 3, dup_each: int = 2) -> pd.DataFrame:
+def _make_overlap(
+    df: pd.DataFrame, unique_keys: int = 3, dup_each: int = 2
+) -> pd.DataFrame:
     base = _pick_distinct(df, unique_keys)
     if base.empty:
         return base

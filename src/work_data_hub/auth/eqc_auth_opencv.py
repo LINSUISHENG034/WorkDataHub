@@ -17,7 +17,7 @@ Environment variables:
   (default .cache/eqc_storage_state.json)
 
 Usage example:
-    from src.work_data_hub.auth.eqc_auth_opencv import run_get_token
+    from work_data_hub.auth.eqc_auth_opencv import run_get_token
     token = run_get_token(180)
 """
 
@@ -29,10 +29,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-import cv2  # type: ignore
+import cv2
 import numpy as np
+from playwright.async_api import (
+    Browser,
+    BrowserContext,
+    Page,
+    Playwright,
+    ViewportSize,
+    async_playwright,
+)
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
-from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
 
 from .eqc_settings import settings
@@ -67,12 +74,12 @@ class AuthTimeoutError(Exception):
     pass
 
 
-async def _ensure_context_with_stealth(browser):
+async def _ensure_context_with_stealth(browser: Browser) -> tuple[BrowserContext, Page]:
     user_agent = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36"
     )
-    viewport_size = {"width": 1920, "height": 1080}
+    viewport_size: ViewportSize = {"width": 1920, "height": 1080}
     context = await browser.new_context(
         user_agent=user_agent,
         viewport=viewport_size,
@@ -89,7 +96,9 @@ async def _ensure_context_with_stealth(browser):
     return context, page
 
 
-async def _load_or_new_context(playwright):
+async def _load_or_new_context(
+    playwright: Playwright,
+) -> tuple[Browser, BrowserContext, Page]:
     """Create a browser context, trying to reuse storage_state if enabled."""
     browser = await playwright.chromium.launch(headless=False)
     try:

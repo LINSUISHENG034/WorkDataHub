@@ -18,7 +18,11 @@ _imports_loaded = False
 
 def _load_imports() -> None:
     """Lazy load all imports to avoid circular import issues."""
-    global _imports_loaded, AnnuityPerformanceIn, AnnuityPerformanceOut, process_with_enrichment
+    global \
+        _imports_loaded, \
+        AnnuityPerformanceIn, \
+        AnnuityPerformanceOut, \
+        process_with_enrichment
     global BronzeAnnuitySchema, GoldAnnuitySchema
     global validate_bronze_dataframe, validate_gold_dataframe
 
@@ -36,10 +40,17 @@ def _load_imports() -> None:
     try:  # Optional heavy dependencies (pandas/pandera)
         from .schemas import (
             BronzeAnnuitySchema as _BronzeAnnuitySchema,
+        )
+        from .schemas import (
             GoldAnnuitySchema as _GoldAnnuitySchema,
+        )
+        from .schemas import (
             validate_bronze_dataframe as _validate_bronze_dataframe,
+        )
+        from .schemas import (
             validate_gold_dataframe as _validate_gold_dataframe,
         )
+
         BronzeAnnuitySchema = _BronzeAnnuitySchema
         GoldAnnuitySchema = _GoldAnnuitySchema
         validate_bronze_dataframe = _validate_bronze_dataframe

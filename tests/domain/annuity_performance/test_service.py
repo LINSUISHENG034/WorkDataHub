@@ -6,7 +6,9 @@ used by the refactored service layer.
 
 import pytest
 
-from work_data_hub.domain.annuity_performance.constants import DEFAULT_ALLOWED_GOLD_COLUMNS
+from work_data_hub.domain.annuity_performance.constants import (
+    DEFAULT_ALLOWED_GOLD_COLUMNS,
+)
 from work_data_hub.domain.annuity_performance.models import AnnuityPerformanceOut
 
 
@@ -46,7 +48,9 @@ class TestDefaultAllowedGoldColumns:
         ]
 
         for col in expected_gold_cols:
-            assert col in allowed, f"Column {col} should be in DEFAULT_ALLOWED_GOLD_COLUMNS"
+            assert col in allowed, (
+                f"Column {col} should be in DEFAULT_ALLOWED_GOLD_COLUMNS"
+            )
 
     def test_is_frozen_set(self):
         """Test that DEFAULT_ALLOWED_GOLD_COLUMNS is immutable."""

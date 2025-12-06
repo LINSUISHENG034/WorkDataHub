@@ -95,12 +95,14 @@ class TestCompanyIdResolutionStep:
     @pytest.fixture
     def sample_df(self):
         """Create sample DataFrame for testing."""
-        return pd.DataFrame({
-            "计划代码": ["FP0001", "FP0002", "UNKNOWN"],
-            "客户名称": ["公司A", "公司B", "公司C"],
-            "年金账户名": ["账户1", "账户2", "账户3"],
-            "公司代码": [None, "EXISTING123", None],
-        })
+        return pd.DataFrame(
+            {
+                "计划代码": ["FP0001", "FP0002", "UNKNOWN"],
+                "客户名称": ["公司A", "公司B", "公司C"],
+                "年金账户名": ["账户1", "账户2", "账户3"],
+                "公司代码": [None, "EXISTING123", None],
+            }
+        )
 
     @pytest.fixture
     def context(self):
@@ -198,19 +200,21 @@ class TestPipelineExecution:
     @pytest.fixture
     def sample_bronze_df(self):
         """Create sample Bronze layer DataFrame."""
-        return pd.DataFrame({
-            "月度": ["202411", "202411"],
-            "计划代码": ["FP0001", "FP0002"],
-            "客户名称": ["测试公司A", "测试公司B"],
-            "年金账户名": ["账户A", "账户B"],
-            "业务类型": ["企年投资", "职年受托"],
-            "机构名称": ["北京", "上海"],
-            "期初资产规模": [1000000.0, 2000000.0],
-            "期末资产规模": [1100000.0, 2200000.0],
-            "流失(含待遇支付)": [50000.0, 100000.0],
-            "id": [1, 2],  # Legacy column to be dropped
-            "备注": ["备注1", "备注2"],  # Legacy column to be dropped
-        })
+        return pd.DataFrame(
+            {
+                "月度": ["202411", "202411"],
+                "计划代码": ["FP0001", "FP0002"],
+                "客户名称": ["测试公司A", "测试公司B"],
+                "年金账户名": ["账户A", "账户B"],
+                "业务类型": ["企年投资", "职年受托"],
+                "机构名称": ["北京", "上海"],
+                "期初资产规模": [1000000.0, 2000000.0],
+                "期末资产规模": [1100000.0, 2200000.0],
+                "流失(含待遇支付)": [50000.0, 100000.0],
+                "id": [1, 2],  # Legacy column to be dropped
+                "备注": ["备注1", "备注2"],  # Legacy column to be dropped
+            }
+        )
 
     @pytest.fixture
     def context(self):

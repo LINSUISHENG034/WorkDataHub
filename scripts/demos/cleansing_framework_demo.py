@@ -171,8 +171,12 @@ try:
     # 测试年金业绩模型
     print("年金业绩数据清洗测试:")
     annuity_model = AnnuityPerformanceOut(**test_data_annuity)
-    print(f"  期初资产规模: {test_data_annuity['期初资产规模']} -> {annuity_model.期初资产规模}")
-    print(f"  当期收益率: {test_data_annuity['当期收益率']} -> {annuity_model.当期收益率}")
+    print(
+        f"  期初资产规模: {test_data_annuity['期初资产规模']} -> {annuity_model.期初资产规模}"
+    )
+    print(
+        f"  当期收益率: {test_data_annuity['当期收益率']} -> {annuity_model.当期收益率}"
+    )
     print(f"  供款: '{test_data_annuity['供款']}' -> {annuity_model.供款}")
     print(f"  流失: '{test_data_annuity['流失']}' -> {annuity_model.流失}")
     print()
@@ -180,11 +184,15 @@ try:
     # 测试受托业绩模型
     print("受托业绩数据清洗测试:")
     trustee_model = TrusteePerformanceOut(**test_data_trustee)
-    print(f"  return_rate: {test_data_trustee['return_rate']} -> {trustee_model.return_rate}")
+    print(
+        f"  return_rate: {test_data_trustee['return_rate']} -> {trustee_model.return_rate}"
+    )
     print(
         f"  net_asset_value: {test_data_trustee['net_asset_value']} -> {trustee_model.net_asset_value}"
     )
-    print(f"  fund_scale: {test_data_trustee['fund_scale']} -> {trustee_model.fund_scale}")
+    print(
+        f"  fund_scale: {test_data_trustee['fund_scale']} -> {trustee_model.fund_scale}"
+    )
     print()
 
     print("✅ 所有清洗测试通过！")
@@ -232,7 +240,11 @@ def clean_company_name(company_name: str) -> str:
 
 # 测试新规则
 print("新增的公司名称清洗规则测试:")
-test_names = ["中国平安保险集团股份有限公司", "华为技术有限公司", "阿里巴巴（中国）有限公司"]
+test_names = [
+    "中国平安保险集团股份有限公司",
+    "华为技术有限公司",
+    "阿里巴巴（中国）有限公司",
+]
 
 for name in test_names:
     cleaned = clean_company_name(name)

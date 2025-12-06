@@ -81,6 +81,7 @@ ANNUITY_PERFORMANCE_DB_ONLY_COLUMNS = {
 # Type Compatibility Mapping
 # =============================================================================
 
+
 def _get_base_type(annotation: Any) -> type | None:
     """Extract base type from Optional, Union, etc."""
     origin = get_origin(annotation)
@@ -120,7 +121,9 @@ def _types_compatible(python_type: Any, sql_type_str: str) -> bool:
 
     # Numeric types
     if base_type in (int, float, Decimal):
-        return any(t in sql_lower for t in ["numeric", "decimal", "integer", "float", "double"])
+        return any(
+            t in sql_lower for t in ["numeric", "decimal", "integer", "float", "double"]
+        )
 
     # If we can't determine, assume compatible (avoid false positives)
     return True
@@ -129,6 +132,7 @@ def _types_compatible(python_type: Any, sql_type_str: str) -> bool:
 # =============================================================================
 # Test Fixtures
 # =============================================================================
+
 
 def get_test_engine() -> Engine | None:
     """Get database engine for testing, or None if not available."""
@@ -155,6 +159,7 @@ def db_engine():
 # Test Classes
 # =============================================================================
 
+
 class TestAnnuityPerformanceSchemaConsistency:
     """Validate AnnuityPerformanceOut model matches annuity_performance_new table."""
 
@@ -170,7 +175,9 @@ class TestAnnuityPerformanceSchemaConsistency:
 
     def test_all_model_fields_have_db_columns(self, db_engine: Engine):
         """Every Pydantic model field should map to a DB column."""
-        from work_data_hub.domain.annuity_performance.models import AnnuityPerformanceOut
+        from work_data_hub.domain.annuity_performance.models import (
+            AnnuityPerformanceOut,
+        )
 
         inspector = inspect(db_engine)
         db_columns = {c["name"] for c in inspector.get_columns(self.TABLE_NAME)}
@@ -184,14 +191,15 @@ class TestAnnuityPerformanceSchemaConsistency:
             if expected_column not in db_columns:
                 missing_in_db.append(f"{field} -> {expected_column}")
 
-        assert not missing_in_db, (
-            f"Model fields missing in DB:\n"
-            + "\n".join(f"  - {m}" for m in missing_in_db)
+        assert not missing_in_db, f"Model fields missing in DB:\n" + "\n".join(
+            f"  - {m}" for m in missing_in_db
         )
 
     def test_all_db_columns_have_model_fields(self, db_engine: Engine):
         """Every DB column should map to a Pydantic model field (except audit columns)."""
-        from work_data_hub.domain.annuity_performance.models import AnnuityPerformanceOut
+        from work_data_hub.domain.annuity_performance.models import (
+            AnnuityPerformanceOut,
+        )
 
         inspector = inspect(db_engine)
         db_columns = {c["name"] for c in inspector.get_columns(self.TABLE_NAME)}
@@ -210,14 +218,15 @@ class TestAnnuityPerformanceSchemaConsistency:
             if expected_field not in model_fields:
                 missing_in_model.append(f"{col} -> {expected_field}")
 
-        assert not missing_in_model, (
-            f"DB columns missing in model:\n"
-            + "\n".join(f"  - {m}" for m in missing_in_model)
+        assert not missing_in_model, f"DB columns missing in model:\n" + "\n".join(
+            f"  - {m}" for m in missing_in_model
         )
 
     def test_field_types_compatible(self, db_engine: Engine):
         """Pydantic field types should be compatible with DB column types."""
-        from work_data_hub.domain.annuity_performance.models import AnnuityPerformanceOut
+        from work_data_hub.domain.annuity_performance.models import (
+            AnnuityPerformanceOut,
+        )
 
         inspector = inspect(db_engine)
         db_columns = {c["name"]: c for c in inspector.get_columns(self.TABLE_NAME)}
@@ -240,14 +249,15 @@ class TestAnnuityPerformanceSchemaConsistency:
                     f"{db_col_name} ({sql_type})"
                 )
 
-        assert not incompatible, (
-            f"Type incompatibilities found:\n"
-            + "\n".join(f"  - {i}" for i in incompatible)
+        assert not incompatible, f"Type incompatibilities found:\n" + "\n".join(
+            f"  - {i}" for i in incompatible
         )
 
     def test_required_fields_not_nullable(self, db_engine: Engine):
         """Required Pydantic fields should map to NOT NULL DB columns."""
-        from work_data_hub.domain.annuity_performance.models import AnnuityPerformanceOut
+        from work_data_hub.domain.annuity_performance.models import (
+            AnnuityPerformanceOut,
+        )
 
         inspector = inspect(db_engine)
         db_columns = {c["name"]: c for c in inspector.get_columns(self.TABLE_NAME)}
@@ -266,13 +276,10 @@ class TestAnnuityPerformanceSchemaConsistency:
 
             # Required field should NOT be nullable in DB
             if is_required and is_nullable:
-                mismatches.append(
-                    f"{field_name}: required in model but nullable in DB"
-                )
+                mismatches.append(f"{field_name}: required in model but nullable in DB")
 
-        assert not mismatches, (
-            f"Required/nullable mismatches:\n"
-            + "\n".join(f"  - {m}" for m in mismatches)
+        assert not mismatches, f"Required/nullable mismatches:\n" + "\n".join(
+            f"  - {m}" for m in mismatches
         )
 
 
@@ -281,7 +288,9 @@ class TestFieldMappingCompleteness:
 
     def test_annuity_performance_mapping_covers_all_model_fields(self):
         """Field mapping should cover all non-excluded model fields."""
-        from work_data_hub.domain.annuity_performance.models import AnnuityPerformanceOut
+        from work_data_hub.domain.annuity_performance.models import (
+            AnnuityPerformanceOut,
+        )
 
         model_fields = set(AnnuityPerformanceOut.model_fields.keys())
         mapped_fields = model_fields - ANNUITY_PERFORMANCE_MODEL_ONLY_FIELDS
@@ -300,7 +309,8 @@ class TestMigrationFieldMapSync:
         """DB column comments should reference correct Chinese field names."""
         # Get columns with comments using proper PostgreSQL query
         with db_engine.connect() as conn:
-            result = conn.execute(text("""
+            result = conn.execute(
+                text("""
                 SELECT
                     a.attname as column_name,
                     col_description(a.attrelid, a.attnum) as comment
@@ -310,7 +320,8 @@ class TestMigrationFieldMapSync:
                 AND a.attnum > 0
                 AND NOT a.attisdropped
                 AND col_description(a.attrelid, a.attnum) IS NOT NULL
-            """))
+            """)
+            )
             columns_with_comments = {row[0]: row[1] for row in result}
 
         # Build reverse mapping
@@ -334,6 +345,7 @@ class TestMigrationFieldMapSync:
         # This is a soft check - just warn, don't fail
         if mismatches:
             import warnings
+
             warnings.warn(
                 f"Column comments may be out of sync:\n"
                 + "\n".join(f"  - {m}" for m in mismatches)

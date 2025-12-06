@@ -2,9 +2,11 @@
 """
 Simple table inspection without pg_stat.
 """
+
 import psycopg2
 
 DSN = "postgres://postgres:Post.169828@localhost:5432/postgres"
+
 
 def simple_table_check():
     """Simple check of all tables."""
@@ -42,13 +44,15 @@ def simple_table_check():
                             ORDER BY ordinal_position;
                         """)
                         columns = cursor.fetchall()
-                        print(f"     Columns: {[f'{col}({typ})' for col, typ in columns]}")
+                        print(
+                            f"     Columns: {[f'{col}({typ})' for col, typ in columns]}"
+                        )
 
                         # Show sample data
                         cursor.execute(f'SELECT * FROM "{table}" LIMIT 2;')
                         rows = cursor.fetchall()
                         for i, row in enumerate(rows):
-                            print(f"     Row {i+1}: {row}")
+                            print(f"     Row {i + 1}: {row}")
 
                 except Exception as e:
                     print(f"   ❌ Error checking {table}: {e}")
@@ -59,6 +63,7 @@ def simple_table_check():
     except Exception as e:
         print(f"❌ Table check failed: {e}")
         return False
+
 
 if __name__ == "__main__":
     simple_table_check()

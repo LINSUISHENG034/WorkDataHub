@@ -24,7 +24,7 @@ Usage:
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, Any, List, Sequence, Union
+from typing import TYPE_CHECKING, Any, List, Sequence, Union, cast
 
 import structlog
 
@@ -86,9 +86,7 @@ def handle_validation_errors(
     error_details = collect_error_details(errors)
 
     # Calculate unique failed rows
-    failed_row_indices = {
-        e.row_index for e in error_details if e.row_index is not None
-    }
+    failed_row_indices = {e.row_index for e in error_details if e.row_index is not None}
     failed_rows = len(failed_row_indices)
     valid_rows = total_rows - failed_rows
     error_rate = failed_rows / total_rows
@@ -176,25 +174,31 @@ def collect_error_details(
     if isinstance(errors, (list, tuple)) and all(
         isinstance(e, ValidationErrorDetail) for e in errors
     ):
-        return errors
+        return cast(Sequence[ValidationErrorDetail], errors)
 
     # Handle Pandera SchemaErrors (lazy validation)
     if _is_pandera_schema_errors(errors):
-        return _collect_from_pandera_schema_errors(errors)
+        return _collect_from_pandera_schema_errors(cast("SchemaErrors", errors))
 
     # Handle Pandera SchemaError (fail-fast)
     if _is_pandera_schema_error(errors):
-        return _collect_from_pandera_schema_error(errors)
+        return _collect_from_pandera_schema_error(cast("SchemaError", errors))
 
     # Handle Pydantic ValidationError
     if _is_pydantic_validation_error(errors):
-        return _collect_from_pydantic_error(errors, row_index=row_index)
+        return _collect_from_pydantic_error(
+            cast("PydanticValidationError", errors), row_index=row_index
+        )
 
     # Handle list of Pydantic ValidationErrors
     if isinstance(errors, list) and errors and _is_pydantic_validation_error(errors[0]):
         result: List[ValidationErrorDetail] = []
         for err in errors:
-            result.extend(_collect_from_pydantic_error(err, row_index=row_index))
+            result.extend(
+                _collect_from_pydantic_error(
+                    cast("PydanticValidationError", err), row_index=row_index
+                )
+            )
         return result
 
     # Unknown type - return empty

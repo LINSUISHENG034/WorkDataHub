@@ -35,9 +35,7 @@ class TestBronzeSchemasWithRealData:
     @pytest.fixture
     def real_data_path(self):
         """Get path to real data file, skip if not available."""
-        file_path = (
-            Path(__file__).parent.parent.parent.parent.parent / REAL_DATA_FILE
-        )
+        file_path = Path(__file__).parent.parent.parent.parent.parent / REAL_DATA_FILE
 
         if not file_path.exists():
             pytest.skip(f"Real data file not found: {file_path}")
@@ -66,9 +64,7 @@ class TestBronzeSchemasWithRealData:
 
         # Verify all rows pass validation
         assert len(validated_df) > 0, "DataFrame should not be empty"
-        assert summary.row_count == len(
-            real_dataframe
-        ), "All rows should be validated"
+        assert summary.row_count == len(real_dataframe), "All rows should be validated"
 
         # No systemic issues (>10% invalid values)
         assert (
@@ -78,14 +74,12 @@ class TestBronzeSchemasWithRealData:
 
         for column, invalid_rows in summary.numeric_error_rows.items():
             ratio = len(invalid_rows) / summary.row_count
-            assert (
-                ratio <= 0.10
-            ), f"Column {column} has {ratio:.1%} invalid values (exceeds 10% threshold)"
+            assert ratio <= 0.10, (
+                f"Column {column} has {ratio:.1%} invalid values (exceeds 10% threshold)"
+            )
 
         # No completely null columns
-        assert (
-            summary.empty_columns == []
-        ), "No columns should be completely null"
+        assert summary.empty_columns == [], "No columns should be completely null"
 
         print(f"\n✅ Bronze validation passed for {summary.row_count:,} rows")
         print(f"   Invalid dates: {len(summary.invalid_date_rows)}")
@@ -105,16 +99,16 @@ class TestBronzeSchemasWithRealData:
         for column in numeric_columns:
             if column in validated_df.columns:
                 # Should be float dtype after coercion
-                assert pd.api.types.is_float_dtype(
-                    validated_df[column]
-                ), f"Column {column} should be float dtype"
+                assert pd.api.types.is_float_dtype(validated_df[column]), (
+                    f"Column {column} should be float dtype"
+                )
 
                 # Check that non-null values are valid floats
                 non_null_values = validated_df[column].dropna()
                 if len(non_null_values) > 0:
-                    assert all(
-                        isinstance(v, (float, int)) for v in non_null_values
-                    ), f"Column {column} should contain only numeric values"
+                    assert all(isinstance(v, (float, int)) for v in non_null_values), (
+                        f"Column {column} should contain only numeric values"
+                    )
 
         print(f"\n✅ Numeric coercion successful for {len(numeric_columns)} columns")
 
@@ -128,9 +122,9 @@ class TestBronzeSchemasWithRealData:
 
         # Check that 月度 column is properly parsed to datetime
         assert "月度" in validated_df.columns, "月度 column should exist"
-        assert pd.api.types.is_datetime64_any_dtype(
-            validated_df["月度"]
-        ), "月度 should be datetime dtype"
+        assert pd.api.types.is_datetime64_any_dtype(validated_df["月度"]), (
+            "月度 should be datetime dtype"
+        )
 
         # Check parsing success rate
         non_null_dates = validated_df["月度"].dropna()
@@ -138,9 +132,9 @@ class TestBronzeSchemasWithRealData:
         parsed_dates = len(non_null_dates)
         success_rate = parsed_dates / total_dates if total_dates > 0 else 0
 
-        assert (
-            success_rate >= 0.90
-        ), f"Date parsing success rate {success_rate:.1%} should be ≥90%"
+        assert success_rate >= 0.90, (
+            f"Date parsing success rate {success_rate:.1%} should be ≥90%"
+        )
 
         print(f"\n✅ Date parsing successful: {success_rate:.1%} success rate")
         print(f"   Parsed: {parsed_dates:,} / {total_dates:,} dates")
@@ -162,9 +156,9 @@ class TestBronzeSchemasWithRealData:
         ]
 
         for column in expected_columns:
-            assert (
-                column in real_dataframe.columns
-            ), f"Required column '{column}' should exist in production data"
+            assert column in real_dataframe.columns, (
+                f"Required column '{column}' should exist in production data"
+            )
 
         print(f"\n✅ All {len(expected_columns)} required columns present")
 
@@ -177,9 +171,9 @@ class TestBronzeSchemasWithRealData:
         validated_df, summary = validate_bronze_dataframe(real_dataframe)
 
         # No completely null columns should be detected
-        assert (
-            summary.empty_columns == []
-        ), f"Completely null columns detected: {summary.empty_columns}"
+        assert summary.empty_columns == [], (
+            f"Completely null columns detected: {summary.empty_columns}"
+        )
 
         print("\n✅ No completely null columns detected")
 
@@ -221,9 +215,9 @@ class TestBronzeSchemasWithRealData:
         # Target: <5ms for 33K rows (from tech-spec-epic-4.md)
         # This is very aggressive, so we'll use a more realistic target
         # Target: ≥5000 rows/second (from schemas.py docstring)
-        assert (
-            rows_per_second >= 5000
-        ), f"Performance target not met: {rows_per_second:,.0f} rows/s < 5000 rows/s"
+        assert rows_per_second >= 5000, (
+            f"Performance target not met: {rows_per_second:,.0f} rows/s < 5000 rows/s"
+        )
 
     def test_document_edge_cases(self, real_dataframe):
         """

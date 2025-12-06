@@ -131,13 +131,15 @@ class TestInsertMissing:
             )
 
     @patch("psycopg2.extras.execute_values")
-    def test_insert_missing_execute_mode(self, mock_execute_values, sample_plan_candidates):
+    def test_insert_missing_execute_mode(
+        self, mock_execute_values, sample_plan_candidates
+    ):
         """Test insert_missing in execute mode with mocked database."""
         # Mock connection and cursor
         mock_conn = Mock()
         mock_cursor = MagicMock()  # Use MagicMock for context manager support
         mock_cursor.rowcount = len(sample_plan_candidates)
-        
+
         # Properly set up context manager
         cursor_context_manager = MagicMock()
         cursor_context_manager.__enter__.return_value = mock_cursor
@@ -197,10 +199,13 @@ class TestInsertMissing:
     @patch("psycopg2.extras.execute_values")
     def test_insert_missing_fallback_on_conflict_absent(self, mock_execute_values):
         """Fallback to SELECT-filter when ON CONFLICT target is absent."""
+
         # Side effect: raise on ON CONFLICT SQL, succeed otherwise
         def _exec_values_side_effect(cursor, sql, argslist, *a, **kw):
             if "ON CONFLICT" in sql:
-                raise Exception("no unique or exclusion constraint matching the ON CONFLICT specification")
+                raise Exception(
+                    "no unique or exclusion constraint matching the ON CONFLICT specification"
+                )
             # Fallback plain INSERT: simulate rowcount equals inserted rows
             try:
                 cursor.rowcount = len(argslist)
@@ -314,7 +319,9 @@ class TestFillNullOnly:
             )
 
     @patch("src.work_data_hub.io.loader.warehouse_loader._adapt_param")
-    def test_fill_null_only_execute_mode(self, mock_adapt_param, sample_plan_candidates):
+    def test_fill_null_only_execute_mode(
+        self, mock_adapt_param, sample_plan_candidates
+    ):
         """Test fill_null_only in execute mode with mocked database."""
         # Mock parameter adaptation
         mock_adapt_param.side_effect = lambda x: x
@@ -323,7 +330,7 @@ class TestFillNullOnly:
         mock_conn = Mock()
         mock_cursor = MagicMock()  # Use MagicMock for context manager support
         mock_cursor.rowcount = 1  # Each update affects 1 row
-        
+
         # Properly set up context manager
         cursor_context_manager = MagicMock()
         cursor_context_manager.__enter__.return_value = mock_cursor
@@ -340,7 +347,7 @@ class TestFillNullOnly:
 
         # Verify cursor.execute was called
         assert mock_cursor.execute.called
-        
+
         # Check that UPDATE statements were generated
         execute_calls = mock_cursor.execute.call_args_list
         for call_args, _ in execute_calls:
@@ -401,7 +408,9 @@ class TestFillNullOnly:
 class TestBackfillIntegration:
     """Integration tests for backfill functions."""
 
-    def test_backfill_workflow_plan_only(self, sample_plan_candidates, sample_portfolio_candidates):
+    def test_backfill_workflow_plan_only(
+        self, sample_plan_candidates, sample_portfolio_candidates
+    ):
         """Test complete backfill workflow in plan-only mode."""
         # Test plan backfill
         plan_result = insert_missing(
@@ -517,7 +526,9 @@ class TestFillNullOnlyWithSchema:
 
     def test_fill_null_only_with_schema(self):
         """Test fill_null_only generates qualified SQL when schema provided."""
-        rows = [{"年金计划号": "PLAN001", "计划全称": "Test Plan A", "客户名称": "Client A"}]
+        rows = [
+            {"年金计划号": "PLAN001", "计划全称": "Test Plan A", "客户名称": "Client A"}
+        ]
 
         result = fill_null_only(
             table="年金计划",

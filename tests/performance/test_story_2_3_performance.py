@@ -75,7 +75,9 @@ class TestStory23Performance:
 
         start = time.perf_counter()
         for value in numeric_values:
-            self.registry.apply_rules(value, NUMERIC_RULE_CHAIN, field_name="年化收益率")
+            self.registry.apply_rules(
+                value, NUMERIC_RULE_CHAIN, field_name="年化收益率"
+            )
         cleansing_duration = time.perf_counter() - start
 
         start = time.perf_counter()
@@ -94,6 +96,8 @@ class TestStory23Performance:
         assert overhead_pct < 20, (
             f"AC-PERF-2 FAILED: numeric cleansing overhead {overhead_pct:.1f}% >= 20%"
         )
+
+
 def _generate_output_rows(count: int) -> List[dict]:
     values = _generate_numeric_values(count)
     rate_patterns = ["5.5%", "0.75%", "0.0%"]

@@ -63,13 +63,15 @@ def normalize_column_names(columns: List[Any]) -> List[str]:
             unnamed_counter += 1
             empty_placeholders += 1
             logger.warning(
-                "column_normalizer.empty_name_placeholder_generated column_index=%s original_value=%s placeholder=%s",
+                "column_normalizer.empty_name_placeholder_generated column_index=%s "
+                "original_value=%s placeholder=%s",
                 idx,
                 repr(original_value),
                 name,
             )
             logging.getLogger().warning(
-                "column_normalizer.empty_name_placeholder_generated column_index=%s original_value=%s placeholder=%s",
+                "column_normalizer.empty_name_placeholder_generated column_index=%s "
+                "original_value=%s placeholder=%s",
                 idx,
                 repr(original_value),
                 name,
@@ -83,13 +85,15 @@ def normalize_column_names(columns: List[Any]) -> List[str]:
             name = f"{base_name}_{seen[base_name]}"
             duplicates_resolved += 1
             logger.warning(
-                "column_normalizer.duplicate_name_resolved original_name=%s suffixed_name=%s occurrence_count=%s",
+                "column_normalizer.duplicate_name_resolved original_name=%s "
+                "suffixed_name=%s occurrence_count=%s",
                 base_name,
                 name,
                 seen[base_name] + 1,
             )
             logging.getLogger().warning(
-                "column_normalizer.duplicate_name_resolved original_name=%s suffixed_name=%s occurrence_count=%s",
+                "column_normalizer.duplicate_name_resolved original_name=%s "
+                "suffixed_name=%s occurrence_count=%s",
                 base_name,
                 name,
                 seen[base_name] + 1,
@@ -100,13 +104,15 @@ def normalize_column_names(columns: List[Any]) -> List[str]:
         normalized.append(name)
 
     logger.info(
-        "column_normalizer.summary columns_normalized=%s empty_placeholders_generated=%s duplicates_resolved=%s",
+        "column_normalizer.summary columns_normalized=%s "
+        "empty_placeholders_generated=%s duplicates_resolved=%s",
         len(columns),
         empty_placeholders,
         duplicates_resolved,
     )
     logging.getLogger().info(
-        "column_normalizer.summary columns_normalized=%s empty_placeholders_generated=%s duplicates_resolved=%s",
+        "column_normalizer.summary columns_normalized=%s "
+        "empty_placeholders_generated=%s duplicates_resolved=%s",
         len(columns),
         empty_placeholders,
         duplicates_resolved,
@@ -116,7 +122,8 @@ def normalize_column_names(columns: List[Any]) -> List[str]:
 
 
 def normalize_column_name(column_name: Any) -> str:
-    """Normalize a single column name while keeping compatibility with existing callers."""
+    """Normalize a single column name while keeping compatibility with existing
+    callers."""
     return normalize_column_names([column_name])[0]
 
 
@@ -131,7 +138,8 @@ def normalize_columns(columns: List[Any]) -> Dict[str, str]:
 def apply_column_normalization(
     data_rows: List[Dict[str, Any]], column_mapping: Optional[Dict[str, str]] = None
 ) -> List[Dict[str, Any]]:
-    """Apply normalization to a list of row dictionaries using provided or derived mapping."""
+    """Apply normalization to a list of row dictionaries using provided or derived
+    mapping."""
     if not data_rows:
         return data_rows
 
@@ -159,7 +167,7 @@ def apply_column_normalization(
     return normalized_rows
 
 
-def add_domain_mapping(original: str, normalized: str):
+def add_domain_mapping(original: str, normalized: str) -> None:
     """
     Add a custom mapping override for specific column names.
     """

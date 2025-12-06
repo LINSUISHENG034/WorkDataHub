@@ -5,8 +5,7 @@ Pydantic 集成适配器 - 简化版本
 """
 
 import logging
-from functools import wraps
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from pydantic import ValidationInfo, field_validator
 
@@ -20,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 def decimal_fields_cleaner(
     *field_names: str, precision_config: Optional[Dict[str, int]] = None
-):
+) -> Any:
     """
     专门用于数值字段清洗的简化装饰器
 
@@ -40,9 +39,9 @@ def decimal_fields_cleaner(
             当期收益率: Optional[Decimal] = None
     """
 
-    def decorator(cls):
+    def decorator(cls: Any) -> Any:
         # 创建验证器函数
-        def validator_func(v, info):
+        def validator_func(v: Any, info: ValidationInfo) -> Any:
             return comprehensive_decimal_cleaning(
                 value=v, field_name=info.field_name, precision_config=precision_config
             )
@@ -73,7 +72,7 @@ def decimal_fields_cleaner(
 
 def simple_field_validator(
     *field_names: str, rule_name: str = "comprehensive_decimal_cleaning"
-):
+) -> Any:
     """
     简化的字段验证器装饰器
 
@@ -82,11 +81,10 @@ def simple_field_validator(
         rule_name: 使用的清洗规则名称
     """
 
-    def decorator(func):
+    def decorator(func: Any) -> Any:
         @field_validator(*field_names, mode="before")
         @classmethod
-        @wraps(func)
-        def wrapper(cls, v, info: ValidationInfo):
+        def wrapper(cls: Any, v: Any, info: ValidationInfo) -> Any:
             # 直接使用综合清洗函数
             if rule_name == "comprehensive_decimal_cleaning":
                 return comprehensive_decimal_cleaning(v, field_name=info.field_name)

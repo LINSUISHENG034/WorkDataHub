@@ -2,9 +2,11 @@
 """
 Schema diagnostics and detailed database inspection.
 """
+
 import psycopg2
 
 DSN = "postgres://postgres:Post.169828@localhost:5432/postgres"
+
 
 def run_schema_diagnostics():
     """Run comprehensive schema diagnostics."""
@@ -14,7 +16,9 @@ def run_schema_diagnostics():
 
         with conn.cursor() as cursor:
             # Basic database info
-            cursor.execute("SELECT current_database(), current_schema(), current_setting('search_path');")
+            cursor.execute(
+                "SELECT current_database(), current_schema(), current_setting('search_path');"
+            )
             db, schema, search_path = cursor.fetchone()
             print(f"📊 Database: {db}, Schema: {schema}, Search path: {search_path}")
 
@@ -26,7 +30,7 @@ def run_schema_diagnostics():
                 ORDER BY table_name;
             """)
             tables = cursor.fetchall()
-            print(f"📋 Tables in public schema:")
+            print("📋 Tables in public schema:")
             for table_name, table_type in tables:
                 print(f"   - {table_name} ({table_type})")
 
@@ -39,11 +43,11 @@ def run_schema_diagnostics():
                 plan_count = cursor.fetchone()[0]
                 print(f"   - 年金计划: {plan_count} rows")
 
-                cursor.execute('''
+                cursor.execute("""
                     SELECT "年金计划号", "计划全称", "客户名称", "company_id"
                     FROM "年金计划"
                     LIMIT 5;
-                ''')
+                """)
                 rows = cursor.fetchall()
                 if rows:
                     print("     Sample rows:")
@@ -59,11 +63,11 @@ def run_schema_diagnostics():
                 portfolio_count = cursor.fetchone()[0]
                 print(f"   - 组合计划: {portfolio_count} rows")
 
-                cursor.execute('''
+                cursor.execute("""
                     SELECT "组合代码", "年金计划号", "组合名称", "组合类型"
                     FROM "组合计划"
                     LIMIT 5;
-                ''')
+                """)
                 rows = cursor.fetchall()
                 if rows:
                     print("     Sample rows:")
@@ -92,6 +96,7 @@ def run_schema_diagnostics():
     except Exception as e:
         print(f"❌ Schema diagnostics failed: {e}")
         return False
+
 
 if __name__ == "__main__":
     run_schema_diagnostics()

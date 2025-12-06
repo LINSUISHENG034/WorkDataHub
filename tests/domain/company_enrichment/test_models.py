@@ -8,7 +8,10 @@ ensuring proper validation, serialization, and field handling.
 import pytest
 from pydantic import ValidationError
 
-from work_data_hub.domain.company_enrichment.models import CompanyDetail, CompanySearchResult
+from work_data_hub.domain.company_enrichment.models import (
+    CompanyDetail,
+    CompanySearchResult,
+)
 
 
 class TestCompanySearchResult:
@@ -20,7 +23,7 @@ class TestCompanySearchResult:
             company_id="123456789",
             official_name="测试公司",
             unite_code="91110000000000001X",
-            match_score=0.85
+            match_score=0.85,
         )
 
         assert result.company_id == "123456789"
@@ -30,10 +33,7 @@ class TestCompanySearchResult:
 
     def test_search_result_with_minimal_fields(self):
         """Test creation with only required fields."""
-        result = CompanySearchResult(
-            company_id="123",
-            official_name="最小公司"
-        )
+        result = CompanySearchResult(company_id="123", official_name="最小公司")
 
         assert result.company_id == "123"
         assert result.official_name == "最小公司"
@@ -43,16 +43,12 @@ class TestCompanySearchResult:
     def test_search_result_normalizes_company_id(self):
         """Test company_id normalization from various types."""
         # Integer company ID
-        result = CompanySearchResult(
-            company_id=123456789,
-            official_name="数字ID公司"
-        )
+        result = CompanySearchResult(company_id=123456789, official_name="数字ID公司")
         assert result.company_id == "123456789"
 
         # String with whitespace
         result = CompanySearchResult(
-            company_id="  987654321  ",
-            official_name="空格ID公司"
+            company_id="  987654321  ", official_name="空格ID公司"
         )
         assert result.company_id == "987654321"
 
@@ -60,25 +56,19 @@ class TestCompanySearchResult:
         """Test unite_code normalization and None handling."""
         # Valid unite code
         result = CompanySearchResult(
-            company_id="123",
-            official_name="公司",
-            unite_code="  91110000000000001X  "
+            company_id="123", official_name="公司", unite_code="  91110000000000001X  "
         )
         assert result.unite_code == "91110000000000001X"
 
         # Empty string becomes None
         result = CompanySearchResult(
-            company_id="123",
-            official_name="公司",
-            unite_code=""
+            company_id="123", official_name="公司", unite_code=""
         )
         assert result.unite_code is None
 
         # Whitespace only becomes None
         result = CompanySearchResult(
-            company_id="123",
-            official_name="公司",
-            unite_code="   "
+            company_id="123", official_name="公司", unite_code="   "
         )
         assert result.unite_code is None
 
@@ -86,43 +76,31 @@ class TestCompanySearchResult:
         """Test match_score field validation."""
         # Valid score range
         result = CompanySearchResult(
-            company_id="123",
-            official_name="公司",
-            match_score=0.5
+            company_id="123", official_name="公司", match_score=0.5
         )
         assert result.match_score == 0.5
 
         # Score at boundaries
         result = CompanySearchResult(
-            company_id="123",
-            official_name="公司",
-            match_score=0.0
+            company_id="123", official_name="公司", match_score=0.0
         )
         assert result.match_score == 0.0
 
         result = CompanySearchResult(
-            company_id="123",
-            official_name="公司",
-            match_score=1.0
+            company_id="123", official_name="公司", match_score=1.0
         )
         assert result.match_score == 1.0
 
         # Invalid score - too low
         with pytest.raises(ValidationError) as exc_info:
             CompanySearchResult(
-                company_id="123",
-                official_name="公司",
-                match_score=-0.1
+                company_id="123", official_name="公司", match_score=-0.1
             )
         assert "greater than or equal to 0" in str(exc_info.value)
 
         # Invalid score - too high
         with pytest.raises(ValidationError) as exc_info:
-            CompanySearchResult(
-                company_id="123",
-                official_name="公司",
-                match_score=1.1
-            )
+            CompanySearchResult(company_id="123", official_name="公司", match_score=1.1)
         assert "less than or equal to 1" in str(exc_info.value)
 
     def test_search_result_required_field_validation(self):
@@ -139,18 +117,12 @@ class TestCompanySearchResult:
 
         # Empty company_id
         with pytest.raises(ValidationError) as exc_info:
-            CompanySearchResult(
-                company_id="",
-                official_name="公司"
-            )
+            CompanySearchResult(company_id="", official_name="公司")
         assert "at least 1 character" in str(exc_info.value)
 
         # Empty official_name
         with pytest.raises(ValidationError) as exc_info:
-            CompanySearchResult(
-                company_id="123",
-                official_name=""
-            )
+            CompanySearchResult(company_id="123", official_name="")
         assert "at least 1 character" in str(exc_info.value)
 
     def test_search_result_string_length_validation(self):
@@ -158,19 +130,14 @@ class TestCompanySearchResult:
         # Official name too long
         long_name = "A" * 501  # Max is 500
         with pytest.raises(ValidationError) as exc_info:
-            CompanySearchResult(
-                company_id="123",
-                official_name=long_name
-            )
+            CompanySearchResult(company_id="123", official_name=long_name)
         assert "at most 500 characters" in str(exc_info.value)
 
         # Unite code too long
         long_unite_code = "A" * 101  # Max is 100
         with pytest.raises(ValidationError) as exc_info:
             CompanySearchResult(
-                company_id="123",
-                official_name="公司",
-                unite_code=long_unite_code
+                company_id="123", official_name="公司", unite_code=long_unite_code
             )
         assert "at most 100 characters" in str(exc_info.value)
 
@@ -179,7 +146,7 @@ class TestCompanySearchResult:
         result = CompanySearchResult(
             company_id="  123  ",
             official_name="  测试公司  ",
-            unite_code="  91110000000000001X  "
+            unite_code="  91110000000000001X  ",
         )
 
         assert result.company_id == "123"
@@ -190,9 +157,7 @@ class TestCompanySearchResult:
         """Test that extra fields are forbidden."""
         with pytest.raises(ValidationError) as exc_info:
             CompanySearchResult(
-                company_id="123",
-                official_name="公司",
-                extra_field="不允许"
+                company_id="123", official_name="公司", extra_field="不允许"
             )
         assert "extra_field" in str(exc_info.value)
 
@@ -207,7 +172,7 @@ class TestCompanyDetail:
             official_name="详细测试公司",
             unite_code="91110000000000001X",
             aliases=["别名1", "别名2"],
-            business_status="在业"
+            business_status="在业",
         )
 
         assert detail.company_id == "123456789"
@@ -218,10 +183,7 @@ class TestCompanyDetail:
 
     def test_company_detail_with_minimal_fields(self):
         """Test creation with only required fields."""
-        detail = CompanyDetail(
-            company_id="123",
-            official_name="最小详情公司"
-        )
+        detail = CompanyDetail(company_id="123", official_name="最小详情公司")
 
         assert detail.company_id == "123"
         assert detail.official_name == "最小详情公司"
@@ -231,70 +193,49 @@ class TestCompanyDetail:
 
     def test_company_detail_normalizes_company_id(self):
         """Test company_id normalization in CompanyDetail."""
-        detail = CompanyDetail(
-            company_id=987654321,
-            official_name="数字ID详情公司"
-        )
+        detail = CompanyDetail(company_id=987654321, official_name="数字ID详情公司")
         assert detail.company_id == "987654321"
 
     def test_company_detail_normalizes_unite_code(self):
         """Test unite_code normalization in CompanyDetail."""
         # Valid unite code with whitespace
         detail = CompanyDetail(
-            company_id="123",
-            official_name="公司",
-            unite_code="  91110000000000001X  "
+            company_id="123", official_name="公司", unite_code="  91110000000000001X  "
         )
         assert detail.unite_code == "91110000000000001X"
 
         # Empty string becomes None
-        detail = CompanyDetail(
-            company_id="123",
-            official_name="公司",
-            unite_code=""
-        )
+        detail = CompanyDetail(company_id="123", official_name="公司", unite_code="")
         assert detail.unite_code is None
 
     def test_company_detail_normalizes_aliases(self):
         """Test aliases field normalization."""
         # List of strings
         detail = CompanyDetail(
-            company_id="123",
-            official_name="公司",
-            aliases=["别名1", "别名2", "别名3"]
+            company_id="123", official_name="公司", aliases=["别名1", "别名2", "别名3"]
         )
         assert detail.aliases == ["别名1", "别名2", "别名3"]
 
         # Single string converted to list
         detail = CompanyDetail(
-            company_id="123",
-            official_name="公司",
-            aliases="单个别名"
+            company_id="123", official_name="公司", aliases="单个别名"
         )
         assert detail.aliases == ["单个别名"]
 
         # Empty string becomes empty list
-        detail = CompanyDetail(
-            company_id="123",
-            official_name="公司",
-            aliases=""
-        )
+        detail = CompanyDetail(company_id="123", official_name="公司", aliases="")
         assert detail.aliases == []
 
         # List with empty/None values filtered out
         detail = CompanyDetail(
             company_id="123",
             official_name="公司",
-            aliases=["有效别名", "", None, "   ", "另一个有效别名"]
+            aliases=["有效别名", "", None, "   ", "另一个有效别名"],
         )
         assert detail.aliases == ["有效别名", "另一个有效别名"]
 
         # None becomes empty list
-        detail = CompanyDetail(
-            company_id="123",
-            official_name="公司",
-            aliases=None
-        )
+        detail = CompanyDetail(company_id="123", official_name="公司", aliases=None)
         assert detail.aliases == []
 
     def test_company_detail_required_field_validation(self):
@@ -314,19 +255,14 @@ class TestCompanyDetail:
         # Official name too long
         long_name = "A" * 501
         with pytest.raises(ValidationError) as exc_info:
-            CompanyDetail(
-                company_id="123",
-                official_name=long_name
-            )
+            CompanyDetail(company_id="123", official_name=long_name)
         assert "at most 500 characters" in str(exc_info.value)
 
         # Business status too long
         long_status = "A" * 101
         with pytest.raises(ValidationError) as exc_info:
             CompanyDetail(
-                company_id="123",
-                official_name="公司",
-                business_status=long_status
+                company_id="123", official_name="公司", business_status=long_status
             )
         assert "at most 100 characters" in str(exc_info.value)
 
@@ -336,7 +272,7 @@ class TestCompanyDetail:
             company_id="  123  ",
             official_name="  详细公司  ",
             unite_code="  91110000000000001X  ",
-            business_status="  在业  "
+            business_status="  在业  ",
         )
 
         assert detail.company_id == "123"
@@ -348,9 +284,7 @@ class TestCompanyDetail:
         """Test that extra fields are forbidden in CompanyDetail."""
         with pytest.raises(ValidationError) as exc_info:
             CompanyDetail(
-                company_id="123",
-                official_name="公司",
-                forbidden_extra="不允许"
+                company_id="123", official_name="公司", forbidden_extra="不允许"
             )
         assert "forbidden_extra" in str(exc_info.value)
 
@@ -361,7 +295,7 @@ class TestCompanyDetail:
             official_name="序列化测试公司",
             unite_code="91110000000000001X",
             aliases=["别名1", "别名2"],
-            business_status="在业"
+            business_status="在业",
         )
 
         data = detail.model_dump()
@@ -371,17 +305,14 @@ class TestCompanyDetail:
             "official_name": "序列化测试公司",
             "unite_code": "91110000000000001X",
             "aliases": ["别名1", "别名2"],
-            "business_status": "在业"
+            "business_status": "在业",
         }
 
         assert data == expected
 
     def test_company_detail_json_serialization(self):
         """Test model JSON serialization."""
-        detail = CompanyDetail(
-            company_id="123",
-            official_name="JSON测试公司"
-        )
+        detail = CompanyDetail(company_id="123", official_name="JSON测试公司")
 
         json_str = detail.model_dump_json()
         assert '"company_id":"123"' in json_str
@@ -401,7 +332,7 @@ class TestModelInteroperability:
             company_id="123456789",
             official_name="搜索结果公司",
             unite_code="91110000000000001X",
-            match_score=0.95
+            match_score=0.95,
         )
 
         # Create detail using data from search result
@@ -410,7 +341,7 @@ class TestModelInteroperability:
             official_name=search_result.official_name,
             unite_code=search_result.unite_code,
             aliases=["搜索别名"],
-            business_status="活跃"
+            business_status="活跃",
         )
 
         assert detail.company_id == search_result.company_id
@@ -422,7 +353,7 @@ class TestModelInteroperability:
         common_data = {
             "company_id": "999888777",
             "official_name": "兼容性测试公司",
-            "unite_code": "91110000000000002Y"
+            "unite_code": "91110000000000002Y",
         }
 
         # Both models should accept the same common data

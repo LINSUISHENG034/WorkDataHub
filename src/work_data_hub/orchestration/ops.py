@@ -8,29 +8,29 @@ configuration validation.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import yaml
 from dagster import Config, OpExecutionContext, op
 from pydantic import field_validator, model_validator
 
-from src.work_data_hub.config.settings import get_settings
-from src.work_data_hub.domain.annuity_performance.service import (
+from work_data_hub.config.settings import get_settings
+from work_data_hub.domain.annuity_performance.service import (
     process_with_enrichment,
 )
-from src.work_data_hub.domain.reference_backfill.service import (
+from work_data_hub.domain.reference_backfill.service import (
     derive_plan_candidates,
     derive_portfolio_candidates,
 )
-from src.work_data_hub.domain.sample_trustee_performance.service import process
-from src.work_data_hub.io.connectors.file_connector import DataSourceConnector
-from src.work_data_hub.io.loader.warehouse_loader import (
+from work_data_hub.domain.sample_trustee_performance.service import process
+from work_data_hub.io.connectors.file_connector import DataSourceConnector
+from work_data_hub.io.loader.warehouse_loader import (
     DataWarehouseLoaderError,
     fill_null_only,
     insert_missing,
     load,
 )
-from src.work_data_hub.io.readers.excel_reader import read_excel_rows
+from work_data_hub.io.readers.excel_reader import read_excel_rows
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 #    attribute here
 # 2) patch builtins.__import__ expects a dynamic import path at runtime
 _PSYCOPG2_NOT_LOADED = object()
-psycopg2 = _PSYCOPG2_NOT_LOADED  # type: ignore
+psycopg2: Any = _PSYCOPG2_NOT_LOADED
 
 
 def _load_valid_domains() -> List[str]:
@@ -56,7 +56,7 @@ def _load_valid_domains() -> List[str]:
     """
     # Optional: Validate data_sources.yml for fail-fast behavior
     try:
-        from src.work_data_hub.infrastructure.settings.data_source_schema import (
+        from work_data_hub.infrastructure.settings.data_source_schema import (
             DataSourcesValidationError,
             validate_data_sources_config,
         )
@@ -318,12 +318,12 @@ def process_annuity_performance_op(
             )
 
             # Lazy import psycopg2 for database connection (following load_op pattern)
-            global psycopg2  # type: ignore
-            if psycopg2 is _PSYCOPG2_NOT_LOADED:  # type: ignore
+            global psycopg2
+            if psycopg2 is _PSYCOPG2_NOT_LOADED:
                 try:
-                    import psycopg2 as _psycopg2  # type: ignore
+                    import psycopg2 as _psycopg2
 
-                    psycopg2 = _psycopg2  # type: ignore
+                    psycopg2 = _psycopg2
                 except ImportError:
                     raise DataWarehouseLoaderError(
                         "psycopg2 not available for enrichment database operations"
@@ -332,7 +332,7 @@ def process_annuity_performance_op(
             # Create database connection only in execute mode
             settings = get_settings()
             dsn = settings.get_database_connection_string()
-            conn = psycopg2.connect(dsn)  # type: ignore
+            conn = psycopg2.connect(dsn)
 
             # Setup enrichment service components with connection
             loader = CompanyEnrichmentLoader(conn)
@@ -438,7 +438,7 @@ class ReadProcessConfig(Config):
 @op
 def read_and_process_sample_trustee_files_op(
     context: OpExecutionContext, config: ReadProcessConfig, file_paths: List[str]
-) -> List[Dict]:
+) -> List[Dict[str, Any]]:
     """
     Process multiple trustee files and return accumulated results.
 
@@ -452,7 +452,7 @@ def read_and_process_sample_trustee_files_op(
     """
     # Limit files like existing MVP approach
     paths_to_process = (file_paths or [])[: min(len(file_paths), config.max_files)]
-    all_processed: List[Dict] = []
+    all_processed: List[Dict[str, Any]] = []
 
     for file_path in paths_to_process:
         try:
@@ -578,20 +578,20 @@ def load_op(
     try:
         if not config.plan_only:
             # Lazy import psycopg2 into module-global for test compatibility
-            global psycopg2  # type: ignore
-            if psycopg2 is None:  # type: ignore
+            global psycopg2
+            if psycopg2 is None:
                 # Explicitly treated as unavailable (tests may patch to None)
                 raise DataWarehouseLoaderError(
                     "psycopg2 not available for database operations"
                 )
-            if psycopg2 is _PSYCOPG2_NOT_LOADED:  # type: ignore
+            if psycopg2 is _PSYCOPG2_NOT_LOADED:
                 try:
-                    import psycopg2 as _psycopg2  # type: ignore
+                    import psycopg2 as _psycopg2
                 except ImportError:
                     raise DataWarehouseLoaderError(
                         "psycopg2 not available for database operations"
                     )
-                psycopg2 = _psycopg2  # type: ignore
+                psycopg2 = _psycopg2
 
             settings = get_settings()
 
@@ -606,7 +606,7 @@ def load_op(
             # Fallback: compatibility wrapper
             if not isinstance(dsn, str) and hasattr(settings, "database"):
                 try:
-                    dsn = settings.database.get_connection_string()  # type: ignore[attr-defined]
+                    dsn = settings.database.get_connection_string()
                 except Exception:
                     pass
             if not isinstance(dsn, str) or not dsn:
@@ -620,7 +620,7 @@ def load_op(
 
             # CRITICAL: Only catch psycopg2.connect failures
             try:
-                conn = psycopg2.connect(dsn)  # type: ignore  # Bare connection, no context manager
+                conn = psycopg2.connect(dsn)  # Bare connection, no context manager
             except Exception as e:
                 raise DataWarehouseLoaderError(
                     f"Database connection failed: {e}. "
@@ -760,19 +760,19 @@ def backfill_refs_op(
     try:
         # Mirror load_op connection handling pattern
         if not config.plan_only:
-            global psycopg2  # type: ignore
-            if psycopg2 is None:  # type: ignore
+            global psycopg2
+            if psycopg2 is None:
                 raise DataWarehouseLoaderError(
                     "psycopg2 not available for database operations"
                 )
-            if psycopg2 is _PSYCOPG2_NOT_LOADED:  # type: ignore
+            if psycopg2 is _PSYCOPG2_NOT_LOADED:
                 try:
-                    import psycopg2 as _psycopg2  # type: ignore
+                    import psycopg2 as _psycopg2
                 except ImportError:
                     raise DataWarehouseLoaderError(
                         "psycopg2 not available for database operations"
                     )
-                psycopg2 = _psycopg2  # type: ignore
+                psycopg2 = _psycopg2
 
             settings = get_settings()
 
@@ -785,7 +785,7 @@ def backfill_refs_op(
                     dsn = None
             if not isinstance(dsn, str) and hasattr(settings, "database"):
                 try:
-                    dsn = settings.database.get_connection_string()  # type: ignore[attr-defined]
+                    dsn = settings.database.get_connection_string()
                 except Exception:
                     pass
             if not isinstance(dsn, str) or not dsn:
@@ -796,7 +796,7 @@ def backfill_refs_op(
             context.log.info("Connecting to database for reference backfill execution")
 
             try:
-                conn = psycopg2.connect(dsn)  # type: ignore
+                conn = psycopg2.connect(dsn)
             except Exception as e:
                 raise DataWarehouseLoaderError(
                     f"Database connection failed: {e}. "
@@ -815,7 +815,7 @@ def backfill_refs_op(
         refs_config = {}
         try:
             with open(settings.data_sources_config, "r", encoding="utf-8") as f:
-                data_sources = yaml.safe_load(f)
+                data_sources: Dict[str, Any] = yaml.safe_load(f) or {}
 
             # Extract refs for current domain (annuity_performance)
             domain = "annuity_performance"  # TODO: pass from discover_files_op
@@ -1066,20 +1066,20 @@ def process_company_lookup_queue_op(
     try:
         if not config.plan_only:
             # Lazy import psycopg2 into module-global for test compatibility
-            global psycopg2  # type: ignore
-            if psycopg2 is None:  # type: ignore
+            global psycopg2
+            if psycopg2 is None:
                 # Explicitly treated as unavailable (tests may patch to None)
                 raise DataWarehouseLoaderError(
                     "psycopg2 not available for database operations"
                 )
-            if psycopg2 is _PSYCOPG2_NOT_LOADED:  # type: ignore
+            if psycopg2 is _PSYCOPG2_NOT_LOADED:
                 try:
-                    import psycopg2 as _psycopg2  # type: ignore
+                    import psycopg2 as _psycopg2
                 except ImportError:
                     raise DataWarehouseLoaderError(
                         "psycopg2 not available for database operations"
                     )
-                psycopg2 = _psycopg2  # type: ignore
+                psycopg2 = _psycopg2
 
             # Import enrichment components (lazy import to avoid circular dependencies)
             from work_data_hub.domain.company_enrichment.lookup_queue import LookupQueue
@@ -1113,7 +1113,7 @@ def process_company_lookup_queue_op(
 
             # CRITICAL: Only catch psycopg2.connect failures
             try:
-                conn = psycopg2.connect(dsn)  # type: ignore  # Bare connection, no context manager
+                conn = psycopg2.connect(dsn)  # Bare connection, no context manager
             except Exception as e:
                 raise DataWarehouseLoaderError(
                     f"Database connection failed: {e}. "
@@ -1140,7 +1140,7 @@ def process_company_lookup_queue_op(
             # Get final queue status
             queue_status = enrichment_service.get_queue_status()
 
-            result = {
+            result: Dict[str, Any] = {
                 "processed_count": processed_count,
                 "batch_size": config.batch_size,
                 "plan_only": config.plan_only,
@@ -1209,9 +1209,7 @@ def read_csv_op(context: OpExecutionContext) -> List[Dict[str, Any]]:
         # Use fixtures path for sample data
         fixture_path = Path("tests/fixtures/sample_data.csv")
 
-        context.log.info(
-            f"Reading sample CSV data from {fixture_path}"
-        )
+        context.log.info(f"Reading sample CSV data from {fixture_path}")
 
         # Read CSV using pandas (minimal logic in op)
         df = pd.read_csv(fixture_path)
@@ -1223,7 +1221,7 @@ def read_csv_op(context: OpExecutionContext) -> List[Dict[str, Any]]:
             f"Sample CSV read completed - rows: {len(rows)}, columns: {len(df.columns)}"
         )
 
-        return rows
+        return cast(List[Dict[str, Any]], rows)
 
     except Exception as e:
         context.log.error(f"Sample CSV read failed: {e}")
@@ -1253,9 +1251,7 @@ def validate_op(
     try:
         # Import Pipeline framework from Story 1.5
 
-        context.log.info(
-            f"Starting sample validation pipeline - rows: {len(rows)}"
-        )
+        context.log.info(f"Starting sample validation pipeline - rows: {len(rows)}")
 
         # Convert rows back to DataFrame for Pipeline framework
         df = pd.DataFrame(rows)
@@ -1276,7 +1272,7 @@ def validate_op(
             f"Sample validation completed - validated: {len(validated_rows)} rows"
         )
 
-        return validated_rows
+        return cast(List[Dict[str, Any]], validated_rows)
 
     except Exception as e:
         context.log.error(f"Sample validation failed: {e}")
@@ -1303,18 +1299,17 @@ def load_to_db_op(
     """
     try:
         # Import Story 1.8 WarehouseLoader
-        from src.work_data_hub.io.loader.warehouse_loader import load
+        from work_data_hub.io.loader.warehouse_loader import load
 
-        context.log.info(
-            f"Starting sample database load - rows: {len(rows)}"
-        )
+        context.log.info(f"Starting sample database load - rows: {len(rows)}")
 
         # Get database connection (using settings from Story 1.4)
-        global psycopg2  # type: ignore
-        if psycopg2 is _PSYCOPG2_NOT_LOADED:  # type: ignore
+        global psycopg2
+        if psycopg2 is _PSYCOPG2_NOT_LOADED:
             try:
-                import psycopg2 as _psycopg2  # type: ignore
-                psycopg2 = _psycopg2  # type: ignore
+                import psycopg2 as _psycopg2
+
+                psycopg2 = _psycopg2
             except ImportError:
                 raise DataWarehouseLoaderError(
                     "psycopg2 not available for database operations"
@@ -1331,7 +1326,7 @@ def load_to_db_op(
                 dsn = None
         if not isinstance(dsn, str) and hasattr(settings, "database"):
             try:
-                dsn = settings.database.get_connection_string()  # type: ignore[attr-defined]
+                dsn = settings.database.get_connection_string()
             except Exception:
                 pass
         if not isinstance(dsn, str) or not dsn:
@@ -1345,7 +1340,7 @@ def load_to_db_op(
 
         conn = None
         try:
-            conn = psycopg2.connect(dsn)  # type: ignore
+            conn = psycopg2.connect(dsn)
 
             # Load using Story 1.8 warehouse loader
             result = load(

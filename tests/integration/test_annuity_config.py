@@ -52,9 +52,9 @@ class TestAnnuityConfigLoading:
             config = yaml.safe_load(f)
 
         assert "domains" in config, "Configuration must have 'domains' section"
-        assert (
-            "annuity_performance" in config["domains"]
-        ), "annuity_performance domain must be defined"
+        assert "annuity_performance" in config["domains"], (
+            "annuity_performance domain must be defined"
+        )
 
     def test_annuity_domain_config_validates(self):
         """AC-4.6.5: Configuration passes Epic 3 Story 3.0 schema validation."""
@@ -64,7 +64,11 @@ class TestAnnuityConfigLoading:
         assert config.base_path is not None
         assert len(config.file_patterns) > 0
         assert config.sheet_name is not None
-        assert config.version_strategy in ["highest_number", "latest_modified", "manual"]
+        assert config.version_strategy in [
+            "highest_number",
+            "latest_modified",
+            "manual",
+        ]
         assert config.fallback in ["error", "use_latest_modified"]
 
 
@@ -336,9 +340,9 @@ class TestMigrationSchemaDefinition:
     def test_migration_is_idempotent(self, migration_source):
         """Verify migration checks for existing table (idempotent)."""
         # Migration should check if table exists before creating
-        assert "get_table_names" in migration_source or "inspector" in migration_source, (
-            "Migration should check for existing table to be idempotent"
-        )
+        assert (
+            "get_table_names" in migration_source or "inspector" in migration_source
+        ), "Migration should check for existing table to be idempotent"
 
 
 # =============================================================================
@@ -392,9 +396,7 @@ class TestDocumentation:
         ]
 
         for section in required_sections:
-            assert section in content, (
-                f"Runbook missing required section: {section}"
-            )
+            assert section in content, f"Runbook missing required section: {section}"
 
 
 # =============================================================================
@@ -421,7 +423,9 @@ class TestAnnuityConfigIntegration:
         assert config.fallback == "error"
 
         # 4. Verify security constraints
-        assert ".." not in config.base_path, "base_path should not contain path traversal"
+        assert ".." not in config.base_path, (
+            "base_path should not contain path traversal"
+        )
 
     def test_config_matches_gold_schema_expectations(self):
         """Verify configuration aligns with AnnuityPerformanceOut model expectations."""

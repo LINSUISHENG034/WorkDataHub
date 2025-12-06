@@ -12,6 +12,9 @@ from work_data_hub.domain.annuity_income.models import (
     EnrichmentStats,
 )
 from work_data_hub.domain.pipelines.types import ErrorContext
+
+# Shared helper imported from infrastructure (Story 5.5.4 extraction)
+from work_data_hub.infrastructure.helpers import normalize_month
 from work_data_hub.infrastructure.validation import export_error_csv
 from work_data_hub.utils.date_parser import (
     parse_chinese_date,
@@ -29,11 +32,9 @@ class FileDiscoveryProtocol(Protocol):
     def discover_and_load(self, *, domain: str, month: str) -> Any: ...
 
 
-# Shared helper imported from infrastructure (Story 5.5.4 extraction)
-from work_data_hub.infrastructure.helpers import normalize_month
-
-
-def run_discovery(*, file_discovery: FileDiscoveryProtocol, domain: str, month: str) -> Any:
+def run_discovery(
+    *, file_discovery: FileDiscoveryProtocol, domain: str, month: str
+) -> Any:
     """Run file discovery for the specified domain and month."""
     try:
         return file_discovery.discover_and_load(domain=domain, month=month)
@@ -51,8 +52,10 @@ def run_discovery(*, file_discovery: FileDiscoveryProtocol, domain: str, month: 
 
 
 # NOTE(5.5.4-deferred): Extraction deferred to Epic 6
-# Reason: Requires generic factory pattern with type parameters (model class + required keys)
-# See: docs/sprint-artifacts/epic-5.5-optimization-recommendations.md "Reuse Candidates" table
+# Reason: Requires generic factory pattern with type parameters (model class +
+# required keys)
+# See: docs/sprint-artifacts/epic-5.5-optimization-recommendations.md "Reuse Candidates"
+# table
 # Duplicated from: annuity_performance/helpers.py (with model type change)
 # Reuse potential: MEDIUM - Epic 6 will implement generic version
 def convert_dataframe_to_models(
@@ -65,7 +68,10 @@ def convert_dataframe_to_models(
 
     for idx, row in df.iterrows():
         try:
-            row_dict = {key: (None if pd.isna(val) else val) for key, val in row.to_dict().items()}
+            row_dict = {
+                key: (None if pd.isna(val) else val)
+                for key, val in row.to_dict().items()
+            }
             row_dict = {k: v for k, v in row_dict.items() if k in allowed_fields}
             if not row_dict.get("计划号") or row_dict.get("月度") is None:
                 continue
@@ -83,9 +89,9 @@ def convert_dataframe_to_models(
                 "Row validation failed", row_index=idx, error=str(exc)
             )
         except Exception as exc:  # pragma: no cover - defensive logging
-            event_logger.bind(domain="annuity_income", step="convert_to_models").warning(
-                "Row unexpected error", row_index=idx, error=str(exc)
-            )
+            event_logger.bind(
+                domain="annuity_income", step="convert_to_models"
+            ).warning("Row unexpected error", row_index=idx, error=str(exc))
 
     return records, unknown_names
 

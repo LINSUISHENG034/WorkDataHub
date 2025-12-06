@@ -26,6 +26,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 import numpy as np
 import pandas as pd
+
 from legacy.annuity_hub.common_utils.common_utils import (
     clean_company_name,
     parse_to_standard_date,
@@ -74,12 +75,22 @@ class ExtractedAnnuityIncomeCleaner:
     def __init__(self, mappings: Dict[str, Any]):
         """Initialize with mapping dictionaries from fixture."""
         # Extract all required mappings
-        self.COMPANY_ID1_MAPPING = _extract_mapping_data(mappings, "company_id1_mapping")
-        self.COMPANY_ID3_MAPPING = _extract_mapping_data(mappings, "company_id3_mapping")
-        self.COMPANY_ID4_MAPPING = _extract_mapping_data(mappings, "company_id4_mapping")
-        self.COMPANY_ID5_MAPPING = _extract_mapping_data(mappings, "company_id5_mapping")
+        self.COMPANY_ID1_MAPPING = _extract_mapping_data(
+            mappings, "company_id1_mapping"
+        )
+        self.COMPANY_ID3_MAPPING = _extract_mapping_data(
+            mappings, "company_id3_mapping"
+        )
+        self.COMPANY_ID4_MAPPING = _extract_mapping_data(
+            mappings, "company_id4_mapping"
+        )
+        self.COMPANY_ID5_MAPPING = _extract_mapping_data(
+            mappings, "company_id5_mapping"
+        )
 
-        self.COMPANY_BRANCH_MAPPING = _extract_mapping_data(mappings, "company_branch_mapping")
+        self.COMPANY_BRANCH_MAPPING = _extract_mapping_data(
+            mappings, "company_branch_mapping"
+        )
         self.BUSINESS_TYPE_CODE_MAPPING = _extract_mapping_data(
             mappings, "business_type_code_mapping"
         )
@@ -88,15 +99,23 @@ class ExtractedAnnuityIncomeCleaner:
         self.DEFAULT_PORTFOLIO_CODE_MAPPING = _extract_mapping_data(
             mappings,
             "default_portfolio_code_mapping",
-            fallback={"集合计划": "QTAN001", "单一计划": "QTAN002", "职业年金": "QTAN003"},
+            fallback={
+                "集合计划": "QTAN001",
+                "单一计划": "QTAN002",
+                "职业年金": "QTAN003",
+            },
         )
 
-    def load_excel_data(self, excel_path: Path, sheet_name: str = "收入明细") -> pd.DataFrame:
+    def load_excel_data(
+        self, excel_path: Path, sheet_name: str = "收入明细"
+    ) -> pd.DataFrame:
         """Load Excel data with proper encoding and string handling."""
         try:
             # Read with string dtype to preserve leading zeros (as in legacy code)
             df = pd.read_excel(excel_path, sheet_name=sheet_name, dtype=str)
-            LOGGER.debug(f"Loaded {len(df)} rows from {excel_path.name}, sheet: {sheet_name}")
+            LOGGER.debug(
+                f"Loaded {len(df)} rows from {excel_path.name}, sheet: {sheet_name}"
+            )
             return df
         except Exception as e:
             LOGGER.error(f"Failed to load Excel data from {excel_path}: {e}")
@@ -159,7 +178,11 @@ class ExtractedAnnuityIncomeCleaner:
         #         else DEFAULT_PORTFOLIO_CODE_MAPPING.get(x['计划类型']),
         #         axis=1)
         # )
-        if "组合代码" in df.columns and "业务类型" in df.columns and "计划类型" in df.columns:
+        if (
+            "组合代码" in df.columns
+            and "业务类型" in df.columns
+            and "计划类型" in df.columns
+        ):
             df["组合代码"] = df["组合代码"].mask(
                 (df["组合代码"].isna() | (df["组合代码"] == "")),
                 df.apply(
@@ -227,7 +250,9 @@ class ExtractedAnnuityIncomeCleaner:
             mask = (df[company_id_col].isna() | (df[company_id_col] == "")) & (
                 df[customer_name_col].isna() | (df[customer_name_col] == "")
             )
-            company_id_from_plan = df[plan_code_col].map(self.COMPANY_ID3_MAPPING).fillna("600866980")
+            company_id_from_plan = (
+                df[plan_code_col].map(self.COMPANY_ID3_MAPPING).fillna("600866980")
+            )
             df.loc[mask, company_id_col] = company_id_from_plan[mask]
 
         # Step 3: Map by customer name (lines 147-150)
@@ -236,7 +261,9 @@ class ExtractedAnnuityIncomeCleaner:
         # df.loc[mask, company_id_col] = company_id_from_customer[mask]
         if customer_name_col in df.columns:
             mask = df[company_id_col].isna() | (df[company_id_col] == "")
-            company_id_from_customer = df[customer_name_col].map(self.COMPANY_ID4_MAPPING)
+            company_id_from_customer = df[customer_name_col].map(
+                self.COMPANY_ID4_MAPPING
+            )
             df.loc[mask, company_id_col] = company_id_from_customer[mask]
 
 
@@ -279,7 +306,9 @@ def canonicalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """Apply deterministic sorting for reproducible output."""
     if df.empty:
         return df
-    sort_cols: List[str] = [col for col in ("月度", "计划号", "company_id") if col in df.columns]
+    sort_cols: List[str] = [
+        col for col in ("月度", "计划号", "company_id") if col in df.columns
+    ]
     if sort_cols:
         df = df.sort_values(sort_cols, na_position="last")
     return df.reset_index(drop=True)
@@ -296,13 +325,22 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--inputs", type=Path, required=True, help="Excel file or directory of Excel files"
+        "--inputs",
+        type=Path,
+        required=True,
+        help="Excel file or directory of Excel files",
     )
     parser.add_argument(
-        "--output", type=Path, required=True, help="Output Parquet path for golden baseline"
+        "--output",
+        type=Path,
+        required=True,
+        help="Output Parquet path for golden baseline",
     )
     parser.add_argument(
-        "--mappings", type=Path, required=True, help="JSON file containing mapping dictionaries"
+        "--mappings",
+        type=Path,
+        required=True,
+        help="JSON file containing mapping dictionaries",
     )
     parser.add_argument(
         "--sheet", default="收入明细", help="Sheet name to process (default: 收入明细)"
@@ -367,7 +405,9 @@ def main(argv: Iterable[str] | None = None) -> int:
     # Save golden baseline
     save_parquet(combined, args.output)
     LOGGER.info("Baseline generation completed successfully")
-    LOGGER.info("Final dataset: %d rows, %d columns", len(combined), len(combined.columns))
+    LOGGER.info(
+        "Final dataset: %d rows, %d columns", len(combined), len(combined.columns)
+    )
 
     return 0
 

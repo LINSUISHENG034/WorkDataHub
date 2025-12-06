@@ -199,7 +199,10 @@ class TestAnnuityPipelineE2E:
         assert result_df is not None, "Pipeline should return a DataFrame"
         assert len(result_df) > 0, "Pipeline should produce output rows"
         assert "company_id" in result_df.columns, "Output should have company_id column"
-        assert context.metadata.get("db_queries", 0) <= PERFORMANCE_THRESHOLDS["max_db_queries"]
+        assert (
+            context.metadata.get("db_queries", 0)
+            <= PERFORMANCE_THRESHOLDS["max_db_queries"]
+        )
 
     def test_pipeline_output_has_required_columns(
         self, test_data: List[Dict[str, Any]], pipeline, context: PipelineContext
@@ -226,7 +229,15 @@ class TestAnnuityPipelineE2E:
         """Test that pipeline handles empty input with correct schema gracefully."""
         # Arrange - Create empty DataFrame with required columns
         empty_df = pd.DataFrame(
-            columns=["月度", "计划代码", "客户名称", "年金账户名", "公司代码", "机构名称", "业务类型"]
+            columns=[
+                "月度",
+                "计划代码",
+                "客户名称",
+                "年金账户名",
+                "公司代码",
+                "机构名称",
+                "业务类型",
+            ]
         )
 
         # Act
@@ -235,7 +246,10 @@ class TestAnnuityPipelineE2E:
         # Assert
         assert result_df is not None
         assert len(result_df) == 0
-        assert context.metadata.get("db_queries", 0) <= PERFORMANCE_THRESHOLDS["max_db_queries"]
+        assert (
+            context.metadata.get("db_queries", 0)
+            <= PERFORMANCE_THRESHOLDS["max_db_queries"]
+        )
 
 
 class TestLegacyBaselineComparison:
@@ -279,8 +293,14 @@ class TestLegacyBaselineComparison:
             f"Row count mismatch: pipeline={len(output_df)}, "
             f"baseline={len(golden_baseline)}"
         )
-        assert context.metadata.get("db_queries", 0) <= PERFORMANCE_THRESHOLDS["max_db_queries"]
-        assert context.metadata.get("db_queries", 0) <= PERFORMANCE_THRESHOLDS["max_db_queries"]
+        assert (
+            context.metadata.get("db_queries", 0)
+            <= PERFORMANCE_THRESHOLDS["max_db_queries"]
+        )
+        assert (
+            context.metadata.get("db_queries", 0)
+            <= PERFORMANCE_THRESHOLDS["max_db_queries"]
+        )
 
     def test_column_set_matches_baseline(
         self, pipeline_output, golden_baseline: pd.DataFrame
@@ -308,7 +328,9 @@ class TestLegacyBaselineComparison:
         missing_cols = baseline_cols - pipeline_cols - expected_differences
 
         # Assert no unexpected missing columns
-        assert not missing_cols, f"Unexpected missing columns from baseline: {missing_cols}"
+        assert not missing_cols, (
+            f"Unexpected missing columns from baseline: {missing_cols}"
+        )
 
         # Log column differences for documentation
         actual_missing = baseline_cols - pipeline_cols
@@ -348,17 +370,13 @@ class TestLegacyBaselineComparison:
             pytest.skip("No comparable columns between pipeline and baseline")
 
         # Compare numeric columns that exist in BOTH DataFrames as numeric
-        pipeline_numeric = set(
-            pipeline_df.select_dtypes(include=["number"]).columns
-        )
+        pipeline_numeric = set(pipeline_df.select_dtypes(include=["number"]).columns)
         baseline_numeric = set(
             golden_baseline.select_dtypes(include=["number"]).columns
         )
 
         # Only compare columns that are numeric in both DataFrames
-        numeric_cols = list(
-            (pipeline_numeric & baseline_numeric) & set(common_cols)
-        )
+        numeric_cols = list((pipeline_numeric & baseline_numeric) & set(common_cols))
 
         if not numeric_cols:
             pytest.skip("No comparable numeric columns between pipeline and baseline")
@@ -374,12 +392,16 @@ class TestLegacyBaselineComparison:
                 continue
 
             try:
-                pipeline_vals = pd.to_numeric(
-                    pipeline_sorted[col], errors="coerce"
-                ).fillna(0).values
-                baseline_vals = pd.to_numeric(
-                    baseline_sorted[col], errors="coerce"
-                ).fillna(0).values
+                pipeline_vals = (
+                    pd.to_numeric(pipeline_sorted[col], errors="coerce")
+                    .fillna(0)
+                    .values
+                )
+                baseline_vals = (
+                    pd.to_numeric(baseline_sorted[col], errors="coerce")
+                    .fillna(0)
+                    .values
+                )
             except (ValueError, TypeError):
                 # Skip columns that can't be converted to numeric
                 continue
@@ -389,7 +411,10 @@ class TestLegacyBaselineComparison:
                 close_enough = True
                 for pv, bv in zip(pipeline_vals, baseline_vals):
                     try:
-                        if abs(float(pv) - float(bv)) > max(abs(float(pv)), abs(float(bv))) * 0.01 + 1e-6:
+                        if (
+                            abs(float(pv) - float(bv))
+                            > max(abs(float(pv)), abs(float(bv))) * 0.01 + 1e-6
+                        ):
                             close_enough = False
                             break
                     except (ValueError, TypeError):

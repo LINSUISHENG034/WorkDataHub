@@ -154,7 +154,7 @@ def show_troubleshooting_guide():
         "💡 预防措施：",
         "• 保持Playwright版本更新",
         "• 避免过于频繁的认证尝试",
-        "• 使用稳定的网络环境"
+        "• 使用稳定的网络环境",
     ]
 
     for line in guide:
@@ -172,9 +172,13 @@ async def main():
                 await run_simple_authentication()
             elif _has_enhanced and choice == "2":
                 await run_enhanced_authentication()
-            elif (_has_enhanced and choice == "3") or (not _has_enhanced and choice == "2"):
+            elif (_has_enhanced and choice == "3") or (
+                not _has_enhanced and choice == "2"
+            ):
                 show_usage()
-            elif (_has_enhanced and choice == "4") or (not _has_enhanced and choice == "3"):
+            elif (_has_enhanced and choice == "4") or (
+                not _has_enhanced and choice == "3"
+            ):
                 print("👋 再见！")
                 break
             else:

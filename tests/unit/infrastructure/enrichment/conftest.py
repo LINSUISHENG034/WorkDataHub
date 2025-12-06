@@ -27,12 +27,14 @@ def sample_plan_override_mapping():
 @pytest.fixture
 def sample_dataframe():
     """Sample DataFrame for testing resolution."""
-    return pd.DataFrame({
-        "计划代码": ["FP0001", "FP0002", "UNKNOWN", "P0809", None],
-        "客户名称": ["公司A", "公司B", "中国平安保险公司", "公司D", "公司E"],
-        "年金账户名": ["账户1", "账户2", "账户3", "账户4", "账户5"],
-        "公司代码": [None, "existing_123", None, None, "existing_456"],
-    })
+    return pd.DataFrame(
+        {
+            "计划代码": ["FP0001", "FP0002", "UNKNOWN", "P0809", None],
+            "客户名称": ["公司A", "公司B", "中国平安保险公司", "公司D", "公司E"],
+            "年金账户名": ["账户1", "账户2", "账户3", "账户4", "账户5"],
+            "公司代码": [None, "existing_123", None, None, "existing_456"],
+        }
+    )
 
 
 @pytest.fixture
@@ -80,12 +82,14 @@ def large_dataframe():
         "泰康保险公司",
     ]
 
-    return pd.DataFrame({
-        "计划代码": [random.choice(plan_codes) for _ in range(1000)],
-        "客户名称": [random.choice(customer_names) for _ in range(1000)],
-        "年金账户名": [f"账户{i}" for i in range(1000)],
-        "公司代码": [None] * 1000,
-    })
+    return pd.DataFrame(
+        {
+            "计划代码": [random.choice(plan_codes) for _ in range(1000)],
+            "客户名称": [random.choice(customer_names) for _ in range(1000)],
+            "年金账户名": [f"账户{i}" for i in range(1000)],
+            "公司代码": [None] * 1000,
+        }
+    )
 
 
 @pytest.fixture
@@ -102,9 +106,11 @@ def very_large_dataframe():
         "泰康保险公司",
     ]
 
-    return pd.DataFrame({
-        "计划代码": [random.choice(plan_codes) for _ in range(10000)],
-        "客户名称": [random.choice(customer_names) for _ in range(10000)],
-        "年金账户名": [f"账户{i}" for i in range(10000)],
-        "公司代码": [None] * 10000,
-    })
+    return pd.DataFrame(
+        {
+            "计划代码": [random.choice(plan_codes) for _ in range(10000)],
+            "客户名称": [random.choice(customer_names) for _ in range(10000)],
+            "年金账户名": [f"账户{i}" for i in range(10000)],
+            "公司代码": [None] * 10000,
+        }
+    )

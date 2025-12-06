@@ -48,7 +48,7 @@ def sql_memos():
     """)
 
     # 更新年金计划号管理资格
-    sql4 = dedent('''
+    sql4 = dedent("""
         UPDATE mapping.`年金计划` Renewal INNER JOIN (
             SELECT 
                 A.`年金计划号`,  
@@ -67,10 +67,10 @@ def sql_memos():
         ON Renewal.`年金计划号` = Result.`年金计划号`
         SET Renewal.`管理资格` = Result.`管理资格`
         WHERE ISNULL(Renewal.`管理资格`);
-    ''')
+    """)
 
     # 为所有年金计划创建默认虚拟组合
-    sql5 = dedent('''
+    sql5 = dedent("""
         INSERT INTO `组合计划`(年金计划号, 组合代码, 组合名称, 组合类型, 组合状态, 备注)
         SELECT 
             `年金计划`.`年金计划号` AS '年金计划号', 
@@ -84,17 +84,17 @@ def sql_memos():
             SELECT `组合计划`.`年金计划号`
             FROM `组合计划`
             WHERE `组合计划`.`组合状态` = '虚拟');
-    ''')
+    """)
 
     # 使用正则表达式替换组合代码首字母F
-    sql6 = dedent('''
+    sql6 = dedent("""
         UPDATE customer.`企年投资估值流失` A
         SET A.`组合代码` = REGEXP_REPLACE(A.`组合代码`, '^F', '')
         WHERE A.`组合代码` LIKE 'F%';
-    ''')
+    """)
 
     # 更新企年受托战客名单
-    sql7 = dedent('''
+    sql7 = dedent("""
         INSERT INTO customer.`企年受托战客`(
           年金计划号, 年金计划全称, 
           计划类型, 管理资格, 备注
@@ -116,10 +116,10 @@ def sql_memos():
           AND ISNULL(
             customer.`企年受托战客`.`年金计划号`
           );
-    ''')
+    """)
 
     # 集合分拆数据准确性校验
-    sql8 = dedent('''
+    sql8 = dedent("""
         SELECT 
             new_tab.`月度`, 
             new_tab.`业务类型`, 
@@ -183,55 +183,94 @@ def sql_memos():
             OR ROUND(new_tab.`流失` - old_tab.`流失`, 4) != 0
             OR ROUND(new_tab.`待遇支付` - old_tab.`待遇支付`, 4) != 0
             OR ROUND(new_tab.`投资收益` - old_tab.`投资收益`, 4) != 0;
-    ''')
+    """)
 
     # XXX
-    sqlx = dedent('''
-    ''')
+    sqlx = dedent("""
+    """)
 
 
 def get_upload_template_info():
-    file_path = Path(r'D:\Share\PAFcloud\年金考核\指标库\上载模板')
+    file_path = Path(r"D:\Share\PAFcloud\年金考核\指标库\上载模板")
     saved_path = TEMPLATE_FILE_PATH
 
     tab_info_dic = {
-        file.stem: '/'.join(pd.read_excel(file, sheet_name=0, header=0, dtype=str).columns)
-        for file in file_path.glob('*.xlsx')
+        file.stem: "/".join(
+            pd.read_excel(file, sheet_name=0, header=0, dtype=str).columns
+        )
+        for file in file_path.glob("*.xlsx")
     }
 
-    tab_info_df = pd.DataFrame.from_dict(tab_info_dic, orient='index', columns=['字段'])
+    tab_info_df = pd.DataFrame.from_dict(tab_info_dic, orient="index", columns=["字段"])
 
-    with pd.ExcelWriter(saved_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-        tab_info_df.to_excel(writer, sheet_name='上载模板')
+    with pd.ExcelWriter(
+        saved_path, engine="openpyxl", mode="a", if_sheet_exists="replace"
+    ) as writer:
+        tab_info_df.to_excel(writer, sheet_name="上载模板")
 
 
 def create_upload_data(year_month):
-    upload_template_df = pd.read_excel(TEMPLATE_FILE_PATH, sheet_name='上载模板', header=0, usecols=[1, 2, 3])
+    upload_template_df = pd.read_excel(
+        TEMPLATE_FILE_PATH, sheet_name="上载模板", header=0, usecols=[1, 2, 3]
+    )
 
     # 将 '上载模板' 列设置为索引并转换为字典
-    upload_template_dic = upload_template_df.set_index('上载模板').to_dict(orient='index')
+    upload_template_dic = upload_template_df.set_index("上载模板").to_dict(
+        orient="index"
+    )
 
-    upload_metrics_df = pd.read_excel(TEMPLATE_FILE_PATH, sheet_name='上载指标', header=0)
-    upload_metrics_df = upload_metrics_df[(upload_metrics_df['类型'] != '删除') & (upload_metrics_df['已上传'] == 0)]
+    upload_metrics_df = pd.read_excel(
+        TEMPLATE_FILE_PATH, sheet_name="上载指标", header=0
+    )
+    upload_metrics_df = upload_metrics_df[
+        (upload_metrics_df["类型"] != "删除") & (upload_metrics_df["已上传"] == 0)
+    ]
 
     # 读取组织架构表
-    branch_df = pd.read_excel(TEMPLATE_FILE_PATH, sheet_name='组织架构', header=0, usecols=[
-        '机构', '年金中心', '战区', '机构代码'
-    ])
-    region_df = branch_df[['战区']].drop_duplicates()
+    branch_df = pd.read_excel(
+        TEMPLATE_FILE_PATH,
+        sheet_name="组织架构",
+        header=0,
+        usecols=["机构", "年金中心", "战区", "机构代码"],
+    )
+    region_df = branch_df[["战区"]].drop_duplicates()
 
-    upload_folder = Path(r'D:\Share\PAFcloud\年金考核\指标库\上载数据')
+    upload_folder = Path(r"D:\Share\PAFcloud\年金考核\指标库\上载数据")
 
-    def create_branch_data(row, org_structure_df, year_month, product_type, is_branch=True):
-        if row['上载表格'] == 'METRICS_TEMPLATE_COST':
-            columns = ["指标编码", "指标名称", "业务线", "年月", "费用科目", "机构", "属地", "战区", "数值（元）", "描述"]
+    def create_branch_data(
+        row, org_structure_df, year_month, product_type, is_branch=True
+    ):
+        if row["上载表格"] == "METRICS_TEMPLATE_COST":
+            columns = [
+                "指标编码",
+                "指标名称",
+                "业务线",
+                "年月",
+                "费用科目",
+                "机构",
+                "属地",
+                "战区",
+                "数值（元）",
+                "描述",
+            ]
             template = {
                 "业务线": product_type,
                 "费用科目": "",
                 "数值（元）": 0,
             }
-        elif row['上载表格'] == 'METRICS_TEMPLATE_MGT_FEE':
-            columns = ["指标编码", "指标名称", "组合代码", "组合名称", "业绩报酬", "机构", "产品类别", "浮费年度", "年月", "描述"]
+        elif row["上载表格"] == "METRICS_TEMPLATE_MGT_FEE":
+            columns = [
+                "指标编码",
+                "指标名称",
+                "组合代码",
+                "组合名称",
+                "业绩报酬",
+                "机构",
+                "产品类别",
+                "浮费年度",
+                "年月",
+                "描述",
+            ]
             template = {
                 "组合代码": "",
                 "组合名称": "",
@@ -239,15 +278,42 @@ def create_upload_data(year_month):
                 "产品类别": product_type,
                 "浮费年度": "",
             }
-        elif row['上载表格'] == 'METRICS_TEMPLATE_RATE_CAT':
-            columns = ["指标编码", "指标名称", "年月", "产品类别", "客户", "机构", "属地", "战区", "数值（%）", "描述"]
+        elif row["上载表格"] == "METRICS_TEMPLATE_RATE_CAT":
+            columns = [
+                "指标编码",
+                "指标名称",
+                "年月",
+                "产品类别",
+                "客户",
+                "机构",
+                "属地",
+                "战区",
+                "数值（%）",
+                "描述",
+            ]
             template = {
                 "产品类别": product_type,
                 "客户": "",
                 "数值（%）": 0,
             }
-        elif row['上载表格'] == 'METRICS_TEMPLATE_SCALE':
-            columns = ["指标编码", "指标名称", "业务线", "年月", "计划代码", "计划名称", "组合代码", "组合名称", "客户", "地区", "机构", "属地", "战区", "数值（元）", "描述"]
+        elif row["上载表格"] == "METRICS_TEMPLATE_SCALE":
+            columns = [
+                "指标编码",
+                "指标名称",
+                "业务线",
+                "年月",
+                "计划代码",
+                "计划名称",
+                "组合代码",
+                "组合名称",
+                "客户",
+                "地区",
+                "机构",
+                "属地",
+                "战区",
+                "数值（元）",
+                "描述",
+            ]
             template = {
                 "业务线": product_type,
                 "计划代码": "",
@@ -266,13 +332,13 @@ def create_upload_data(year_month):
 
         for _, org_row in org_structure_df.iterrows():
             data_row = {
-                "指标编码": row['指标编码'],
-                "指标名称": row['指标名称'],
+                "指标编码": row["指标编码"],
+                "指标名称": row["指标名称"],
                 "年月": year_month,
-                "机构": org_row['机构'] if is_branch else "",
-                "属地": org_row['年金中心'] if is_branch else "",
-                "战区": org_row['战区'],
-                "描述": ""
+                "机构": org_row["机构"] if is_branch else "",
+                "属地": org_row["年金中心"] if is_branch else "",
+                "战区": org_row["战区"],
+                "描述": "",
             }
             data_row.update(template)
             virtual_data.append(data_row)
@@ -280,15 +346,15 @@ def create_upload_data(year_month):
         return virtual_data, columns
 
     for _, row in upload_metrics_df.iterrows():
-        upload_table = row['上载表格']
-        indicator_code = row['指标编码']
-        indicator_name = row['指标名称']
-        product_types = row['所属产品线'].split('/')  # 对"所属产品线"进行分割
+        upload_table = row["上载表格"]
+        indicator_code = row["指标编码"]
+        indicator_name = row["指标名称"]
+        product_types = row["所属产品线"].split("/")  # 对"所属产品线"进行分割
         file_name = f"{upload_table}_{indicator_code}_{indicator_name}.xlsx"
 
         if upload_table in upload_template_dic:
             template_info = upload_template_dic[upload_table]
-            sheet_name = template_info['表名']
+            sheet_name = template_info["表名"]
 
             all_virtual_data = []
             all_columns = None
@@ -296,10 +362,13 @@ def create_upload_data(year_month):
             for product_type in product_types:
                 if "区域" in indicator_name:
                     # 仅创建区域虚拟数据
-                    virtual_data, columns = create_branch_data(row, region_df, year_month, product_type,
-                                                               is_branch=False)
+                    virtual_data, columns = create_branch_data(
+                        row, region_df, year_month, product_type, is_branch=False
+                    )
                 else:
-                    virtual_data, columns = create_branch_data(row, branch_df, year_month, product_type)
+                    virtual_data, columns = create_branch_data(
+                        row, branch_df, year_month, product_type
+                    )
 
                 if all_columns is None:
                     all_columns = columns
@@ -310,7 +379,7 @@ def create_upload_data(year_month):
 
             save_path = upload_folder / year_month / file_name
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            with pd.ExcelWriter(save_path, engine='openpyxl') as writer:
+            with pd.ExcelWriter(save_path, engine="openpyxl") as writer:
                 template_df.to_excel(writer, sheet_name=sheet_name, index=False)
 
             print(f"Created file: {file_name}")
@@ -327,14 +396,14 @@ def merge_upload_files(period_time, folder_path, output_folder):
         "METRICS_TEMPLATE_COST": [],
         "METRICS_TEMPLATE_MGT_FEE": [],
         "METRICS_TEMPLATE_RATE_CAT": [],
-        "METRICS_TEMPLATE_SCALE": []
+        "METRICS_TEMPLATE_SCALE": [],
     }
 
     # 定义可能的前缀
     valid_prefixes = set(combined_data.keys())
 
     # 遍历文件夹中的所有文件
-    for file in folder_path.glob('*.xlsx'):
+    for file in folder_path.glob("*.xlsx"):
         file_name = file.stem
 
         # 判断文件名的前缀
@@ -356,18 +425,19 @@ def merge_upload_files(period_time, folder_path, output_folder):
         if dataframes:  # 仅在有数据时才保存文件
             combined_df = pd.concat(dataframes, ignore_index=True)
             save_path = output_folder / f"{upload_table}_{period_time}.xlsx"
-            with pd.ExcelWriter(save_path, engine='openpyxl') as writer:
-                combined_df.to_excel(writer, sheet_name='Combined', index=False)
+            with pd.ExcelWriter(save_path, engine="openpyxl") as writer:
+                combined_df.to_excel(writer, sheet_name="Combined", index=False)
             print(f"Created combined file: {save_path}")
 
 
-if __name__ == '__main__':
-    period_time = '202405'
+if __name__ == "__main__":
+    period_time = "202405"
     is_created = True
     if is_created:
-        source_folder = fr'D:\Share\PAFcloud\年金考核\指标库\上载数据\{period_time}'
-        destination_folder = fr'D:\Share\PAFcloud\年金考核\指标库\上载数据\{period_time}\合并数据'
+        source_folder = rf"D:\Share\PAFcloud\年金考核\指标库\上载数据\{period_time}"
+        destination_folder = (
+            rf"D:\Share\PAFcloud\年金考核\指标库\上载数据\{period_time}\合并数据"
+        )
         merge_upload_files(period_time, source_folder, destination_folder)
     else:
         create_upload_data(year_month=period_time)
-

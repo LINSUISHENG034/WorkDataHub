@@ -40,13 +40,17 @@ class TestSampleTrusteePerformanceJob:
             yaml.dump(config_data, f)
 
         # Mock settings
-        with patch("src.work_data_hub.orchestration.jobs.get_settings") as mock_settings:
+        with patch(
+            "src.work_data_hub.orchestration.jobs.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             # Create run config
             run_config = {
                 "ops": {
-                    "discover_files_op": {"config": {"domain": "sample_trustee_performance"}},
+                    "discover_files_op": {
+                        "config": {"domain": "sample_trustee_performance"}
+                    },
                     "read_excel_op": {"config": {"sheet": 0}},
                     "load_op": {
                         "config": {
@@ -62,7 +66,9 @@ class TestSampleTrusteePerformanceJob:
             # Mock op implementations to return test data
             mock_file_paths = ["/test/file.xlsx"]
             mock_excel_rows = [{"年": "2024", "月": "11", "计划代码": "PLAN001"}]
-            mock_processed_rows = [{"report_date": "2024-11-01", "plan_code": "PLAN001"}]
+            mock_processed_rows = [
+                {"report_date": "2024-11-01", "plan_code": "PLAN001"}
+            ]
             mock_load_result = {
                 "mode": "delete_insert",
                 "table": "trustee_performance",
@@ -76,7 +82,9 @@ class TestSampleTrusteePerformanceJob:
             }
 
             with (
-                patch("src.work_data_hub.orchestration.ops.discover_files_op") as mock_discover,
+                patch(
+                    "src.work_data_hub.orchestration.ops.discover_files_op"
+                ) as mock_discover,
                 patch("src.work_data_hub.orchestration.ops.read_excel_op") as mock_read,
                 patch(
                     "src.work_data_hub.orchestration.ops.process_sample_trustee_performance_op"
@@ -141,7 +149,9 @@ class TestBuildRunConfig:
         args.pk = None
         args.pk = None
 
-        with patch("src.work_data_hub.orchestration.jobs.get_settings") as mock_settings:
+        with patch(
+            "src.work_data_hub.orchestration.jobs.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             result = build_run_config(args)
@@ -181,7 +191,9 @@ class TestBuildRunConfig:
         args.skip_plans = False
         args.pk = None
 
-        with patch("src.work_data_hub.orchestration.jobs.get_settings") as mock_settings:
+        with patch(
+            "src.work_data_hub.orchestration.jobs.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             result = build_run_config(args)
@@ -210,7 +222,9 @@ class TestBuildRunConfig:
         args.skip_facts = False
         args.skip_plans = False
 
-        with patch("src.work_data_hub.orchestration.jobs.get_settings") as mock_settings:
+        with patch(
+            "src.work_data_hub.orchestration.jobs.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.data_sources_config = "nonexistent.yml"
 
             # Should handle error gracefully and use fallbacks
@@ -223,14 +237,18 @@ class TestBuildRunConfig:
     def test_build_run_config_execute_flag_inversion(self, tmp_path):
         """Test that execute flag is properly inverted to plan_only."""
         config_data = {
-            "domains": {"trustee_performance": {"table": "trustee_performance", "pk": ["id"]}}
+            "domains": {
+                "trustee_performance": {"table": "trustee_performance", "pk": ["id"]}
+            }
         }
 
         config_file = tmp_path / "test_config.yml"
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
-        with patch("src.work_data_hub.orchestration.jobs.get_settings") as mock_settings:
+        with patch(
+            "src.work_data_hub.orchestration.jobs.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             # Test execute=True -> plan_only=False
@@ -257,7 +275,9 @@ class TestBuildRunConfig:
             assert load_config["plan_only"] is True
 
 
-@pytest.mark.skip(reason="CLI tests depend on deprecated trustee_performance functionality - pending Epic 5")
+@pytest.mark.skip(
+    reason="CLI tests depend on deprecated trustee_performance functionality - pending Epic 5"
+)
 class TestCLIMain:
     """Test CLI main function."""
 
@@ -279,7 +299,9 @@ class TestCLIMain:
                 }
                 mock_execute.return_value = mock_result
 
-                with patch("src.work_data_hub.orchestration.jobs.build_run_config") as mock_build:
+                with patch(
+                    "src.work_data_hub.orchestration.jobs.build_run_config"
+                ) as mock_build:
                     mock_build.return_value = {}
 
                     # Capture stdout
@@ -320,7 +342,9 @@ class TestCLIMain:
                 }
                 mock_execute.return_value = mock_result
 
-                with patch("src.work_data_hub.orchestration.jobs.build_run_config") as mock_build:
+                with patch(
+                    "src.work_data_hub.orchestration.jobs.build_run_config"
+                ) as mock_build:
                     mock_build.return_value = {}
 
                     captured_output = io.StringIO()
@@ -340,7 +364,9 @@ class TestCLIMain:
             ) as mock_execute:
                 mock_execute.side_effect = Exception("Job failed")
 
-                with patch("src.work_data_hub.orchestration.jobs.build_run_config") as mock_build:
+                with patch(
+                    "src.work_data_hub.orchestration.jobs.build_run_config"
+                ) as mock_build:
                     mock_build.return_value = {}
 
                     captured_output = io.StringIO()
@@ -362,7 +388,9 @@ class TestCLIMain:
                 mock_result.all_node_events = []  # No specific error events
                 mock_execute.return_value = mock_result
 
-                with patch("src.work_data_hub.orchestration.jobs.build_run_config") as mock_build:
+                with patch(
+                    "src.work_data_hub.orchestration.jobs.build_run_config"
+                ) as mock_build:
                     mock_build.return_value = {}
 
                     captured_output = io.StringIO()
@@ -388,7 +416,11 @@ class TestCLIMain:
                     "inserted": 3,
                     "batches": 1,
                     "sql_plans": [
-                        ("DELETE", "DELETE FROM trustee_performance WHERE ...", ["param1"]),
+                        (
+                            "DELETE",
+                            "DELETE FROM trustee_performance WHERE ...",
+                            ["param1"],
+                        ),
                         (
                             "INSERT",
                             "INSERT INTO trustee_performance VALUES ...",
@@ -398,7 +430,9 @@ class TestCLIMain:
                 }
                 mock_execute.return_value = mock_result
 
-                with patch("src.work_data_hub.orchestration.jobs.build_run_config") as mock_build:
+                with patch(
+                    "src.work_data_hub.orchestration.jobs.build_run_config"
+                ) as mock_build:
                     mock_build.return_value = {}
 
                     captured_output = io.StringIO()
@@ -418,62 +452,72 @@ class TestCLIMain:
         test_args = ["jobs.py", "--execute", "--domain", "trustee_performance"]
 
         with patch("sys.argv", test_args):
-            with patch("src.work_data_hub.orchestration.jobs.build_run_config") as mock_build:
+            with patch(
+                "src.work_data_hub.orchestration.jobs.build_run_config"
+            ) as mock_build:
                 mock_build.return_value = {}
 
                 # Mock job execution to avoid complexity
             with patch(
                 "src.work_data_hub.orchestration.jobs.sample_trustee_performance_multi_file_job.execute_in_process"
             ) as mock_execute:
-                    mock_result = Mock()
-                    mock_result.success = True
-                    mock_result.output_for_node.return_value = {
-                        "mode": "delete_insert",
-                        "table": "trustee_performance",
-                        "deleted": 0,
-                        "inserted": 0,
-                        "batches": 0,
-                    }
-                    mock_execute.return_value = mock_result
+                mock_result = Mock()
+                mock_result.success = True
+                mock_result.output_for_node.return_value = {
+                    "mode": "delete_insert",
+                    "table": "trustee_performance",
+                    "deleted": 0,
+                    "inserted": 0,
+                    "batches": 0,
+                }
+                mock_execute.return_value = mock_result
 
-                    captured_output = io.StringIO()
-                    with patch("sys.stdout", captured_output):
-                        result = main()
+                captured_output = io.StringIO()
+                with patch("sys.stdout", captured_output):
+                    result = main()
 
-                    assert result == 0
-                    output = captured_output.getvalue()
-                    assert "Execute: True" in output
-                    assert "Plan-only: False" in output
+                assert result == 0
+                output = captured_output.getvalue()
+                assert "Execute: True" in output
+                assert "Plan-only: False" in output
 
     def test_cli_max_files_flag(self):
         """Test CLI --max-files flag is parsed correctly."""
-        test_args = ["jobs.py", "--max-files", "5", "--domain", "sample_trustee_performance"]
+        test_args = [
+            "jobs.py",
+            "--max-files",
+            "5",
+            "--domain",
+            "sample_trustee_performance",
+        ]
 
         with patch("sys.argv", test_args):
-            with patch("src.work_data_hub.orchestration.jobs.build_run_config") as mock_build:
+            with patch(
+                "src.work_data_hub.orchestration.jobs.build_run_config"
+            ) as mock_build:
                 mock_build.return_value = {}
 
             with patch(
                 "src.work_data_hub.orchestration.jobs.sample_trustee_performance_job.execute_in_process"
             ) as mock_execute:
-                    mock_result = Mock()
-                    mock_result.success = True
-                    mock_result.output_for_node.return_value = {
-                        "mode": "delete_insert",
-                        "table": "trustee_performance",
-                        "deleted": 0,
-                        "inserted": 0,
-                        "batches": 0,
-                    }
-                    mock_execute.return_value = mock_result
+                mock_result = Mock()
+                mock_result.success = True
+                mock_result.output_for_node.return_value = {
+                    "mode": "delete_insert",
+                    "table": "trustee_performance",
+                    "deleted": 0,
+                    "inserted": 0,
+                    "batches": 0,
+                }
+                mock_execute.return_value = mock_result
 
-                    captured_output = io.StringIO()
-                    with patch("sys.stdout", captured_output):
-                        result = main()
+                captured_output = io.StringIO()
+                with patch("sys.stdout", captured_output):
+                    result = main()
 
-                    assert result == 0
-                    output = captured_output.getvalue()
-                    assert "Max files: 5" in output
+                assert result == 0
+                output = captured_output.getvalue()
+                assert "Max files: 5" in output
 
     def test_cli_execute_and_max_files_together(self):
         """Test CLI --execute and --max-files flags work together."""
@@ -489,33 +533,35 @@ class TestCLIMain:
         ]
 
         with patch("sys.argv", test_args):
-            with patch("src.work_data_hub.orchestration.jobs.build_run_config") as mock_build:
+            with patch(
+                "src.work_data_hub.orchestration.jobs.build_run_config"
+            ) as mock_build:
                 mock_build.return_value = {}
 
             with patch(
                 "src.work_data_hub.orchestration.jobs.sample_trustee_performance_job.execute_in_process"
             ) as mock_execute:
-                    mock_result = Mock()
-                    mock_result.success = True
-                    mock_result.output_for_node.return_value = {
-                        "mode": "append",
-                        "table": "trustee_performance",
-                        "deleted": 0,
-                        "inserted": 10,
-                        "batches": 1,
-                    }
-                    mock_execute.return_value = mock_result
+                mock_result = Mock()
+                mock_result.success = True
+                mock_result.output_for_node.return_value = {
+                    "mode": "append",
+                    "table": "trustee_performance",
+                    "deleted": 0,
+                    "inserted": 10,
+                    "batches": 1,
+                }
+                mock_execute.return_value = mock_result
 
-                    captured_output = io.StringIO()
-                    with patch("sys.stdout", captured_output):
-                        result = main()
+                captured_output = io.StringIO()
+                with patch("sys.stdout", captured_output):
+                    result = main()
 
-                    assert result == 0
-                    output = captured_output.getvalue()
-                    assert "Execute: True" in output
-                    assert "Plan-only: False" in output
-                    assert "Max files: 3" in output
-                    assert "Mode: append" in output
+                assert result == 0
+                output = captured_output.getvalue()
+                assert "Execute: True" in output
+                assert "Plan-only: False" in output
+                assert "Max files: 3" in output
+                assert "Mode: append" in output
 
 
 class TestFlagNormalization:
@@ -525,14 +571,18 @@ class TestFlagNormalization:
         """Test --execute takes precedence over --plan-only."""
         # Create minimal config for testing
         config_data = {
-            "domains": {"trustee_performance": {"table": "trustee_performance", "pk": ["id"]}}
+            "domains": {
+                "trustee_performance": {"table": "trustee_performance", "pk": ["id"]}
+            }
         }
 
         config_file = tmp_path / "test_config.yml"
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
-        with patch("src.work_data_hub.orchestration.jobs.get_settings") as mock_settings:
+        with patch(
+            "src.work_data_hub.orchestration.jobs.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             # Case 1: --execute present -> should execute (plan_only=False)
@@ -575,7 +625,10 @@ class TestFlagNormalization:
         """Test build_run_config handles max_files parameter correctly."""
         config_data = {
             "domains": {
-                "sample_trustee_performance": {"table": "sample_trustee_performance", "pk": ["id"]}
+                "sample_trustee_performance": {
+                    "table": "sample_trustee_performance",
+                    "pk": ["id"],
+                }
             }
         }
 
@@ -583,7 +636,9 @@ class TestFlagNormalization:
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
-        with patch("src.work_data_hub.orchestration.jobs.get_settings") as mock_settings:
+        with patch(
+            "src.work_data_hub.orchestration.jobs.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             # Test max_files = 1 -> should configure existing ops
@@ -621,7 +676,9 @@ class TestFlagNormalization:
             assert "read_excel_op" not in config2["ops"]
 
             # Verify combined op config
-            combined_config = config2["ops"]["read_and_process_sample_trustee_files_op"]["config"]
+            combined_config = config2["ops"][
+                "read_and_process_sample_trustee_files_op"
+            ]["config"]
             assert combined_config["sheet"] == 1
             assert combined_config["max_files"] == 5
 
@@ -633,7 +690,9 @@ class TestFlagNormalization:
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
-        with patch("src.work_data_hub.orchestration.jobs.get_settings") as mock_settings:
+        with patch(
+            "src.work_data_hub.orchestration.jobs.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             # Args without max_files attribute -> should default to 1
@@ -660,7 +719,9 @@ class TestMultiFileJob:
         """Test that multi-file job definition is valid."""
         job_def = sample_trustee_performance_multi_file_job
         assert job_def.name == "sample_trustee_performance_multi_file_job"
-        assert len(job_def.nodes) == 3  # Three ops: discover, read_and_process_combined, load
+        assert (
+            len(job_def.nodes) == 3
+        )  # Three ops: discover, read_and_process_combined, load
 
     def test_job_selection_logic_in_main(self, tmp_path):
         """Test that main() selects correct job based on max_files."""
@@ -673,7 +734,9 @@ class TestMultiFileJob:
         test_args_single = ["jobs.py", "--max-files", "1"]
 
         with patch("sys.argv", test_args_single):
-            with patch("src.work_data_hub.orchestration.jobs.get_settings") as mock_settings:
+            with patch(
+                "src.work_data_hub.orchestration.jobs.get_settings"
+            ) as mock_settings:
                 mock_settings.return_value.data_sources_config = str(config_file)
 
                 with patch(
@@ -706,7 +769,9 @@ class TestMultiFileJob:
         test_args_multi = ["jobs.py", "--max-files", "3"]
 
         with patch("sys.argv", test_args_multi):
-            with patch("src.work_data_hub.orchestration.jobs.get_settings") as mock_settings:
+            with patch(
+                "src.work_data_hub.orchestration.jobs.get_settings"
+            ) as mock_settings:
                 mock_settings.return_value.data_sources_config = str(config_file)
 
                 with patch(

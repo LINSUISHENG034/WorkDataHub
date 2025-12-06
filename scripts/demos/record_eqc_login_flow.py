@@ -26,7 +26,6 @@ import asyncio
 import json
 import os
 import sys
-import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -34,7 +33,6 @@ from typing import Any, Dict, List
 
 from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
-
 
 LOGIN_URL = os.getenv("EQC_LOGIN_URL", "https://eqc.pingan.com/")
 OUT_DIR = Path(os.getenv("EQC_RECORD_OUT", "logs/eqc_login_record"))
@@ -65,10 +63,12 @@ class Recorder:
         self.events.append(evt)
 
     def log_request(self, data: Dict[str, Any]) -> None:
-        self.requests.append({
-            "ts": datetime.utcnow().isoformat() + "Z",
-            **data,
-        })
+        self.requests.append(
+            {
+                "ts": datetime.utcnow().isoformat() + "Z",
+                **data,
+            }
+        )
 
     def flush(self) -> None:
         self.out_dir.mkdir(parents=True, exist_ok=True)
@@ -83,7 +83,7 @@ class Recorder:
         with (self.out_dir / "timeline.md").open("w", encoding="utf-8") as f:
             f.write("# EQC 登录动作记录时间线\n\n")
             for e in self.events:
-                f.write(f"- [{e['ts']}] {e['kind']}: {e.get('summary','')}\n")
+                f.write(f"- [{e['ts']}] {e['kind']}: {e.get('summary', '')}\n")
 
 
 INIT_JS = r"""
@@ -188,13 +188,24 @@ async def main() -> None:
         # 反指纹
         stealth = Stealth()
         await stealth.apply_stealth_async(page)
-        await page.add_init_script("Object.defineProperty(navigator, 'webdriver', { get: () => false });")
+        await page.add_init_script(
+            "Object.defineProperty(navigator, 'webdriver', { get: () => false });"
+        )
         await page.add_init_script(INIT_JS)
 
         # 页面事件
         page.on("console", lambda msg: _on_console(rec, msg))
-        page.on("framenavigated", lambda frame: rec.log_event("framenavigated", {"url": frame.url, "summary": f"navigated: {frame.url}"}))
-        page.on("load", lambda: rec.log_event("load", {"url": page.url, "summary": "page load"}))
+        page.on(
+            "framenavigated",
+            lambda frame: rec.log_event(
+                "framenavigated",
+                {"url": frame.url, "summary": f"navigated: {frame.url}"},
+            ),
+        )
+        page.on(
+            "load",
+            lambda: rec.log_event("load", {"url": page.url, "summary": "page load"}),
+        )
 
         # 网络事件（无需拦截，避免干扰登录）
         page.on("requestfinished", lambda req: _on_request_finished(rec, req))
@@ -246,14 +257,16 @@ def _on_console(rec: Recorder, msg) -> None:
         txt = msg.text()
         if not txt.startswith("EQC_REC:"):
             return
-        payload = json.loads(txt[len("EQC_REC:"):])
+        payload = json.loads(txt[len("EQC_REC:") :])
         kind = payload.get("kind", "console")
         data = payload.get("payload", {})
         # 补充摘要
         summary = data.get("type") or data.get("action") or "event"
         tgt = data.get("target", {})
         if tgt:
-            summary += f" @ {tgt.get('css') or tgt.get('placeholder') or tgt.get('id') or ''}"
+            summary += (
+                f" @ {tgt.get('css') or tgt.get('placeholder') or tgt.get('id') or ''}"
+            )
         rec.log_event(kind, {**data, "summary": summary})
     except Exception:
         pass
@@ -263,24 +276,28 @@ def _on_request_finished(rec: Recorder, req) -> None:
     try:
         hdrs = req.headers
         token = hdrs.get("token")
-        rec.log_request({
-            "event": "requestfinished",
-            "method": req.method,
-            "url": req.url,
-            "has_token": bool(token),
-            "token_len": len(token) if token else 0,
-        })
+        rec.log_request(
+            {
+                "event": "requestfinished",
+                "method": req.method,
+                "url": req.url,
+                "has_token": bool(token),
+                "token_len": len(token) if token else 0,
+            }
+        )
     except Exception:
         pass
 
 
 def _on_response(rec: Recorder, resp) -> None:
     try:
-        rec.log_request({
-            "event": "response",
-            "status": resp.status,
-            "url": resp.url,
-        })
+        rec.log_request(
+            {
+                "event": "response",
+                "status": resp.status,
+                "url": resp.url,
+            }
+        )
     except Exception:
         pass
 
@@ -335,7 +352,9 @@ def generate_replay_script(events: List[Dict[str, Any]], out_dir: Path) -> None:
     lines.append("async def main():")
     lines.append("    async with async_playwright() as pw:")
     lines.append("        browser = await pw.chromium.launch(headless=False)")
-    lines.append("        context = await browser.new_context(viewport={'width':1366,'height':900})")
+    lines.append(
+        "        context = await browser.new_context(viewport={'width':1366,'height':900})"
+    )
     lines.append("        page = await context.new_page()")
     lines.append("        await page.goto(LOGIN_URL, wait_until='domcontentloaded')")
     lines.append("")
@@ -364,7 +383,9 @@ def generate_replay_script(events: List[Dict[str, Any]], out_dir: Path) -> None:
         elif e.get("kind") == "geetest_panel":
             action = e.get("action") or e.get("payload", {}).get("action")
             if action == "added":
-                lines.append("        # Geetest panel detected -> complete slider manually or via automation here")
+                lines.append(
+                    "        # Geetest panel detected -> complete slider manually or via automation here"
+                )
             elif action == "removed":
                 lines.append("        # Geetest panel closed")
 
@@ -379,6 +400,7 @@ def generate_replay_script(events: List[Dict[str, Any]], out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     replay = out_dir / "replay.py"
     replay.write_text("\n".join(lines), encoding="utf-8")
+
 
 if __name__ == "__main__":
     try:

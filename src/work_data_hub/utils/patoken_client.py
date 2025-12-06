@@ -10,7 +10,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 import requests
 from gmssl import func, sm2
@@ -25,23 +25,6 @@ MANUAL_REFRESH_URL = "https://otp.paic.com.cn/api/rest/newPortal/v1/manualRefres
 DEFAULT_TIMEOUT = 15
 
 
-if sys.version_info >= (3, 10):
-
-    def dataclass_slotted(_cls: Optional[type] = None, **kwargs: Any):
-        def wrap(cls: type) -> type:
-            return dataclass(cls, slots=True, **kwargs)
-
-        return wrap(_cls) if _cls is not None else wrap
-
-else:  # pragma: no cover - Python < 3.10 compatibility
-
-    def dataclass_slotted(_cls: Optional[type] = None, **kwargs: Any):
-        def wrap(cls: type) -> type:
-            return dataclass(cls, **kwargs)
-
-        return wrap(_cls) if _cls is not None else wrap
-
-
 class PATokenError(RuntimeError):
     """Top-level exception for PA token failures."""
 
@@ -50,7 +33,7 @@ class APIRequestError(PATokenError):
     """Wraps transport-level or non-zero ret code responses."""
 
 
-@dataclass_slotted()
+@dataclass(slots=True)
 class SM2Config:
     pin_x: str
     pin_y: str
@@ -59,7 +42,7 @@ class SM2Config:
     pwd_split: str
 
 
-@dataclass_slotted()
+@dataclass(slots=True)
 class OTPResult:
     otp: str
     token: str
@@ -175,7 +158,7 @@ class PATokenClient:
         session_id = (payload.get("data") or {}).get("sessionId")
         if not session_id:
             raise PATokenError("Missing sessionId in authenticate response")
-        return session_id
+        return cast(str, session_id)
 
     def _authenticate_pin(self, sm2_config: SM2Config, session_id: str) -> str:
         encrypted_pin = self._encrypt(sm2_config.pin_x, sm2_config.pin_y, self.pin)
@@ -192,7 +175,7 @@ class PATokenClient:
         token = payload.get("data")
         if not token:
             raise PATokenError("Missing token in authUserPin response")
-        return token
+        return cast(str, token)
 
     def _request_otp(
         self,
@@ -216,7 +199,7 @@ class PATokenClient:
         otp = outer.get("otp")
         if not otp:
             raise PATokenError("OTP value missing in refresh response")
-        return outer
+        return cast(Dict[str, Any], outer)
 
     def _request_json(
         self,
@@ -243,7 +226,7 @@ class PATokenClient:
                     )
             raise APIRequestError(f"Request to {url} failed: {exc}{hint}") from exc
         try:
-            payload: Dict[str, Any] = response.json()
+            payload: Dict[str, Any] = cast(Dict[str, Any], response.json())
         except ValueError as exc:
             raise APIRequestError(f"Invalid JSON from {url}") from exc
 
@@ -267,7 +250,7 @@ class PATokenClient:
             cipher_bytes = crypt.encrypt(plaintext.encode("utf-8"), random_hex)
         else:
             cipher_bytes = crypt.encrypt(plaintext.encode("utf-8"))
-        return cipher_bytes.hex().upper()
+        return cast(str, cipher_bytes.hex().upper())
 
 
 def build_client_from_env() -> PATokenClient:
@@ -287,7 +270,9 @@ def build_client_from_env() -> PATokenClient:
     if missing:
         joined = ", ".join(missing)
         raise PATokenError(f"Missing required environment variables: {joined}")
-    return PATokenClient(account=account, password=password, pin=pin)
+    return PATokenClient(
+        account=cast(str, account), password=cast(str, password), pin=cast(str, pin)
+    )
 
 
 def main() -> None:

@@ -96,7 +96,9 @@ class TestDataSourceConnector:
 
     def test_init_with_missing_config_file(self):
         """Test initialization with non-existent config file."""
-        with pytest.raises(DataSourceConnectorError, match="Configuration file not found"):
+        with pytest.raises(
+            DataSourceConnectorError, match="Configuration file not found"
+        ):
             DataSourceConnector(config_path="/nonexistent/config.yml")
 
     def test_init_with_invalid_yaml(self, tmp_path):
@@ -104,7 +106,9 @@ class TestDataSourceConnector:
         bad_config = tmp_path / "bad_config.yml"
         bad_config.write_text("invalid: yaml: content: [")
 
-        with pytest.raises(DataSourceConnectorError, match="Invalid YAML configuration"):
+        with pytest.raises(
+            DataSourceConnectorError, match="Invalid YAML configuration"
+        ):
             DataSourceConnector(config_path=str(bad_config))
 
     def test_init_with_missing_domains(self, tmp_path):
@@ -135,9 +139,13 @@ class TestDataSourceConnector:
         with pytest.raises(DataSourceConnectorError, match="Invalid regex pattern"):
             DataSourceConnector(config_path=str(config_path))
 
-    @pytest.mark.skip(reason="Test depends on deprecated sample_trustee_performance domain - pending Epic 5")
+    @pytest.mark.skip(
+        reason="Test depends on deprecated sample_trustee_performance domain - pending Epic 5"
+    )
     @patch("src.work_data_hub.config.settings.get_settings")
-    def test_discover_sample_trustee_performance_files(self, mock_settings, config_file, test_data_dir):
+    def test_discover_sample_trustee_performance_files(
+        self, mock_settings, config_file, test_data_dir
+    ):
         """Test discovery of trustee performance files with Chinese characters."""
         # Mock settings to use test directory
         mock_settings.return_value.data_base_dir = test_data_dir
@@ -165,7 +173,9 @@ class TestDataSourceConnector:
                 assert 1 <= file.month <= 12
 
     @patch("src.work_data_hub.config.settings.get_settings")
-    def test_discover_ignores_temp_files(self, mock_settings, config_file, test_data_dir):
+    def test_discover_ignores_temp_files(
+        self, mock_settings, config_file, test_data_dir
+    ):
         """Test that temporary and email files are ignored."""
         mock_settings.return_value.data_base_dir = test_data_dir
 
@@ -179,7 +189,9 @@ class TestDataSourceConnector:
         assert not any("~$" in p for p in paths)
 
     @patch("src.work_data_hub.config.settings.get_settings")
-    def test_discover_excludes_directories(self, mock_settings, config_file, test_data_dir):
+    def test_discover_excludes_directories(
+        self, mock_settings, config_file, test_data_dir
+    ):
         """Test that excluded directories are not scanned."""
         mock_settings.return_value.data_base_dir = test_data_dir
 
@@ -190,12 +202,18 @@ class TestDataSourceConnector:
         paths = [f.path for f in files]
         assert not any("backup" + os.sep in p for p in paths)
 
-    @pytest.mark.skip(reason="Test depends on deprecated trustee_performance domain config - pending Epic 5")
+    @pytest.mark.skip(
+        reason="Test depends on deprecated trustee_performance domain config - pending Epic 5"
+    )
     @patch("src.work_data_hub.config.settings.get_settings")
     def test_latest_by_year_month_selection(self, mock_settings, config_file, tmp_path):
         """Test selection of latest version by year/month."""
         # Create test files with different dates
-        test_files = ["2024_01_受托业绩.xlsx", "2024_12_受托业绩.xlsx", "2023_06_受托业绩.xlsx"]
+        test_files = [
+            "2024_01_受托业绩.xlsx",
+            "2024_12_受托业绩.xlsx",
+            "2023_06_受托业绩.xlsx",
+        ]
 
         for filename in test_files:
             (tmp_path / filename).write_text("test")
@@ -210,7 +228,9 @@ class TestDataSourceConnector:
         assert files[0].year == 2024
         assert files[0].month == 12
 
-    @pytest.mark.skip(reason="Test depends on deprecated trustee_performance domain config - pending Epic 5")
+    @pytest.mark.skip(
+        reason="Test depends on deprecated trustee_performance domain config - pending Epic 5"
+    )
     @patch("src.work_data_hub.config.settings.get_settings")
     def test_latest_by_mtime_fallback(self, mock_settings, config_file, tmp_path):
         """Test fallback to mtime when year/month not available."""
@@ -261,7 +281,9 @@ class TestDataSourceConnector:
         with pytest.raises(DataSourceConnectorError, match="Unknown domain"):
             connector.discover("nonexistent_domain")
 
-    @pytest.mark.skip(reason="Test depends on deprecated trustee_performance domain config - pending Epic 5")
+    @pytest.mark.skip(
+        reason="Test depends on deprecated trustee_performance domain config - pending Epic 5"
+    )
     @patch("src.work_data_hub.config.settings.get_settings")
     def test_discover_all_domains(self, mock_settings, config_file, tmp_path):
         """Test discovery across all domains."""
@@ -319,7 +341,9 @@ class TestDataSourceConnector:
                 assert "filename" in file.metadata
                 assert file.metadata["filename"] == "2024_11_受托业绩.xlsx"
 
-    @pytest.mark.skip(reason="Test depends on deprecated trustee_performance domain config - pending Epic 5")
+    @pytest.mark.skip(
+        reason="Test depends on deprecated trustee_performance domain config - pending Epic 5"
+    )
     @patch("src.work_data_hub.config.settings.get_settings")
     def test_latest_by_year_month_and_version_selection(self, mock_settings, tmp_path):
         """Test selection of latest version by year/month with version-aware strategy."""

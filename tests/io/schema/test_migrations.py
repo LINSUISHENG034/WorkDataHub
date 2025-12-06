@@ -19,7 +19,9 @@ def test_core_tables_exist(test_db_with_migrations: str) -> None:
     assert {"pipeline_executions", "data_quality_metrics"}.issubset(tables)
 
     with engine.begin() as connection:
-        revision = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+        revision = connection.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
         # Updated to latest migration revision (includes upsert constraints)
         assert revision == "20251206_000001"
 

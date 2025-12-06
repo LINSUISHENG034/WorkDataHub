@@ -22,22 +22,22 @@ from src.work_data_hub.io.loader.company_mapping_loader import (
     _extract_company_id1_mapping,
     _extract_company_id2_mapping,
     _extract_company_id4_mapping,
-    _extract_company_id5_mapping
+    _extract_company_id5_mapping,
 )
 
 
 class TestLegacyDataExtraction:
     """Test extraction from legacy MySQL sources."""
 
-    @patch('src.work_data_hub.io.loader.company_mapping_loader.MySqlDBManager')
+    @patch("src.work_data_hub.io.loader.company_mapping_loader.MySqlDBManager")
     def test_extract_company_id1_mapping_success(self, mock_mysql_manager):
         """Test successful extraction from COMPANY_ID1_MAPPING (plan codes)."""
         # Mock MySQL cursor and results
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = [
-            ('AN001', '614810477'),
-            ('AN002', '608349737'),
-            ('P0290', '610081428')
+            ("AN001", "614810477"),
+            ("AN002", "608349737"),
+            ("P0290", "610081428"),
         ]
 
         mock_db = MagicMock()
@@ -48,11 +48,7 @@ class TestLegacyDataExtraction:
         result = _extract_company_id1_mapping()
 
         # Verify results
-        expected = {
-            'AN001': '614810477',
-            'AN002': '608349737',
-            'P0290': '610081428'
-        }
+        expected = {"AN001": "614810477", "AN002": "608349737", "P0290": "610081428"}
         assert result == expected
 
         # Verify SQL query was correct
@@ -63,13 +59,13 @@ class TestLegacyDataExtraction:
         assert "单一计划" in sql_call
         assert "AN002" in sql_call  # Excluded condition
 
-    @patch('src.work_data_hub.io.loader.company_mapping_loader.MySqlDBManager')
+    @patch("src.work_data_hub.io.loader.company_mapping_loader.MySqlDBManager")
     def test_extract_company_id2_mapping_success(self, mock_mysql_manager):
         """Test successful extraction from COMPANY_ID2_MAPPING (account numbers)."""
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = [
-            ('123456789', '614810477'),
-            ('987654321', '608349737')
+            ("123456789", "614810477"),
+            ("987654321", "608349737"),
         ]
 
         mock_db = MagicMock()
@@ -78,27 +74,24 @@ class TestLegacyDataExtraction:
 
         result = _extract_company_id2_mapping()
 
-        expected = {
-            '123456789': '614810477',
-            '987654321': '608349737'
-        }
+        expected = {"123456789": "614810477", "987654321": "608349737"}
         assert result == expected
 
         # Verify database and query
-        mock_mysql_manager.assert_called_with(database='enterprise')
+        mock_mysql_manager.assert_called_with(database="enterprise")
         sql_call = mock_cursor.execute.call_args[0][0]
         assert "年金账户号" in sql_call
         assert "annuity_account_mapping" in sql_call
         assert "GM%" in sql_call  # Exclusion pattern
 
-    @patch('src.work_data_hub.io.loader.company_mapping_loader.MySqlDBManager')
+    @patch("src.work_data_hub.io.loader.company_mapping_loader.MySqlDBManager")
     def test_extract_company_id4_mapping_chinese_names(self, mock_mysql_manager):
         """Test extraction with Chinese company names."""
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = [
-            ('中国平安保险股份有限公司', '614810477'),
-            ('上海银行股份有限公司', '608349737'),
-            ('北京银行股份有限公司', '610081428')
+            ("中国平安保险股份有限公司", "614810477"),
+            ("上海银行股份有限公司", "608349737"),
+            ("北京银行股份有限公司", "610081428"),
         ]
 
         mock_db = MagicMock()
@@ -108,19 +101,19 @@ class TestLegacyDataExtraction:
         result = _extract_company_id4_mapping()
 
         expected = {
-            '中国平安保险股份有限公司': '614810477',
-            '上海银行股份有限公司': '608349737',
-            '北京银行股份有限公司': '610081428'
+            "中国平安保险股份有限公司": "614810477",
+            "上海银行股份有限公司": "608349737",
+            "北京银行股份有限公司": "610081428",
         }
         assert result == expected
 
-    @patch('src.work_data_hub.io.loader.company_mapping_loader.MySqlDBManager')
+    @patch("src.work_data_hub.io.loader.company_mapping_loader.MySqlDBManager")
     def test_extract_company_id5_mapping_success(self, mock_mysql_manager):
         """Test successful extraction from COMPANY_ID5_MAPPING (account names)."""
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = [
-            ('测试账户名称1', '614810477'),
-            ('测试账户名称2', '608349737')
+            ("测试账户名称1", "614810477"),
+            ("测试账户名称2", "608349737"),
         ]
 
         mock_db = MagicMock()
@@ -129,14 +122,11 @@ class TestLegacyDataExtraction:
 
         result = _extract_company_id5_mapping()
 
-        expected = {
-            '测试账户名称1': '614810477',
-            '测试账户名称2': '608349737'
-        }
+        expected = {"测试账户名称1": "614810477", "测试账户名称2": "608349737"}
         assert result == expected
 
         # Verify correct database and table
-        mock_mysql_manager.assert_called_with(database='business')
+        mock_mysql_manager.assert_called_with(database="business")
         sql_call = mock_cursor.execute.call_args[0][0]
         assert "年金账户名" in sql_call
         assert "规模明细" in sql_call
@@ -144,11 +134,11 @@ class TestLegacyDataExtraction:
     def test_extract_with_retry_success_first_attempt(self):
         """Test retry mechanism succeeds on first attempt."""
         mock_func = MagicMock()
-        mock_func.return_value = {'test': 'data'}
+        mock_func.return_value = {"test": "data"}
 
         result = _extract_with_retry(mock_func, "test extraction")
 
-        assert result == {'test': 'data'}
+        assert result == {"test": "data"}
         assert mock_func.call_count == 1
 
     def test_extract_with_retry_success_after_retries(self):
@@ -157,12 +147,12 @@ class TestLegacyDataExtraction:
         mock_func.side_effect = [
             Exception("Connection failed"),
             Exception("Timeout"),
-            {'test': 'data'}  # Success on third attempt
+            {"test": "data"},  # Success on third attempt
         ]
 
         result = _extract_with_retry(mock_func, "test extraction", max_attempts=3)
 
-        assert result == {'test': 'data'}
+        assert result == {"test": "data"}
         assert mock_func.call_count == 3
 
     def test_extract_with_retry_all_attempts_fail(self):
@@ -175,18 +165,35 @@ class TestLegacyDataExtraction:
 
         assert mock_func.call_count == 2
 
-    @patch('src.work_data_hub.io.loader.company_mapping_loader.MySqlDBManager', spec=True)
-    @patch('src.work_data_hub.io.loader.company_mapping_loader._extract_company_id1_mapping')
-    @patch('src.work_data_hub.io.loader.company_mapping_loader._extract_company_id2_mapping')
-    @patch('src.work_data_hub.io.loader.company_mapping_loader._extract_company_id4_mapping')
-    @patch('src.work_data_hub.io.loader.company_mapping_loader._extract_company_id5_mapping')
-    def test_extract_legacy_mappings_success(self, mock_extract5, mock_extract4, mock_extract2, mock_extract1, mock_mysql_manager):
+    @patch(
+        "src.work_data_hub.io.loader.company_mapping_loader.MySqlDBManager", spec=True
+    )
+    @patch(
+        "src.work_data_hub.io.loader.company_mapping_loader._extract_company_id1_mapping"
+    )
+    @patch(
+        "src.work_data_hub.io.loader.company_mapping_loader._extract_company_id2_mapping"
+    )
+    @patch(
+        "src.work_data_hub.io.loader.company_mapping_loader._extract_company_id4_mapping"
+    )
+    @patch(
+        "src.work_data_hub.io.loader.company_mapping_loader._extract_company_id5_mapping"
+    )
+    def test_extract_legacy_mappings_success(
+        self,
+        mock_extract5,
+        mock_extract4,
+        mock_extract2,
+        mock_extract1,
+        mock_mysql_manager,
+    ):
         """Test full legacy mapping extraction from all 5 sources."""
         # Mock each extraction function
-        mock_extract1.return_value = {'AN001': '111111111', 'AN002': '222222222'}
-        mock_extract2.return_value = {'GM123456': '333333333'}
-        mock_extract4.return_value = {'中国平安保险': '444444444'}
-        mock_extract5.return_value = {'测试账户': '555555555'}
+        mock_extract1.return_value = {"AN001": "111111111", "AN002": "222222222"}
+        mock_extract2.return_value = {"GM123456": "333333333"}
+        mock_extract4.return_value = {"中国平安保险": "444444444"}
+        mock_extract5.return_value = {"测试账户": "555555555"}
 
         # Execute extraction
         mappings = extract_legacy_mappings()
@@ -216,30 +223,49 @@ class TestLegacyDataExtraction:
 
         # Verify hardcoded mappings include expected values
         hardcode_dict = {m.alias_name: m.canonical_id for m in hardcode_mappings}
-        assert hardcode_dict['FP0001'] == '614810477'
-        assert hardcode_dict['P0809'] == '608349737'
-        assert hardcode_dict['XNP596'] == '601038164'
+        assert hardcode_dict["FP0001"] == "614810477"
+        assert hardcode_dict["P0809"] == "608349737"
+        assert hardcode_dict["XNP596"] == "601038164"
 
-    @patch('src.work_data_hub.io.loader.company_mapping_loader.MySqlDBManager', spec=True)
-    @patch('src.work_data_hub.io.loader.company_mapping_loader._extract_company_id1_mapping')
-    def test_extract_legacy_mappings_handles_extraction_failure(self, mock_extract1, mock_mysql_manager):
+    @patch(
+        "src.work_data_hub.io.loader.company_mapping_loader.MySqlDBManager", spec=True
+    )
+    @patch(
+        "src.work_data_hub.io.loader.company_mapping_loader._extract_company_id1_mapping"
+    )
+    def test_extract_legacy_mappings_handles_extraction_failure(
+        self, mock_extract1, mock_mysql_manager
+    ):
         """Test that extraction failure for one source raises appropriate error."""
         mock_extract1.side_effect = Exception("Database connection failed")
 
-        with pytest.raises(CompanyMappingLoaderError, match="Plan code extraction failed"):
+        with pytest.raises(
+            CompanyMappingLoaderError, match="Plan code extraction failed"
+        ):
             extract_legacy_mappings()
 
-    @patch('src.work_data_hub.io.loader.company_mapping_loader.MySqlDBManager', spec=True)
+    @patch(
+        "src.work_data_hub.io.loader.company_mapping_loader.MySqlDBManager", spec=True
+    )
     def test_extract_legacy_mappings_filters_empty_values(self, mock_mysql_manager):
         """Test that empty/None values are filtered out during extraction."""
-        with patch('src.work_data_hub.io.loader.company_mapping_loader._extract_company_id1_mapping') as mock1, \
-             patch('src.work_data_hub.io.loader.company_mapping_loader._extract_company_id2_mapping') as mock2, \
-             patch('src.work_data_hub.io.loader.company_mapping_loader._extract_company_id4_mapping') as mock4, \
-             patch('src.work_data_hub.io.loader.company_mapping_loader._extract_company_id5_mapping') as mock5:
-
+        with (
+            patch(
+                "src.work_data_hub.io.loader.company_mapping_loader._extract_company_id1_mapping"
+            ) as mock1,
+            patch(
+                "src.work_data_hub.io.loader.company_mapping_loader._extract_company_id2_mapping"
+            ) as mock2,
+            patch(
+                "src.work_data_hub.io.loader.company_mapping_loader._extract_company_id4_mapping"
+            ) as mock4,
+            patch(
+                "src.work_data_hub.io.loader.company_mapping_loader._extract_company_id5_mapping"
+            ) as mock5,
+        ):
             # Include None and empty values to test filtering
-            mock1.return_value = {'AN001': '111111111', '': '222222222', 'AN003': None}
-            mock2.return_value = {'GM123': '333333333', None: '444444444'}
+            mock1.return_value = {"AN001": "111111111", "": "222222222", "AN003": None}
+            mock2.return_value = {"GM123": "333333333", None: "444444444"}
             mock4.return_value = {}
             mock5.return_value = {}
 
@@ -261,10 +287,21 @@ class TestLoadPlanGeneration:
     def test_generate_load_plan_with_mappings(self):
         """Test plan generation with sample mappings."""
         mappings = [
-            CompanyMappingRecord(alias_name="AN001", canonical_id="111", match_type="plan", priority=1),
-            CompanyMappingRecord(alias_name="AN002", canonical_id="222", match_type="plan", priority=1),
-            CompanyMappingRecord(alias_name="GM123", canonical_id="333", match_type="account", priority=2),
-            CompanyMappingRecord(alias_name="FP0001", canonical_id="444", match_type="hardcode", priority=3),
+            CompanyMappingRecord(
+                alias_name="AN001", canonical_id="111", match_type="plan", priority=1
+            ),
+            CompanyMappingRecord(
+                alias_name="AN002", canonical_id="222", match_type="plan", priority=1
+            ),
+            CompanyMappingRecord(
+                alias_name="GM123", canonical_id="333", match_type="account", priority=2
+            ),
+            CompanyMappingRecord(
+                alias_name="FP0001",
+                canonical_id="444",
+                match_type="hardcode",
+                priority=3,
+            ),
         ]
 
         plan = generate_load_plan(mappings, "enterprise", "company_mapping")
@@ -293,8 +330,12 @@ class TestPostgreSQLLoading:
     def test_load_company_mappings_success(self):
         """Test successful loading to PostgreSQL."""
         mappings = [
-            CompanyMappingRecord(alias_name="AN001", canonical_id="111", match_type="plan", priority=1),
-            CompanyMappingRecord(alias_name="GM123", canonical_id="222", match_type="account", priority=2),
+            CompanyMappingRecord(
+                alias_name="AN001", canonical_id="111", match_type="plan", priority=1
+            ),
+            CompanyMappingRecord(
+                alias_name="GM123", canonical_id="222", match_type="account", priority=2
+            ),
         ]
 
         # Mock PostgreSQL connection and cursor
@@ -329,7 +370,12 @@ class TestPostgreSQLLoading:
         """Test that large datasets are properly chunked."""
         # Create more mappings than chunk_size
         mappings = [
-            CompanyMappingRecord(alias_name=f"AN{i:03d}", canonical_id=f"{i:09d}", match_type="plan", priority=1)
+            CompanyMappingRecord(
+                alias_name=f"AN{i:03d}",
+                canonical_id=f"{i:09d}",
+                match_type="plan",
+                priority=1,
+            )
             for i in range(5)  # 5 mappings with chunk_size=2
         ]
 
@@ -350,7 +396,9 @@ class TestPostgreSQLLoading:
     def test_load_company_mappings_transaction_failure(self):
         """Test proper error handling when transaction fails."""
         mappings = [
-            CompanyMappingRecord(alias_name="AN001", canonical_id="111", match_type="plan", priority=1)
+            CompanyMappingRecord(
+                alias_name="AN001", canonical_id="111", match_type="plan", priority=1
+            )
         ]
 
         mock_cursor = MagicMock()
@@ -360,13 +408,17 @@ class TestPostgreSQLLoading:
         mock_conn.__enter__.return_value = mock_conn
 
         # Should raise DataWarehouseLoaderError
-        with pytest.raises(Exception):  # Could be DataWarehouseLoaderError or psycopg2.Error
+        with pytest.raises(
+            Exception
+        ):  # Could be DataWarehouseLoaderError or psycopg2.Error
             load_company_mappings(mappings, mock_conn)
 
     def test_load_company_mappings_delete_insert_mode(self):
         """Test delete_insert mode performs both DELETE and INSERT operations."""
         mappings = [
-            CompanyMappingRecord(alias_name="AN001", canonical_id="111", match_type="plan", priority=1)
+            CompanyMappingRecord(
+                alias_name="AN001", canonical_id="111", match_type="plan", priority=1
+            )
         ]
 
         mock_cursor = MagicMock()
@@ -387,8 +439,12 @@ class TestPostgreSQLLoading:
     def test_load_company_mappings_append_mode(self):
         """Test append mode uses conflict handling to prevent duplicates."""
         mappings = [
-            CompanyMappingRecord(alias_name="AN001", canonical_id="111", match_type="plan", priority=1),
-            CompanyMappingRecord(alias_name="AN002", canonical_id="222", match_type="plan", priority=1)
+            CompanyMappingRecord(
+                alias_name="AN001", canonical_id="111", match_type="plan", priority=1
+            ),
+            CompanyMappingRecord(
+                alias_name="AN002", canonical_id="222", match_type="plan", priority=1
+            ),
         ]
 
         mock_cursor = MagicMock()
@@ -401,7 +457,7 @@ class TestPostgreSQLLoading:
 
         # Should have called execute (INSERT with ON CONFLICT)
         mock_cursor.execute.assert_called()
-        
+
         # Verify SQL includes conflict handling
         sql_call = mock_cursor.execute.call_args[0][0]
         assert "INSERT INTO" in sql_call
@@ -416,9 +472,15 @@ class TestPostgreSQLLoading:
     def test_load_company_mappings_append_mode_with_conflicts(self):
         """Test append mode handles conflicts correctly with accurate stats."""
         mappings = [
-            CompanyMappingRecord(alias_name="AN001", canonical_id="111", match_type="plan", priority=1),
-            CompanyMappingRecord(alias_name="AN002", canonical_id="222", match_type="plan", priority=1),
-            CompanyMappingRecord(alias_name="AN003", canonical_id="333", match_type="plan", priority=1)
+            CompanyMappingRecord(
+                alias_name="AN001", canonical_id="111", match_type="plan", priority=1
+            ),
+            CompanyMappingRecord(
+                alias_name="AN002", canonical_id="222", match_type="plan", priority=1
+            ),
+            CompanyMappingRecord(
+                alias_name="AN003", canonical_id="333", match_type="plan", priority=1
+            ),
         ]
 
         mock_cursor = MagicMock()
@@ -431,7 +493,7 @@ class TestPostgreSQLLoading:
 
         # Verify conflict-aware SQL is used
         sql_call = mock_cursor.execute.call_args[0][0]
-        assert "ON CONFLICT (\"alias_name\",\"match_type\") DO NOTHING" in sql_call
+        assert 'ON CONFLICT ("alias_name","match_type") DO NOTHING' in sql_call
 
         # Stats should reflect actual inserts, not attempts
         assert stats["deleted"] == 0
@@ -442,8 +504,12 @@ class TestPostgreSQLLoading:
         """Test append mode works with chunking for large datasets."""
         # Create more mappings than chunk size
         mappings = [
-            CompanyMappingRecord(alias_name=f"AN{i:03d}", canonical_id=str(100 + i), 
-                               match_type="plan", priority=1)
+            CompanyMappingRecord(
+                alias_name=f"AN{i:03d}",
+                canonical_id=str(100 + i),
+                match_type="plan",
+                priority=1,
+            )
             for i in range(5)  # 5 records
         ]
 
@@ -456,8 +522,10 @@ class TestPostgreSQLLoading:
         stats = load_company_mappings(mappings, mock_conn, mode="append", chunk_size=2)
 
         # Should have called execute multiple times for chunks
-        assert mock_cursor.execute.call_count >= 2  # At least 2 chunks (5 records / 2 per chunk)
-        
+        assert (
+            mock_cursor.execute.call_count >= 2
+        )  # At least 2 chunks (5 records / 2 per chunk)
+
         # All calls should use conflict handling
         for call in mock_cursor.execute.call_args_list:
             sql = call[0][0]
@@ -465,7 +533,9 @@ class TestPostgreSQLLoading:
             assert "DO NOTHING" in sql
 
         assert stats["deleted"] == 0
-        assert stats["batches"] >= 3  # 3 batches for 5 records with chunk_size=2  # 3 batches for 5 records with chunk_size=2
+        assert (
+            stats["batches"] >= 3
+        )  # 3 batches for 5 records with chunk_size=2  # 3 batches for 5 records with chunk_size=2
 
 
 class TestModelTransformation:
@@ -475,20 +545,20 @@ class TestModelTransformation:
         """Test creating CompanyMappingRecord from legacy extraction data."""
         # Simulate legacy data extraction
         legacy_data = {
-            'alias_name': 'AN001',
-            'canonical_id': '614810477',
-            'match_type': 'plan',
-            'priority': 1
+            "alias_name": "AN001",
+            "canonical_id": "614810477",
+            "match_type": "plan",
+            "priority": 1,
         }
 
         # Create record (simulating what happens in extract_legacy_mappings)
         record = CompanyMappingRecord(
-            alias_name=legacy_data['alias_name'],
-            canonical_id=legacy_data['canonical_id'],
-            match_type=legacy_data['match_type'],
-            priority=legacy_data['priority'],
+            alias_name=legacy_data["alias_name"],
+            canonical_id=legacy_data["canonical_id"],
+            match_type=legacy_data["match_type"],
+            priority=legacy_data["priority"],
             source="internal",
-            updated_at=datetime.now(timezone.utc)
+            updated_at=datetime.now(timezone.utc),
         )
 
         assert record.alias_name == "AN001"
@@ -502,7 +572,7 @@ class TestModelTransformation:
             alias_name="测试公司",
             canonical_id="614810477",
             match_type="name",
-            priority=4
+            priority=4,
         )
 
         dumped = record.model_dump()

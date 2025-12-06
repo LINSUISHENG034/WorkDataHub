@@ -20,7 +20,7 @@ def create_structure(base_path, config):
     # 创建文件
     for filename in config.get("files", []):
         file_path = os.path.join(base_path, filename)
-        with open(file_path, 'w') as f:
+        with open(file_path, "w") as f:
             pass  # 创建空文件
         print(f"文件已创建：{file_path}")
 
@@ -33,14 +33,14 @@ def create_structure(base_path, config):
 def main():
     # 设置命令行参数
     parser = argparse.ArgumentParser(description="根据JSON配置创建目录结构")
-    parser.add_argument('-c', '--config', required=True, help='配置文件路径')
-    parser.add_argument('-t', '--target', default='.', help='目标目录，默认为当前目录')
+    parser.add_argument("-c", "--config", required=True, help="配置文件路径")
+    parser.add_argument("-t", "--target", default=".", help="目标目录，默认为当前目录")
 
     args = parser.parse_args()
 
     try:
         # 读取配置文件
-        with open(args.config, 'r', encoding='utf-8') as f:
+        with open(args.config, "r", encoding="utf-8") as f:
             config_data = json.load(f)
 
         # 获取根配置

@@ -36,11 +36,13 @@ def generate_date_test_data(num_rows: int = 10000) -> List[dict]:
 
         if not is_valid:
             # Invalid date for error handling
-            test_data.append({
-                "index": i,
-                "value": f"INVALID_{i}",
-                "expected_valid": False,
-            })
+            test_data.append(
+                {
+                    "index": i,
+                    "value": f"INVALID_{i}",
+                    "expected_valid": False,
+                }
+            )
             continue
 
         # Vary date formats across valid data
@@ -75,8 +77,12 @@ def generate_date_test_data(num_rows: int = 10000) -> List[dict]:
             year = 2020 + (i % 10)
             month = (i % 12) + 1
             # Convert to full-width
-            year_fw = str(year).translate(str.maketrans('0123456789', '０１２３４５６７８９'))
-            month_fw = str(month).translate(str.maketrans('0123456789', '０１２３４５６７８９'))
+            year_fw = str(year).translate(
+                str.maketrans("0123456789", "０１２３４５６７８９")
+            )
+            month_fw = str(month).translate(
+                str.maketrans("0123456789", "０１２３４５６７８９")
+            )
             value = f"{year_fw}年{month_fw}月"
             expected = date(year, month, 1)
         elif format_choice == 5:
@@ -99,12 +105,14 @@ def generate_date_test_data(num_rows: int = 10000) -> List[dict]:
             value = year * 10000 + month * 100 + day
             expected = date(year, month, day)
 
-        test_data.append({
-            "index": i,
-            "value": value,
-            "expected_valid": True,
-            "expected_result": expected,
-        })
+        test_data.append(
+            {
+                "index": i,
+                "value": value,
+                "expected_valid": True,
+                "expected_result": expected,
+            }
+        )
 
     return test_data
 
@@ -155,15 +163,19 @@ class TestAC_PERF1_DateParserPerformance:
                     if result == item["expected_result"]:
                         correct_count += 1
                     else:
-                        print(f"MISMATCH at index {item['index']}: "
-                              f"value={item['value']}, "
-                              f"expected={item['expected_result']}, "
-                              f"got={result}")
+                        print(
+                            f"MISMATCH at index {item['index']}: "
+                            f"value={item['value']}, "
+                            f"expected={item['expected_result']}, "
+                            f"got={result}"
+                        )
             except ValueError:
                 invalid_count += 1
                 # Verify it was expected to be invalid
                 if item["expected_valid"]:
-                    print(f"UNEXPECTED ERROR at index {item['index']}: value={item['value']}")
+                    print(
+                        f"UNEXPECTED ERROR at index {item['index']}: value={item['value']}"
+                    )
 
         end_time = time.time()
         duration = end_time - start_time
@@ -174,19 +186,23 @@ class TestAC_PERF1_DateParserPerformance:
 
         # Calculate accuracy
         expected_valid = sum(1 for item in date_test_data_10k if item["expected_valid"])
-        accuracy_pct = (correct_count / expected_valid) * 100 if expected_valid > 0 else 0
+        accuracy_pct = (
+            (correct_count / expected_valid) * 100 if expected_valid > 0 else 0
+        )
 
         # Report results
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Performance Test: parse_yyyymm_or_chinese")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"Total date values: {total_rows:,}")
         print(f"Valid parses: {valid_count:,}")
         print(f"Invalid/Error: {invalid_count:,}")
-        print(f"Correctly parsed: {correct_count:,} / {expected_valid:,} ({accuracy_pct:.1f}%)")
+        print(
+            f"Correctly parsed: {correct_count:,} / {expected_valid:,} ({accuracy_pct:.1f}%)"
+        )
         print(f"Duration: {duration:.3f} seconds")
         print(f"Throughput: {rows_per_second:.0f} rows/s")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         # AC-PERF-1: Assert ≥1000 rows/s
         assert rows_per_second >= 1000, (
@@ -202,11 +218,15 @@ class TestAC_PERF1_DateParserPerformance:
 
         # Target: 2000+ rows/s (2x above minimum)
         if rows_per_second >= 2000:
-            print(f"✓ EXCELLENT: Throughput {rows_per_second:.0f} rows/s exceeds target (2000 rows/s)")
+            print(
+                f"✓ EXCELLENT: Throughput {rows_per_second:.0f} rows/s exceeds target (2000 rows/s)"
+            )
         elif rows_per_second >= 1500:
             print(f"✓ GOOD: Throughput {rows_per_second:.0f} rows/s above 1500 rows/s")
         else:
-            print(f"⚠ WARNING: Throughput {rows_per_second:.0f} rows/s below target (2000 rows/s)")
+            print(
+                f"⚠ WARNING: Throughput {rows_per_second:.0f} rows/s below target (2000 rows/s)"
+            )
 
     def test_date_parser_format_distribution(self, date_test_data_10k):
         """
@@ -251,9 +271,9 @@ class TestAC_PERF1_DateParserPerformance:
                 format_groups["string_yyyymm"].append(item)
 
         # Test each format group independently
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Performance by Format Type")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         for format_name, items in format_groups.items():
             if not items:
@@ -270,10 +290,12 @@ class TestAC_PERF1_DateParserPerformance:
             duration = end_time - start_time
             if duration > 0:
                 throughput = len(items) / duration
-                print(f"{format_name:20s}: {len(items):5,} items, "
-                      f"{throughput:7,.0f} rows/s, {duration*1000:6.1f} ms")
+                print(
+                    f"{format_name:20s}: {len(items):5,} items, "
+                    f"{throughput:7,.0f} rows/s, {duration * 1000:6.1f} ms"
+                )
 
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
     def test_edge_cases_performance(self):
         """
@@ -303,13 +325,13 @@ class TestAC_PERF1_DateParserPerformance:
         duration = end_time - start_time
         rows_per_second = len(edge_cases) / duration
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Edge Cases Performance Test")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"Total edge cases: {len(edge_cases):,}")
         print(f"Duration: {duration:.3f} seconds")
         print(f"Throughput: {rows_per_second:.0f} rows/s")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         # Should still meet AC-PERF-1 threshold
         assert rows_per_second >= 1000, (

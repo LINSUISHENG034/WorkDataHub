@@ -103,13 +103,13 @@ class PipelineConfig(BaseModel):
         default=3,
         ge=0,
         le=10,
-        description="Maximum retry attempts for transient errors"
+        description="Maximum retry attempts for transient errors",
     )
     retry_backoff_base: float = Field(
         default=1.0,
         ge=0.1,
         le=10.0,
-        description="Base delay in seconds for exponential backoff"
+        description="Base delay in seconds for exponential backoff",
     )
     retryable_exceptions: tuple = Field(
         default=(
@@ -123,11 +123,11 @@ class PipelineConfig(BaseModel):
             "builtins.BrokenPipeError",
             "builtins.TimeoutError",
         ),
-        description="Exception class names eligible for retry"
+        description="Exception class names eligible for retry",
     )
     retryable_http_status_codes: tuple = Field(
         default=(429, 500, 502, 503, 504),
-        description="HTTP status codes that trigger retry"
+        description="HTTP status codes that trigger retry",
     )
     retry_limits: Dict[str, int] = Field(
         default_factory=lambda: {
@@ -136,7 +136,7 @@ class PipelineConfig(BaseModel):
             "http_429_503": 3,
             "http_500_502_504": 2,
         },
-        description="Tier-specific retry limits by error category"
+        description="Tier-specific retry limits by error category",
     )
 
     @field_validator("name")

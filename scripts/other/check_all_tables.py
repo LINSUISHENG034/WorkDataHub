@@ -2,9 +2,11 @@
 """
 Check all table schemas and find where data is being inserted.
 """
+
 import psycopg2
 
 DSN = "postgres://postgres:Post.169828@localhost:5432/postgres"
+
 
 def check_all_tables():
     """Check all tables for data and schema structure."""
@@ -29,7 +31,9 @@ def check_all_tables():
             tables = cursor.fetchall()
             print("📊 Table statistics (schema, table, inserts, updates, deletes):")
             for schema, table, inserts, updates, deletes in tables:
-                print(f"   - {schema}.{table}: {inserts} inserts, {updates} updates, {deletes} deletes")
+                print(
+                    f"   - {schema}.{table}: {inserts} inserts, {updates} updates, {deletes} deletes"
+                )
 
             # Check actual row counts
             print("\n📋 Actual row counts:")
@@ -66,6 +70,7 @@ def check_all_tables():
     except Exception as e:
         print(f"❌ Table check failed: {e}")
         return False
+
 
 if __name__ == "__main__":
     check_all_tables()

@@ -31,7 +31,7 @@ class TestVersionDetectionIntegration:
         result = scanner.detect_version(
             base_path=base_path,
             file_patterns=["*年金终稿*.xlsx"],
-            strategy='highest_number'
+            strategy="highest_number",
         )
 
         assert result.version == "V1"
@@ -59,6 +59,7 @@ class TestVersionDetectionIntegration:
 
         # Explicitly set different modification times to avoid filesystem granularity issues
         import os
+
         current_time = time.time()
         os.utime(v1, (current_time, current_time - 20))  # V1 oldest
         os.utime(v2, (current_time, current_time - 10))  # V2 middle
@@ -68,7 +69,7 @@ class TestVersionDetectionIntegration:
         result = scanner.detect_version(
             base_path=base_path,
             file_patterns=["*年金终稿*.xlsx"],
-            strategy='latest_modified'
+            strategy="latest_modified",
         )
 
         # Should select V3 (newest modification time)
@@ -88,7 +89,7 @@ class TestVersionDetectionIntegration:
         result = scanner.detect_version(
             base_path=base_path,
             file_patterns=["*组合排名*.xlsx"],
-            strategy='highest_number'
+            strategy="highest_number",
         )
 
         assert result.version == "base"
@@ -120,7 +121,7 @@ class TestVersionDetectionIntegration:
         result = scanner.detect_version(
             base_path=base_path,
             file_patterns=["*年金终稿*.xlsx"],  # Only matches V1
-            strategy='highest_number'
+            strategy="highest_number",
         )
 
         # Should select V1 (only version with matching annuity files)
@@ -150,7 +151,7 @@ class TestVersionDetectionIntegration:
             scanner.detect_version(
                 base_path=base_path,
                 file_patterns=["*.xlsx"],
-                strategy='latest_modified'
+                strategy="latest_modified",
             )
 
         assert exc_info.value.failed_stage == "version_detection"
@@ -172,16 +173,16 @@ class TestVersionDetectionIntegration:
         start_time = time.time()
 
         result = scanner.detect_version(
-            base_path=base_path,
-            file_patterns=["*.xlsx"],
-            strategy='highest_number'
+            base_path=base_path, file_patterns=["*.xlsx"], strategy="highest_number"
         )
 
         end_time = time.time()
         duration_ms = (end_time - start_time) * 1000
 
         # Performance requirement: should complete within 2 seconds
-        assert duration_ms < 2000, f"Version detection took {duration_ms}ms, exceeded 2 seconds requirement"
+        assert duration_ms < 2000, (
+            f"Version detection took {duration_ms}ms, exceeded 2 seconds requirement"
+        )
         assert result.version == "V50"
 
     def test_cross_platform_unicode_paths(self, tmp_path):
@@ -201,7 +202,7 @@ class TestVersionDetectionIntegration:
         result = scanner.detect_version(
             base_path=base_path,
             file_patterns=[filename],  # Exact filename match
-            strategy='highest_number'
+            strategy="highest_number",
         )
 
         assert result.version == "V1"
@@ -232,15 +233,15 @@ class TestVersionDetectionIntegration:
             scanner.detect_version(
                 base_path=base_path,
                 file_patterns=["*.xlsx"],
-                strategy='latest_modified'
+                strategy="latest_modified",
             )
 
         # Now test manual override resolves ambiguity
         result = scanner.detect_version(
             base_path=base_path,
             file_patterns=["*.xlsx"],
-            strategy='latest_modified',
-            version_override="V1"  # Manual override
+            strategy="latest_modified",
+            version_override="V1",  # Manual override
         )
 
         assert result.version == "V1"
@@ -268,7 +269,7 @@ class TestVersionDetectionIntegration:
         result_annuity = scanner.detect_version(
             base_path=base_path,
             file_patterns=["*annuity*.xlsx"],
-            strategy='highest_number'
+            strategy="highest_number",
         )
         assert result_annuity.version == "V1"
         assert result_annuity.path == v1
@@ -277,7 +278,7 @@ class TestVersionDetectionIntegration:
         result_business = scanner.detect_version(
             base_path=base_path,
             file_patterns=["*business*.xlsx"],
-            strategy='highest_number'
+            strategy="highest_number",
         )
         assert result_business.version == "V2"
         assert result_business.path == v2
@@ -286,15 +287,15 @@ class TestVersionDetectionIntegration:
         """Test version regex handles edge cases correctly"""
         # Create various folder names to test regex
         test_cases = [
-            ("V1", True),   # Valid
-            ("V2", True),   # Valid
+            ("V1", True),  # Valid
+            ("V2", True),  # Valid
             ("V10", True),  # Valid double digit
             ("V99", True),  # Valid high number
             ("V0", False),  # Invalid (0 not positive)
-            ("V", False),    # Invalid (no number)
+            ("V", False),  # Invalid (no number)
             ("Version1", False),  # Invalid (not V\d+)
             ("V1a", False),  # Invalid (has letters)
-            ("v1", False),   # Invalid (lowercase)
+            ("v1", False),  # Invalid (lowercase)
         ]
 
         for folder_name, should_match in test_cases:
@@ -305,16 +306,13 @@ class TestVersionDetectionIntegration:
 
         scanner = VersionScanner()
         result = scanner.detect_version(
-            base_path=tmp_path,
-            file_patterns=["*.xlsx"],
-            strategy='highest_number'
+            base_path=tmp_path, file_patterns=["*.xlsx"], strategy="highest_number"
         )
 
         # Should only find valid version folders
         expected_versions = [case[0] for case in test_cases if case[1]]
         actual_versions = [
-            v.name for v in tmp_path.iterdir()
-            if v.is_dir() and v.name.startswith('V')
+            v.name for v in tmp_path.iterdir() if v.is_dir() and v.name.startswith("V")
         ]
 
         # Verify scanner only found expected valid versions

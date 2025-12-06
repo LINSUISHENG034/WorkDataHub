@@ -57,7 +57,9 @@ def test_sample_pipeline_performance_regression() -> None:
     if BASELINE_FILE.exists():
         baseline = json.loads(BASELINE_FILE.read_text())
         baseline_ms = float(baseline.get(BASELINE_KEY, duration_ms))
-        regression_pct = ((duration_ms - baseline_ms) / baseline_ms) * 100 if baseline_ms else 0.0
+        regression_pct = (
+            ((duration_ms - baseline_ms) / baseline_ms) * 100 if baseline_ms else 0.0
+        )
         if regression_pct > 20:
             warnings.warn(
                 f"Performance regression detected: {regression_pct:.1f}% slower "

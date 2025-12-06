@@ -11,7 +11,8 @@ import time
 from datetime import datetime
 
 from work_data_hub.io.connectors.file_pattern_matcher import (
-    FilePatternMatcher, FileMatchResult
+    FilePatternMatcher,
+    FileMatchResult,
 )
 from work_data_hub.io.connectors.exceptions import DiscoveryError
 
@@ -30,7 +31,7 @@ class TestFilePatternMatchingIntegration:
         result = matcher.match_files(
             search_path=tmp_path,
             include_patterns=["*年金*.xlsx", "*规模明细*.xlsx"],
-            exclude_patterns=["~$*", "*回复*"]
+            exclude_patterns=["~$*", "*回复*"],
         )
 
         # Should find exactly 1 file after filtering
@@ -51,8 +52,7 @@ class TestFilePatternMatchingIntegration:
 
         with pytest.raises(DiscoveryError) as exc_info:
             matcher.match_files(
-                search_path=tmp_path,
-                include_patterns=["*年金数据*.xlsx"]
+                search_path=tmp_path, include_patterns=["*年金数据*.xlsx"]
             )
 
         assert exc_info.value.failed_stage == "file_matching"
@@ -65,8 +65,7 @@ class TestFilePatternMatchingIntegration:
 
         with pytest.raises(DiscoveryError) as exc_info:
             matcher.match_files(
-                search_path=tmp_path,
-                include_patterns=["*不存在的*.xlsx"]
+                search_path=tmp_path, include_patterns=["*不存在的*.xlsx"]
             )
 
         assert exc_info.value.failed_stage == "file_matching"
@@ -80,8 +79,7 @@ class TestFilePatternMatchingIntegration:
 
         matcher = FilePatternMatcher()
         result = matcher.match_files(
-            search_path=tmp_path,
-            include_patterns=["*target*.xlsx"]
+            search_path=tmp_path, include_patterns=["*target*.xlsx"]
         )
 
         assert result.match_count == 1
@@ -95,8 +93,7 @@ class TestFilePatternMatchingIntegration:
 
         matcher = FilePatternMatcher()
         result = matcher.match_files(
-            search_path=tmp_path,
-            include_patterns=["*公司*.xlsx"]
+            search_path=tmp_path, include_patterns=["*公司*.xlsx"]
         )
 
         # Should find exactly 1 file with Chinese characters
@@ -116,7 +113,7 @@ class TestFilePatternMatchingIntegration:
         with pytest.raises(DiscoveryError) as exc_info:
             matcher.match_files(
                 search_path=tmp_path,
-                include_patterns=["*公司*.xlsx", "*规模*.xlsx", "*客户*.xlsx"]
+                include_patterns=["*公司*.xlsx", "*规模*.xlsx", "*客户*.xlsx"],
             )
 
         assert exc_info.value.failed_stage == "file_matching"
@@ -136,7 +133,7 @@ class TestFilePatternMatchingIntegration:
         result = matcher.match_files(
             search_path=tmp_path,
             include_patterns=["*.xlsx"],
-            exclude_patterns=["temp_*"]  # Exclude all temp files
+            exclude_patterns=["temp_*"],  # Exclude all temp files
         )
         duration = time.time() - start_time
 
@@ -159,13 +156,15 @@ class TestFilePatternMatchingIntegration:
         result = matcher.match_files(
             search_path=tmp_path,
             include_patterns=["*重要数据*.xlsx"],
-            exclude_patterns=["~*", "*回复*"]  # Exclude temp and reply files
+            exclude_patterns=["~*", "*回复*"],  # Exclude temp and reply files
         )
 
         # Should find only 1 file after excluding others
         assert result.match_count == 1
         assert result.matched_file.name == "重要数据.xlsx"
-        assert len(result.candidates_found) == 3  # xlsx files only (eml not matched by pattern)
+        assert (
+            len(result.candidates_found) == 3
+        )  # xlsx files only (eml not matched by pattern)
         assert len(result.excluded_files) == 2  # temp and reply files
 
         excluded_names = [f.name for f in result.excluded_files]
@@ -187,7 +186,10 @@ class TestFilePatternMatchingIntegration:
             matcher.match_files(
                 search_path=tmp_path,
                 include_patterns=["*重要数据*.xlsx"],
-                exclude_patterns=["~*", "*回复*"]  # Leaves 重要数据.xlsx and 其他重要数据.xlsx
+                exclude_patterns=[
+                    "~*",
+                    "*回复*",
+                ],  # Leaves 重要数据.xlsx and 其他重要数据.xlsx
             )
 
         assert exc_info.value.failed_stage == "file_matching"
@@ -205,7 +207,7 @@ class TestFilePatternMatchingIntegration:
         result = matcher.match_files(
             search_path=tmp_path,
             include_patterns=["*.xlsx"],
-            exclude_patterns=["~$*"]  # Exclude Excel temp files
+            exclude_patterns=["~$*"],  # Exclude Excel temp files
         )
 
         # Verify metadata completeness
@@ -223,10 +225,7 @@ class TestFilePatternMatchingIntegration:
         matcher = FilePatternMatcher()
 
         with pytest.raises(DiscoveryError) as exc_info:
-            matcher.match_files(
-                search_path=tmp_path,
-                include_patterns=["*.xlsx"]
-            )
+            matcher.match_files(search_path=tmp_path, include_patterns=["*.xlsx"])
 
         assert exc_info.value.failed_stage == "file_matching"
         assert "No files found matching patterns" in str(exc_info.value)

@@ -22,8 +22,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import argparse
-import json
 import logging
 import sys
 from datetime import datetime, timezone
@@ -36,6 +34,12 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 # Import legacy cleaner components
+from scripts.tools.parity.common import (
+    DEFAULT_EXCLUDE_COLS,
+    compare_dataframes,
+    print_report_summary,
+    save_results,
+)
 from scripts.tools.run_legacy_annuity_income_cleaner import (
     ExtractedAnnuityIncomeCleaner,
     canonicalize_dataframe,
@@ -50,13 +54,6 @@ from work_data_hub.domain.annuity_income.pipeline_builder import (
 from work_data_hub.domain.pipelines.types import PipelineContext
 from work_data_hub.io.readers.excel_reader import read_excel_rows
 
-from scripts.tools.parity.common import (
-    DEFAULT_EXCLUDE_COLS,
-    compare_dataframes,
-    print_report_summary,
-    save_results,
-)
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -65,7 +62,10 @@ logging.basicConfig(
 LOGGER = logging.getLogger(__name__)
 
 # Configuration - Use 202412 V2 for consistency with AnnuityPerformance validation
-REAL_DATA_PATH = PROJECT_ROOT / "tests/fixtures/real_data/202412/收集数据/数据采集/V2/【for年金分战区经营分析】24年12月年金终稿数据0109采集-补充企年投资收入.xlsx"
+REAL_DATA_PATH = (
+    PROJECT_ROOT
+    / "tests/fixtures/real_data/202412/收集数据/数据采集/V2/【for年金分战区经营分析】24年12月年金终稿数据0109采集-补充企年投资收入.xlsx"
+)
 MAPPING_FIXTURE_PATH = PROJECT_ROOT / "tests/fixtures/sample_legacy_mappings.json"
 OUTPUT_DIR = PROJECT_ROOT / "tests/fixtures/validation_results"
 SHEET_NAME = "收入明细"
@@ -95,7 +95,9 @@ def load_real_data(excel_path: Path, sheet_name: str) -> List[Dict[str, Any]]:
     return rows
 
 
-def process_with_legacy(rows: List[Dict[str, Any]], mappings: Dict[str, Any]) -> pd.DataFrame:
+def process_with_legacy(
+    rows: List[Dict[str, Any]], mappings: Dict[str, Any]
+) -> pd.DataFrame:
     """Process data using the legacy cleaner (WITH COMPANY_ID5_MAPPING fallback)."""
     LOGGER.info("Processing with LEGACY cleaner (includes ID5 fallback)...")
 
@@ -154,7 +156,9 @@ def process_with_pipeline(
     # Don't sort here - we'll normalize sorting in compare_dataframes
     result_df = result_df.reset_index(drop=True)
 
-    LOGGER.info(f"Pipeline output: {len(result_df)} rows, {len(result_df.columns)} columns")
+    LOGGER.info(
+        f"Pipeline output: {len(result_df)} rows, {len(result_df.columns)} columns"
+    )
     return result_df
 
 
@@ -279,7 +283,9 @@ def build_report_with_company_id_notes(
     base_report["summary"]["company_id_id5_fallback_count"] = company_id_analysis[
         "legacy_only_has_company_id"
     ]
-    base_report["summary"]["company_id_pipeline_only"] = company_id_analysis["pipeline_only_has_company_id"]
+    base_report["summary"]["company_id_pipeline_only"] = company_id_analysis[
+        "pipeline_only_has_company_id"
+    ]
     return base_report
 
 
@@ -287,7 +293,9 @@ def main() -> int:
     """Main entry point."""
     LOGGER.info("Starting AnnuityIncome parity validation")
 
-    parser = argparse.ArgumentParser(description="Validate AnnuityIncome parity against legacy.")
+    parser = argparse.ArgumentParser(
+        description="Validate AnnuityIncome parity against legacy."
+    )
     parser.add_argument(
         "--data",
         type=Path,

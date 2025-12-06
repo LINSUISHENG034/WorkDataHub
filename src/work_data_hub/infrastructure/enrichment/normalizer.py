@@ -108,29 +108,25 @@ def normalize_for_temp_id(company_name: str) -> str:
     name = re.sub(r"及下属子企业", "", name)
     # Remove patterns like: (团托), -ChinaHolding, -BSU280, -养老, -福利, -Dsservice
     # Also handles mixed alphanumeric codes like -SupportChinaMiniMalls
-    name = re.sub(r"(?:\(团托\)|（团托）|-[A-Za-z][A-Za-z0-9]*|-\d+|-养老|-福利)$", "", name)
+    name = re.sub(
+        r"(?:\(团托\)|（团托）|-[A-Za-z][A-Za-z0-9]*|-\d+|-养老|-福利)$", "", name
+    )
 
     # 3. Remove status markers
     for core_str in CORE_REPLACE_STRING_SORTED:
         # Pattern for status at start (with optional brackets and separator)
         # e.g., "已转出-中国平安" -> "中国平安"
-        pattern_start = (
-            rf"^[\(\（]?{re.escape(core_str)}[\)\）]?[\-]?"
-        )
+        pattern_start = rf"^[\(\（]?{re.escape(core_str)}[\)\）]?[\-]?"
         name = re.sub(pattern_start, "", name)
 
         # Pattern for status at end (with optional separators and brackets)
         # e.g., "中国平安-已转出" -> "中国平安"
-        pattern_end = (
-            rf"[\-\(\（]{re.escape(core_str)}[\)\）]?$"
-        )
+        pattern_end = rf"[\-\(\（]{re.escape(core_str)}[\)\）]?$"
         name = re.sub(pattern_end, "", name)
 
         # Pattern for status in brackets at end
         # e.g., "中国平安（已转出）" -> "中国平安"
-        pattern_bracket = (
-            rf"[\(\（]{re.escape(core_str)}[\)\）]$"
-        )
+        pattern_bracket = rf"[\(\（]{re.escape(core_str)}[\)\）]$"
         name = re.sub(pattern_bracket, "", name)
 
     # 4. Full-width → Half-width conversion (before bracket normalization)

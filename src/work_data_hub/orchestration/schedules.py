@@ -10,7 +10,7 @@ from typing import Any, Dict
 import yaml
 from dagster import schedule
 
-from src.work_data_hub.config.settings import get_settings
+from work_data_hub.config.settings import get_settings
 
 from .jobs import sample_trustee_performance_multi_file_job
 

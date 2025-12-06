@@ -24,7 +24,14 @@ class AbstractReader(ABC):
 
 
 class CSVReader(AbstractReader):
-    def read(self, file_path, delimiter=",", encoding="utf-8-sig", strip_columns=True, **kwargs):
+    def read(
+        self,
+        file_path,
+        delimiter=",",
+        encoding="utf-8-sig",
+        strip_columns=True,
+        **kwargs,
+    ):
         df = pd.read_csv(file_path, delimiter=delimiter, encoding=encoding, **kwargs)
         if strip_columns:
             df = df.rename(columns=str.strip)
@@ -32,9 +39,25 @@ class CSVReader(AbstractReader):
 
 
 class ExcelReader(AbstractReader):
-    def read(self, file_path, sheet_name=0, header=0, usecols=None, dtype=None, skiprows=None, **kwargs):
-        return pd.read_excel(file_path, sheet_name=sheet_name, header=header, usecols=usecols, dtype=dtype,
-                             skiprows=skiprows, **kwargs)
+    def read(
+        self,
+        file_path,
+        sheet_name=0,
+        header=0,
+        usecols=None,
+        dtype=None,
+        skiprows=None,
+        **kwargs,
+    ):
+        return pd.read_excel(
+            file_path,
+            sheet_name=sheet_name,
+            header=header,
+            usecols=usecols,
+            dtype=dtype,
+            skiprows=skiprows,
+            **kwargs,
+        )
 
 
 class PDFReader(AbstractReader):
@@ -47,16 +70,16 @@ class PDFReader(AbstractReader):
 
 
 class TextReader(AbstractReader):
-    def read(self, file_path, encoding='utf-8', sep='\n', **kwargs):
-        with open(file_path, 'r', encoding=encoding) as file:
+    def read(self, file_path, encoding="utf-8", sep="\n", **kwargs):
+        with open(file_path, "r", encoding=encoding) as file:
             text = file.read().split(sep)
         return text  # 返回按行分割的文本列表
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     reader = ExcelReader()
     data = reader.read(
         file_path=r"D:\Share\DATABASE\数据更新\Daily Update\保险考核业绩2019版_渠道.xlsx",
-        header=3
+        header=3,
     )
     print(data)

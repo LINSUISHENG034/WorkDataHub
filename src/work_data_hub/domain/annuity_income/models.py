@@ -28,7 +28,9 @@ DEFAULT_NUMERIC_RULES: List[Any] = [
 ]
 
 
-def apply_domain_rules(value: Any, field_name: str, fallback_rules: Optional[List[Any]] = None) -> Any:
+def apply_domain_rules(
+    value: Any, field_name: str, fallback_rules: Optional[List[Any]] = None
+) -> Any:
     """Apply cleansing rules from registry for the annuity_income domain."""
     rules = CLEANSING_REGISTRY.get_domain_rules(CLEANSING_DOMAIN, field_name)
     if not rules:
@@ -48,8 +50,12 @@ class AnnuityIncomeIn(BaseModel):
         validate_default=True,
     )
 
-    月度: Optional[Union[date, str, int]] = Field(None, description="Report date (月度)")
-    机构: Optional[str] = Field(None, description="Institution (机构) - renamed to 机构代码")
+    月度: Optional[Union[date, str, int]] = Field(
+        None, description="Report date (月度)"
+    )
+    机构: Optional[str] = Field(
+        None, description="Institution (机构) - renamed to 机构代码"
+    )
     机构名称: Optional[str] = Field(None, description="Institution name (机构名称)")
     机构代码: Optional[str] = Field(None, description="Institution code (机构代码)")
     计划号: Optional[str] = Field(None, description="Plan code (计划号)")
@@ -58,12 +64,24 @@ class AnnuityIncomeIn(BaseModel):
     计划类型: Optional[str] = Field(None, description="Plan type (计划类型)")
     组合代码: Optional[str] = Field(None, description="Portfolio code (组合代码)")
     # Story 5.5.5: Four income fields instead of 收入金额
-    固费: Optional[Union[Decimal, float, int, str]] = Field(None, description="Fixed fee income (固费)")
-    浮费: Optional[Union[Decimal, float, int, str]] = Field(None, description="Variable fee income (浮费)")
-    回补: Optional[Union[Decimal, float, int, str]] = Field(None, description="Rebate income (回补)")
-    税: Optional[Union[Decimal, float, int, str]] = Field(None, description="Tax amount (税)")
-    年金账户名: Optional[str] = Field(None, description="Pension account name (年金账户名)")
-    产品线代码: Optional[str] = Field(None, description="Product line code (产品线代码)")
+    固费: Optional[Union[Decimal, float, int, str]] = Field(
+        None, description="Fixed fee income (固费)"
+    )
+    浮费: Optional[Union[Decimal, float, int, str]] = Field(
+        None, description="Variable fee income (浮费)"
+    )
+    回补: Optional[Union[Decimal, float, int, str]] = Field(
+        None, description="Rebate income (回补)"
+    )
+    税: Optional[Union[Decimal, float, int, str]] = Field(
+        None, description="Tax amount (税)"
+    )
+    年金账户名: Optional[str] = Field(
+        None, description="Pension account name (年金账户名)"
+    )
+    产品线代码: Optional[str] = Field(
+        None, description="Product line code (产品线代码)"
+    )
     company_id: Optional[str] = Field(None, description="Company identifier")
     id: Optional[int] = Field(None, description="Auto-generated ID")
     data_source: Optional[str] = Field(None, description="Source file or system")
@@ -97,7 +115,9 @@ class AnnuityIncomeIn(BaseModel):
                 fallback_rules=DEFAULT_NUMERIC_RULES,
             )
         except ValueError as exc:
-            raise ValueError(f"Field '{field_name}': Cannot clean numeric value '{v}'. Error: {exc}") from exc
+            raise ValueError(
+                f"Field '{field_name}': Cannot clean numeric value '{v}'. Error: {exc}"
+            ) from exc
         if cleaned is None:
             return None
         if isinstance(cleaned, Decimal):
@@ -107,7 +127,9 @@ class AnnuityIncomeIn(BaseModel):
         try:
             return float(cleaned)
         except (TypeError, ValueError) as exc:
-            raise ValueError(f"Field '{field_name}': Cannot convert '{v}' to number.") from exc
+            raise ValueError(
+                f"Field '{field_name}': Cannot convert '{v}' to number."
+            ) from exc
 
     @field_validator("月度", mode="before")
     @classmethod
@@ -148,7 +170,9 @@ class AnnuityIncomeOut(BaseModel):
 
     # Required fields (composite PK: 月度, 计划号, company_id)
     月度: date = Field(..., description="Report date (月度)")
-    计划号: str = Field(..., min_length=1, max_length=255, description="Plan code identifier")
+    计划号: str = Field(
+        ..., min_length=1, max_length=255, description="Plan code identifier"
+    )
     company_id: str = Field(
         ...,  # Required for gold output parity and composite PK
         min_length=1,
@@ -161,9 +185,15 @@ class AnnuityIncomeOut(BaseModel):
     产品线代码: str = Field(..., max_length=255, description="Product line code")
     机构代码: str = Field(..., max_length=255, description="Institution code")
     # Story 5.5.5: Four income fields instead of 收入金额
-    固费: Decimal | float = Field(..., decimal_places=4, description="Fixed fee income (固费)")
-    浮费: Decimal | float = Field(..., decimal_places=4, description="Variable fee income (浮费)")
-    回补: Decimal | float = Field(..., decimal_places=4, description="Rebate income (回补)")
+    固费: Decimal | float = Field(
+        ..., decimal_places=4, description="Fixed fee income (固费)"
+    )
+    浮费: Decimal | float = Field(
+        ..., decimal_places=4, description="Variable fee income (浮费)"
+    )
+    回补: Decimal | float = Field(
+        ..., decimal_places=4, description="Rebate income (回补)"
+    )
     税: Decimal | float = Field(..., decimal_places=4, description="Tax amount (税)")
 
     # Optional fields
@@ -171,7 +201,9 @@ class AnnuityIncomeOut(BaseModel):
     业务类型: Optional[str] = Field(None, max_length=255, description="Business type")
     计划类型: Optional[str] = Field(None, max_length=255, description="Plan type")
     组合代码: Optional[str] = Field(None, max_length=255, description="Portfolio code")
-    年金账户名: Optional[str] = Field(None, max_length=255, description="Pension account name (original 客户名称)")
+    年金账户名: Optional[str] = Field(
+        None, max_length=255, description="Pension account name (original 客户名称)"
+    )
 
     @field_validator("月度", mode="before")
     @classmethod
@@ -192,7 +224,9 @@ class AnnuityIncomeOut(BaseModel):
                 fallback_rules=DEFAULT_COMPANY_RULES,
             )
         except Exception as e:
-            raise ValueError(f"Field '客户名称': Cannot clean company name '{v}'. Error: {e}")
+            raise ValueError(
+                f"Field '客户名称': Cannot clean company name '{v}'. Error: {e}"
+            )
 
     @field_validator("计划号", mode="after")
     @classmethod
@@ -213,14 +247,22 @@ class AnnuityIncomeOut(BaseModel):
     # Story 5.5.5: Validator for four income fields instead of 收入金额
     @field_validator("固费", "浮费", "回补", "税", mode="before")
     @classmethod
-    def clean_decimal_fields_output(cls, v: Any, info: ValidationInfo) -> Decimal | float:
+    def clean_decimal_fields_output(
+        cls, v: Any, info: ValidationInfo
+    ) -> Decimal | float:
         field_name = info.field_name or "numeric_field"
         try:
-            normalized = apply_domain_rules(v, field_name, fallback_rules=DEFAULT_NUMERIC_RULES)
-            cleaned = CLEANSING_REGISTRY.apply_rule(normalized, "comprehensive_decimal_cleaning", field_name=field_name)
+            normalized = apply_domain_rules(
+                v, field_name, fallback_rules=DEFAULT_NUMERIC_RULES
+            )
+            cleaned = CLEANSING_REGISTRY.apply_rule(
+                normalized, "comprehensive_decimal_cleaning", field_name=field_name
+            )
             return cast(Decimal | float, cleaned)
         except ValueError as exc:
-            raise ValueError(f"Field '{field_name}': Cannot clean numeric value '{v}'. Error: {exc}") from exc
+            raise ValueError(
+                f"Field '{field_name}': Cannot clean numeric value '{v}'. Error: {exc}"
+            ) from exc
 
     @model_validator(mode="after")
     def validate_business_rules(self) -> "AnnuityIncomeOut":
@@ -228,7 +270,10 @@ class AnnuityIncomeOut(BaseModel):
         if report_date:
             current_date = date.today()
             if report_date > current_date:
-                raise ValueError(f"Field '月度': Report date {report_date} cannot be in the future (today: {current_date})")
+                raise ValueError(
+                    f"Field '月度': Report date {report_date} cannot be in the future "
+                    f"(today: {current_date})"
+                )
             if (current_date - report_date).days > 3650:
                 logger.warning(f"Report date {report_date} is older than 10 years")
         return self
@@ -236,7 +281,8 @@ class AnnuityIncomeOut(BaseModel):
 
 # NOTE(5.5.4-deferred): Extraction deferred to Epic 6
 # Reason: Low risk, but bundled with other model extractions for consistency
-# See: docs/sprint-artifacts/epic-5.5-optimization-recommendations.md "Reuse Candidates" table
+# See: docs/sprint-artifacts/epic-5.5-optimization-recommendations.md "Reuse Candidates"
+# table
 # Duplicated from: annuity_performance/models.py
 # Reuse potential: HIGH - Epic 6 will extract to infrastructure/models/shared.py
 class EnrichmentStats(BaseModel):
@@ -279,8 +325,12 @@ class ProcessingResultWithEnrichment(BaseModel):
         validate_default=True,
         extra="forbid",
     )
-    records: List[AnnuityIncomeOut] = Field(..., description="Processed annuity income records")
+    records: List[AnnuityIncomeOut] = Field(
+        ..., description="Processed annuity income records"
+    )
     enrichment_stats: EnrichmentStats = Field(default_factory=EnrichmentStats)
-    unknown_names_csv: Optional[str] = Field(None, description="Path to exported unknown names CSV")
+    unknown_names_csv: Optional[str] = Field(
+        None, description="Path to exported unknown names CSV"
+    )
     data_source: str = Field("unknown", description="Source file or identifier")
     processing_time_ms: int = Field(0, description="Total processing time")

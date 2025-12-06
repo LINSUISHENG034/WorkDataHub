@@ -48,7 +48,12 @@ ENABLE_UPSERT_MODE = False  # Detail table - use refresh mode instead
 
 # UPSERT keys (only used when ENABLE_UPSERT_MODE = True)
 # For aggregate tables with unique records per key combination
-DEFAULT_UPSERT_KEYS: Optional[List[str]] = ["月度", "计划代码", "组合代码", "company_id"]
+DEFAULT_UPSERT_KEYS: Optional[List[str]] = [
+    "月度",
+    "计划代码",
+    "组合代码",
+    "company_id",
+]
 
 # REFRESH keys (used when ENABLE_UPSERT_MODE = False)
 # Defines scope for DELETE before INSERT (Legacy: update_based_on_field)
@@ -93,7 +98,9 @@ def process_annuity_performance(
     # Choose loading mode based on configuration
     if ENABLE_UPSERT_MODE:
         # UPSERT mode: ON CONFLICT DO UPDATE (for aggregate tables)
-        actual_upsert_keys = upsert_keys if upsert_keys is not None else DEFAULT_UPSERT_KEYS
+        actual_upsert_keys = (
+            upsert_keys if upsert_keys is not None else DEFAULT_UPSERT_KEYS
+        )
         load_result = warehouse_loader.load_dataframe(
             dataframe,
             table=table_name,
@@ -102,7 +109,9 @@ def process_annuity_performance(
         )
     else:
         # REFRESH mode: DELETE + INSERT (for detail tables)
-        actual_refresh_keys = refresh_keys if refresh_keys is not None else DEFAULT_REFRESH_KEYS
+        actual_refresh_keys = (
+            refresh_keys if refresh_keys is not None else DEFAULT_REFRESH_KEYS
+        )
         load_result = warehouse_loader.load_with_refresh(
             dataframe,
             table=table_name,
@@ -155,7 +164,9 @@ def process_with_enrichment(
     export_unknown_names: bool = True,
 ) -> ProcessingResultWithEnrichment:
     if not rows:
-        logger.bind(domain="annuity_performance", step="process_with_enrichment").info("No rows provided for processing")
+        logger.bind(domain="annuity_performance", step="process_with_enrichment").info(
+            "No rows provided for processing"
+        )
         return ProcessingResultWithEnrichment(
             records=[],
             data_source=data_source,
@@ -187,7 +198,9 @@ def process_with_enrichment(
     if dropped_count > 0:
         drop_rate = dropped_count / len(rows) if rows else 0
         if drop_rate > 0.5:
-            logger.bind(domain="annuity_performance", step="process_with_enrichment").warning(
+            logger.bind(
+                domain="annuity_performance", step="process_with_enrichment"
+            ).warning(
                 "High row drop rate during processing",
                 dropped=dropped_count,
                 total=len(rows),
@@ -200,14 +213,16 @@ def process_with_enrichment(
         else:
             failed_df = input_df
         if not failed_df.empty:
-            csv_path = export_error_csv(
+            error_csv_path = export_error_csv(
                 failed_df,
                 filename_prefix=f"failed_records_{Path(data_source).stem}",
                 output_dir=Path("logs"),
             )
-            logger.bind(domain="annuity_performance", step="process_with_enrichment").info(
+            logger.bind(
+                domain="annuity_performance", step="process_with_enrichment"
+            ).info(
                 "Exported failed records to CSV",
-                csv_path=str(csv_path),
+                csv_path=str(error_csv_path),
                 count=len(failed_df),
             )
     csv_path = export_unknown_names_csv(
@@ -232,4 +247,13 @@ def process_with_enrichment(
 
 
 def _records_to_dataframe(records: List[AnnuityPerformanceOut]) -> pd.DataFrame:
-    return pd.DataFrame([r.model_dump(mode="json", by_alias=True, exclude_none=True) for r in records]) if records else pd.DataFrame()
+    return (
+        pd.DataFrame(
+            [
+                r.model_dump(mode="json", by_alias=True, exclude_none=True)
+                for r in records
+            ]
+        )
+        if records
+        else pd.DataFrame()
+    )

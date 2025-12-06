@@ -11,7 +11,10 @@ from typing import Dict, List
 
 from src.work_data_hub.domain.pipelines.core import TransformStep
 from src.work_data_hub.domain.pipelines.types import Row, StepResult
-from src.work_data_hub.domain.pipelines.pipeline_config import PipelineConfig, StepConfig
+from src.work_data_hub.domain.pipelines.pipeline_config import (
+    PipelineConfig,
+    StepConfig,
+)
 
 
 class MockTransformStep(TransformStep):
@@ -53,7 +56,7 @@ class MockTransformStep(TransformStep):
             row=transformed_row,
             warnings=[],
             errors=[],
-            metadata={"step_name": self.step_name, "call_count": self.call_count}
+            metadata={"step_name": self.step_name, "call_count": self.call_count},
         )
 
 
@@ -81,7 +84,7 @@ class UpperCaseStep(TransformStep):
             row=transformed_row,
             warnings=[],
             errors=[],
-            metadata={"processed_fields": self.fields}
+            metadata={"processed_fields": self.fields},
         )
 
 
@@ -109,7 +112,7 @@ class TrimStep(TransformStep):
             row=transformed_row,
             warnings=[],
             errors=[],
-            metadata={"processed_fields": self.fields}
+            metadata={"processed_fields": self.fields},
         )
 
 
@@ -138,7 +141,7 @@ def sample_row():
         "amount": "123.456",
         "price": 67.89,
         "description": "Sample Description",
-        "active": True
+        "active": True,
     }
 
 
@@ -151,15 +154,15 @@ def sample_config():
             StepConfig(
                 name="uppercase",
                 import_path="tests.domain.pipelines.conftest.UpperCaseStep",
-                options={"fields": ["name"]}
+                options={"fields": ["name"]},
             ),
             StepConfig(
                 name="trim",
                 import_path="tests.domain.pipelines.conftest.TrimStep",
-                options={"fields": ["name"]}
-            )
+                options={"fields": ["name"]},
+            ),
         ],
-        stop_on_error=True
+        stop_on_error=True,
     )
 
 
@@ -172,15 +175,15 @@ def sample_config_dict():
             {
                 "name": "uppercase",
                 "import_path": "tests.domain.pipelines.conftest.UpperCaseStep",
-                "options": {"fields": ["name"]}
+                "options": {"fields": ["name"]},
             },
             {
                 "name": "trim",
                 "import_path": "tests.domain.pipelines.conftest.TrimStep",
-                "options": {"fields": ["name"]}
-            }
+                "options": {"fields": ["name"]},
+            },
         ],
-        "stop_on_error": True
+        "stop_on_error": True,
     }
 
 
@@ -190,7 +193,7 @@ def mock_steps():
     return [
         MockTransformStep("step1", lambda row: {**row, "step1_value": "processed"}),
         MockTransformStep("step2", lambda row: {**row, "step2_value": "processed"}),
-        MockTransformStep("step3", lambda row: {**row, "step3_value": "processed"})
+        MockTransformStep("step3", lambda row: {**row, "step3_value": "processed"}),
     ]
 
 
@@ -210,5 +213,5 @@ def decimal_test_data():
         "金额": "¥1,234.56",
         "invalid_decimal": "not a number",
         "empty_field": "",
-        "null_field": None
+        "null_field": None,
     }

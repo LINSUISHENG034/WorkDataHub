@@ -35,6 +35,8 @@ Usage:
         return value.strip().upper()
 """
 
+from typing import Any, Dict
+
 # 导出主要的公共 API
 from work_data_hub.infrastructure.cleansing.integrations.pydantic_adapter import (
     decimal_fields_cleaner,
@@ -92,7 +94,7 @@ __all__: list[str] = [
 ]
 
 
-def get_framework_info():
+def get_framework_info() -> Dict[str, Any]:
     """获取简化框架信息和统计数据"""
     stats = registry.get_statistics()
 
@@ -106,7 +108,7 @@ def get_framework_info():
     }
 
 
-def list_available_rules():
+def list_available_rules() -> Dict[str, Any]:
     """列出所有可用的清洗规则"""
     rules = registry.list_all_rules()
 

@@ -44,7 +44,9 @@ class TestCleansingFramework:
 
         # 检查是否能按名称查找规则
         decimal_rule = registry.get_rule("comprehensive_decimal_cleaning")
-        assert decimal_rule is not None, "应该能找到 comprehensive_decimal_cleaning 规则"
+        assert decimal_rule is not None, (
+            "应该能找到 comprehensive_decimal_cleaning 规则"
+        )
 
         # 检查是否能按分类查找规则
         numeric_rules = registry.find_by_category(RuleCategory.NUMERIC)
@@ -108,11 +110,15 @@ class TestCleansingFramework:
         result = comprehensive_decimal_cleaning(-1.1, "当期收益率")
         assert result == Decimal("-0.011000"), f"边界值 -1.1 应该转换: {result}"
 
-    @pytest.mark.skip(reason="decimal_fields_cleaner decorator has Pydantic V2 compatibility issues - to be fixed in Epic 5")
+    @pytest.mark.skip(
+        reason="decimal_fields_cleaner decorator has Pydantic V2 compatibility issues - to be fixed in Epic 5"
+    )
     def test_pydantic_integration(self):
         """测试与 Pydantic 的集成"""
 
-        @decimal_fields_cleaner("amount", "rate", precision_config={"rate": 6, "amount": 4})
+        @decimal_fields_cleaner(
+            "amount", "rate", precision_config={"rate": 6, "amount": 4}
+        )
         class TestModel(BaseModel):
             amount: Optional[Decimal] = None
             rate: Optional[Decimal] = None
@@ -145,7 +151,11 @@ class TestCleansingFramework:
         from src.work_data_hub.infrastructure.cleansing.registry import RuleCategory
 
         # 动态添加新规则（使用简化的装饰器）
-        @rule(name="test_custom_rule", category=RuleCategory.STRING, description="测试自定义规则")
+        @rule(
+            name="test_custom_rule",
+            category=RuleCategory.STRING,
+            description="测试自定义规则",
+        )
         def custom_cleaner(value):
             return str(value).upper() if value else None
 
@@ -158,7 +168,9 @@ class TestCleansingFramework:
         assert result == "HELLO"
 
 
-@pytest.mark.skip(reason="decimal_fields_cleaner decorator has Pydantic V2 compatibility issues - to be fixed in Epic 5")
+@pytest.mark.skip(
+    reason="decimal_fields_cleaner decorator has Pydantic V2 compatibility issues - to be fixed in Epic 5"
+)
 def test_framework_solves_duplication():
     """
     集成测试: 验证框架成功解决重复实现问题
@@ -168,7 +180,9 @@ def test_framework_solves_duplication():
 
     # 模拟年金业绩模型
     @decimal_fields_cleaner(
-        "期初资产规模", "当期收益率", precision_config={"当期收益率": 6, "期初资产规模": 4}
+        "期初资产规模",
+        "当期收益率",
+        precision_config={"当期收益率": 6, "期初资产规模": 4},
     )
     class AnnuityModel(BaseModel):
         期初资产规模: Optional[Decimal] = None
@@ -176,23 +190,31 @@ def test_framework_solves_duplication():
 
     # 模拟受托业绩模型
     @decimal_fields_cleaner(
-        "return_rate", "fund_scale", precision_config={"return_rate": 6, "fund_scale": 2}
+        "return_rate",
+        "fund_scale",
+        precision_config={"return_rate": 6, "fund_scale": 2},
     )
     class TrusteeModel(BaseModel):
         return_rate: Optional[Decimal] = None
         fund_scale: Optional[Decimal] = None
 
     # 使用相同的测试数据
-    test_data = {"currency_field": "¥1,234.567", "percentage_field": "5.25%", "null_field": "-"}
+    test_data = {
+        "currency_field": "¥1,234.567",
+        "percentage_field": "5.25%",
+        "null_field": "-",
+    }
 
     # 测试年金模型
     annuity = AnnuityModel(
-        期初资产规模=test_data["currency_field"], 当期收益率=test_data["percentage_field"]
+        期初资产规模=test_data["currency_field"],
+        当期收益率=test_data["percentage_field"],
     )
 
     # 测试受托模型
     trustee = TrusteeModel(
-        return_rate=test_data["percentage_field"], fund_scale=test_data["currency_field"]
+        return_rate=test_data["percentage_field"],
+        fund_scale=test_data["currency_field"],
     )
 
     # 验证两个模型使用相同的清洗逻辑得到一致的结果

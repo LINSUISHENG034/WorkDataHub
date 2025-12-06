@@ -20,7 +20,9 @@ from src.work_data_hub.domain.sample_trustee_performance.service import process
 from src.work_data_hub.io.connectors.file_connector import DataSourceConnector
 from src.work_data_hub.io.readers.excel_reader import read_excel_rows
 
-pytestmark = pytest.mark.skip(reason="Tests depend on deprecated sample_trustee_performance domain - pending Epic 5")
+pytestmark = pytest.mark.skip(
+    reason="Tests depend on deprecated sample_trustee_performance domain - pending Epic 5"
+)
 
 
 @pytest.fixture
@@ -76,7 +78,9 @@ def test_data_directory(tmp_path, sample_trustee_data):
 
     # Create non-matching file that should be ignored
     other_file = tmp_path / "other_report.xlsx"
-    pd.DataFrame({"col1": ["data"]}).to_excel(other_file, index=False, engine="openpyxl")
+    pd.DataFrame({"col1": ["data"]}).to_excel(
+        other_file, index=False, engine="openpyxl"
+    )
 
     # Create backup directory with file that should be ignored
     backup_dir = tmp_path / "backup"
@@ -102,7 +106,9 @@ class TestEndToEndIntegration:
         def mock_get_settings():
             return test_settings
 
-        monkeypatch.setattr("src.work_data_hub.config.settings.get_settings", mock_get_settings)
+        monkeypatch.setattr(
+            "src.work_data_hub.config.settings.get_settings", mock_get_settings
+        )
 
         # Step 2: File Discovery
         connector = DataSourceConnector(config_path=integration_test_config)
@@ -153,18 +159,24 @@ class TestEndToEndIntegration:
         assert first_record.has_performance_data is True
 
         # Verify all records have consistent report date
-        assert all(record.report_date == date(2024, 11, 1) for record in processed_records)
+        assert all(
+            record.report_date == date(2024, 11, 1) for record in processed_records
+        )
 
         # Verify return rate conversions
         expected_rates = [Decimal("0.055"), Decimal("0.032"), Decimal("0.048")]
         actual_rates = [record.return_rate for record in processed_records]
         assert actual_rates == expected_rates
 
-    def test_pipeline_with_no_matching_files(self, integration_test_config, tmp_path, monkeypatch):
+    def test_pipeline_with_no_matching_files(
+        self, integration_test_config, tmp_path, monkeypatch
+    ):
         """Test pipeline behavior when no files match the domain pattern."""
         # Create directory with non-matching files
         non_matching_file = tmp_path / "some_other_file.xlsx"
-        pd.DataFrame({"col": ["data"]}).to_excel(non_matching_file, index=False, engine="openpyxl")
+        pd.DataFrame({"col": ["data"]}).to_excel(
+            non_matching_file, index=False, engine="openpyxl"
+        )
 
         # Mock settings
         test_settings = Settings()
@@ -174,7 +186,9 @@ class TestEndToEndIntegration:
         def mock_get_settings():
             return test_settings
 
-        monkeypatch.setattr("src.work_data_hub.config.settings.get_settings", mock_get_settings)
+        monkeypatch.setattr(
+            "src.work_data_hub.config.settings.get_settings", mock_get_settings
+        )
 
         # Run discovery
         connector = DataSourceConnector(config_path=integration_test_config)
@@ -183,7 +197,9 @@ class TestEndToEndIntegration:
         # Should find no files
         assert len(discovered_files) == 0
 
-    def test_pipeline_with_empty_excel_file(self, integration_test_config, tmp_path, monkeypatch):
+    def test_pipeline_with_empty_excel_file(
+        self, integration_test_config, tmp_path, monkeypatch
+    ):
         """Test pipeline behavior with empty Excel file."""
         # Create empty Excel file with matching name
         empty_file = tmp_path / "2024_11_受托业绩报告.xlsx"
@@ -198,7 +214,9 @@ class TestEndToEndIntegration:
         def mock_get_settings():
             return test_settings
 
-        monkeypatch.setattr("src.work_data_hub.config.settings.get_settings", mock_get_settings)
+        monkeypatch.setattr(
+            "src.work_data_hub.config.settings.get_settings", mock_get_settings
+        )
 
         # Run pipeline
         connector = DataSourceConnector(config_path=integration_test_config)
@@ -239,7 +257,9 @@ class TestEndToEndIntegration:
         def mock_get_settings():
             return test_settings
 
-        monkeypatch.setattr("src.work_data_hub.config.settings.get_settings", mock_get_settings)
+        monkeypatch.setattr(
+            "src.work_data_hub.config.settings.get_settings", mock_get_settings
+        )
 
         # Run discovery
         connector = DataSourceConnector(config_path=integration_test_config)
@@ -286,7 +306,9 @@ class TestEndToEndIntegration:
         def mock_get_settings():
             return test_settings
 
-        monkeypatch.setattr("src.work_data_hub.config.settings.get_settings", mock_get_settings)
+        monkeypatch.setattr(
+            "src.work_data_hub.config.settings.get_settings", mock_get_settings
+        )
 
         # Run complete pipeline
         connector = DataSourceConnector(config_path=integration_test_config)
@@ -301,5 +323,7 @@ class TestEndToEndIntegration:
         assert len(processed_records) == 2
 
         first_record = processed_records[0]
-        assert first_record.plan_code == "计划A"  # Chinese characters preserved but normalized
+        assert (
+            first_record.plan_code == "计划A"
+        )  # Chinese characters preserved but normalized
         assert first_record.company_code == "公司01"

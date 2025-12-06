@@ -56,7 +56,10 @@ class TestAnnuityIncomeIn:
             "unknown_field": "should be allowed",
         }
         model = AnnuityIncomeIn(**data)
-        assert hasattr(model, "unknown_field") or model.model_extra.get("unknown_field") == "should be allowed"
+        assert (
+            hasattr(model, "unknown_field")
+            or model.model_extra.get("unknown_field") == "should be allowed"
+        )
 
     def test_strips_whitespace(self):
         """Model strips whitespace from string fields."""
@@ -71,6 +74,7 @@ class TestAnnuityIncomeIn:
     def test_converts_nan_to_none(self):
         """Model converts NaN values to None."""
         import math
+
         # Story 5.5.5: Updated to use 固费 instead of 收入金额
         data = {
             "计划号": "FP0001",
@@ -216,6 +220,7 @@ class TestAnnuityIncomeOut:
     def test_validates_future_date(self):
         """Model rejects future dates."""
         from datetime import timedelta
+
         # Story 5.5.5: Updated to use four income fields instead of 收入金额
         future_date = date.today() + timedelta(days=30)
         data = {

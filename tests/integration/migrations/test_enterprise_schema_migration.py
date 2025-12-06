@@ -66,10 +66,13 @@ class TestEnterpriseSchemaExists:
     def test_schema_exists(self, migrated_db: Engine):
         """AC1: Verify enterprise schema exists."""
         with migrated_db.connect() as conn:
-            result = conn.execute(text(
-                "SELECT schema_name FROM information_schema.schemata "
-                "WHERE schema_name = :schema"
-            ), {"schema": SCHEMA_NAME})
+            result = conn.execute(
+                text(
+                    "SELECT schema_name FROM information_schema.schemata "
+                    "WHERE schema_name = :schema"
+                ),
+                {"schema": SCHEMA_NAME},
+            )
             schemas = [row[0] for row in result]
             assert SCHEMA_NAME in schemas, f"Schema '{SCHEMA_NAME}' should exist"
 
@@ -79,10 +82,18 @@ class TestEnterpriseSchemaExists:
         tables = inspector.get_table_names(schema=SCHEMA_NAME)
         assert "company_master" in tables, "company_master table should exist"
 
-        columns = {c["name"] for c in inspector.get_columns("company_master", schema=SCHEMA_NAME)}
+        columns = {
+            c["name"]
+            for c in inspector.get_columns("company_master", schema=SCHEMA_NAME)
+        }
         expected_columns = {
-            "company_id", "official_name", "unified_credit_code",
-            "aliases", "source", "created_at", "updated_at"
+            "company_id",
+            "official_name",
+            "unified_credit_code",
+            "aliases",
+            "source",
+            "created_at",
+            "updated_at",
         }
         assert expected_columns.issubset(columns), (
             f"company_master missing columns: {expected_columns - columns}"
@@ -99,7 +110,9 @@ class TestEnterpriseSchemaExists:
     def test_company_master_unique_constraint(self, migrated_db: Engine):
         """AC2: Verify unified_credit_code has unique constraint."""
         inspector = inspect(migrated_db)
-        unique_constraints = inspector.get_unique_constraints("company_master", schema=SCHEMA_NAME)
+        unique_constraints = inspector.get_unique_constraints(
+            "company_master", schema=SCHEMA_NAME
+        )
         ucc_columns = [uc["column_names"] for uc in unique_constraints]
         # unified_credit_code should be unique (either via constraint or unique index)
         indexes = inspector.get_indexes("company_master", schema=SCHEMA_NAME)
@@ -119,10 +132,19 @@ class TestEnterpriseSchemaExists:
         tables = inspector.get_table_names(schema=SCHEMA_NAME)
         assert "company_mapping" in tables, "company_mapping table should exist"
 
-        columns = {c["name"] for c in inspector.get_columns("company_mapping", schema=SCHEMA_NAME)}
+        columns = {
+            c["name"]
+            for c in inspector.get_columns("company_mapping", schema=SCHEMA_NAME)
+        }
         expected_columns = {
-            "id", "alias_name", "canonical_id", "match_type",
-            "priority", "source", "created_at", "updated_at"
+            "id",
+            "alias_name",
+            "canonical_id",
+            "match_type",
+            "priority",
+            "source",
+            "created_at",
+            "updated_at",
         }
         assert expected_columns.issubset(columns), (
             f"company_mapping missing columns: {expected_columns - columns}"
@@ -131,7 +153,9 @@ class TestEnterpriseSchemaExists:
     def test_company_mapping_unique_constraint(self, migrated_db: Engine):
         """AC3: Verify (alias_name, match_type) unique constraint."""
         inspector = inspect(migrated_db)
-        unique_constraints = inspector.get_unique_constraints("company_mapping", schema=SCHEMA_NAME)
+        unique_constraints = inspector.get_unique_constraints(
+            "company_mapping", schema=SCHEMA_NAME
+        )
         has_alias_type_unique = any(
             set(uc["column_names"]) == {"alias_name", "match_type"}
             for uc in unique_constraints
@@ -152,22 +176,30 @@ class TestEnterpriseSchemaExists:
     def test_company_mapping_priority_check(self, migrated_db: Engine):
         """AC3: Verify priority CHECK constraint (1-5)."""
         inspector = inspect(migrated_db)
-        check_constraints = inspector.get_check_constraints("company_mapping", schema=SCHEMA_NAME)
-        has_priority_check = any(
-            "priority" in (c.get("sqltext", "") or "")
-            for c in check_constraints
+        check_constraints = inspector.get_check_constraints(
+            "company_mapping", schema=SCHEMA_NAME
         )
-        assert has_priority_check, "company_mapping should have CHECK constraint on priority"
+        has_priority_check = any(
+            "priority" in (c.get("sqltext", "") or "") for c in check_constraints
+        )
+        assert has_priority_check, (
+            "company_mapping should have CHECK constraint on priority"
+        )
 
     def test_company_mapping_match_type_check(self, migrated_db: Engine):
         """AC3: Verify match_type CHECK constraint for allowed values."""
         inspector = inspect(migrated_db)
-        check_constraints = inspector.get_check_constraints("company_mapping", schema=SCHEMA_NAME)
+        check_constraints = inspector.get_check_constraints(
+            "company_mapping", schema=SCHEMA_NAME
+        )
         has_match_type_check = any(
-            "match_type" in (c.get("sqltext", "") or "") and "account_name" in (c.get("sqltext", "") or "")
+            "match_type" in (c.get("sqltext", "") or "")
+            and "account_name" in (c.get("sqltext", "") or "")
             for c in check_constraints
         )
-        assert has_match_type_check, "company_mapping should restrict match_type to allowed values"
+        assert has_match_type_check, (
+            "company_mapping should restrict match_type to allowed values"
+        )
 
     def test_enrichment_requests_table_exists(self, migrated_db: Engine):
         """AC4: Verify enrichment_requests table exists with correct columns."""
@@ -175,10 +207,21 @@ class TestEnterpriseSchemaExists:
         tables = inspector.get_table_names(schema=SCHEMA_NAME)
         assert "enrichment_requests" in tables, "enrichment_requests table should exist"
 
-        columns = {c["name"] for c in inspector.get_columns("enrichment_requests", schema=SCHEMA_NAME)}
+        columns = {
+            c["name"]
+            for c in inspector.get_columns("enrichment_requests", schema=SCHEMA_NAME)
+        }
         expected_columns = {
-            "id", "raw_name", "normalized_name", "temp_id", "status",
-            "attempts", "last_error", "resolved_company_id", "created_at", "updated_at"
+            "id",
+            "raw_name",
+            "normalized_name",
+            "temp_id",
+            "status",
+            "attempts",
+            "last_error",
+            "resolved_company_id",
+            "created_at",
+            "updated_at",
         }
         assert expected_columns.issubset(columns), (
             f"enrichment_requests missing columns: {expected_columns - columns}"
@@ -240,7 +283,9 @@ class TestPipelineIndependence:
         """AC7: Core pipeline modules should not import enterprise tables."""
         # Import core pipeline modules - they should work without enterprise schema
         from work_data_hub.infrastructure.transforms import Pipeline, MappingStep
-        from work_data_hub.infrastructure.enrichment.company_id_resolver import CompanyIdResolver
+        from work_data_hub.infrastructure.enrichment.company_id_resolver import (
+            CompanyIdResolver,
+        )
 
         # These imports should succeed without database connection
         assert Pipeline is not None

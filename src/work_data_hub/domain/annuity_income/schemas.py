@@ -52,7 +52,7 @@ GOLD_COMPOSITE_KEY: Sequence[str] = ("月度", "计划号", "组合代码", "com
 
 CLEANSING_DOMAIN = "annuity_income"
 
-BronzeAnnuityIncomeSchema = pa.DataFrameSchema(  # type: ignore[no-untyped-call]
+BronzeAnnuityIncomeSchema = pa.DataFrameSchema(
     columns={
         "月度": pa.Column(pa.DateTime, nullable=True, coerce=True),
         "机构代码": pa.Column(pa.String, nullable=True, coerce=True),
@@ -70,7 +70,7 @@ BronzeAnnuityIncomeSchema = pa.DataFrameSchema(  # type: ignore[no-untyped-call]
 )
 
 
-GoldAnnuityIncomeSchema = pa.DataFrameSchema(  # type: ignore[no-untyped-call]
+GoldAnnuityIncomeSchema = pa.DataFrameSchema(
     columns={
         "月度": pa.Column(pa.DateTime, nullable=False, coerce=True),
         "计划号": pa.Column(pa.String, nullable=False, coerce=True),
@@ -115,15 +115,23 @@ class GoldValidationSummary:
 
     row_count: int
     removed_columns: List[str] = field(default_factory=list)
-    duplicate_keys: List[Tuple[str, str, str]] = field(default_factory=list)
+    duplicate_keys: List[Tuple[str, str, str, str]] = field(default_factory=list)
 
 
-def validate_bronze_dataframe(dataframe: pd.DataFrame, failure_threshold: float = 0.10) -> Tuple[pd.DataFrame, BronzeValidationSummary]:
+
+def validate_bronze_dataframe(
+    dataframe: pd.DataFrame, failure_threshold: float = 0.10
+) -> Tuple[pd.DataFrame, BronzeValidationSummary]:
     """Validate bronze layer DataFrame against schema."""
     working_df = dataframe.copy(deep=True)
     ensure_not_empty(GoldAnnuityIncomeSchema, working_df, schema_name="Gold")
     ensure_not_empty(BronzeAnnuityIncomeSchema, working_df, schema_name="Bronze")
-    ensure_required_columns(BronzeAnnuityIncomeSchema, working_df, BRONZE_REQUIRED_COLUMNS, schema_name="Bronze")
+    ensure_required_columns(
+        BronzeAnnuityIncomeSchema,
+        working_df,
+        BRONZE_REQUIRED_COLUMNS,
+        schema_name="Bronze",
+    )
 
     registry = get_cleansing_registry()
     numeric_invalid_rows = coerce_numeric_columns(
@@ -140,7 +148,9 @@ def validate_bronze_dataframe(dataframe: pd.DataFrame, failure_threshold: float 
     parsed_dates, invalid_date_rows = parse_bronze_dates(working_df["月度"])
     working_df["月度"] = parsed_dates
 
-    empty_columns = ensure_non_null_columns(BronzeAnnuityIncomeSchema, working_df, BRONZE_REQUIRED_COLUMNS)
+    empty_columns = ensure_non_null_columns(
+        BronzeAnnuityIncomeSchema, working_df, BRONZE_REQUIRED_COLUMNS
+    )
 
     for column, rows in numeric_invalid_rows.items():
         track_invalid_ratio(
@@ -188,7 +198,9 @@ def validate_gold_dataframe(
 
     if project_columns:
         gold_cols = GoldAnnuityIncomeSchema.columns
-        removed_columns = [column for column in working_df.columns if column not in gold_cols]
+        removed_columns = [
+            column for column in working_df.columns if column not in gold_cols
+        ]
         if removed_columns:
             working_df = working_df.drop(columns=removed_columns, errors="ignore")
 
@@ -196,7 +208,9 @@ def validate_gold_dataframe(
     if "组合代码" not in working_df.columns:
         working_df["组合代码"] = None
 
-    ensure_required_columns(GoldAnnuityIncomeSchema, working_df, GOLD_REQUIRED_COLUMNS, schema_name="Gold")
+    ensure_required_columns(
+        GoldAnnuityIncomeSchema, working_df, GOLD_REQUIRED_COLUMNS, schema_name="Gold"
+    )
 
     duplicate_mask = working_df.duplicated(subset=GOLD_COMPOSITE_KEY, keep=False)
     duplicate_keys: List[Tuple[str, str, str, str]] = []
@@ -208,7 +222,9 @@ def validate_gold_dataframe(
             .tolist()
         )
         if enforce_unique:
-            failure_cases = pd.DataFrame(duplicate_keys, columns=list(GOLD_COMPOSITE_KEY))
+            failure_cases = pd.DataFrame(
+                duplicate_keys, columns=list(GOLD_COMPOSITE_KEY)
+            )
             raise_schema_error(
                 GoldAnnuityIncomeSchema,
                 working_df,

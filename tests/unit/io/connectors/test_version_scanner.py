@@ -31,9 +31,7 @@ class TestVersionScanner:
 
         scanner = VersionScanner()
         result = scanner.detect_version(
-            base_path=tmp_path,
-            file_patterns=["*.xlsx"],
-            strategy='highest_number'
+            base_path=tmp_path, file_patterns=["*.xlsx"], strategy="highest_number"
         )
 
         assert result.version == "V2"
@@ -45,9 +43,7 @@ class TestVersionScanner:
         """AC: Fallback to base path when no V folders"""
         scanner = VersionScanner()
         result = scanner.detect_version(
-            base_path=tmp_path,
-            file_patterns=["*.xlsx"],
-            strategy='highest_number'
+            base_path=tmp_path, file_patterns=["*.xlsx"], strategy="highest_number"
         )
 
         assert result.version == "base"
@@ -66,15 +62,14 @@ class TestVersionScanner:
 
         # Explicitly set different modification times to avoid Windows filesystem granularity issues
         import os
+
         current_time = time.time()
         os.utime(v1, (current_time, current_time - 10))  # V1 modified 10 seconds ago
         os.utime(v2, (current_time, current_time))  # V2 modified now
 
         scanner = VersionScanner()
         result = scanner.detect_version(
-            base_path=tmp_path,
-            file_patterns=["*.xlsx"],
-            strategy='latest_modified'
+            base_path=tmp_path, file_patterns=["*.xlsx"], strategy="latest_modified"
         )
 
         assert result.version == "V2"
@@ -94,8 +89,8 @@ class TestVersionScanner:
         result = scanner.detect_version(
             base_path=tmp_path,
             file_patterns=["*.xlsx"],
-            strategy='highest_number',
-            version_override="V1"  # Override to V1
+            strategy="highest_number",
+            version_override="V1",  # Override to V1
         )
 
         assert result.version == "V1"
@@ -113,13 +108,15 @@ class TestVersionScanner:
         (v1 / "annuity_data.xlsx").touch()
         # V2 has no files
         # Ensure V2 exists but is detected as empty
-        (v2 / "empty.txt").touch()  # Create file to ensure directory exists but has no matching files
+        (
+            v2 / "empty.txt"
+        ).touch()  # Create file to ensure directory exists but has no matching files
 
         scanner = VersionScanner()
         result = scanner.detect_version(
             base_path=tmp_path,
             file_patterns=["*annuity*.xlsx"],
-            strategy='highest_number'
+            strategy="highest_number",
         )
 
         # Should select V1 (only version with matching files)
@@ -138,15 +135,14 @@ class TestVersionScanner:
 
         # Set same modification time
         import os
+
         mtime = v1.stat().st_mtime
         os.utime(v2, (mtime, mtime))
 
         scanner = VersionScanner()
         with pytest.raises(DiscoveryError) as exc_info:
             scanner.detect_version(
-                base_path=tmp_path,
-                file_patterns=["*.xlsx"],
-                strategy='latest_modified'
+                base_path=tmp_path, file_patterns=["*.xlsx"], strategy="latest_modified"
             )
 
         assert exc_info.value.failed_stage == "version_detection"
@@ -159,7 +155,7 @@ class TestVersionScanner:
             scanner.detect_version(
                 base_path=tmp_path,
                 file_patterns=["*.xlsx"],
-                version_override="V99"  # Doesn't exist
+                version_override="V99",  # Doesn't exist
             )
 
         assert exc_info.value.failed_stage == "version_detection"
@@ -174,9 +170,7 @@ class TestVersionScanner:
 
         scanner = VersionScanner()
         result = scanner.detect_version(
-            base_path=tmp_path,
-            file_patterns=["*.xlsx"],
-            strategy='highest_number'
+            base_path=tmp_path, file_patterns=["*.xlsx"], strategy="highest_number"
         )
 
         assert result.version == "V10"
@@ -191,9 +185,7 @@ class TestVersionScanner:
 
         scanner = VersionScanner()
         result = scanner.detect_version(
-            base_path=base,
-            file_patterns=["*年金*.xlsx"],
-            strategy='highest_number'
+            base_path=base, file_patterns=["*年金*.xlsx"], strategy="highest_number"
         )
 
         assert result.version == "V1"
@@ -208,7 +200,7 @@ class TestVersionScanner:
             scanner.detect_version(
                 base_path=nonexistent,
                 file_patterns=["*.xlsx"],
-                strategy='highest_number'
+                strategy="highest_number",
             )
 
         assert exc_info.value.failed_stage == "version_detection"
@@ -225,7 +217,7 @@ class TestVersionScanner:
             scanner.detect_version(
                 base_path=tmp_path,
                 file_patterns=["*.xlsx"],
-                strategy='invalid_strategy'
+                strategy="invalid_strategy",
             )
 
         assert exc_info.value.failed_stage == "version_detection"
@@ -244,9 +236,7 @@ class TestVersionScanner:
 
         scanner = VersionScanner()
         result = scanner.detect_version(
-            base_path=tmp_path,
-            file_patterns=["*.xlsx"],
-            strategy='highest_number'
+            base_path=tmp_path, file_patterns=["*.xlsx"], strategy="highest_number"
         )
 
         # Should only find valid version folders
@@ -268,7 +258,7 @@ class TestVersionScanner:
         result = scanner.detect_version(
             base_path=tmp_path,
             file_patterns=["*.xlsx", "*.csv"],
-            strategy='highest_number'
+            strategy="highest_number",
         )
 
         # Should select V2 (newer) since both have matching files
@@ -287,9 +277,7 @@ class TestVersionScanner:
 
         scanner = VersionScanner()
         result = scanner.detect_version(
-            base_path=tmp_path,
-            file_patterns=["*.xlsx"],
-            strategy='highest_number'
+            base_path=tmp_path, file_patterns=["*.xlsx"], strategy="highest_number"
         )
 
         # Should select V1 (only version with matching files)
@@ -304,17 +292,15 @@ class TestVersionScanner:
 
         scanner = VersionScanner()
         result = scanner.detect_version(
-            base_path=tmp_path,
-            file_patterns=["*.xlsx"],
-            strategy='highest_number'
+            base_path=tmp_path, file_patterns=["*.xlsx"], strategy="highest_number"
         )
 
         # Check all required fields are present and have correct types
-        assert hasattr(result, 'path')
-        assert hasattr(result, 'version')
-        assert hasattr(result, 'strategy_used')
-        assert hasattr(result, 'selected_at')
-        assert hasattr(result, 'rejected_versions')
+        assert hasattr(result, "path")
+        assert hasattr(result, "version")
+        assert hasattr(result, "strategy_used")
+        assert hasattr(result, "selected_at")
+        assert hasattr(result, "rejected_versions")
 
         assert isinstance(result.path, Path)
         assert isinstance(result.version, str)
@@ -342,9 +328,7 @@ class TestVersionScanner:
         scanner = VersionScanner()
         # Should still work despite access issues on one folder
         result = scanner.detect_version(
-            base_path=tmp_path,
-            file_patterns=["*.xlsx"],
-            strategy='highest_number'
+            base_path=tmp_path, file_patterns=["*.xlsx"], strategy="highest_number"
         )
 
         # Should select V1 (highest number among accessible folders with matching files)

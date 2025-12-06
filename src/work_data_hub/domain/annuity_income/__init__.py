@@ -36,17 +36,25 @@ def _load_imports() -> None:
     try:  # Optional heavy dependencies (pandas/pandera)
         from .schemas import (
             BronzeAnnuityIncomeSchema as _BronzeAnnuityIncomeSchema,
+        )
+        from .schemas import (
             GoldAnnuityIncomeSchema as _GoldAnnuityIncomeSchema,
+        )
+        from .schemas import (
             validate_bronze_dataframe as _validate_bronze_dataframe,
+        )
+        from .schemas import (
             validate_gold_dataframe as _validate_gold_dataframe,
         )
+
         BronzeAnnuityIncomeSchema = _BronzeAnnuityIncomeSchema
         GoldAnnuityIncomeSchema = _GoldAnnuityIncomeSchema
         validate_bronze_dataframe = _validate_bronze_dataframe
         validate_gold_dataframe = _validate_gold_dataframe
     except ModuleNotFoundError as exc:  # pragma: no cover
         logger.debug(
-            "Skipping annuity_income schema imports because optional dependency is missing: %s",
+            "Skipping annuity_income schema imports because optional dependency is "
+            "missing: %s",
             exc,
         )
 

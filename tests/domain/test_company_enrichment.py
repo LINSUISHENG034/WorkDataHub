@@ -12,12 +12,12 @@ from datetime import datetime, timezone
 from src.work_data_hub.domain.company_enrichment.models import (
     CompanyMappingRecord,
     CompanyMappingQuery,
-    CompanyResolutionResult
+    CompanyResolutionResult,
 )
 from src.work_data_hub.domain.company_enrichment.service import (
     resolve_company_id,
     build_mapping_lookup,
-    validate_mapping_consistency
+    validate_mapping_consistency,
 )
 
 
@@ -28,10 +28,7 @@ class TestCompanyMappingModels:
         """Test CompanyMappingRecord validation rules."""
         # Valid record
         record = CompanyMappingRecord(
-            alias_name="AN001",
-            canonical_id="614810477",
-            match_type="plan",
-            priority=1
+            alias_name="AN001", canonical_id="614810477", match_type="plan", priority=1
         )
         assert record.alias_name == "AN001"
         assert record.canonical_id == "614810477"
@@ -45,10 +42,7 @@ class TestCompanyMappingModels:
         # Empty alias_name should fail
         with pytest.raises(ValueError):
             CompanyMappingRecord(
-                alias_name="",
-                canonical_id="614810477",
-                match_type="plan",
-                priority=1
+                alias_name="", canonical_id="614810477", match_type="plan", priority=1
             )
 
         # Invalid priority should fail
@@ -57,7 +51,7 @@ class TestCompanyMappingModels:
                 alias_name="AN001",
                 canonical_id="614810477",
                 match_type="plan",
-                priority=10  # Out of range 1-5
+                priority=10,  # Out of range 1-5
             )
 
         # Invalid match_type should fail
@@ -66,7 +60,7 @@ class TestCompanyMappingModels:
                 alias_name="AN001",
                 canonical_id="614810477",
                 match_type="invalid_type",
-                priority=1
+                priority=1,
             )
 
     def test_company_mapping_query_normalization(self):
@@ -75,7 +69,7 @@ class TestCompanyMappingModels:
             plan_code="  AN001  ",  # Should be stripped
             account_number="",  # Should become None
             customer_name="中国平安保险股份有限公司",
-            account_name=None
+            account_name=None,
         )
 
         assert query.plan_code == "AN001"
@@ -86,10 +80,7 @@ class TestCompanyMappingModels:
     def test_company_resolution_result_validation(self):
         """Test CompanyResolutionResult validation."""
         result = CompanyResolutionResult(
-            company_id="614810477",
-            match_type="plan",
-            source_value="AN001",
-            priority=1
+            company_id="614810477", match_type="plan", source_value="AN001", priority=1
         )
 
         assert result.company_id == "614810477"
@@ -109,9 +100,24 @@ class TestResolveCompanyId:
     def test_priority_based_resolution(self):
         """Test that priority order matches legacy _update_company_id exactly."""
         mappings = [
-            CompanyMappingRecord(alias_name="AN001", canonical_id="614810477", match_type="plan", priority=1),
-            CompanyMappingRecord(alias_name="GM123456", canonical_id="608349737", match_type="account", priority=2),
-            CompanyMappingRecord(alias_name="测试企业A", canonical_id="614810477", match_type="name", priority=4),
+            CompanyMappingRecord(
+                alias_name="AN001",
+                canonical_id="614810477",
+                match_type="plan",
+                priority=1,
+            ),
+            CompanyMappingRecord(
+                alias_name="GM123456",
+                canonical_id="608349737",
+                match_type="account",
+                priority=2,
+            ),
+            CompanyMappingRecord(
+                alias_name="测试企业A",
+                canonical_id="614810477",
+                match_type="name",
+                priority=4,
+            ),
         ]
 
         # Plan code should take priority over customer name
@@ -127,15 +133,40 @@ class TestResolveCompanyId:
         """Test each step of the 5-layer priority system."""
         mappings = [
             # Priority 1: plan
-            CompanyMappingRecord(alias_name="AN001", canonical_id="111111111", match_type="plan", priority=1),
+            CompanyMappingRecord(
+                alias_name="AN001",
+                canonical_id="111111111",
+                match_type="plan",
+                priority=1,
+            ),
             # Priority 2: account
-            CompanyMappingRecord(alias_name="GM123456", canonical_id="222222222", match_type="account", priority=2),
+            CompanyMappingRecord(
+                alias_name="GM123456",
+                canonical_id="222222222",
+                match_type="account",
+                priority=2,
+            ),
             # Priority 3: hardcode (uses plan_code as key)
-            CompanyMappingRecord(alias_name="FP0001", canonical_id="333333333", match_type="hardcode", priority=3),
+            CompanyMappingRecord(
+                alias_name="FP0001",
+                canonical_id="333333333",
+                match_type="hardcode",
+                priority=3,
+            ),
             # Priority 4: name
-            CompanyMappingRecord(alias_name="测试企业", canonical_id="444444444", match_type="name", priority=4),
+            CompanyMappingRecord(
+                alias_name="测试企业",
+                canonical_id="444444444",
+                match_type="name",
+                priority=4,
+            ),
             # Priority 5: account_name
-            CompanyMappingRecord(alias_name="测试账户", canonical_id="555555555", match_type="account_name", priority=5),
+            CompanyMappingRecord(
+                alias_name="测试账户",
+                canonical_id="555555555",
+                match_type="account_name",
+                priority=5,
+            ),
         ]
 
         # Test 1: Only plan_code matches -> priority 1
@@ -163,7 +194,9 @@ class TestResolveCompanyId:
         assert result.match_type == "name"
 
         # Test 5: Only account_name matches -> priority 5
-        query = CompanyMappingQuery(account_name="测试账户", customer_name="has value")  # customer_name has value so no default
+        query = CompanyMappingQuery(
+            account_name="测试账户", customer_name="has value"
+        )  # customer_name has value so no default
         result = resolve_company_id(mappings, query)
         assert result.company_id == "555555555"
         assert result.match_type == "account_name"
@@ -175,14 +208,14 @@ class TestResolveCompanyId:
                 alias_name="中国平安保险股份有限公司",
                 canonical_id="614810477",
                 match_type="name",
-                priority=4
+                priority=4,
             ),
             CompanyMappingRecord(
                 alias_name="上海银行股份有限公司",
                 canonical_id="608349737",
                 match_type="account_name",
-                priority=5
-            )
+                priority=5,
+            ),
         ]
 
         # Test exact Chinese character match
@@ -195,7 +228,7 @@ class TestResolveCompanyId:
         # Test account name with Chinese characters
         query = CompanyMappingQuery(
             account_name="上海银行股份有限公司",
-            customer_name="has value"  # Prevent default fallback
+            customer_name="has value",  # Prevent default fallback
         )
         result = resolve_company_id(mappings, query)
         assert result.company_id == "608349737"
@@ -254,8 +287,18 @@ class TestResolveCompanyId:
         # This replicates the legacy COMPANY_ID3_MAPPING behavior where
         # hardcode lookups use plan_code as the key, not a separate field
         mappings = [
-            CompanyMappingRecord(alias_name="FP0001", canonical_id="614810477", match_type="hardcode", priority=3),
-            CompanyMappingRecord(alias_name="P0809", canonical_id="608349737", match_type="hardcode", priority=3),
+            CompanyMappingRecord(
+                alias_name="FP0001",
+                canonical_id="614810477",
+                match_type="hardcode",
+                priority=3,
+            ),
+            CompanyMappingRecord(
+                alias_name="P0809",
+                canonical_id="608349737",
+                match_type="hardcode",
+                priority=3,
+            ),
         ]
 
         # Hardcode lookup uses plan_code as key
@@ -269,7 +312,12 @@ class TestResolveCompanyId:
     def test_exact_string_matching(self):
         """Test that matching is exact and case-sensitive."""
         mappings = [
-            CompanyMappingRecord(alias_name="AN001", canonical_id="614810477", match_type="plan", priority=1),
+            CompanyMappingRecord(
+                alias_name="AN001",
+                canonical_id="614810477",
+                match_type="plan",
+                priority=1,
+            ),
         ]
 
         # Exact match should work
@@ -292,21 +340,44 @@ class TestResolveCompanyId:
         """Test complex scenario mimicking real legacy data."""
         mappings = [
             # Real hardcoded mappings from COMPANY_ID3_MAPPING
-            CompanyMappingRecord(alias_name="FP0001", canonical_id="614810477", match_type="hardcode", priority=3),
-            CompanyMappingRecord(alias_name="FP0002", canonical_id="614810477", match_type="hardcode", priority=3),
-            CompanyMappingRecord(alias_name="P0809", canonical_id="608349737", match_type="hardcode", priority=3),
-
+            CompanyMappingRecord(
+                alias_name="FP0001",
+                canonical_id="614810477",
+                match_type="hardcode",
+                priority=3,
+            ),
+            CompanyMappingRecord(
+                alias_name="FP0002",
+                canonical_id="614810477",
+                match_type="hardcode",
+                priority=3,
+            ),
+            CompanyMappingRecord(
+                alias_name="P0809",
+                canonical_id="608349737",
+                match_type="hardcode",
+                priority=3,
+            ),
             # Plan mappings
-            CompanyMappingRecord(alias_name="AN001", canonical_id="111111111", match_type="plan", priority=1),
-
+            CompanyMappingRecord(
+                alias_name="AN001",
+                canonical_id="111111111",
+                match_type="plan",
+                priority=1,
+            ),
             # Chinese company name mappings
-            CompanyMappingRecord(alias_name="中国人寿保险股份有限公司", canonical_id="222222222", match_type="name", priority=4),
+            CompanyMappingRecord(
+                alias_name="中国人寿保险股份有限公司",
+                canonical_id="222222222",
+                match_type="name",
+                priority=4,
+            ),
         ]
 
         # Test 1: Plan takes priority over hardcode
         query = CompanyMappingQuery(
             plan_code="AN001",  # Should match plan mapping
-            customer_name="中国人寿保险股份有限公司"  # Should NOT be used due to priority
+            customer_name="中国人寿保险股份有限公司",  # Should NOT be used due to priority
         )
         result = resolve_company_id(mappings, query)
         assert result.company_id == "111111111"  # From plan, not name
@@ -315,16 +386,14 @@ class TestResolveCompanyId:
         # Test 2: Hardcode mapping when no plan match
         query = CompanyMappingQuery(
             plan_code="FP0001",  # Should match hardcode mapping
-            customer_name="中国人寿保险股份有限公司"
+            customer_name="中国人寿保险股份有限公司",
         )
         result = resolve_company_id(mappings, query)
         assert result.company_id == "614810477"  # From hardcode
         assert result.match_type == "hardcode"
 
         # Test 3: Chinese name mapping when no higher priority matches
-        query = CompanyMappingQuery(
-            customer_name="中国人寿保险股份有限公司"
-        )
+        query = CompanyMappingQuery(customer_name="中国人寿保险股份有限公司")
         result = resolve_company_id(mappings, query)
         assert result.company_id == "222222222"  # From name
         assert result.match_type == "name"
@@ -336,16 +405,22 @@ class TestBuildMappingLookup:
     def test_build_mapping_lookup_structure(self):
         """Test that lookup structure is built correctly."""
         mappings = [
-            CompanyMappingRecord(alias_name="AN001", canonical_id="111", match_type="plan", priority=1),
-            CompanyMappingRecord(alias_name="AN002", canonical_id="222", match_type="plan", priority=1),
-            CompanyMappingRecord(alias_name="GM123", canonical_id="333", match_type="account", priority=2),
+            CompanyMappingRecord(
+                alias_name="AN001", canonical_id="111", match_type="plan", priority=1
+            ),
+            CompanyMappingRecord(
+                alias_name="AN002", canonical_id="222", match_type="plan", priority=1
+            ),
+            CompanyMappingRecord(
+                alias_name="GM123", canonical_id="333", match_type="account", priority=2
+            ),
         ]
 
         lookup = build_mapping_lookup(mappings)
 
         expected = {
             "plan": {"AN001": "111", "AN002": "222"},
-            "account": {"GM123": "333"}
+            "account": {"GM123": "333"},
         }
 
         assert lookup == expected
@@ -362,8 +437,12 @@ class TestValidateMappingConsistency:
     def test_no_warnings_for_clean_data(self):
         """Test that clean data produces no warnings."""
         mappings = [
-            CompanyMappingRecord(alias_name="AN001", canonical_id="111", match_type="plan", priority=1),
-            CompanyMappingRecord(alias_name="GM123", canonical_id="222", match_type="account", priority=2),
+            CompanyMappingRecord(
+                alias_name="AN001", canonical_id="111", match_type="plan", priority=1
+            ),
+            CompanyMappingRecord(
+                alias_name="GM123", canonical_id="222", match_type="account", priority=2
+            ),
         ]
 
         warnings = validate_mapping_consistency(mappings)
@@ -372,8 +451,12 @@ class TestValidateMappingConsistency:
     def test_conflict_detection(self):
         """Test detection of conflicting mappings."""
         mappings = [
-            CompanyMappingRecord(alias_name="AN001", canonical_id="111", match_type="plan", priority=1),
-            CompanyMappingRecord(alias_name="AN001", canonical_id="222", match_type="plan", priority=1),  # Conflict!
+            CompanyMappingRecord(
+                alias_name="AN001", canonical_id="111", match_type="plan", priority=1
+            ),
+            CompanyMappingRecord(
+                alias_name="AN001", canonical_id="222", match_type="plan", priority=1
+            ),  # Conflict!
         ]
 
         warnings = validate_mapping_consistency(mappings)
@@ -384,7 +467,9 @@ class TestValidateMappingConsistency:
     def test_priority_mismatch_detection(self):
         """Test detection of priority mismatches."""
         mappings = [
-            CompanyMappingRecord(alias_name="AN001", canonical_id="111", match_type="plan", priority=2),  # Should be 1!
+            CompanyMappingRecord(
+                alias_name="AN001", canonical_id="111", match_type="plan", priority=2
+            ),  # Should be 1!
         ]
 
         warnings = validate_mapping_consistency(mappings)

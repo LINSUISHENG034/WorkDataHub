@@ -9,7 +9,8 @@ from pathlib import Path
 from datetime import datetime
 
 from work_data_hub.io.connectors.file_pattern_matcher import (
-    FilePatternMatcher, FileMatchResult
+    FilePatternMatcher,
+    FileMatchResult,
 )
 from work_data_hub.io.connectors.exceptions import DiscoveryError
 
@@ -27,13 +28,11 @@ class TestFilePatternMatcher:
         matcher = FilePatternMatcher()
         # Use separate patterns to get exactly 1 match each
         result1 = matcher.match_files(
-            search_path=tmp_path,
-            include_patterns=["*年金*.xlsx"]
+            search_path=tmp_path, include_patterns=["*年金*.xlsx"]
         )
 
         result2 = matcher.match_files(
-            search_path=tmp_path,
-            include_patterns=["*规模明细*.xlsx"]
+            search_path=tmp_path, include_patterns=["*规模明细*.xlsx"]
         )
 
         # Both results should find exactly 1 file
@@ -53,7 +52,7 @@ class TestFilePatternMatcher:
         result = matcher.match_files(
             search_path=tmp_path,
             include_patterns=["*.xlsx"],
-            exclude_patterns=["~$*", "*回复*"]
+            exclude_patterns=["~$*", "*回复*"],
         )
 
         assert len(result.candidates_found) == 3
@@ -74,8 +73,7 @@ class TestFilePatternMatcher:
         # Test no matches
         with pytest.raises(DiscoveryError) as exc_info:
             matcher.match_files(
-                search_path=tmp_path,
-                include_patterns=["*不存在的*.xlsx"]
+                search_path=tmp_path, include_patterns=["*不存在的*.xlsx"]
             )
         assert exc_info.value.failed_stage == "file_matching"
         assert "No files found matching patterns" in str(exc_info.value)
@@ -83,8 +81,7 @@ class TestFilePatternMatcher:
         # Test ambiguous matches
         with pytest.raises(DiscoveryError) as exc_info:
             matcher.match_files(
-                search_path=tmp_path,
-                include_patterns=["*年金数据*.xlsx"]
+                search_path=tmp_path, include_patterns=["*年金数据*.xlsx"]
             )
         assert exc_info.value.failed_stage == "file_matching"
         assert "Ambiguous match" in str(exc_info.value)
@@ -97,8 +94,7 @@ class TestFilePatternMatcher:
 
         matcher = FilePatternMatcher()
         result = matcher.match_files(
-            search_path=tmp_path,
-            include_patterns=["*年金*.xlsx"]
+            search_path=tmp_path, include_patterns=["*年金*.xlsx"]
         )
 
         # Should find exactly 1 file with Chinese characters
@@ -117,8 +113,7 @@ class TestFilePatternMatcher:
         # Multiple patterns matching multiple files should raise DiscoveryError
         with pytest.raises(DiscoveryError) as exc_info:
             matcher.match_files(
-                search_path=tmp_path,
-                include_patterns=["*年金*.xlsx", "*规模*.xlsx"]
+                search_path=tmp_path, include_patterns=["*年金*.xlsx", "*规模*.xlsx"]
             )
 
         assert exc_info.value.failed_stage == "file_matching"
@@ -132,8 +127,7 @@ class TestFilePatternMatcher:
 
         matcher = FilePatternMatcher()
         result = matcher.match_files(
-            search_path=tmp_path,
-            include_patterns=["*公司*.xlsx"]
+            search_path=tmp_path, include_patterns=["*公司*.xlsx"]
         )
 
         # Should find file with full-width characters
@@ -155,7 +149,7 @@ class TestFilePatternMatcher:
         result = matcher.match_files(
             search_path=tmp_path,
             include_patterns=["*.xlsx"],
-            exclude_patterns=["temp_*"]  # Exclude all temp files, keep only target
+            exclude_patterns=["temp_*"],  # Exclude all temp files, keep only target
         )
         duration = time.time() - start_time
 
@@ -174,9 +168,7 @@ class TestFilePatternMatcher:
 
         matcher = FilePatternMatcher()
         result = matcher.match_files(
-            search_path=tmp_path,
-            include_patterns=["*.xlsx"],
-            exclude_patterns=["~$*"]
+            search_path=tmp_path, include_patterns=["*.xlsx"], exclude_patterns=["~$*"]
         )
 
         # Verify all fields are populated
@@ -198,10 +190,7 @@ class TestFilePatternMatcher:
         matcher = FilePatternMatcher()
 
         with pytest.raises(DiscoveryError) as exc_info:
-            matcher.match_files(
-                search_path=tmp_path,
-                include_patterns=["*.xlsx"]
-            )
+            matcher.match_files(search_path=tmp_path, include_patterns=["*.xlsx"])
         assert exc_info.value.failed_stage == "file_matching"
         assert "No files found matching patterns" in str(exc_info.value)
 
@@ -217,16 +206,14 @@ class TestFilePatternMatcher:
 
         # Test exact match
         result = matcher.match_files(
-            search_path=tmp_path,
-            include_patterns=["normal_file.xlsx"]
+            search_path=tmp_path, include_patterns=["normal_file.xlsx"]
         )
         assert result.match_count == 1
         assert result.matched_file.name == "normal_file.xlsx"
 
         # Test pattern with spaces
         result = matcher.match_files(
-            search_path=tmp_path,
-            include_patterns=["*file with spaces*"]
+            search_path=tmp_path, include_patterns=["*file with spaces*"]
         )
         assert result.match_count == 1
         assert result.matched_file.name == "file with spaces.xlsx"
@@ -242,7 +229,7 @@ class TestFilePatternMatcher:
         result = matcher.match_files(
             search_path=tmp_path,
             include_patterns=["keep*.xlsx", "temp_*.xlsx"],
-            exclude_patterns=["*temp*"]  # Should exclude temp_keep and remove_temp
+            exclude_patterns=["*temp*"],  # Should exclude temp_keep and remove_temp
         )
 
         # Should find 2 candidates (keep_final, temp_keep) but only 1 match after filtering
@@ -265,7 +252,9 @@ class TestFilePatternMatcher:
             matcher.match_files(
                 search_path=tmp_path,
                 include_patterns=["*.xlsx"],
-                exclude_patterns=["temp_*"]  # Excludes temp_file, leaves keep1 and keep2
+                exclude_patterns=[
+                    "temp_*"
+                ],  # Excludes temp_file, leaves keep1 and keep2
             )
 
         assert exc_info.value.failed_stage == "file_matching"

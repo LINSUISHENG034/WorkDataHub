@@ -12,20 +12,20 @@ import sys
 from typing import Any, Dict, List, Optional
 
 import yaml
-from dagster import Config, DagsterInstance, job, op
+from dagster import Config, DagsterInstance, OpExecutionContext, job, op
 
-from src.work_data_hub.config.settings import get_settings
-from src.work_data_hub.domain.annuity_performance.service import (
+from work_data_hub.config.settings import get_settings
+from work_data_hub.domain.annuity_performance.service import (
     process_annuity_performance,
 )
-from src.work_data_hub.domain.pipelines.types import DomainPipelineResult
-from src.work_data_hub.io.connectors.file_connector import FileDiscoveryService
-from src.work_data_hub.io.loader.company_mapping_loader import (
+from work_data_hub.domain.pipelines.types import DomainPipelineResult
+from work_data_hub.io.connectors.file_connector import FileDiscoveryService
+from work_data_hub.io.loader.company_mapping_loader import (
     extract_legacy_mappings,
     generate_load_plan,
     load_company_mappings,
 )
-from src.work_data_hub.io.loader.warehouse_loader import WarehouseLoader
+from work_data_hub.io.loader.warehouse_loader import WarehouseLoader
 
 from .ops import (
     backfill_refs_op,
@@ -46,7 +46,7 @@ from .ops import (
 
 
 @job
-def sample_trustee_performance_job():
+def sample_trustee_performance_job() -> Any:
     """
     End-to-end trustee performance processing job.
 
@@ -67,7 +67,7 @@ def sample_trustee_performance_job():
 
 
 @job
-def sample_trustee_performance_multi_file_job():
+def sample_trustee_performance_multi_file_job() -> Any:
     """
     End-to-end trustee performance processing job for multi-file scenarios.
 
@@ -90,7 +90,7 @@ trustee_performance_multi_file_job = sample_trustee_performance_multi_file_job
 
 
 @job
-def annuity_performance_job():
+def annuity_performance_job() -> Any:
     """
     End-to-end annuity performance processing job with optional reference backfill.
 
@@ -130,7 +130,7 @@ class AnnuityPipelineConfig(Config):
 
 @op
 def run_annuity_pipeline_op(
-    context,
+    context: OpExecutionContext,
     config: AnnuityPipelineConfig,
 ) -> Dict[str, Any]:
     """
@@ -150,7 +150,6 @@ def run_annuity_pipeline_op(
             warehouse_loader=loader,
             sync_lookup_budget=config.sync_lookup_budget,
             export_unknown_names=config.export_unknown_names,
-            use_pipeline=config.use_pipeline,
         )
     finally:
         if loader is not None:
@@ -161,7 +160,7 @@ def run_annuity_pipeline_op(
 
 
 @job
-def annuity_performance_story45_job():
+def annuity_performance_story45_job() -> Any:
     """
     Story 4.5 Dagster job that executes the full annuity pipeline via one op.
     """
@@ -170,7 +169,7 @@ def annuity_performance_story45_job():
 
 
 @job
-def import_company_mappings_job():
+def import_company_mappings_job() -> Any:
     """
     Company ID mapping migration job.
 
@@ -193,7 +192,7 @@ def import_company_mappings_job():
 
 
 @job
-def process_company_lookup_queue_job():
+def process_company_lookup_queue_job() -> Any:
     """
     Company lookup queue processing job.
 
@@ -220,7 +219,7 @@ def process_company_lookup_queue_job():
 
 
 @job
-def sample_pipeline_job():
+def sample_pipeline_job() -> Any:
     """
     Sample end-to-end pipeline demonstrating Dagster orchestration (Story 1.9).
 
@@ -245,7 +244,7 @@ def sample_pipeline_job():
     load_to_db_op(validated)
 
 
-def _log_pipeline_metrics(logger, result: DomainPipelineResult) -> None:
+def _log_pipeline_metrics(logger: Any, result: DomainPipelineResult) -> None:
     """Log concise telemetry for DomainPipelineResult."""
     logger.info(
         "annuity_pipeline.completed",
@@ -382,7 +381,7 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
     return run_config
 
 
-def _execute_company_mapping_job(args: argparse.Namespace):
+def _execute_company_mapping_job(args: argparse.Namespace) -> int:
     """
     Execute company mapping migration job with direct database operations.
 
@@ -392,10 +391,10 @@ def _execute_company_mapping_job(args: argparse.Namespace):
     """
     import psycopg2
 
-    from src.work_data_hub.domain.company_enrichment.service import (
+    from work_data_hub.domain.company_enrichment.service import (
         validate_mapping_consistency,
     )
-    from src.work_data_hub.io.loader.company_mapping_loader import (
+    from work_data_hub.io.loader.company_mapping_loader import (
         CompanyMappingLoaderError,
     )
 
@@ -415,11 +414,11 @@ def _execute_company_mapping_job(args: argparse.Namespace):
             mappings = extract_legacy_mappings()
         except CompanyMappingLoaderError as e:
             print(f"❌ Legacy mapping extraction failed: {e}")
-            return
+            return 1
 
         if not mappings:
             print("⚠️ No mappings extracted - migration aborted")
-            return
+            return 1
 
         print(f"✅ Successfully extracted {len(mappings)} total mappings")
 
@@ -456,7 +455,7 @@ def _execute_company_mapping_job(args: argparse.Namespace):
         if effective_plan_only:
             print("\n" + "=" * 50)
             print("✅ Plan generation complete - no database changes made")
-            return
+            return 0
 
         # Step 4: Execute migration
         print("💾 Executing database migration...")
@@ -484,7 +483,8 @@ def _execute_company_mapping_job(args: argparse.Namespace):
                     ("enterprise", "company_mapping"),
                 )
 
-                table_exists = cursor.fetchone()[0]
+                row = cursor.fetchone()
+                table_exists = row[0] if row else False
                 cursor.close()
 
                 if not table_exists:
@@ -493,7 +493,7 @@ def _execute_company_mapping_job(args: argparse.Namespace):
                         "Please run the DDL script first: "
                         "scripts/create_table/ddl/company_mapping.sql"
                     )
-                    return
+                    return 1
 
                 # Execute the load
                 stats = load_company_mappings(
@@ -512,21 +512,24 @@ def _execute_company_mapping_job(args: argparse.Namespace):
 
         except psycopg2.Error as e:
             print(f"❌ PostgreSQL connection/operation failed: {e}")
-            return
+            return 1
 
         print("=" * 50)
         print("🎉 MIGRATION SUCCESS - All legacy mappings migrated")
         print("=" * 50)
+        return 0
 
     except KeyboardInterrupt:
         print("⚠️ Migration interrupted by user")
+        return 130
     except Exception as e:
         print(f"❌ Unexpected migration failure: {e}")
         if args.raise_on_error:
             raise
+        return 1
 
 
-def _execute_queue_processing_job(args: argparse.Namespace):
+def _execute_queue_processing_job(args: argparse.Namespace) -> int:
     """
     Execute company lookup queue processing job with direct queue operations.
 
@@ -586,16 +589,19 @@ def _execute_queue_processing_job(args: argparse.Namespace):
         else:
             print("🎉 QUEUE PROCESSING SUCCESS - Pending requests processed")
         print("=" * 50)
+        return 0
 
     except KeyboardInterrupt:
         print("⚠️ Queue processing interrupted by user")
+        return 130
     except Exception as e:
         print(f"❌ Unexpected queue processing failure: {e}")
         if args.raise_on_error:
             raise
+        return 1
 
 
-def main():
+def main() -> int:
     """
     CLI entry point for local execution.
 

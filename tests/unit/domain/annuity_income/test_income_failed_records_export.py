@@ -20,7 +20,9 @@ class TestFailedRecordsExport:
 
     @patch("work_data_hub.domain.annuity_income.service.convert_dataframe_to_models")
     @patch("work_data_hub.domain.annuity_income.service.validate_gold_dataframe")
-    @patch("work_data_hub.domain.annuity_income.service.build_bronze_to_silver_pipeline")
+    @patch(
+        "work_data_hub.domain.annuity_income.service.build_bronze_to_silver_pipeline"
+    )
     @patch("work_data_hub.domain.annuity_income.service.export_error_csv")
     @patch("work_data_hub.domain.annuity_income.service.export_unknown_names_csv")
     def test_exports_failed_rows_using_composite_key(
@@ -33,7 +35,9 @@ class TestFailedRecordsExport:
     ):
         """AC5: Failed rows exported when dropped, filtered by 计划号+组合代码."""
         mock_export_unknown.return_value = None
-        mock_export_error.return_value = Path("logs/failed_records_test_20241206_120000.csv")
+        mock_export_error.return_value = Path(
+            "logs/failed_records_test_20241206_120000.csv"
+        )
         pipeline = MagicMock()
         row_success = {
             "月度": "202412",
@@ -70,18 +74,24 @@ class TestFailedRecordsExport:
 
         rows = [row_success, row_fail]
 
-        process_with_enrichment(rows, data_source="test_file.xlsx", export_unknown_names=False)
+        process_with_enrichment(
+            rows, data_source="test_file.xlsx", export_unknown_names=False
+        )
 
         mock_export_error.assert_called_once()
         failed_df = mock_export_error.call_args.args[0]
         expected_df = pd.DataFrame([rows[1]])
-        assert_frame_equal(failed_df.reset_index(drop=True), expected_df.reset_index(drop=True))
+        assert_frame_equal(
+            failed_df.reset_index(drop=True), expected_df.reset_index(drop=True)
+        )
         assert mock_export_error.call_args.kwargs["output_dir"] == Path("logs")
         assert "test_file" in mock_export_error.call_args.kwargs["filename_prefix"]
 
     @patch("work_data_hub.domain.annuity_income.service.convert_dataframe_to_models")
     @patch("work_data_hub.domain.annuity_income.service.validate_gold_dataframe")
-    @patch("work_data_hub.domain.annuity_income.service.build_bronze_to_silver_pipeline")
+    @patch(
+        "work_data_hub.domain.annuity_income.service.build_bronze_to_silver_pipeline"
+    )
     @patch("work_data_hub.domain.annuity_income.service.export_error_csv")
     @patch("work_data_hub.domain.annuity_income.service.export_unknown_names_csv")
     def test_no_export_when_all_records_pass_validation(
@@ -115,7 +125,9 @@ class TestFailedRecordsExport:
 
         rows = [row_success]
 
-        process_with_enrichment(rows, data_source="test_file.xlsx", export_unknown_names=False)
+        process_with_enrichment(
+            rows, data_source="test_file.xlsx", export_unknown_names=False
+        )
 
         mock_export_error.assert_not_called()
 

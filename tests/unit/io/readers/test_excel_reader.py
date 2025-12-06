@@ -24,17 +24,36 @@ def multi_sheet_excel_file(tmp_path):
     # Sample data with Chinese characters
     data = {
         "规模明细": [
-            {"月度": "202411", "计划代码": "PLAN001", "客户名称": "客户A", "期初资产规模": 1000000, "期末资产规模": 1050000, "当期收益率": "5.5%"},
-            {"月度": "202411", "计划代码": "PLAN002", "客户名称": "客户B", "期初资产规模": 2000000, "期末资产规模": 2100000, "当期收益率": "5.2%"},
-            {"月度": "202411", "计划代码": "PLAN003", "客户名称": "客户C", "期初资产规模": 1500000, "期末资产规模": 1575000, "当期收益率": "5.0%"}
+            {
+                "月度": "202411",
+                "计划代码": "PLAN001",
+                "客户名称": "客户A",
+                "期初资产规模": 1000000,
+                "期末资产规模": 1050000,
+                "当期收益率": "5.5%",
+            },
+            {
+                "月度": "202411",
+                "计划代码": "PLAN002",
+                "客户名称": "客户B",
+                "期初资产规模": 2000000,
+                "期末资产规模": 2100000,
+                "当期收益率": "5.2%",
+            },
+            {
+                "月度": "202411",
+                "计划代码": "PLAN003",
+                "客户名称": "客户C",
+                "期初资产规模": 1500000,
+                "期末资产规模": 1575000,
+                "当期收益率": "5.0%",
+            },
         ],
         "Summary": [
             {"报表类型": "月度报表", "总客户数": 3, "总资产规模": 4500000},
-            {"报表类型": "季度报表", "总客户数": 5, "总资产规模": 7500000}
+            {"报表类型": "季度报表", "总客户数": 5, "总资产规模": 7500000},
         ],
-        "Notes": [
-            {"备注": "数据采集于2024年11月", "处理人": "张三"}
-        ]
+        "Notes": [{"备注": "数据采集于2024年11月", "处理人": "张三"}],
     }
 
     # Create DataFrames for each sheet
@@ -44,7 +63,7 @@ def multi_sheet_excel_file(tmp_path):
 
     # Create Excel file
     excel_path = tmp_path / "test_multi_sheet.xlsx"
-    with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
+    with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
         for sheet_name, df in dfs.items():
             df.to_excel(writer, sheet_name=sheet_name, index=False)
 
@@ -60,12 +79,12 @@ def chinese_column_excel_file(tmp_path):
         "客户名称": ["客户A", "客户B", "客户C"],
         "期初资产规模": [1000000, 2000000, 1500000],
         "期末资产规模": [1050000, 2100000, 1575000],
-        "当期收益率": ["5.5%", "5.2%", "5.0%"]
+        "当期收益率": ["5.5%", "5.2%", "5.0%"],
     }
 
     excel_path = tmp_path / "test_chinese_columns.xlsx"
     df = pd.DataFrame(data)
-    df.to_excel(excel_path, index=False, engine='openpyxl')
+    df.to_excel(excel_path, index=False, engine="openpyxl")
 
     return excel_path
 
@@ -85,7 +104,7 @@ def empty_rows_excel_file(tmp_path):
 
     excel_path = tmp_path / "test_empty_rows.xlsx"
     df = pd.DataFrame(data)
-    df.to_excel(excel_path, index=False, engine='openpyxl')
+    df.to_excel(excel_path, index=False, engine="openpyxl")
 
     return excel_path
 
@@ -96,12 +115,12 @@ def merged_cells_excel_file(tmp_path):
     data = {
         "A": ["Header1", "Header2"],  # A1:A2 merged
         "B": ["Value1", "Value2"],
-        "C": ["Value3", "Value4"]
+        "C": ["Value3", "Value4"],
     }
 
     excel_path = tmp_path / "test_merged_cells.xlsx"
     df = pd.DataFrame(data)
-    df.to_excel(excel_path, index=False, engine='openpyxl')
+    df.to_excel(excel_path, index=False, engine="openpyxl")
 
     return excel_path
 
@@ -113,8 +132,8 @@ def whitespace_columns_excel_file(tmp_path):
         "月度  ": ["202411"],
         "  计划代码": ["PLAN001"],
         "客户　名称": ["客户A"],  # full-width space
-        "客户 名称": ["客户A"],   # duplicate after whitespace removal
-        "": ["空列"],             # empty column header
+        "客户 名称": ["客户A"],  # duplicate after whitespace removal
+        "": ["空列"],  # empty column header
     }
 
     excel_path = tmp_path / "test_whitespace_columns.xlsx"
@@ -143,7 +162,14 @@ class TestExcelReadSheetMethod:
 
         # Verify DataFrame content
         df = result.df
-        assert list(df.columns) == ["月度", "计划代码", "客户名称", "期初资产规模", "期末资产规模", "当期收益率"]
+        assert list(df.columns) == [
+            "月度",
+            "计划代码",
+            "客户名称",
+            "期初资产规模",
+            "期末资产规模",
+            "当期收益率",
+        ]
         assert len(df) == 3
 
         # Verify Chinese characters preserved
@@ -180,10 +206,14 @@ class TestExcelReadSheetMethod:
         assert "Notes" in error_str
 
     @pytest.mark.unit
-    def test_read_sheet_empty_row_handling_with_logging(self, empty_rows_excel_file, caplog):
+    def test_read_sheet_empty_row_handling_with_logging(
+        self, empty_rows_excel_file, caplog
+    ):
         """TC-3.3-4: Empty Row Handling with Count Logging."""
         reader = ExcelReader()
-        result = reader.read_sheet(empty_rows_excel_file, sheet_name=0, skip_empty_rows=True)
+        result = reader.read_sheet(
+            empty_rows_excel_file, sheet_name=0, skip_empty_rows=True
+        )
 
         # Should skip blank/empty rows (header row remains)
         assert result.row_count == 3
@@ -201,7 +231,14 @@ class TestExcelReadSheetMethod:
 
         # Verify Chinese characters preserved in column names
         df = result.df
-        expected_columns = ["月度", "计划代码", "客户名称", "期初资产规模", "期末资产规模", "当期收益率"]
+        expected_columns = [
+            "月度",
+            "计划代码",
+            "客户名称",
+            "期初资产规模",
+            "期末资产规模",
+            "当期收益率",
+        ]
         assert list(df.columns) == expected_columns
 
         # Verify data integrity
@@ -236,7 +273,9 @@ class TestExcelReadSheetMethod:
         assert result.read_at >= start_time
 
     @pytest.mark.unit
-    def test_read_sheet_backward_compatibility_read_rows_still_works(self, multi_sheet_excel_file):
+    def test_read_sheet_backward_compatibility_read_rows_still_works(
+        self, multi_sheet_excel_file
+    ):
         """TC-3.3-11: Backward Compatibility: read_rows() Still Works."""
         reader = ExcelReader()
 
@@ -247,12 +286,16 @@ class TestExcelReadSheetMethod:
         assert rows[0]["客户名称"] == "客户A"
 
     @pytest.mark.unit
-    def test_read_sheet_resolve_sheet_name_index_out_of_range(self, multi_sheet_excel_file):
+    def test_read_sheet_resolve_sheet_name_index_out_of_range(
+        self, multi_sheet_excel_file
+    ):
         """Test _resolve_sheet_name with out-of-range index."""
         reader = ExcelReader()
 
         with pytest.raises(DiscoveryError) as exc_info:
-            reader.read_sheet(multi_sheet_excel_file, sheet_name=10)  # Only 3 sheets exist
+            reader.read_sheet(
+                multi_sheet_excel_file, sheet_name=10
+            )  # Only 3 sheets exist
 
         assert exc_info.value.failed_stage == "excel_reading"
         assert "Sheet index 10 out of range" in str(exc_info.value)
@@ -280,7 +323,9 @@ class TestExcelReadSheetMethod:
         assert "Excel file not found" in str(exc_info.value)
 
     @pytest.mark.unit
-    def test_read_sheet_column_normalization_mapping(self, whitespace_columns_excel_file):
+    def test_read_sheet_column_normalization_mapping(
+        self, whitespace_columns_excel_file
+    ):
         """Verify column normalization mapping and duplicate handling."""
         reader = ExcelReader()
         result = reader.read_sheet(whitespace_columns_excel_file, sheet_name=0)
@@ -301,7 +346,10 @@ class TestExcelReadSheetMethod:
         ]
         assert result.normalization_duration_ms is not None
         assert result.duration_breakdown is not None
-        assert result.duration_breakdown.get("normalization_ms") == result.normalization_duration_ms
+        assert (
+            result.duration_breakdown.get("normalization_ms")
+            == result.normalization_duration_ms
+        )
 
     @pytest.mark.unit
     def test_read_sheet_disable_normalization(self, whitespace_columns_excel_file):

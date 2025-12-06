@@ -25,13 +25,14 @@ class FileMatchResult:
     Provides comprehensive metadata about the matching process
     following Epic 3 structured logging requirements.
     """
-    matched_file: Path          # Selected file path
-    patterns_used: List[str]     # Include patterns tried
+
+    matched_file: Path  # Selected file path
+    patterns_used: List[str]  # Include patterns tried
     exclude_patterns: List[str]  # Exclude patterns applied
     candidates_found: List[Path]  # All files before filtering
-    excluded_files: List[Path]     # Files filtered out
-    match_count: int              # Files remaining after filtering
-    selected_at: datetime         # Timestamp of selection
+    excluded_files: List[Path]  # Files filtered out
+    match_count: int  # Files remaining after filtering
+    selected_at: datetime  # Timestamp of selection
 
 
 class FilePatternMatcher:
@@ -46,7 +47,7 @@ class FilePatternMatcher:
         self,
         search_path: Path,
         include_patterns: List[str],
-        exclude_patterns: Optional[List[str]] = None
+        exclude_patterns: Optional[List[str]] = None,
     ) -> FileMatchResult:
         """
         Match files in search_path using include/exclude patterns.
@@ -68,7 +69,7 @@ class FilePatternMatcher:
             "file_matching.started",
             search_path=str(search_path),
             include_patterns=include_patterns,
-            exclude_patterns=exclude_patterns
+            exclude_patterns=exclude_patterns,
         )
 
         # Step 1: Find all files matching include patterns
@@ -87,7 +88,7 @@ class FilePatternMatcher:
                     f"No files found matching patterns {include_patterns} "
                     f"in path {search_path}. Candidates found: {len(candidates)}, "
                     f"Files excluded: {len(excluded)}"
-                )
+                ),
             )
 
         if len(matched) > 1:
@@ -99,7 +100,7 @@ class FilePatternMatcher:
                     f"Ambiguous match: Found {len(matched)} files {matched}, "
                     f"refine patterns or use version detection. "
                     f"Searched in {search_path} with patterns {include_patterns}"
-                )
+                ),
             )
 
         selected_file = matched[0]
@@ -110,7 +111,7 @@ class FilePatternMatcher:
             candidates_count=len(candidates),
             excluded_count=len(excluded),
             selected_file=str(selected_file),
-            match_count=len(matched)
+            match_count=len(matched),
         )
 
         return FileMatchResult(
@@ -120,7 +121,7 @@ class FilePatternMatcher:
             candidates_found=candidates,
             excluded_files=excluded,
             match_count=len(matched),
-            selected_at=datetime.now()
+            selected_at=datetime.now(),
         )
 
     def _find_candidates(self, search_path: Path, patterns: List[str]) -> List[Path]:
@@ -134,13 +135,11 @@ class FilePatternMatcher:
                     "file_matching.pattern_matched",
                     pattern=pattern,
                     matches_count=len(matches),
-                    matches=[str(m) for m in matches]
+                    matches=[str(m) for m in matches],
                 )
             except Exception as e:
                 logger.warning(
-                    "file_matching.pattern_failed",
-                    pattern=pattern,
-                    error=str(e)
+                    "file_matching.pattern_failed", pattern=pattern, error=str(e)
                 )
 
         # Remove duplicates while preserving order
@@ -154,9 +153,7 @@ class FilePatternMatcher:
         return unique_candidates
 
     def _apply_excludes(
-        self,
-        candidates: List[Path],
-        exclude_patterns: List[str]
+        self, candidates: List[Path], exclude_patterns: List[str]
     ) -> Tuple[List[Path], List[Path]]:
         """Apply exclude patterns to candidates."""
         included = []
@@ -172,7 +169,7 @@ class FilePatternMatcher:
                     logger.debug(
                         "file_matching.file_excluded",
                         file=str(candidate),
-                        pattern=pattern
+                        pattern=pattern,
                     )
                     break
 
@@ -184,8 +181,8 @@ class FilePatternMatcher:
     def _matches_pattern(self, filename: str, pattern: str) -> bool:
         """Check if filename matches pattern, handling Unicode."""
         # Normalize both filename and pattern for Unicode consistency
-        norm_filename = unicodedata.normalize('NFC', filename)
-        norm_pattern = unicodedata.normalize('NFC', pattern)
+        norm_filename = unicodedata.normalize("NFC", filename)
+        norm_pattern = unicodedata.normalize("NFC", pattern)
 
         # Use fnmatch for glob pattern matching
         return fnmatch.fnmatch(norm_filename, norm_pattern)

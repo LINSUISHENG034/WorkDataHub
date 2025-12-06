@@ -17,9 +17,8 @@ Output:
 
 import random
 from datetime import datetime, timedelta
-from decimal import Decimal
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 import pandas as pd
 
@@ -112,10 +111,10 @@ def generate_invalid_dates(count: int) -> List[str]:
     invalid_formats = [
         "INVALID",
         "20250115",  # YYYYMMDD instead of YYYYMM
-        "2025-01",   # Hyphenated
+        "2025-01",  # Hyphenated
         "2025年01月",  # Chinese format (might be valid depending on parser)
-        "202513",    # Invalid month
-        "999999",    # Nonsense
+        "202513",  # Invalid month
+        "999999",  # Nonsense
     ]
     return [random.choice(invalid_formats) for _ in range(count)]
 
@@ -132,8 +131,8 @@ def main():
     invalid_count = total_rows - valid_count
 
     print(f"   Total rows: {total_rows:,}")
-    print(f"   Valid rows: {valid_count:,} ({(1-invalid_ratio)*100:.0f}%)")
-    print(f"   Invalid rows: {invalid_count:,} ({invalid_ratio*100:.0f}%)")
+    print(f"   Valid rows: {valid_count:,} ({(1 - invalid_ratio) * 100:.0f}%)")
+    print(f"   Invalid rows: {invalid_count:,} ({invalid_ratio * 100:.0f}%)")
 
     # Generate valid data
     report_dates = generate_report_dates(valid_count)
@@ -155,7 +154,9 @@ def main():
         "规模": scales[:valid_count],
         "单位净值": [round(random.uniform(1.0, 2.0), 4) for _ in range(valid_count)],
         "收益率": returns,
-        "累计收益率": [round(random.uniform(0.01, 0.50), 4) for _ in range(valid_count)],
+        "累计收益率": [
+            round(random.uniform(0.01, 0.50), 4) for _ in range(valid_count)
+        ],
         "客户名称": company_names,
         "company_id": [random.randint(1000000, 9999999) for _ in range(valid_count)],
     }
@@ -166,12 +167,9 @@ def main():
     invalid_data_list: List[Dict[str, Any]] = []
 
     for i in range(invalid_count):
-        error_type = random.choice([
-            "invalid_date",
-            "negative_scale",
-            "empty_required",
-            "invalid_plan_type"
-        ])
+        error_type = random.choice(
+            ["invalid_date", "negative_scale", "empty_required", "invalid_plan_type"]
+        )
 
         if error_type == "invalid_date":
             invalid_row = {
@@ -267,12 +265,18 @@ def main():
     print("\n🔍 Validation characteristics:")
     negative_scales = (df_combined["规模"] < 0).sum()
     empty_plan_codes = (df_combined["计划代码"] == "").sum()
-    invalid_dates = df_combined["月度"].apply(lambda x: not str(x).isdigit() or len(str(x)) != 6).sum()
+    invalid_dates = (
+        df_combined["月度"]
+        .apply(lambda x: not str(x).isdigit() or len(str(x)) != 6)
+        .sum()
+    )
 
     print(f"   Rows with negative 规模: {negative_scales}")
     print(f"   Rows with empty 计划代码: {empty_plan_codes}")
     print(f"   Rows with invalid 月度 format: {invalid_dates}")
-    print(f"   Total validation errors: {negative_scales + empty_plan_codes + invalid_dates}")
+    print(
+        f"   Total validation errors: {negative_scales + empty_plan_codes + invalid_dates}"
+    )
 
     print("\n✅ Fixture generation complete!")
 

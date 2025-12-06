@@ -65,8 +65,13 @@ def _apply_portfolio_code_defaults(df: pd.DataFrame) -> pd.Series:
         # Legacy behavior: str.replace on numeric values converts them to NaN
         # We need to replicate this by treating numeric-only values as empty
         result = result.apply(
-            lambda x: None if (isinstance(x, (int, float)) and not pd.isna(x))
-            else (str(x).replace("F", "", 1) if isinstance(x, str) and x.startswith("F") else x)
+            lambda x: None
+            if (isinstance(x, (int, float)) and not pd.isna(x))
+            else (
+                str(x).replace("F", "", 1)
+                if isinstance(x, str) and x.startswith("F")
+                else x
+            )
         )
         # Convert 'nan' and 'None' strings back to actual None
         result = result.replace({"nan": None, "None": None, "": None})
@@ -75,7 +80,9 @@ def _apply_portfolio_code_defaults(df: pd.DataFrame) -> pd.Series:
         empty_mask = result.isna() | (result == "") | (result == "None")
 
         # QTAN003 for 职年受托/职年投资
-        qtan003_mask = empty_mask & df["业务类型"].isin(PORTFOLIO_QTAN003_BUSINESS_TYPES)
+        qtan003_mask = empty_mask & df["业务类型"].isin(
+            PORTFOLIO_QTAN003_BUSINESS_TYPES
+        )
         result = result.mask(qtan003_mask, "QTAN003")
 
         # Default based on plan type for remaining empty values
@@ -125,7 +132,9 @@ class CompanyIdResolutionStep(TransformStep):
         # Log resolution statistics
         stats = result.statistics
         cfg = context.config or {}
-        domain = getattr(context, "domain", None) or cfg.get("domain", "annuity_performance")
+        domain = getattr(context, "domain", None) or cfg.get(
+            "domain", "annuity_performance"
+        )
         logger.bind(domain=domain, step=self.name).info(
             "Company ID resolution complete",
             **stats.to_dict(),
@@ -144,31 +153,53 @@ def build_bronze_to_silver_pipeline(
         # Step 1: Column name standardization (机构 → 机构名称, 流失(含待遇支付) → 流失_含待遇支付)
         MappingStep({**COLUMN_ALIAS_MAPPING, "机构": "机构名称"}),
         # Step 2: Preserve original customer name before cleansing (年金账户名 = 客户名称)
-        CalculationStep({
-            "年金账户名": lambda df: df["客户名称"].copy() if "客户名称" in df.columns else pd.Series([None] * len(df)),
-        }),
+        CalculationStep(
+            {
+                "年金账户名": lambda df: df["客户名称"].copy()
+                if "客户名称" in df.columns
+                else pd.Series([None] * len(df)),
+            }
+        ),
         # Step 3: Plan code corrections
         ReplacementStep({"计划代码": PLAN_CODE_CORRECTIONS}),
         # Step 4: Plan code defaults (empty → AN001 for 集合计划, AN002 for 单一计划)
-        CalculationStep({
-            "计划代码": lambda df: _apply_plan_code_defaults(df),
-        }),
+        CalculationStep(
+            {
+                "计划代码": lambda df: _apply_plan_code_defaults(df),
+            }
+        ),
         # Step 5: Institution code mapping (机构名称 → 机构代码)
-        CalculationStep({
-            "机构代码": lambda df: df["机构名称"].map(COMPANY_BRANCH_MAPPING).fillna("G00") if "机构名称" in df.columns else pd.Series(["G00"] * len(df)),
-        }),
+        CalculationStep(
+            {
+                "机构代码": lambda df: df["机构名称"]
+                .map(COMPANY_BRANCH_MAPPING)
+                .fillna("G00")
+                if "机构名称" in df.columns
+                else pd.Series(["G00"] * len(df)),
+            }
+        ),
         # Step 5: Product line code derivation (业务类型 → 产品线代码)
-        CalculationStep({
-            "产品线代码": lambda df: df["业务类型"].map(BUSINESS_TYPE_CODE_MAPPING) if "业务类型" in df.columns else pd.Series([None] * len(df)),
-        }),
+        CalculationStep(
+            {
+                "产品线代码": lambda df: df["业务类型"].map(BUSINESS_TYPE_CODE_MAPPING)
+                if "业务类型" in df.columns
+                else pd.Series([None] * len(df)),
+            }
+        ),
         # Step 7: Date parsing (月度: 202412 → datetime)
-        CalculationStep({
-            "月度": lambda df: df["月度"].apply(parse_chinese_date) if "月度" in df.columns else df["月度"],
-        }),
+        CalculationStep(
+            {
+                "月度": lambda df: df["月度"].apply(parse_chinese_date)
+                if "月度" in df.columns
+                else df["月度"],
+            }
+        ),
         # Step 8: Portfolio code defaults (QTAN001/QTAN002/QTAN003)
-        CalculationStep({
-            "组合代码": lambda df: _apply_portfolio_code_defaults(df),
-        }),
+        CalculationStep(
+            {
+                "组合代码": lambda df: _apply_portfolio_code_defaults(df),
+            }
+        ),
         # Step 9: Data cleansing via CleansingRegistry
         CleansingStep(domain="annuity_performance"),
         # Step 10: Company ID resolution
@@ -215,7 +246,9 @@ def load_plan_override_mapping(mapping_path: Optional[str] = None) -> Dict[str, 
 
         mapping = data.get("plan_overrides", {})
         if not isinstance(mapping, dict):
-            logger.bind(domain="annuity_performance", step="load_plan_override").warning("Plan override mapping is not a dict", path=mapping_path)
+            logger.bind(
+                domain="annuity_performance", step="load_plan_override"
+            ).warning("Plan override mapping is not a dict", path=mapping_path)
             return {}
 
         logger.bind(domain="annuity_performance", step="load_plan_override").info(
@@ -224,7 +257,9 @@ def load_plan_override_mapping(mapping_path: Optional[str] = None) -> Dict[str, 
         return {str(k): str(v) for k, v in mapping.items()}
 
     except Exception as e:
-        logger.bind(domain="annuity_performance", step="load_plan_override").warning("Failed to load plan override mapping", error=str(e))
+        logger.bind(domain="annuity_performance", step="load_plan_override").warning(
+            "Failed to load plan override mapping", error=str(e)
+        )
         return {}
 
 

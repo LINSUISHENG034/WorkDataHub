@@ -2,9 +2,11 @@
 """
 Drop unique indexes to test fallback path.
 """
+
 import psycopg2
 
 DSN = "postgres://postgres:Post.169828@localhost:5432/postgres"
+
 
 def drop_unique_indexes():
     """Drop unique indexes to force fallback path."""
@@ -47,6 +49,7 @@ def drop_unique_indexes():
         print(f"❌ Failed to drop indexes: {e}")
         return False
 
+
 def check_final_counts():
     """Check final row counts."""
     try:
@@ -59,7 +62,9 @@ def check_final_counts():
             cursor.execute('SELECT COUNT(*) FROM "组合计划";')
             portfolio_count = cursor.fetchone()[0]
 
-            print(f"📊 Final counts - 年金计划: {plan_count}, 组合计划: {portfolio_count}")
+            print(
+                f"📊 Final counts - 年金计划: {plan_count}, 组合计划: {portfolio_count}"
+            )
 
         conn.close()
         return True
@@ -67,6 +72,7 @@ def check_final_counts():
     except Exception as e:
         print(f"❌ Failed to check counts: {e}")
         return False
+
 
 if __name__ == "__main__":
     print("🔧 Testing fallback path without unique indexes...")

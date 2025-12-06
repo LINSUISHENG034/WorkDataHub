@@ -39,9 +39,9 @@ class TestAC1_UvProjectInitialization:
         assert "project" in config, "[project] section must exist in pyproject.toml"
         assert "name" in config["project"], "[project] must have 'name' field"
         assert "version" in config["project"], "[project] must have 'version' field"
-        assert (
-            "requires-python" in config["project"]
-        ), "[project] must have 'requires-python' field"
+        assert "requires-python" in config["project"], (
+            "[project] must have 'requires-python' field"
+        )
 
     def test_python_version_file_exists(self):
         """Verify .python-version file specifies Python 3.10+"""
@@ -54,9 +54,9 @@ class TestAC1_UvProjectInitialization:
 
         # Parse major.minor version
         major, minor = map(int, version.split(".")[:2])
-        assert (
-            major == 3 and minor >= 10
-        ), f".python-version must specify Python 3.10+, got {version}"
+        assert major == 3 and minor >= 10, (
+            f".python-version must specify Python 3.10+, got {version}"
+        )
 
     def test_uv_lock_exists(self):
         """Verify uv.lock file committed to git (reproducible builds)"""
@@ -81,9 +81,9 @@ class TestAC2_CleanArchitectureStructure:
         """Verify all required directories exist"""
         for dir_path in self.REQUIRED_DIRECTORIES:
             full_path = PROJECT_ROOT / dir_path
-            assert (
-                full_path.exists() and full_path.is_dir()
-            ), f"Required directory must exist: {dir_path}"
+            assert full_path.exists() and full_path.is_dir(), (
+                f"Required directory must exist: {dir_path}"
+            )
 
     def test_all_directories_have_init_py(self):
         """Verify each directory has __init__.py for Python package recognition"""
@@ -106,12 +106,12 @@ class TestAC2_CleanArchitectureStructure:
         # Verify README contains documentation of key concepts
         assert "domain" in content.lower(), "README must document domain/ layer"
         assert "io" in content.lower(), "README must document io/ layer"
-        assert (
-            "orchestration" in content.lower()
-        ), "README must document orchestration/ layer"
-        assert (
-            "clean architecture" in content.lower()
-        ), "README must explain Clean Architecture"
+        assert "orchestration" in content.lower(), (
+            "README must document orchestration/ layer"
+        )
+        assert "clean architecture" in content.lower(), (
+            "README must explain Clean Architecture"
+        )
 
 
 @pytest.mark.unit
@@ -184,16 +184,16 @@ class TestAC3_CoreDependencies:
         for dep_name, min_version in self.MIN_VERSIONS.items():
             # Find dependency declaration
             dep_decl = [d for d in all_deps if dep_name in d]
-            assert (
-                dep_decl
-            ), f"{dep_name} must be declared in dependencies with minimum version"
+            assert dep_decl, (
+                f"{dep_name} must be declared in dependencies with minimum version"
+            )
 
             # Verify version constraint
             dep_str = dep_decl[0]
             assert ">=" in dep_str, f"{dep_name} must specify minimum version with >="
-            assert (
-                min_version in dep_str
-            ), f"{dep_name} must have minimum version {min_version}"
+            assert min_version in dep_str, (
+                f"{dep_name} must have minimum version {min_version}"
+            )
 
     def test_uv_lock_pins_all_dependencies(self):
         """Verify uv.lock exists and pins all dependencies"""
@@ -201,9 +201,9 @@ class TestAC3_CoreDependencies:
         assert uv_lock_path.exists(), "uv.lock must exist to pin all dependencies"
 
         # Verify it's not empty
-        assert (
-            uv_lock_path.stat().st_size > 0
-        ), "uv.lock must not be empty (should contain locked dependencies)"
+        assert uv_lock_path.stat().st_size > 0, (
+            "uv.lock must not be empty (should contain locked dependencies)"
+        )
 
 
 @pytest.mark.unit
@@ -234,9 +234,7 @@ class TestAC4_EnvironmentConfiguration:
             content = f.read()
 
         for var in self.REQUIRED_ENV_VARS:
-            assert (
-                var in content
-            ), f".env.example must contain placeholder for {var}"
+            assert var in content, f".env.example must contain placeholder for {var}"
 
     def test_env_in_gitignore(self):
         """Verify .env added to .gitignore (security requirement)"""
@@ -246,9 +244,9 @@ class TestAC4_EnvironmentConfiguration:
         with open(gitignore_path) as f:
             content = f.read()
 
-        assert (
-            ".env" in content
-        ), ".env must be in .gitignore to prevent committing secrets"
+        assert ".env" in content, (
+            ".env must be in .gitignore to prevent committing secrets"
+        )
 
     def test_gitignore_covers_python_artifacts(self):
         """Verify .gitignore covers all required Python artifacts"""
@@ -258,9 +256,7 @@ class TestAC4_EnvironmentConfiguration:
             content = f.read()
 
         for pattern in self.REQUIRED_GITIGNORE_PATTERNS:
-            assert (
-                pattern in content
-            ), f".gitignore must contain pattern: {pattern}"
+            assert pattern in content, f".gitignore must contain pattern: {pattern}"
 
 
 @pytest.mark.unit
@@ -276,12 +272,10 @@ class TestProjectDocumentation:
             content = f.read()
 
         # Verify README documents essential setup information
-        assert (
-            "uv" in content.lower()
-        ), "README must document uv package manager usage"
-        assert (
-            "setup" in content.lower() or "installation" in content.lower()
-        ), "README must include setup/installation instructions"
+        assert "uv" in content.lower(), "README must document uv package manager usage"
+        assert "setup" in content.lower() or "installation" in content.lower(), (
+            "README must include setup/installation instructions"
+        )
 
         # Verify comprehensive sections
         assert len(content) > 1000, "README should be comprehensive (>1000 chars)"

@@ -61,7 +61,12 @@ class TestConvertDataFrameToModels:
         df = pd.DataFrame(
             [
                 {"月度": date(2024, 11, 1), "计划代码": "P1", "company_id": "C1"},
-                {"月度": date(2024, 11, 1), "计划代码": "P2", "company_id": "IN_ABC", "客户名称": "未识别"},
+                {
+                    "月度": date(2024, 11, 1),
+                    "计划代码": "P2",
+                    "company_id": "IN_ABC",
+                    "客户名称": "未识别",
+                },
             ]
         )
         records, unknown = convert_dataframe_to_models(df)

@@ -234,7 +234,11 @@ class TestLoaderOrchestration:
         """Test delete_insert mode returns complete plan."""
         pk = ["report_date", "plan_code", "company_code"]
         result = load(
-            table="trustee_performance", rows=sample_rows, mode="delete_insert", pk=pk, conn=None
+            table="trustee_performance",
+            rows=sample_rows,
+            mode="delete_insert",
+            pk=pk,
+            conn=None,
         )
 
         assert result["mode"] == "delete_insert"
@@ -253,7 +257,9 @@ class TestLoaderOrchestration:
         # Create 2500 rows to test chunking
         rows = [{"id": i, "value": f"val_{i}"} for i in range(2500)]
 
-        result = load(table="test_table", rows=rows, mode="append", chunk_size=1000, conn=None)
+        result = load(
+            table="test_table", rows=rows, mode="append", chunk_size=1000, conn=None
+        )
 
         assert result["inserted"] == 2500
         assert result["batches"] == 3  # ceil(2500/1000)
@@ -361,7 +367,9 @@ class TestWarehouseLoaderClass:
             mocked_execute_values,
         )
 
-        result = loader.load_dataframe(df, table="trustee_performance", upsert_keys=["plan_code"])
+        result = loader.load_dataframe(
+            df, table="trustee_performance", upsert_keys=["plan_code"]
+        )
 
         assert isinstance(result, LoadResult)
         assert result.rows_inserted == 2
@@ -373,10 +381,13 @@ class TestWarehouseLoaderClass:
 
     def test_connection_retry_on_operational_error(self, monkeypatch):
         """_get_connection_with_retry should handle transient OperationalErrors."""
+
         class FakeOperationalError(Exception):
             """Sentinel error type for retry verification."""
 
-        loader, pool, _, _ = _create_loader(monkeypatch, operational_error=FakeOperationalError)
+        loader, pool, _, _ = _create_loader(
+            monkeypatch, operational_error=FakeOperationalError
+        )
         conn, _ = _build_fake_connection()
         initial_calls = pool.getconn.call_count
         pool.getconn.side_effect = [FakeOperationalError("boom"), conn]
@@ -406,7 +417,11 @@ class TestDatabaseSettings:
         from src.work_data_hub.config.settings import DatabaseSettings
 
         db_settings = DatabaseSettings(
-            host="localhost", port=5432, user="testuser", password="testpass", db="testdb"
+            host="localhost",
+            port=5432,
+            user="testuser",
+            password="testpass",
+            db="testdb",
         )
 
         expected = "postgresql://testuser:testpass@localhost:5432/testdb"
@@ -424,7 +439,9 @@ class TestDatabaseSettings:
             uri="postgresql://user:pass@host:5432/db",
         )
 
-        assert db_settings.get_connection_string() == "postgresql://user:pass@host:5432/db"
+        assert (
+            db_settings.get_connection_string() == "postgresql://user:pass@host:5432/db"
+        )
 
 
 # Integration tests (skipped by default)
@@ -483,7 +500,10 @@ class TestDatabaseIntegration:
         ]
 
         result = load(
-            table="test_trustee_performance", rows=rows, mode="append", conn=db_connection
+            table="test_trustee_performance",
+            rows=rows,
+            mode="append",
+            conn=db_connection,
         )
 
         assert result["inserted"] == 1
@@ -498,7 +518,9 @@ def _reset_test_table(dsn: str, table_name: str) -> None:
     with psycopg2.connect(dsn) as conn:
         conn.autocommit = True
         with conn.cursor() as cursor:
-            cursor.execute(sql.SQL("DROP TABLE IF EXISTS {}").format(sql.Identifier(table_name)))
+            cursor.execute(
+                sql.SQL("DROP TABLE IF EXISTS {}").format(sql.Identifier(table_name))
+            )
             cursor.execute(
                 sql.SQL(
                     """
@@ -527,12 +549,24 @@ class TestWarehouseLoaderIntegration:
         loader = WarehouseLoader(connection_url=dsn, pool_size=2, batch_size=2)
         df = pd.DataFrame(
             [
-                {"plan_code": "A101", "report_date": "2024-01-01", "return_rate": 0.01, "extra": "x"},
-                {"plan_code": "A102", "report_date": "2024-01-02", "return_rate": 0.02, "extra": "y"},
+                {
+                    "plan_code": "A101",
+                    "report_date": "2024-01-01",
+                    "return_rate": 0.01,
+                    "extra": "x",
+                },
+                {
+                    "plan_code": "A102",
+                    "report_date": "2024-01-02",
+                    "return_rate": 0.02,
+                    "extra": "y",
+                },
             ]
         )
 
-        result = loader.load_dataframe(df, table=table_name, schema="public", upsert_keys=["plan_code"])
+        result = loader.load_dataframe(
+            df, table=table_name, schema="public", upsert_keys=["plan_code"]
+        )
         assert result.success is True
         assert result.rows_inserted == 2
         assert result.rows_updated == 0
@@ -543,7 +577,9 @@ class TestWarehouseLoaderIntegration:
         with psycopg2.connect(dsn) as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
-                    sql.SQL("SELECT COUNT(*) FROM {}").format(sql.Identifier(table_name))
+                    sql.SQL("SELECT COUNT(*) FROM {}").format(
+                        sql.Identifier(table_name)
+                    )
                 )
                 assert cursor.fetchone()[0] == 2
 
@@ -559,7 +595,11 @@ class TestWarehouseLoaderIntegration:
         df = pd.DataFrame(
             [
                 {"plan_code": "B201", "report_date": "2024-02-01", "return_rate": 0.01},
-                {"plan_code": "B202", "report_date": "2024-02-01", "return_rate": "invalid"},
+                {
+                    "plan_code": "B202",
+                    "report_date": "2024-02-01",
+                    "return_rate": "invalid",
+                },
             ]
         )
 
@@ -572,7 +612,9 @@ class TestWarehouseLoaderIntegration:
         with psycopg2.connect(dsn) as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
-                    sql.SQL("SELECT COUNT(*) FROM {}").format(sql.Identifier(table_name))
+                    sql.SQL("SELECT COUNT(*) FROM {}").format(
+                        sql.Identifier(table_name)
+                    )
                 )
                 assert cursor.fetchone()[0] == 0
 
@@ -667,9 +709,19 @@ class TestJSONBParameterAdaptation:
 
         # Test various JSON-compatible types
         test_cases = [
-            {"string": "value", "number": 42, "float": 3.14, "bool": True, "null": None},
+            {
+                "string": "value",
+                "number": 42,
+                "float": 3.14,
+                "bool": True,
+                "null": None,
+            },
             [1, "two", 3.0, True, None, {"nested": "object"}],
-            {"empty_dict": {}, "empty_list": [], "nested": {"deep": {"deeper": "value"}}},
+            {
+                "empty_dict": {},
+                "empty_list": [],
+                "nested": {"deep": {"deeper": "value"}},
+            },
         ]
 
         for case in test_cases:
@@ -684,7 +736,10 @@ class TestJSONBParameterAdaptation:
                 "report_date": "2024-01-01",
                 "plan_code": "P001",
                 "company_code": "C001",
-                "validation_warnings": ["warning1", "warning2"],  # List that needs JSONB adaptation
+                "validation_warnings": [
+                    "warning1",
+                    "warning2",
+                ],  # List that needs JSONB adaptation
                 "metadata": {
                     "source": "test",
                     "processed": True,
@@ -711,13 +766,20 @@ class TestJSONBParameterAdaptation:
         rows = [
             {
                 "id": 1,
-                "validation_warnings": ["warning1", {"type": "error", "msg": "Invalid data"}],
+                "validation_warnings": [
+                    "warning1",
+                    {"type": "error", "msg": "Invalid data"},
+                ],
                 "metadata": {"source": "file1.xlsx", "processed": True},
             },
             {
                 "id": 2,
                 "validation_warnings": ["warning2"],
-                "metadata": {"source": "file2.xlsx", "processed": False, "errors": [{"code": 500}]},
+                "metadata": {
+                    "source": "file2.xlsx",
+                    "processed": False,
+                    "errors": [{"code": 500}],
+                },
             },
         ]
 
@@ -758,7 +820,10 @@ class TestJSONBParameterAdaptation:
                 row_map = dict(zip(columns, row_values))
                 assert isinstance(row_map["validation_warnings"], Json)
                 assert isinstance(row_map["metadata"], Json)
-                assert row_map["validation_warnings"].adapted == rows[idx]["validation_warnings"]
+                assert (
+                    row_map["validation_warnings"].adapted
+                    == rows[idx]["validation_warnings"]
+                )
                 assert row_map["metadata"].adapted == rows[idx]["metadata"]
 
     def test_execute_values_parameter_structure_with_jsonb(self):
@@ -819,7 +884,10 @@ class TestJSONBParameterAdaptation:
             metadata_param = row_params["metadata"]
 
             assert validation_warnings_param.adapted == ["Rate exceeds threshold"]
-            assert metadata_param.adapted["file_source"] == "2024_11_trustee_performance.xlsx"
+            assert (
+                metadata_param.adapted["file_source"]
+                == "2024_11_trustee_performance.xlsx"
+            )
 
             # Verify page_size parameter
             assert page_size == 1000  # min(chunk_size=1000, 1000)
@@ -845,7 +913,11 @@ class TestJSONBParameterAdaptation:
 
         # Plan-only mode to test chunking logic
         result = load(
-            table="test_table", rows=large_dataset, mode="append", chunk_size=1000, conn=None
+            table="test_table",
+            rows=large_dataset,
+            mode="append",
+            chunk_size=1000,
+            conn=None,
         )
 
         # Verify chunking worked correctly
@@ -893,7 +965,10 @@ class TestJSONBParameterAdaptation:
             (None, type(None)),  # None should remain None
             ({"key": None}, Json),  # Dict with None value should be wrapped
             ([None, None], Json),  # List with None values should be wrapped
-            ({"empty_list": [], "empty_dict": {}}, Json),  # Nested empties should be wrapped
+            (
+                {"empty_list": [], "empty_dict": {}},
+                Json,
+            ),  # Nested empties should be wrapped
         ]
 
         for input_val, expected_type in test_cases:

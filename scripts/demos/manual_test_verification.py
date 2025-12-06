@@ -12,6 +12,7 @@ from psycopg2.extras import RealDictCursor
 # 加载环境变量
 load_dotenv()
 
+
 def get_db_connection():
     """获取数据库连接"""
     return psycopg2.connect(
@@ -19,8 +20,9 @@ def get_db_connection():
         port=os.getenv("WDH_DATABASE_PORT"),
         user=os.getenv("WDH_DATABASE_USER"),
         password=os.getenv("WDH_DATABASE_PASSWORD"),
-        database=os.getenv("WDH_DATABASE_DB")
+        database=os.getenv("WDH_DATABASE_DB"),
     )
+
 
 def check_table_structure():
     """检查规模明细表的结构"""
@@ -34,7 +36,7 @@ def check_table_structure():
                     WHERE table_name = '规模明细'
                 );
             """)
-            table_exists = cur.fetchone()['exists']
+            table_exists = cur.fetchone()["exists"]
             print(f"表'规模明细'是否存在: {table_exists}")
 
             if not table_exists:
@@ -58,10 +60,16 @@ def check_table_structure():
             print(f"\n📋 当前表结构 ({len(columns)} 列):")
             print("-" * 80)
             for col in columns:
-                default = col['column_default'] or 'NULL'
-                max_len = f"({col['character_maximum_length']})" if col['character_maximum_length'] else ""
-                print(f"  {col['column_name']:<25} {col['data_type']}{max_len:<15} "
-                     f"nullable:{col['is_nullable']:<5} default:{default}")
+                default = col["column_default"] or "NULL"
+                max_len = (
+                    f"({col['character_maximum_length']})"
+                    if col["character_maximum_length"]
+                    else ""
+                )
+                print(
+                    f"  {col['column_name']:<25} {col['data_type']}{max_len:<15} "
+                    f"nullable:{col['is_nullable']:<5} default:{default}"
+                )
 
             # 检查id列是否为自增
             cur.execute("""
@@ -82,14 +90,9 @@ def check_table_structure():
                 print(f"  标识生成方式: {id_info.get('identity_generation', 'N/A')}")
 
             # 检查关键列是否存在
-            required_columns = [
-                "流失(含待遇支付)",
-                "月度",
-                "计划代码",
-                "company_id"
-            ]
+            required_columns = ["流失(含待遇支付)", "月度", "计划代码", "company_id"]
 
-            existing_column_names = [col['column_name'] for col in columns]
+            existing_column_names = [col["column_name"] for col in columns]
 
             print("\n✅ 关键列检查:")
             for req_col in required_columns:
@@ -112,7 +115,7 @@ def check_table_structure():
 
             print("\n🔑 主键信息:")
             if pk_columns:
-                pk_cols = [col['column_name'] for col in pk_columns]
+                pk_cols = [col["column_name"] for col in pk_columns]
                 print(f"  当前主键: {pk_cols}")
             else:
                 print("  ❌ 未找到主键定义")
@@ -120,7 +123,7 @@ def check_table_structure():
             # 期望的主键应该是 ["月度", "计划代码", "company_id"]
             expected_pk = ["月度", "计划代码", "company_id"]
             if pk_columns:
-                actual_pk = [col['column_name'] for col in pk_columns]
+                actual_pk = [col["column_name"] for col in pk_columns]
                 if actual_pk == expected_pk:
                     print(f"  ✅ 主键符合期望: {expected_pk}")
                 else:
@@ -132,6 +135,7 @@ def check_table_structure():
         print(f"❌ 数据库查询错误: {e}")
     finally:
         conn.close()
+
 
 def compare_with_ddl():
     """与DDL文件对比"""
@@ -167,6 +171,7 @@ def compare_with_ddl():
     for col_name, col_type, extra in expected_structure:
         extra_info = f" {extra}" if extra else ""
         print(f"  {col_name:<25} {col_type}{extra_info}")
+
 
 if __name__ == "__main__":
     print("🔍 数据库结构验证开始...")

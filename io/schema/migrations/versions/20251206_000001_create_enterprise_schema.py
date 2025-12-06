@@ -35,27 +35,33 @@ SCHEMA_NAME = "enterprise"
 
 def _table_exists(conn, table_name: str, schema: str) -> bool:
     """Check if a table exists in the given schema."""
-    result = conn.execute(sa.text(
-        """
+    result = conn.execute(
+        sa.text(
+            """
         SELECT EXISTS (
             SELECT FROM information_schema.tables
             WHERE table_schema = :schema AND table_name = :table
         )
         """
-    ), {"schema": schema, "table": table_name})
+        ),
+        {"schema": schema, "table": table_name},
+    )
     return result.scalar()
 
 
 def _index_exists(conn, index_name: str, schema: str) -> bool:
     """Check if an index exists in the given schema."""
-    result = conn.execute(sa.text(
-        """
+    result = conn.execute(
+        sa.text(
+            """
         SELECT EXISTS (
             SELECT FROM pg_indexes
             WHERE schemaname = :schema AND indexname = :index
         )
         """
-    ), {"schema": schema, "index": index_name})
+        ),
+        {"schema": schema, "index": index_name},
+    )
     return result.scalar()
 
 
@@ -78,40 +84,40 @@ def upgrade() -> None:
                 "company_id",
                 sa.String(100),
                 primary_key=True,
-                comment="Company identifier (公司标识)"
+                comment="Company identifier (公司标识)",
             ),
             sa.Column(
                 "official_name",
                 sa.String(255),
                 nullable=False,
-                comment="Official company name (官方名称)"
+                comment="Official company name (官方名称)",
             ),
             sa.Column(
                 "unified_credit_code",
                 sa.String(50),
                 unique=True,
                 nullable=True,
-                comment="Unified social credit code (统一社会信用代码)"
+                comment="Unified social credit code (统一社会信用代码)",
             ),
             sa.Column(
                 "aliases",
                 postgresql.ARRAY(sa.Text),
                 nullable=True,
-                comment="Known aliases for this company (别名列表)"
+                comment="Known aliases for this company (别名列表)",
             ),
             sa.Column(
                 "source",
                 sa.String(50),
                 nullable=False,
                 server_default="internal",
-                comment="Data source: internal/eqc"
+                comment="Data source: internal/eqc",
             ),
             sa.Column(
                 "created_at",
                 sa.DateTime(timezone=True),
                 server_default=func.now(),
                 nullable=False,
-                comment="Record creation timestamp"
+                comment="Record creation timestamp",
             ),
             sa.Column(
                 "updated_at",
@@ -119,7 +125,7 @@ def upgrade() -> None:
                 server_default=func.now(),
                 onupdate=func.now(),
                 nullable=False,
-                comment="Record last update timestamp"
+                comment="Record last update timestamp",
             ),
             schema=SCHEMA_NAME,
         )
@@ -133,45 +139,45 @@ def upgrade() -> None:
                 sa.Integer,
                 primary_key=True,
                 autoincrement=True,
-                comment="Auto-increment primary key"
+                comment="Auto-increment primary key",
             ),
             sa.Column(
                 "alias_name",
                 sa.String(255),
                 nullable=False,
-                comment="Alias or lookup key (别名/查询键)"
+                comment="Alias or lookup key (别名/查询键)",
             ),
             sa.Column(
                 "canonical_id",
                 sa.String(100),
                 nullable=False,
-                comment="Resolved company_id (规范化公司ID)"
+                comment="Resolved company_id (规范化公司ID)",
             ),
             sa.Column(
                 "match_type",
                 sa.String(20),
                 nullable=False,
-                comment="Mapping type: plan/account/hardcode/name/account_name"
+                comment="Mapping type: plan/account/hardcode/name/account_name",
             ),
             sa.Column(
                 "priority",
                 sa.Integer,
                 nullable=False,
-                comment="Resolution priority 1-5 (lower = higher priority)"
+                comment="Resolution priority 1-5 (lower = higher priority)",
             ),
             sa.Column(
                 "source",
                 sa.String(50),
                 nullable=False,
                 server_default="internal",
-                comment="Data source: internal/eqc/pipeline_backflow"
+                comment="Data source: internal/eqc/pipeline_backflow",
             ),
             sa.Column(
                 "created_at",
                 sa.DateTime(timezone=True),
                 server_default=func.now(),
                 nullable=False,
-                comment="Record creation timestamp"
+                comment="Record creation timestamp",
             ),
             sa.Column(
                 "updated_at",
@@ -179,19 +185,18 @@ def upgrade() -> None:
                 server_default=func.now(),
                 onupdate=func.now(),
                 nullable=False,
-                comment="Record last update timestamp"
+                comment="Record last update timestamp",
             ),
             # Constraints
             sa.UniqueConstraint(
                 "alias_name", "match_type", name="uq_company_mapping_alias_type"
             ),
             sa.CheckConstraint(
-                "priority >= 1 AND priority <= 5",
-                name="chk_company_mapping_priority"
+                "priority >= 1 AND priority <= 5", name="chk_company_mapping_priority"
             ),
             sa.CheckConstraint(
                 "match_type IN ('plan','account','hardcode','name','account_name')",
-                name="chk_company_mapping_match_type"
+                name="chk_company_mapping_match_type",
             ),
             schema=SCHEMA_NAME,
         )
@@ -214,58 +219,58 @@ def upgrade() -> None:
                 sa.Integer,
                 primary_key=True,
                 autoincrement=True,
-                comment="Auto-increment primary key"
+                comment="Auto-increment primary key",
             ),
             sa.Column(
                 "raw_name",
                 sa.String(255),
                 nullable=False,
-                comment="Original company name as received (原始名称)"
+                comment="Original company name as received (原始名称)",
             ),
             sa.Column(
                 "normalized_name",
                 sa.String(255),
                 nullable=False,
-                comment="Normalized name for deduplication (规范化名称)"
+                comment="Normalized name for deduplication (规范化名称)",
             ),
             sa.Column(
                 "temp_id",
                 sa.String(50),
                 nullable=True,
-                comment="Assigned temporary ID (IN_xxx format)"
+                comment="Assigned temporary ID (IN_xxx format)",
             ),
             sa.Column(
                 "status",
                 sa.String(20),
                 nullable=False,
                 server_default="pending",
-                comment="Queue status: pending/processing/done/failed"
+                comment="Queue status: pending/processing/done/failed",
             ),
             sa.Column(
                 "attempts",
                 sa.Integer,
                 nullable=False,
                 server_default="0",
-                comment="Number of processing attempts"
+                comment="Number of processing attempts",
             ),
             sa.Column(
                 "last_error",
                 sa.Text,
                 nullable=True,
-                comment="Last error message if failed"
+                comment="Last error message if failed",
             ),
             sa.Column(
                 "resolved_company_id",
                 sa.String(100),
                 nullable=True,
-                comment="Resolved company_id after successful enrichment"
+                comment="Resolved company_id after successful enrichment",
             ),
             sa.Column(
                 "created_at",
                 sa.DateTime(timezone=True),
                 server_default=func.now(),
                 nullable=False,
-                comment="Record creation timestamp"
+                comment="Record creation timestamp",
             ),
             sa.Column(
                 "updated_at",
@@ -273,7 +278,7 @@ def upgrade() -> None:
                 server_default=func.now(),
                 onupdate=func.now(),
                 nullable=False,
-                comment="Record last update timestamp"
+                comment="Record last update timestamp",
             ),
             schema=SCHEMA_NAME,
         )
@@ -290,13 +295,15 @@ def upgrade() -> None:
     # Partial unique index: prevent duplicate pending/processing requests
     # This uses raw SQL because Alembic doesn't directly support partial indexes
     # IF NOT EXISTS is used for idempotency
-    conn.execute(sa.text(
-        f"""
+    conn.execute(
+        sa.text(
+            f"""
         CREATE UNIQUE INDEX IF NOT EXISTS idx_enrichment_requests_normalized
         ON {SCHEMA_NAME}.enrichment_requests (normalized_name)
         WHERE status IN ('pending', 'processing')
         """
-    ))
+        )
+    )
 
 
 def downgrade() -> None:
@@ -309,35 +316,34 @@ def downgrade() -> None:
     conn = op.get_bind()
 
     # === Step 1: Drop indexes (with IF EXISTS for safety) ===
-    conn.execute(sa.text(
-        f"DROP INDEX IF EXISTS {SCHEMA_NAME}.idx_enrichment_requests_normalized"
-    ))
-    conn.execute(sa.text(
-        f"DROP INDEX IF EXISTS {SCHEMA_NAME}.idx_enrichment_requests_status"
-    ))
-    conn.execute(sa.text(
-        f"DROP INDEX IF EXISTS {SCHEMA_NAME}.idx_company_mapping_lookup"
-    ))
+    conn.execute(
+        sa.text(
+            f"DROP INDEX IF EXISTS {SCHEMA_NAME}.idx_enrichment_requests_normalized"
+        )
+    )
+    conn.execute(
+        sa.text(f"DROP INDEX IF EXISTS {SCHEMA_NAME}.idx_enrichment_requests_status")
+    )
+    conn.execute(
+        sa.text(f"DROP INDEX IF EXISTS {SCHEMA_NAME}.idx_company_mapping_lookup")
+    )
 
     # === Step 2: Drop tables (with IF EXISTS for safety) ===
-    conn.execute(sa.text(
-        f"DROP TABLE IF EXISTS {SCHEMA_NAME}.enrichment_requests"
-    ))
-    conn.execute(sa.text(
-        f"DROP TABLE IF EXISTS {SCHEMA_NAME}.company_mapping"
-    ))
-    conn.execute(sa.text(
-        f"DROP TABLE IF EXISTS {SCHEMA_NAME}.company_master"
-    ))
+    conn.execute(sa.text(f"DROP TABLE IF EXISTS {SCHEMA_NAME}.enrichment_requests"))
+    conn.execute(sa.text(f"DROP TABLE IF EXISTS {SCHEMA_NAME}.company_mapping"))
+    conn.execute(sa.text(f"DROP TABLE IF EXISTS {SCHEMA_NAME}.company_master"))
 
     # === Step 3: Drop schema (only if empty) ===
-    remaining_tables = conn.execute(sa.text(
-        """
+    remaining_tables = conn.execute(
+        sa.text(
+            """
         SELECT COUNT(*)
         FROM information_schema.tables
         WHERE table_schema = :schema
         """
-    ), {"schema": SCHEMA_NAME}).scalar()
+        ),
+        {"schema": SCHEMA_NAME},
+    ).scalar()
 
     if remaining_tables == 0:
         conn.execute(sa.text(f"DROP SCHEMA IF EXISTS {SCHEMA_NAME}"))

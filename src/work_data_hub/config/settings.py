@@ -238,7 +238,9 @@ class Settings(BaseSettings):
     database_user: str = Field(default="user", description="Database user")
     database_password: str = Field(default="password", description="Database password")
     database_db: str = Field(default="database", description="Database name")
-    database_schema: str = Field(default="wdh_dev", description="Database schema for all domains")
+    database_schema: str = Field(
+        default="wdh_dev", description="Database schema for all domains"
+    )
     database_uri: Optional[str] = Field(
         default=None, description="Complete database URI"
     )
@@ -246,7 +248,8 @@ class Settings(BaseSettings):
     def get_database_connection_string(self) -> str:
         """Get PostgreSQL connection string from .env file only.
 
-        Configuration is read exclusively from .env file to ensure single source of truth.
+        Configuration is read exclusively from .env file to ensure single source
+        of truth.
         Priority order:
         1) WDH_DATABASE__URI (canonical, from .env)
         2) WDH_DATABASE_URI (alternate, from .env)
@@ -391,7 +394,7 @@ def get_settings() -> Settings:
     Returns:
         Settings instance with loaded configuration
     """
-    return Settings()  # type: ignore[call-arg]
+    return Settings()
 
 
 def validate_data_directory(settings: Settings) -> bool:

@@ -30,7 +30,9 @@ DEFAULT_NUMERIC_RULES: List[Any] = [
 ]
 
 
-def apply_domain_rules(value: Any, field_name: str, fallback_rules: Optional[List[Any]] = None) -> Any:
+def apply_domain_rules(
+    value: Any, field_name: str, fallback_rules: Optional[List[Any]] = None
+) -> Any:
     rules = CLEANSING_REGISTRY.get_domain_rules(CLEANSING_DOMAIN, field_name)
     if not rules:
         rules = fallback_rules or []
@@ -48,7 +50,9 @@ class AnnuityPerformanceIn(BaseModel):
     )
     年: Optional[str] = Field(None, description="Year field from Excel (年)")
     月: Optional[str] = Field(None, description="Month field from Excel (月)")
-    月度: Optional[Union[date, str, int]] = Field(None, description="Report date (月度)")
+    月度: Optional[Union[date, str, int]] = Field(
+        None, description="Report date (月度)"
+    )
     计划代码: Optional[str] = Field(None, description="Plan code (计划代码)")
     公司代码: Optional[str] = Field(None, description="Company code - for mapping")
     id: Optional[int] = Field(None, description="Auto-generated ID")
@@ -59,32 +63,60 @@ class AnnuityPerformanceIn(BaseModel):
     组合代码: Optional[str] = Field(None, description="Portfolio code (组合代码)")
     组合名称: Optional[str] = Field(None, description="Portfolio name (组合名称)")
     客户名称: Optional[str] = Field(None, description="Customer name (客户名称)")
-    期初资产规模: Optional[Union[Decimal, float, int, str]] = Field(None, description="Initial asset scale (期初资产规模)")
-    期末资产规模: Optional[Union[Decimal, float, int, str]] = Field(None, description="Final asset scale (期末资产规模)")
-    供款: Optional[Union[Decimal, float, int, str]] = Field(None, description="Contribution (供款)")
+    期初资产规模: Optional[Union[Decimal, float, int, str]] = Field(
+        None, description="Initial asset scale (期初资产规模)"
+    )
+    期末资产规模: Optional[Union[Decimal, float, int, str]] = Field(
+        None, description="Final asset scale (期末资产规模)"
+    )
+    供款: Optional[Union[Decimal, float, int, str]] = Field(
+        None, description="Contribution (供款)"
+    )
     流失_含待遇支付: Optional[Union[Decimal, float, int, str]] = Field(
         None,
         description="Loss including benefit payment (流失_含待遇支付)",
         alias="流失(含待遇支付)",
         serialization_alias="流失(含待遇支付)",
     )
-    流失: Optional[Union[Decimal, float, int, str]] = Field(None, description="Loss (流失)")
-    待遇支付: Optional[Union[Decimal, float, int, str]] = Field(None, description="Benefit payment (待遇支付)")
-    投资收益: Optional[Union[Decimal, float, int, str]] = Field(None, description="Investment return (投资收益)")
+    流失: Optional[Union[Decimal, float, int, str]] = Field(
+        None, description="Loss (流失)"
+    )
+    待遇支付: Optional[Union[Decimal, float, int, str]] = Field(
+        None, description="Benefit payment (待遇支付)"
+    )
+    投资收益: Optional[Union[Decimal, float, int, str]] = Field(
+        None, description="Investment return (投资收益)"
+    )
     当期收益率: Optional[Union[Decimal, float, int, str]] = Field(
         None,
         description="Current period return rate (当期收益率)",
         validation_alias=AliasChoices("当期收益率", "年化收益率"),
     )
     机构代码: Optional[str] = Field(None, description="Institution code (机构代码)")
-    机构名称: Optional[str] = Field(None, description="Institution name (机构名称)", alias="机构")
-    产品线代码: Optional[str] = Field(None, description="Product line code (产品线代码)")
-    年金账户号: Optional[str] = Field(None, description="Pension account number (年金账户号)")
-    年金账户名: Optional[str] = Field(None, description="Pension account name (年金账户名)")
-    子企业号: Optional[str] = Field(None, description="Sub-enterprise number (子企业号)")
-    子企业名称: Optional[str] = Field(None, description="Sub-enterprise name (子企业名称)")
-    集团企业客户号: Optional[str] = Field(None, description="Group enterprise customer number (集团企业客户号)")
-    集团企业客户名称: Optional[str] = Field(None, description="Group enterprise customer name (集团企业客户名称)")
+    机构名称: Optional[str] = Field(
+        None, description="Institution name (机构名称)", alias="机构"
+    )
+    产品线代码: Optional[str] = Field(
+        None, description="Product line code (产品线代码)"
+    )
+    年金账户号: Optional[str] = Field(
+        None, description="Pension account number (年金账户号)"
+    )
+    年金账户名: Optional[str] = Field(
+        None, description="Pension account name (年金账户名)"
+    )
+    子企业号: Optional[str] = Field(
+        None, description="Sub-enterprise number (子企业号)"
+    )
+    子企业名称: Optional[str] = Field(
+        None, description="Sub-enterprise name (子企业名称)"
+    )
+    集团企业客户号: Optional[str] = Field(
+        None, description="Group enterprise customer number (集团企业客户号)"
+    )
+    集团企业客户名称: Optional[str] = Field(
+        None, description="Group enterprise customer name (集团企业客户名称)"
+    )
     company_id: Optional[str] = Field(None, description="Company identifier")
     report_period: Optional[str] = Field(None, description="Report period string")
     data_source: Optional[str] = Field(None, description="Source file or system")
@@ -110,7 +142,9 @@ class AnnuityPerformanceIn(BaseModel):
         if v is None:
             return v
         v_str = str(v).strip()
-        v_str = v_str.replace("年", "").replace("月", "").replace("/", "").replace("-", "")
+        v_str = (
+            v_str.replace("年", "").replace("月", "").replace("/", "").replace("-", "")
+        )
         return v_str if v_str else None
 
     @field_validator(
@@ -136,7 +170,9 @@ class AnnuityPerformanceIn(BaseModel):
                 fallback_rules=DEFAULT_NUMERIC_RULES,
             )
         except ValueError as exc:
-            raise ValueError(f"Field '{field_name}': Cannot clean numeric value '{v}'. Error: {exc}") from exc
+            raise ValueError(
+                f"Field '{field_name}': Cannot clean numeric value '{v}'. Error: {exc}"
+            ) from exc
         if cleaned is None:
             return None
         if isinstance(cleaned, Decimal):
@@ -146,7 +182,9 @@ class AnnuityPerformanceIn(BaseModel):
         try:
             return float(cleaned)
         except (TypeError, ValueError) as exc:
-            raise ValueError(f"Field '{field_name}': Cannot convert '{v}' to number.") from exc
+            raise ValueError(
+                f"Field '{field_name}': Cannot convert '{v}' to number."
+            ) from exc
 
     @field_validator("月度", mode="before")
     @classmethod
@@ -193,7 +231,9 @@ class AnnuityPerformanceOut(BaseModel):
         from_attributes=True,
         populate_by_name=True,
     )
-    计划代码: str = Field(..., min_length=1, max_length=255, description="Plan code identifier")
+    计划代码: str = Field(
+        ..., min_length=1, max_length=255, description="Plan code identifier"
+    )
     company_id: Optional[str] = Field(
         None,
         min_length=1,
@@ -209,9 +249,15 @@ class AnnuityPerformanceOut(BaseModel):
     组合代码: Optional[str] = Field(None, max_length=255, description="Portfolio code")
     组合名称: Optional[str] = Field(None, max_length=255, description="Portfolio name")
     客户名称: Optional[str] = Field(None, max_length=255, description="Customer name")
-    期初资产规模: Optional[Decimal] = Field(None, decimal_places=4, ge=0, description="Initial asset scale (non-negative)")
-    期末资产规模: Optional[Decimal] = Field(None, decimal_places=4, ge=0, description="Final asset scale")
-    供款: Optional[Decimal] = Field(None, decimal_places=4, ge=0, description="Contribution (non-negative)")
+    期初资产规模: Optional[Decimal] = Field(
+        None, decimal_places=4, ge=0, description="Initial asset scale (non-negative)"
+    )
+    期末资产规模: Optional[Decimal] = Field(
+        None, decimal_places=4, ge=0, description="Final asset scale"
+    )
+    供款: Optional[Decimal] = Field(
+        None, decimal_places=4, ge=0, description="Contribution (non-negative)"
+    )
     流失_含待遇支付: Optional[Decimal] = Field(
         None,
         decimal_places=4,
@@ -219,8 +265,12 @@ class AnnuityPerformanceOut(BaseModel):
         validation_alias="流失(含待遇支付)",
     )
     流失: Optional[Decimal] = Field(None, decimal_places=4, description="Loss")
-    待遇支付: Optional[Decimal] = Field(None, decimal_places=4, description="Benefit payment")
-    投资收益: Optional[Decimal] = Field(None, decimal_places=4, description="Investment return (can be negative)")
+    待遇支付: Optional[Decimal] = Field(
+        None, decimal_places=4, description="Benefit payment"
+    )
+    投资收益: Optional[Decimal] = Field(
+        None, decimal_places=4, description="Investment return (can be negative)"
+    )
     当期收益率: Optional[Decimal] = Field(
         None,
         decimal_places=6,
@@ -229,15 +279,33 @@ class AnnuityPerformanceOut(BaseModel):
         description="Current period return rate (当期收益率, sanity check range)",
         validation_alias=AliasChoices("当期收益率", "年化收益率"),
     )
-    机构代码: Optional[str] = Field(None, max_length=255, description="Institution code")
-    机构名称: Optional[str] = Field(None, max_length=255, description="Institution name")
-    产品线代码: Optional[str] = Field(None, max_length=255, description="Product line code")
-    年金账户号: Optional[str] = Field(None, max_length=50, description="Pension account number")
-    年金账户名: Optional[str] = Field(None, max_length=255, description="Pension account name")
-    子企业号: Optional[str] = Field(None, max_length=50, description="Sub-enterprise number (子企业号)")
-    子企业名称: Optional[str] = Field(None, max_length=255, description="Sub-enterprise name (子企业名称)")
-    集团企业客户号: Optional[str] = Field(None, max_length=50, description="Group enterprise customer number")
-    集团企业客户名称: Optional[str] = Field(None, max_length=255, description="Group enterprise customer name")
+    机构代码: Optional[str] = Field(
+        None, max_length=255, description="Institution code"
+    )
+    机构名称: Optional[str] = Field(
+        None, max_length=255, description="Institution name"
+    )
+    产品线代码: Optional[str] = Field(
+        None, max_length=255, description="Product line code"
+    )
+    年金账户号: Optional[str] = Field(
+        None, max_length=50, description="Pension account number"
+    )
+    年金账户名: Optional[str] = Field(
+        None, max_length=255, description="Pension account name"
+    )
+    子企业号: Optional[str] = Field(
+        None, max_length=50, description="Sub-enterprise number (子企业号)"
+    )
+    子企业名称: Optional[str] = Field(
+        None, max_length=255, description="Sub-enterprise name (子企业名称)"
+    )
+    集团企业客户号: Optional[str] = Field(
+        None, max_length=50, description="Group enterprise customer number"
+    )
+    集团企业客户名称: Optional[str] = Field(
+        None, max_length=255, description="Group enterprise customer name"
+    )
 
     @field_validator("月度", mode="before")
     @classmethod
@@ -262,7 +330,9 @@ class AnnuityPerformanceOut(BaseModel):
                 fallback_rules=DEFAULT_COMPANY_RULES,
             )
         except Exception as e:
-            raise ValueError(f"Field '客户名称': Cannot clean company name '{v}'. Error: {e}")
+            raise ValueError(
+                f"Field '客户名称': Cannot clean company name '{v}'. Error: {e}"
+            )
 
     @field_validator("计划代码", mode="after")
     @classmethod
@@ -296,16 +366,24 @@ class AnnuityPerformanceOut(BaseModel):
         mode="before",
     )
     @classmethod
-    def clean_decimal_fields_output(cls, v: Any, info: ValidationInfo) -> Optional[Decimal]:
+    def clean_decimal_fields_output(
+        cls, v: Any, info: ValidationInfo
+    ) -> Optional[Decimal]:
         if v is None:
             return None
         field_name = info.field_name or "numeric_field"
         try:
-            normalized = apply_domain_rules(v, field_name, fallback_rules=DEFAULT_NUMERIC_RULES)
-            cleaned = CLEANSING_REGISTRY.apply_rule(normalized, "comprehensive_decimal_cleaning", field_name=field_name)
+            normalized = apply_domain_rules(
+                v, field_name, fallback_rules=DEFAULT_NUMERIC_RULES
+            )
+            cleaned = CLEANSING_REGISTRY.apply_rule(
+                normalized, "comprehensive_decimal_cleaning", field_name=field_name
+            )
             return cast(Optional[Decimal], cleaned)
         except ValueError as exc:
-            raise ValueError(f"Field '{field_name}': Cannot clean numeric value '{v}'. Error: {exc}") from exc
+            raise ValueError(
+                f"Field '{field_name}': Cannot clean numeric value '{v}'. Error: {exc}"
+            ) from exc
 
     @model_validator(mode="after")
     def validate_business_rules(self) -> "AnnuityPerformanceOut":
@@ -313,7 +391,9 @@ class AnnuityPerformanceOut(BaseModel):
         if report_date:
             current_date = date.today()
             if report_date > current_date:
-                raise ValueError(f"Field '月度': Report date {report_date} cannot be in the future (today: {current_date})")
+                raise ValueError(
+                    f"Field '月度': Report date {report_date} cannot be in the future (today: {current_date})"
+                )
             if (current_date - report_date).days > 3650:
                 logger.warning(f"Report date {report_date} is older than 10 years")
         return self
@@ -363,8 +443,12 @@ class ProcessingResultWithEnrichment(BaseModel):
         validate_default=True,
         extra="forbid",
     )
-    records: List[AnnuityPerformanceOut] = Field(..., description="Processed annuity performance records")
+    records: List[AnnuityPerformanceOut] = Field(
+        ..., description="Processed annuity performance records"
+    )
     enrichment_stats: EnrichmentStats = Field(default_factory=EnrichmentStats)
-    unknown_names_csv: Optional[str] = Field(None, description="Path to exported unknown names CSV")
+    unknown_names_csv: Optional[str] = Field(
+        None, description="Path to exported unknown names CSV"
+    )
     data_source: str = Field("unknown", description="Source file or identifier")
     processing_time_ms: int = Field(0, description="Total processing time")

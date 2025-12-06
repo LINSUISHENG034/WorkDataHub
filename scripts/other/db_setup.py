@@ -11,7 +11,7 @@ import argparse
 from pathlib import Path
 from typing import Optional
 
-from sqlalchemy import text, create_engine
+from sqlalchemy import create_engine, text
 
 from work_data_hub.config import get_settings
 from work_data_hub.io.schema import migration_runner

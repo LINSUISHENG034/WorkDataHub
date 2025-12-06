@@ -97,7 +97,9 @@ class TestCleansingStep:
         df_in = pd.DataFrame({"col1": ["a", "b"]})
         step = CleansingStep(
             domain="test_domain",
-            rules_override={"col1": [{"name": "test_append_suffix", "kwargs": {"suffix": "?"}}]},
+            rules_override={
+                "col1": [{"name": "test_append_suffix", "kwargs": {"suffix": "?"}}]
+            },
         )
 
         result = step.apply(df_in, pipeline_context)

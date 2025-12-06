@@ -8,8 +8,8 @@ import asyncio
 import logging
 from typing import Optional
 
+from playwright.async_api import Route, ViewportSize, async_playwright
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
-from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
 from pydantic import ValidationError
 
@@ -70,7 +70,7 @@ async def get_auth_token_interactively(
                 )
 
                 # 2. 设置常规的视口大小
-                viewport_size = {"width": 1920, "height": 1080}
+                viewport_size: ViewportSize = {"width": 1920, "height": 1080}
 
                 context = await browser.new_context(
                     user_agent=user_agent,
@@ -104,7 +104,7 @@ async def get_auth_token_interactively(
                 # Use Future for cross-coroutine communication
                 token_future: asyncio.Future[str] = asyncio.Future()
 
-                async def intercept_request(route):
+                async def intercept_request(route: Route) -> None:
                     """Intercept and check requests for authentication token."""
                     try:
                         request = route.request

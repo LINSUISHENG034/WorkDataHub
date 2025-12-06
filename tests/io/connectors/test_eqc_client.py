@@ -15,7 +15,10 @@ from unittest.mock import Mock, patch, MagicMock
 import pytest
 import requests
 
-from work_data_hub.domain.company_enrichment.models import CompanyDetail, CompanySearchResult
+from work_data_hub.domain.company_enrichment.models import (
+    CompanyDetail,
+    CompanySearchResult,
+)
 from work_data_hub.io.connectors.eqc_client import (
     EQCAuthenticationError,
     EQCClient,
@@ -57,7 +60,7 @@ class TestEQCClientInitialization:
             timeout=60,
             retry_max=5,
             rate_limit=20,
-            base_url="https://custom.eqc.com"
+            base_url="https://custom.eqc.com",
         )
         assert client.timeout == 60
         assert client.retry_max == 5
@@ -66,7 +69,7 @@ class TestEQCClientInitialization:
         assert len(client.request_times) == 0
         assert client.request_times.maxlen == 20
 
-    @patch('work_data_hub.io.connectors.eqc_client.get_settings')
+    @patch("work_data_hub.io.connectors.eqc_client.get_settings")
     def test_client_uses_settings_defaults(self, mock_get_settings):
         """Test client uses settings for default configuration."""
         mock_settings = Mock()
@@ -95,7 +98,7 @@ class TestEQCClientRateLimiting:
         client.request_times.extend([now - 30, now - 10])
 
         # Mock time.sleep to track if it's called
-        with mock.patch('time.sleep') as mock_sleep:
+        with mock.patch("time.sleep") as mock_sleep:
             start_time = time.time()
             client._enforce_rate_limit()
             elapsed = time.time() - start_time
@@ -115,7 +118,7 @@ class TestEQCClientRateLimiting:
         client.request_times.extend([old_time, old_time + 5])
 
         # Should not sleep for old timestamps
-        with mock.patch('time.sleep') as mock_sleep:
+        with mock.patch("time.sleep") as mock_sleep:
             client._enforce_rate_limit()
             mock_sleep.assert_not_called()
 
@@ -125,12 +128,14 @@ class TestEQCClientRateLimiting:
 
         # Add mix of old and recent timestamps
         now = time.time()
-        client.request_times.extend([
-            now - 70,  # Old - should be removed
-            now - 65,  # Old - should be removed
-            now - 30,  # Recent - should remain
-            now - 10,  # Recent - should remain
-        ])
+        client.request_times.extend(
+            [
+                now - 70,  # Old - should be removed
+                now - 65,  # Old - should be removed
+                now - 30,  # Recent - should remain
+                now - 10,  # Recent - should remain
+            ]
+        )
 
         assert len(client.request_times) == 4
 
@@ -144,7 +149,7 @@ class TestEQCClientRateLimiting:
 class TestEQCClientSearchMethod:
     """Test company search functionality."""
 
-    @patch('work_data_hub.io.connectors.eqc_client.EQCClient._make_request')
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._make_request")
     def test_search_company_success(self, mock_make_request):
         """Test successful company search."""
         # Mock response
@@ -154,13 +159,13 @@ class TestEQCClientSearchMethod:
                 {
                     "companyId": "123456789",
                     "companyFullName": "测试公司A",
-                    "unite_code": "91110000000000001X"
+                    "unite_code": "91110000000000001X",
                 },
                 {
                     "companyId": "987654321",
                     "companyFullName": "测试公司B",
-                    "unite_code": None
-                }
+                    "unite_code": None,
+                },
             ]
         }
         mock_make_request.return_value = mock_response
@@ -175,8 +180,8 @@ class TestEQCClientSearchMethod:
             params={
                 "keyword": "%E6%B5%8B%E8%AF%95",  # URL encoded "测试"
                 "currentPage": 1,
-                "pageSize": 10
-            }
+                "pageSize": 10,
+            },
         )
 
         # Verify results
@@ -191,7 +196,7 @@ class TestEQCClientSearchMethod:
         assert results[1].official_name == "测试公司B"
         assert results[1].unite_code is None
 
-    @patch('work_data_hub.io.connectors.eqc_client.EQCClient._make_request')
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._make_request")
     def test_search_company_empty_results(self, mock_make_request):
         """Test search with empty results."""
         mock_response = Mock()
@@ -216,7 +221,7 @@ class TestEQCClientSearchMethod:
             client.search_company("   ")
         assert "Company name cannot be empty" in str(exc_info.value)
 
-    @patch('work_data_hub.io.connectors.eqc_client.EQCClient._make_request')
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._make_request")
     def test_search_company_invalid_json_response(self, mock_make_request):
         """Test search handles invalid JSON response."""
         mock_response = Mock()
@@ -229,16 +234,19 @@ class TestEQCClientSearchMethod:
             client.search_company("test")
         assert "Invalid JSON response" in str(exc_info.value)
 
-    @patch('work_data_hub.io.connectors.eqc_client.EQCClient._make_request')
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._make_request")
     def test_search_company_malformed_result_items(self, mock_make_request):
         """Test search handles malformed result items gracefully."""
         mock_response = Mock()
         mock_response.json.return_value = {
             "list": [
                 {"companyId": "123", "companyFullName": "Valid Company"},
-                {"companyId": "", "companyFullName": ""},  # Invalid - empty required fields
+                {
+                    "companyId": "",
+                    "companyFullName": "",
+                },  # Invalid - empty required fields
                 {"invalid": "structure"},  # Invalid - missing required fields
-                {"companyId": "456", "companyFullName": "Another Valid Company"}
+                {"companyId": "456", "companyFullName": "Another Valid Company"},
             ]
         }
         mock_make_request.return_value = mock_response
@@ -255,7 +263,7 @@ class TestEQCClientSearchMethod:
 class TestEQCClientDetailMethod:
     """Test company detail retrieval functionality."""
 
-    @patch('work_data_hub.io.connectors.eqc_client.EQCClient._make_request')
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._make_request")
     def test_get_company_detail_success(self, mock_make_request):
         """Test successful company detail retrieval."""
         mock_response = Mock()
@@ -265,7 +273,7 @@ class TestEQCClientDetailMethod:
                 "unite_code": "91110000000000001X",
                 "business_status": "在业",
                 "alias_name": "公司别名",
-                "short_name": "简称"
+                "short_name": "简称",
             }
         }
         mock_make_request.return_value = mock_response
@@ -277,7 +285,7 @@ class TestEQCClientDetailMethod:
         mock_make_request.assert_called_once_with(
             "GET",
             "https://eqc.pingan.com/kg-api-hfd/api/search/findDepart",
-            params={"targetId": "123456789"}
+            params={"targetId": "123456789"},
         )
 
         # Verify result
@@ -289,7 +297,7 @@ class TestEQCClientDetailMethod:
         assert "公司别名" in detail.aliases
         assert "简称" in detail.aliases
 
-    @patch('work_data_hub.io.connectors.eqc_client.EQCClient._make_request')
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._make_request")
     def test_get_company_detail_empty_business_info(self, mock_make_request):
         """Test detail retrieval with empty business info raises not found error."""
         mock_response = Mock()
@@ -302,7 +310,7 @@ class TestEQCClientDetailMethod:
             client.get_company_detail("nonexistent")
         assert "No business information found" in str(exc_info.value)
 
-    @patch('work_data_hub.io.connectors.eqc_client.EQCClient._make_request')
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._make_request")
     def test_get_company_detail_missing_business_info(self, mock_make_request):
         """Test detail retrieval with missing businessInfodto key."""
         mock_response = Mock()
@@ -327,7 +335,7 @@ class TestEQCClientDetailMethod:
             client.get_company_detail("   ")
         assert "Company ID cannot be empty" in str(exc_info.value)
 
-    @patch('work_data_hub.io.connectors.eqc_client.EQCClient._make_request')
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._make_request")
     def test_get_company_detail_alternative_field_names(self, mock_make_request):
         """Test detail retrieval handles alternative field names."""
         mock_response = Mock()
@@ -335,7 +343,7 @@ class TestEQCClientDetailMethod:
             "businessInfodto": {
                 "company_name": "使用备用字段名",  # Alternative to companyFullName
                 "status": "正常",  # Alternative to business_status
-                "aliases": ["别名1", "别名2"]  # Array format aliases
+                "aliases": ["别名1", "别名2"],  # Array format aliases
             }
         }
         mock_make_request.return_value = mock_response
@@ -352,12 +360,12 @@ class TestEQCClientDetailMethod:
 class TestEQCClientErrorHandling:
     """Test error handling for various HTTP status codes and network issues."""
 
-    @patch('work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit')
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
     def test_authentication_error_401(self, mock_enforce_rate_limit):
         """Test 401 authentication error handling."""
         client = EQCClient(token="invalid_token")
 
-        with patch.object(client.session, 'request') as mock_request:
+        with patch.object(client.session, "request") as mock_request:
             mock_response = Mock()
             mock_response.status_code = 401
             mock_request.return_value = mock_response
@@ -366,12 +374,12 @@ class TestEQCClientErrorHandling:
                 client.search_company("test")
             assert "Invalid or expired EQC token" in str(exc_info.value)
 
-    @patch('work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit')
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
     def test_not_found_error_404(self, mock_enforce_rate_limit):
         """Test 404 not found error handling."""
         client = EQCClient(token="test_token")
 
-        with patch.object(client.session, 'request') as mock_request:
+        with patch.object(client.session, "request") as mock_request:
             mock_response = Mock()
             mock_response.status_code = 404
             mock_request.return_value = mock_response
@@ -380,13 +388,15 @@ class TestEQCClientErrorHandling:
                 client.get_company_detail("nonexistent")
             assert "Resource not found" in str(exc_info.value)
 
-    @patch('work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit')
-    @patch('time.sleep')
-    def test_rate_limit_error_429_with_retries(self, mock_sleep, mock_enforce_rate_limit):
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    @patch("time.sleep")
+    def test_rate_limit_error_429_with_retries(
+        self, mock_sleep, mock_enforce_rate_limit
+    ):
         """Test 429 rate limit error with retry logic."""
         client = EQCClient(token="test_token", retry_max=2)
 
-        with patch.object(client.session, 'request') as mock_request:
+        with patch.object(client.session, "request") as mock_request:
             # All attempts return 429
             mock_response = Mock()
             mock_response.status_code = 429
@@ -400,13 +410,13 @@ class TestEQCClientErrorHandling:
             assert mock_request.call_count == 3  # Initial + 2 retries
             assert mock_sleep.call_count == 2  # 2 retry delays
 
-    @patch('work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit')
-    @patch('time.sleep')
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    @patch("time.sleep")
     def test_server_error_500_with_retries(self, mock_sleep, mock_enforce_rate_limit):
         """Test 500 server error with retry logic."""
         client = EQCClient(token="test_token", retry_max=2)
 
-        with patch.object(client.session, 'request') as mock_request:
+        with patch.object(client.session, "request") as mock_request:
             # All attempts return 500
             mock_response = Mock()
             mock_response.status_code = 500
@@ -420,13 +430,13 @@ class TestEQCClientErrorHandling:
             assert mock_request.call_count == 3  # Initial + 2 retries
             assert mock_sleep.call_count == 2  # 2 retry delays
 
-    @patch('work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit')
-    @patch('time.sleep')
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    @patch("time.sleep")
     def test_request_exception_with_retries(self, mock_sleep, mock_enforce_rate_limit):
         """Test requests.RequestException with retry logic."""
         client = EQCClient(token="test_token", retry_max=2)
 
-        with patch.object(client.session, 'request') as mock_request:
+        with patch.object(client.session, "request") as mock_request:
             # All attempts raise RequestException
             mock_request.side_effect = requests.RequestException("Network error")
 
@@ -443,19 +453,19 @@ class TestEQCClientErrorHandling:
 class TestEQCClientRetryLogic:
     """Test retry logic with exponential backoff."""
 
-    @patch('work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit')
-    @patch('time.sleep')
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    @patch("time.sleep")
     def test_exponential_backoff_calculation(self, mock_sleep, mock_enforce_rate_limit):
         """Test exponential backoff delays are calculated correctly."""
         client = EQCClient(token="test_token", retry_max=3)
 
-        with patch.object(client.session, 'request') as mock_request:
+        with patch.object(client.session, "request") as mock_request:
             # First few attempts fail, last succeeds
             mock_request.side_effect = [
                 Mock(status_code=500),  # First attempt fails
                 Mock(status_code=500),  # Second attempt fails
                 Mock(status_code=500),  # Third attempt fails
-                Mock(status_code=200, json=lambda: {"list": []})  # Fourth succeeds
+                Mock(status_code=200, json=lambda: {"list": []}),  # Fourth succeeds
             ]
 
             client.search_company("test")
@@ -473,19 +483,24 @@ class TestEQCClientRetryLogic:
             # Third delay should be roughly 2^2 * (0.8-1.2) = 3.2-4.8 seconds
             assert 3.2 <= delays[2] <= 5.6
 
-    @patch('work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit')
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
     def test_successful_retry_after_transient_failure(self, mock_enforce_rate_limit):
         """Test successful request after transient failures."""
         client = EQCClient(token="test_token", retry_max=2)
 
-        with patch.object(client.session, 'request') as mock_request:
+        with patch.object(client.session, "request") as mock_request:
             # First attempt fails, second succeeds
             mock_request.side_effect = [
                 Mock(status_code=500),  # First attempt fails
-                Mock(status_code=200, json=lambda: {"list": [{"companyId": "123", "companyFullName": "Test"}]})
+                Mock(
+                    status_code=200,
+                    json=lambda: {
+                        "list": [{"companyId": "123", "companyFullName": "Test"}]
+                    },
+                ),
             ]
 
-            with patch('time.sleep'):  # Mock sleep to speed up test
+            with patch("time.sleep"):  # Mock sleep to speed up test
                 results = client.search_company("test")
 
             # Should succeed and return results
@@ -506,12 +521,20 @@ class TestEQCClientAliasExtraction:
             "english_name": "English Name",
             "former_name": "旧名称",
             "other_names": "其他名称",
-            "aliases": ["数组别名1", "数组别名2"]
+            "aliases": ["数组别名1", "数组别名2"],
         }
 
         aliases = client._extract_aliases(business_info)
 
-        expected_aliases = ["别名1", "简称", "English Name", "旧名称", "其他名称", "数组别名1", "数组别名2"]
+        expected_aliases = [
+            "别名1",
+            "简称",
+            "English Name",
+            "旧名称",
+            "其他名称",
+            "数组别名1",
+            "数组别名2",
+        ]
         assert all(alias in aliases for alias in expected_aliases)
         assert len(aliases) == len(expected_aliases)
 
@@ -523,7 +546,7 @@ class TestEQCClientAliasExtraction:
             "alias_name": "",
             "short_name": None,
             "english_name": "   ",  # Whitespace only
-            "aliases": ["", None, "   ", "Valid Alias"]
+            "aliases": ["", None, "   ", "Valid Alias"],
         }
 
         aliases = client._extract_aliases(business_info)
@@ -534,9 +557,7 @@ class TestEQCClientAliasExtraction:
         """Test alias extraction when aliases field is a string instead of array."""
         client = EQCClient(token="test_token")
 
-        business_info = {
-            "aliases": "String Alias"
-        }
+        business_info = {"aliases": "String Alias"}
 
         aliases = client._extract_aliases(business_info)
 
@@ -549,7 +570,7 @@ class TestEQCClientAliasExtraction:
         business_info = {
             "alias_name": "重复别名",
             "short_name": "重复别名",  # Duplicate
-            "aliases": ["重复别名", "独特别名"]  # Another duplicate
+            "aliases": ["重复别名", "独特别名"],  # Another duplicate
         }
 
         aliases = client._extract_aliases(business_info)
@@ -565,7 +586,9 @@ class TestEQCClientUrlSanitization:
         """Test URL sanitization removes token parameters."""
         client = EQCClient(token="test_token")
 
-        url_with_token = "https://eqc.pingan.com/api/search?keyword=test&token=secret123&other=param"
+        url_with_token = (
+            "https://eqc.pingan.com/api/search?keyword=test&token=secret123&other=param"
+        )
         sanitized = client._sanitize_url_for_logging(url_with_token)
 
         assert "secret123" not in sanitized

@@ -52,7 +52,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
     """Skip opt-in suites unless their corresponding flag is enabled."""
     run_legacy = config.getoption(LEGACY_OPTION)
     run_e2e = config.getoption(E2E_OPTION)
@@ -74,14 +76,22 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
         # Skip tests marked with needs_investigation due to complexity
         if "needs_investigation" in item.keywords:
-            item.add_marker(pytest.mark.skip(reason="Test needs investigation due to known complexity issues"))
+            item.add_marker(
+                pytest.mark.skip(
+                    reason="Test needs investigation due to known complexity issues"
+                )
+            )
             continue
 
 
 def _resolve_postgres_dsn() -> str:
-    database_url = os.environ.get("DATABASE_URL") or os.environ.get("WDH_TEST_DATABASE_URI")
+    database_url = os.environ.get("DATABASE_URL") or os.environ.get(
+        "WDH_TEST_DATABASE_URI"
+    )
     if not database_url or not database_url.startswith("postgres"):
-        pytest.skip("PostgreSQL DATABASE_URL/WDH_TEST_DATABASE_URI must be set for postgres-backed tests")
+        pytest.skip(
+            "PostgreSQL DATABASE_URL/WDH_TEST_DATABASE_URI must be set for postgres-backed tests"
+        )
     return database_url
 
 
@@ -99,7 +109,9 @@ def _create_ephemeral_database(base_dsn: str) -> tuple[str, str, str]:
     try:
         with conn.cursor() as cursor:
             cursor.execute(
-                sql.SQL("CREATE DATABASE {} TEMPLATE template0").format(sql.Identifier(temp_db))
+                sql.SQL("CREATE DATABASE {} TEMPLATE template0").format(
+                    sql.Identifier(temp_db)
+                )
             )
     finally:
         conn.close()

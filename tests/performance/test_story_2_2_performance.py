@@ -16,7 +16,9 @@ from work_data_hub.domain.annuity_performance.schemas import (
     validate_gold_dataframe,
 )
 
-pytestmark = pytest.mark.skip(reason="Performance tests need recalibration after Epic 5 infrastructure refactoring")
+pytestmark = pytest.mark.skip(
+    reason="Performance tests need recalibration after Epic 5 infrastructure refactoring"
+)
 
 
 def _generate_bronze_rows(num_rows: int = 10_000) -> List[dict]:
@@ -100,8 +102,7 @@ class TestStory22Performance:
         start_pipeline = time.time()
         df = bronze_dataframe.copy()
         df["月度"] = pd.to_datetime(
-            df["月度"].str.replace("年", "-").str.replace("月", ""),
-            format="mixed"
+            df["月度"].str.replace("年", "-").str.replace("月", ""), format="mixed"
         )
         df = df.dropna().reset_index(drop=True)
         time.sleep(0.5)
@@ -110,7 +111,9 @@ class TestStory22Performance:
         time.sleep(0.2)
         pipeline_duration = time.time() - start_pipeline
 
-        overhead_pct = (validation_duration / (validation_duration + pipeline_duration)) * 100
+        overhead_pct = (
+            validation_duration / (validation_duration + pipeline_duration)
+        ) * 100
         assert overhead_pct < 20.0, (
             f"Validation overhead {overhead_pct:.1f}% exceeds 20% budget "
             "(simulated pipeline)."

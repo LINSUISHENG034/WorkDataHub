@@ -37,10 +37,10 @@ class CleansingRule:
 
     name: str
     category: RuleCategory
-    func: Callable
+    func: Callable[..., Any]
     description: str
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """验证规则的有效性"""
         if not callable(self.func):
             raise ValueError(f"Rule {self.name} must have a callable function")
@@ -61,7 +61,7 @@ class CleansingRegistry:
     _rules: Dict[str, CleansingRule] = {}
     _rule_signatures: Dict[str, inspect.Signature] = {}
 
-    def __new__(cls):
+    def __new__(cls) -> "CleansingRegistry":
         """实现单例模式，确保全局唯一的注册表"""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
@@ -133,8 +133,7 @@ class CleansingRegistry:
         if not rule:
             available = sorted(self._rules.keys())
             raise ValueError(
-                f"Cleansing rule '{rule_name}' not registered. "
-                f"Available: {available}"
+                f"Cleansing rule '{rule_name}' not registered. Available: {available}"
             )
 
         try:
@@ -166,7 +165,7 @@ class CleansingRegistry:
 
         for spec in rule_specs:
             if isinstance(spec, str):
-                rule_name = spec
+                rule_name: Optional[str] = spec
                 rule_kwargs: Dict[str, Any] = {}
             elif isinstance(spec, dict):
                 rule_name = spec.get("name")
@@ -178,10 +177,15 @@ class CleansingRegistry:
                     f"Invalid rule specification {spec!r}. Expected string or mapping."
                 )
 
+            # Ensure rule_name is not None before using it
+            if rule_name is None:
+                raise ValueError("Rule name cannot be None")
+
             merged_kwargs = {**rule_kwargs, **common_kwargs}
             result = self.apply_rule(result, rule_name, **merged_kwargs)
 
         return result
+
     def _filter_kwargs(self, rule_name: str, kwargs: Dict[str, Any]) -> Dict[str, Any]:
         if not kwargs:
             return {}
@@ -276,14 +280,18 @@ class CleansingRegistry:
     def _validate_rule_specs(self, specs: Iterable[RuleSpec], label: str) -> None:
         for spec in specs:
             if isinstance(spec, str):
-                rule_name = spec
+                rule_name: str = spec
             elif isinstance(spec, dict):
-                rule_name = spec.get("name")
-                if not rule_name:
+                rule_name_raw = spec.get("name")
+                if not rule_name_raw:
                     raise ValueError(f"Rule spec in '{label}' missing name field")
+
+                # rule_name is guaranteed to be non-empty string after the check above
+                rule_name = str(rule_name_raw)
             else:
                 raise ValueError(
-                    f"Invalid rule specification in '{label}'. Expected string or mapping, got {type(spec)}"
+                    f"Invalid rule specification in '{label}'. Expected string or "
+                    f"mapping, got {type(spec)}"
                 )
 
             if rule_name not in self._rules:
@@ -296,7 +304,9 @@ class CleansingRegistry:
 registry = CleansingRegistry()
 
 
-def rule(name: str, category: RuleCategory, description: str):
+def rule(
+    name: str, category: RuleCategory, description: str
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
     清洗规则注册装饰器 - 简化版本
 
@@ -318,7 +328,7 @@ def rule(name: str, category: RuleCategory, description: str):
             return processed_value
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         # 创建清洗规则对象
         rule_obj = CleansingRule(
             name=name, category=category, func=func, description=description
@@ -327,9 +337,7 @@ def rule(name: str, category: RuleCategory, description: str):
         # 注册到全局注册表
         registry.register(rule_obj)
 
-        # 为函数添加元数据
-        func._cleansing_rule = rule_obj  # type: ignore[attr-defined]
-
+        # 保持函数签名不变
         return func
 
     return decorator

@@ -23,7 +23,9 @@ from dagster import DagsterInstance
 
 from src.work_data_hub.orchestration.jobs import sample_pipeline_job
 
-pytestmark = pytest.mark.skip(reason="Tests require fixture files - pending Epic 5 infrastructure refactoring")
+pytestmark = pytest.mark.skip(
+    reason="Tests require fixture files - pending Epic 5 infrastructure refactoring"
+)
 
 
 @pytest.mark.integration
@@ -53,8 +55,8 @@ def test_sample_pipeline_job_executes_successfully() -> None:
             "table": "sample_data",
             "deleted": 0,
             "inserted": 5,
-            "batches": 1
-        }
+            "batches": 1,
+        },
     )
 
     with mock_connection, mock_load:
@@ -63,14 +65,16 @@ def test_sample_pipeline_job_executes_successfully() -> None:
         # which should exist for this test to pass
         result = sample_pipeline_job.execute_in_process(
             instance=instance,
-            raise_on_error=True  # Fail test immediately if job raises exception
+            raise_on_error=True,  # Fail test immediately if job raises exception
         )
 
     # Verify job completed successfully
     assert result.success is True, "sample_pipeline_job should complete successfully"
 
     # Verify all ops executed
-    executed_ops = [event.node_name for event in result.all_node_events if event.is_step_success]
+    executed_ops = [
+        event.node_name for event in result.all_node_events if event.is_step_success
+    ]
 
     assert "read_csv_op" in executed_ops, "read_csv_op should execute successfully"
     assert "validate_op" in executed_ops, "validate_op should execute successfully"
@@ -97,12 +101,12 @@ def test_sample_pipeline_job_reads_csv_fixture() -> None:
     instance = DagsterInstance.ephemeral()
 
     # Mock database operations
-    with patch("src.work_data_hub.orchestration.ops.psycopg2"), \
-         patch("src.work_data_hub.io.loader.warehouse_loader.load", return_value={}):
-
+    with (
+        patch("src.work_data_hub.orchestration.ops.psycopg2"),
+        patch("src.work_data_hub.io.loader.warehouse_loader.load", return_value={}),
+    ):
         result = sample_pipeline_job.execute_in_process(
-            instance=instance,
-            raise_on_error=True
+            instance=instance, raise_on_error=True
         )
 
     # Extract output from read_csv_op
@@ -138,12 +142,12 @@ def test_sample_pipeline_job_validates_with_pipeline_framework() -> None:
     instance = DagsterInstance.ephemeral()
 
     # Mock database operations
-    with patch("src.work_data_hub.orchestration.ops.psycopg2"), \
-         patch("src.work_data_hub.io.loader.warehouse_loader.load", return_value={}):
-
+    with (
+        patch("src.work_data_hub.orchestration.ops.psycopg2"),
+        patch("src.work_data_hub.io.loader.warehouse_loader.load", return_value={}),
+    ):
         result = sample_pipeline_job.execute_in_process(
-            instance=instance,
-            raise_on_error=True
+            instance=instance, raise_on_error=True
         )
 
     # Extract data before and after validation
@@ -155,8 +159,9 @@ def test_sample_pipeline_job_validates_with_pipeline_framework() -> None:
 
     # Verify data structure preserved (pass-through for demo)
     assert isinstance(validated_data, list), "Validated data should be a list"
-    assert len(validated_data) == len(csv_data), \
+    assert len(validated_data) == len(csv_data), (
         "Validated data should have same length as input (pass-through demo)"
+    )
 
 
 @pytest.mark.integration
@@ -181,30 +186,33 @@ def test_sample_pipeline_job_backward_compatibility() -> None:
     instance = DagsterInstance.ephemeral()
 
     # Mock database operations
-    with patch("src.work_data_hub.orchestration.ops.psycopg2"), \
-         patch("src.work_data_hub.io.loader.warehouse_loader.load", return_value={}):
-
+    with (
+        patch("src.work_data_hub.orchestration.ops.psycopg2"),
+        patch("src.work_data_hub.io.loader.warehouse_loader.load", return_value={}),
+    ):
         # This should execute without errors, demonstrating backward compatibility
         result = sample_pipeline_job.execute_in_process(
-            instance=instance,
-            raise_on_error=True
+            instance=instance, raise_on_error=True
         )
 
     # Verify job structure remains intact
     assert result.success is True
 
     # Verify all expected ops are present and execute
-    op_names = {event.node_name for event in result.all_node_events if event.is_step_success}
+    op_names = {
+        event.node_name for event in result.all_node_events if event.is_step_success
+    }
 
     expected_ops = {"read_csv_op", "validate_op", "load_to_db_op"}
-    assert expected_ops.issubset(op_names), \
+    assert expected_ops.issubset(op_names), (
         f"Expected ops {expected_ops} should all execute, got: {op_names}"
+    )
 
 
 @pytest.mark.integration
 @pytest.mark.skipif(
     True,  # Skip by default - requires database fixture
-    reason="Requires PostgreSQL database fixture (enable for full integration testing)"
+    reason="Requires PostgreSQL database fixture (enable for full integration testing)",
 )
 def test_sample_pipeline_job_with_database(postgres_db_with_migrations: str) -> None:
     """
@@ -236,16 +244,14 @@ def test_sample_pipeline_job_with_database(postgres_db_with_migrations: str) -> 
                 "config": {
                     "table": "sample_data",
                     "mode": "append",
-                    "connection_string": postgres_db_with_migrations
+                    "connection_string": postgres_db_with_migrations,
                 }
             }
         }
     }
 
     result = sample_pipeline_job.execute_in_process(
-        instance=instance,
-        run_config=run_config,
-        raise_on_error=True
+        instance=instance, run_config=run_config, raise_on_error=True
     )
 
     assert result.success is True
@@ -286,23 +292,26 @@ def test_validate_op_pipeline_api_bug_fixed() -> None:
     instance = DagsterInstance.ephemeral()
 
     # Mock database operations
-    with patch("src.work_data_hub.orchestration.ops.psycopg2"), \
-         patch("src.work_data_hub.io.loader.warehouse_loader.load", return_value={}):
-
+    with (
+        patch("src.work_data_hub.orchestration.ops.psycopg2"),
+        patch("src.work_data_hub.io.loader.warehouse_loader.load", return_value={}),
+    ):
         # This should NOT raise TypeError about unexpected 'name' argument
         result = sample_pipeline_job.execute_in_process(
             instance=instance,
-            raise_on_error=True  # Fail on any exception, including TypeError
+            raise_on_error=True,  # Fail on any exception, including TypeError
         )
 
     # Verify validate_op executed successfully (no TypeError)
     validate_events = [
-        event for event in result.all_node_events
+        event
+        for event in result.all_node_events
         if event.node_name == "validate_op" and event.is_step_success
     ]
 
-    assert len(validate_events) > 0, \
+    assert len(validate_events) > 0, (
         "validate_op should execute successfully without Pipeline API TypeError"
+    )
 
 
 # ============================================================================
@@ -342,12 +351,12 @@ def test_sample_pipeline_job_performance_baseline() -> None:
     start_time = time.time()
 
     # Mock database operations
-    with patch("src.work_data_hub.orchestration.ops.psycopg2"), \
-         patch("src.work_data_hub.io.loader.warehouse_loader.load", return_value={}):
-
+    with (
+        patch("src.work_data_hub.orchestration.ops.psycopg2"),
+        patch("src.work_data_hub.io.loader.warehouse_loader.load", return_value={}),
+    ):
         result = sample_pipeline_job.execute_in_process(
-            instance=instance,
-            raise_on_error=True
+            instance=instance, raise_on_error=True
         )
 
     duration_seconds = time.time() - start_time
@@ -363,7 +372,7 @@ def test_sample_pipeline_job_performance_baseline() -> None:
         pytest.warns(
             UserWarning,
             match=f"sample_pipeline_job execution time ({duration_seconds:.2f}s) "
-                  f"exceeded baseline+20% ({threshold_seconds:.2f}s)"
+            f"exceeded baseline+20% ({threshold_seconds:.2f}s)",
         )
 
 

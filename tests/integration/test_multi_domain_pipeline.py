@@ -110,13 +110,21 @@ class MockFileDiscovery:
 class StubDiscoveryService:
     """Stubbed file discovery that returns normalized DataFrames in DataDiscoveryResult."""
 
-    def __init__(self, dataframe: pd.DataFrame, *, version: str = "V1", sheet: str = DEFAULT_SHEET) -> None:
+    def __init__(
+        self,
+        dataframe: pd.DataFrame,
+        *,
+        version: str = "V1",
+        sheet: str = DEFAULT_SHEET,
+    ) -> None:
         self._df = dataframe
         self.version = version
         self.sheet = sheet
         self.calls: List[dict[str, str]] = []
 
-    def discover_and_load(self, domain: str, month: str, **_: str) -> DataDiscoveryResult:  # type: ignore[override]
+    def discover_and_load(
+        self, domain: str, month: str, **_: str
+    ) -> DataDiscoveryResult:  # type: ignore[override]
         self.calls.append({"domain": domain, "month": month})
         df_copy = self._df.copy(deep=True)
         return DataDiscoveryResult(
@@ -162,15 +170,17 @@ class StubWarehouseLoader:
         )
 
 
-def create_mock_annuity_performance_data(month: str = DEFAULT_MONTH, rows: int = 1000) -> pd.DataFrame:
+def create_mock_annuity_performance_data(
+    month: str = DEFAULT_MONTH, rows: int = 1000
+) -> pd.DataFrame:
     """Create mock data for annuity_performance domain using factory."""
     factory = AnnuityTestDataFactory()
     df = factory.create_valid_sample(n=rows)
     df["月度"] = int(month)
     # Ensure domain specific columns exist
     if "计划代码" not in df.columns:
-         df["计划代码"] = [f"P{i}" for i in range(rows)]
-    
+        df["计划代码"] = [f"P{i}" for i in range(rows)]
+
     # Avoid duplicate columns after MappingStep ("机构" -> "机构名称")
     if "机构" in df.columns and "机构名称" in df.columns:
         df = df.drop(columns=["机构名称"])
@@ -178,7 +188,9 @@ def create_mock_annuity_performance_data(month: str = DEFAULT_MONTH, rows: int =
     return df
 
 
-def create_mock_annuity_income_data(month: str = DEFAULT_MONTH, rows: int = 1000) -> pd.DataFrame:
+def create_mock_annuity_income_data(
+    month: str = DEFAULT_MONTH, rows: int = 1000
+) -> pd.DataFrame:
     """Create mock data for annuity_income domain using factory."""
     factory = AnnuityTestDataFactory()
     df = factory.create_annuity_income_sample(n=rows, month=month)
@@ -190,7 +202,9 @@ def create_mock_annuity_income_data(month: str = DEFAULT_MONTH, rows: int = 1000
     return df
 
 
-def measure_performance(func: Any, *args: Any, **kwargs: Any) -> tuple[Any, PerformanceMetrics]:
+def measure_performance(
+    func: Any, *args: Any, **kwargs: Any
+) -> tuple[Any, PerformanceMetrics]:
     """Measure performance of a function call."""
     domain = kwargs.get("domain", "unknown")
 
@@ -214,7 +228,9 @@ def measure_performance(func: Any, *args: Any, **kwargs: Any) -> tuple[Any, Perf
 
     processing_time_ms = (end_time - start_time) * 1000
     rows_processed = len(result) if hasattr(result, "__len__") else 0
-    throughput = rows_processed / (processing_time_ms / 1000) if processing_time_ms > 0 else 0
+    throughput = (
+        rows_processed / (processing_time_ms / 1000) if processing_time_ms > 0 else 0
+    )
 
     metrics = PerformanceMetrics(
         domain=domain,
@@ -285,7 +301,9 @@ def check_performance_regression(
 
         baseline_time = baseline_metrics[current.domain]["processing_time_ms"]
         if baseline_time > 0:
-            regression_percent = ((current.processing_time_ms - baseline_time) / baseline_time) * 100
+            regression_percent = (
+                (current.processing_time_ms - baseline_time) / baseline_time
+            ) * 100
             if regression_percent > threshold_percent:
                 warnings.append(
                     f"Performance regression in {current.domain}: "
@@ -303,8 +321,12 @@ class TestMultiDomainPipeline:
     def mock_data(self) -> Dict[str, pd.DataFrame]:
         """Create mock data for both domains."""
         return {
-            f"annuity_performance_{DEFAULT_MONTH}": create_mock_annuity_performance_data(rows=1000),
-            f"annuity_income_{DEFAULT_MONTH}": create_mock_annuity_income_data(rows=1000),
+            f"annuity_performance_{DEFAULT_MONTH}": create_mock_annuity_performance_data(
+                rows=1000
+            ),
+            f"annuity_income_{DEFAULT_MONTH}": create_mock_annuity_income_data(
+                rows=1000
+            ),
         }
 
     @pytest.fixture
@@ -396,15 +418,27 @@ class TestMultiDomainPipeline:
         from work_data_hub.domain.annuity_performance import constants as ap_constants
 
         # Domain-specific constants should be different objects
-        assert ai_constants.COLUMN_ALIAS_MAPPING is not ap_constants.COLUMN_ALIAS_MAPPING
-        assert ai_constants.LEGACY_COLUMNS_TO_DELETE is not ap_constants.LEGACY_COLUMNS_TO_DELETE
-        assert ai_constants.DEFAULT_ALLOWED_GOLD_COLUMNS is not ap_constants.DEFAULT_ALLOWED_GOLD_COLUMNS
+        assert (
+            ai_constants.COLUMN_ALIAS_MAPPING is not ap_constants.COLUMN_ALIAS_MAPPING
+        )
+        assert (
+            ai_constants.LEGACY_COLUMNS_TO_DELETE
+            is not ap_constants.LEGACY_COLUMNS_TO_DELETE
+        )
+        assert (
+            ai_constants.DEFAULT_ALLOWED_GOLD_COLUMNS
+            is not ap_constants.DEFAULT_ALLOWED_GOLD_COLUMNS
+        )
 
     @pytest.mark.integration
     def test_domain_output_schemas_are_distinct(self) -> None:
         """AC9: Verify domain output schemas don't overlap incorrectly."""
-        from work_data_hub.domain.annuity_income.constants import DEFAULT_ALLOWED_GOLD_COLUMNS as AI_COLS
-        from work_data_hub.domain.annuity_performance.constants import DEFAULT_ALLOWED_GOLD_COLUMNS as AP_COLS
+        from work_data_hub.domain.annuity_income.constants import (
+            DEFAULT_ALLOWED_GOLD_COLUMNS as AI_COLS,
+        )
+        from work_data_hub.domain.annuity_performance.constants import (
+            DEFAULT_ALLOWED_GOLD_COLUMNS as AP_COLS,
+        )
 
         ai_cols_set = set(AI_COLS)
         ap_cols_set = set(AP_COLS)
@@ -529,7 +563,9 @@ class TestPerformanceBaseline:
                 throughput_rows_per_sec=10000.0,
             )
         ]
-        save_performance_baseline(baseline_metrics, EnvironmentInfo.capture(), baseline_path)
+        save_performance_baseline(
+            baseline_metrics, EnvironmentInfo.capture(), baseline_path
+        )
 
         # Test with no regression
         current_metrics = [
@@ -541,7 +577,9 @@ class TestPerformanceBaseline:
                 throughput_rows_per_sec=9523.8,
             )
         ]
-        warnings = check_performance_regression(current_metrics, baseline_path, threshold_percent=10.0)
+        warnings = check_performance_regression(
+            current_metrics, baseline_path, threshold_percent=10.0
+        )
         assert len(warnings) == 0
 
         # Test with regression
@@ -554,7 +592,9 @@ class TestPerformanceBaseline:
                 throughput_rows_per_sec=6666.7,
             )
         ]
-        warnings = check_performance_regression(regressed_metrics, baseline_path, threshold_percent=10.0)
+        warnings = check_performance_regression(
+            regressed_metrics, baseline_path, threshold_percent=10.0
+        )
         assert len(warnings) == 1
         assert "regression" in warnings[0].lower()
 
@@ -568,7 +608,10 @@ class TestPerformanceBaseline:
         assert "environment" in data
         assert "metrics" in data
         assert isinstance(data["metrics"], list)
-        assert all({"domain", "processing_time_ms", "rows_processed"} <= set(m.keys()) for m in data["metrics"])
+        assert all(
+            {"domain", "processing_time_ms", "rows_processed"} <= set(m.keys())
+            for m in data["metrics"]
+        )
 
 
 # Parallel execution note (AC9):

@@ -8,7 +8,12 @@ from work_data_hub.utils.column_normalizer import normalize_column_names
 @pytest.mark.unit
 def test_basic_whitespace_normalization():
     columns = ["月度  ", "  计划代码", "客户名称\n", "期末资产规模"]
-    assert normalize_column_names(columns) == ["月度", "计划代码", "客户名称", "期末资产规模"]
+    assert normalize_column_names(columns) == [
+        "月度",
+        "计划代码",
+        "客户名称",
+        "期末资产规模",
+    ]
 
 
 @pytest.mark.unit

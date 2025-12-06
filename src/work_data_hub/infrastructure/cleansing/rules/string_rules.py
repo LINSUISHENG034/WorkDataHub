@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import re
+from typing import Any
 
 from work_data_hub.infrastructure.cleansing.registry import RuleCategory, rule
 
-_DECORATIVE_CHARS = "「」『』\"""《》"
+_DECORATIVE_CHARS = '「」『』"《》'
 
 # Legacy parity: suffixes / markers to remove from company names
 _COMPANY_NAME_SUFFIXES_TO_REMOVE = (
@@ -60,11 +59,11 @@ def trim_whitespace(value: Any) -> Any:
 )
 def normalize_company_name(value: Any) -> Any:
     """
-    Legacy-compatible公司名称规范化（对齐 legacy/annuity_hub/common_utils.clean_company_name）。
+    Legacy-compatible公司名称规范化（对齐
+    legacy/annuity_hub/common_utils.clean_company_name）。
 
     Story 5.6.2: 清理开头/结尾的括号内容 (xx) 或 （xx）
     业务规则：公司名称以括号为开头或结尾都应归类为异常字符，可以直接清除。
-    限制：只处理开头、结尾的情况，中间的括号内容不可直接清除。
     """
     if value is None:
         return None
@@ -72,7 +71,8 @@ def normalize_company_name(value: Any) -> Any:
     if not isinstance(value, str):
         return value
 
-    # Collapse whitespace to single spaces (legacy compatibility expects preserved token gaps)
+    # Collapse whitespace to single spaces (legacy compatibility expects preserved token
+    # gaps)
     normalized = re.sub(r"\s+", " ", value.replace("\u3000", " ")).strip()
     for char in _DECORATIVE_CHARS:
         normalized = normalized.replace(char, "")
@@ -89,10 +89,15 @@ def normalize_company_name(value: Any) -> Any:
 
     # Remove core status markers from start/end (sorted desc by length)
     for core_str in _SORTED_CORE_SUFFIXES:
-        pattern_start = rf'^([\(\（]?){re.escape(core_str)}([\)\）]?)(?=[^\u4e00-\u9fff]|$)'
+        pattern_start = (
+            rf"^([\(\（]?){re.escape(core_str)}([\)\）]?)(?=[^\u4e00-\u9fff]|$)"
+        )
         normalized = re.sub(pattern_start, "", normalized)
 
-        pattern_end = rf'(?<![\u4e00-\u9fff])([\-\(\（]?){re.escape(core_str)}([\)\）]?)[\-\(\（\)\）]*$'
+        pattern_end = (
+            rf"(?<![\u4e00-\u9fff])([\-\(\（]?){re.escape(core_str)}([\)\）]?)"
+            r"[\-\(\（\)\）]*$"
+        )
         normalized = re.sub(pattern_end, "", normalized)
 
     # Trim trailing hyphens/brackets
@@ -100,7 +105,10 @@ def normalize_company_name(value: Any) -> Any:
 
     # Convert full-width ASCII to half-width (legacy default to_fullwidth=False)
     normalized = "".join(
-        [chr(ord(char) - 0xFEE0) if 0xFF01 <= ord(char) <= 0xFF5E else char for char in normalized]
+        [
+            chr(ord(char) - 0xFEE0) if 0xFF01 <= ord(char) <= 0xFF5E else char
+            for char in normalized
+        ]
     )
 
     # Normalize parentheses to full-width (Chinese standard)

@@ -22,8 +22,8 @@ try:  # pragma: no cover - availability checked at runtime
     from psycopg2.extras import execute_values
     from psycopg2.pool import ThreadedConnectionPool
 except ImportError:  # pragma: no cover - handled gracefully
-    OperationalError = None  # type: ignore[assignment]
-    ThreadedConnectionPool = None  # type: ignore[assignment]
+    OperationalError = None  # type: ignore[assignment, misc]
+    ThreadedConnectionPool = None  # type: ignore[assignment, misc]
     execute_values = None  # type: ignore[assignment]
 
 from work_data_hub.config import get_settings
@@ -65,7 +65,11 @@ class WarehouseLoader:
         batch_size: Optional[int] = None,
         connect_timeout: int = 5,
     ) -> None:
-        if ThreadedConnectionPool is None or OperationalError is None or execute_values is None:
+        if (
+            ThreadedConnectionPool is None
+            or OperationalError is None
+            or execute_values is None
+        ):
             raise DataWarehouseLoaderError(
                 "psycopg2 is required to use WarehouseLoader but is not installed"
             )
@@ -131,7 +135,7 @@ class WarehouseLoader:
         else:
             self._pool.putconn(conn)
 
-    def _get_connection_with_retry(self):
+    def _get_connection_with_retry(self) -> Any:
         """Acquire a connection from the pool with retry on transient errors."""
         last_error: Optional[Exception] = None
         delay = self._backoff_ms / 1000
@@ -153,7 +157,9 @@ class WarehouseLoader:
                 )
                 time.sleep(delay)
                 delay *= 2
-        raise DataWarehouseLoaderError("Unable to acquire database connection") from last_error
+        raise DataWarehouseLoaderError(
+            "Unable to acquire database connection"
+        ) from last_error
 
     def get_allowed_columns(self, table: str, schema: str = "public") -> List[str]:
         """Fetch and cache the allowed columns for a table."""
@@ -195,7 +201,9 @@ class WarehouseLoader:
     ) -> pd.DataFrame:
         """Project DataFrame columns to the allowed schema-defined set."""
         if not isinstance(df, pd.DataFrame):
-            raise DataWarehouseLoaderError("load_dataframe() requires a pandas DataFrame")
+            raise DataWarehouseLoaderError(
+                "load_dataframe() requires a pandas DataFrame"
+            )
 
         allowed = self.get_allowed_columns(table, schema)
         preserved = [col for col in allowed if col in df.columns]
@@ -267,7 +275,9 @@ class WarehouseLoader:
     ) -> LoadResult:
         """Load a DataFrame into PostgreSQL with ACID guarantees."""
         if not isinstance(df, pd.DataFrame):
-            raise DataWarehouseLoaderError("load_dataframe() requires a pandas DataFrame")
+            raise DataWarehouseLoaderError(
+                "load_dataframe() requires a pandas DataFrame"
+            )
 
         execution_id = uuid.uuid4().hex
         if df.empty:
@@ -311,7 +321,7 @@ class WarehouseLoader:
                         page_size=min(len(values), self.batch_size),
                     )
                     result_flags = cursor.fetchall()
-                    inserted = sum(1 for flag, in result_flags if flag)
+                    inserted = sum(1 for (flag,) in result_flags if flag)
                     rows_inserted += inserted
                     rows_updated += len(result_flags) - inserted
             conn.commit()
@@ -383,7 +393,8 @@ class WarehouseLoader:
             LoadResult with rows_inserted (new records) and rows_updated (deleted count)
 
         Example:
-            # Refresh all records for specific month/business_type/plan_type combinations
+            # Refresh all records for specific month/business_type/plan_type
+            # combinations
             loader.load_with_refresh(
                 df,
                 table="annuity_performance_NEW",
@@ -391,7 +402,9 @@ class WarehouseLoader:
             )
         """
         if not isinstance(df, pd.DataFrame):
-            raise DataWarehouseLoaderError("load_with_refresh() requires a pandas DataFrame")
+            raise DataWarehouseLoaderError(
+                "load_with_refresh() requires a pandas DataFrame"
+            )
 
         execution_id = uuid.uuid4().hex
         if df.empty:
@@ -405,7 +418,9 @@ class WarehouseLoader:
             return LoadResult(True, 0, 0, 0.0, execution_id)
 
         if not refresh_keys:
-            raise DataWarehouseLoaderError("refresh_keys is required for load_with_refresh()")
+            raise DataWarehouseLoaderError(
+                "refresh_keys is required for load_with_refresh()"
+            )
 
         # Validate refresh_keys exist in DataFrame
         missing_keys = [k for k in refresh_keys if k not in df.columns]
@@ -418,7 +433,9 @@ class WarehouseLoader:
         columns = list(projected_df.columns)
 
         # Extract unique combinations of refresh_keys from input data
-        unique_combinations = df[refresh_keys].drop_duplicates().to_dict(orient="records")
+        unique_combinations = (
+            df[refresh_keys].drop_duplicates().to_dict(orient="records")
+        )
 
         conn = self._get_connection_with_retry()
         start_time = time.perf_counter()
@@ -451,12 +468,17 @@ class WarehouseLoader:
                                 conditions.append(f"{quote_ident(key)} = %s")
                                 values.append(val)
 
-                        delete_sql = f"DELETE FROM {qualified_table} WHERE {' AND '.join(conditions)}"
+                        delete_sql = (
+                            f"DELETE FROM {qualified_table} "
+                            f"WHERE {' AND '.join(conditions)}"
+                        )
                         cursor.execute(delete_sql, values)
                         rows_deleted += cursor.rowcount if cursor.rowcount > 0 else 0
 
                 # Step 2: INSERT all new records
-                insert_query = self._build_insert_query(columns, table, schema, upsert_keys=None)
+                insert_query = self._build_insert_query(
+                    columns, table, schema, upsert_keys=None
+                )
                 for batch in self._chunk_dataframe(projected_df):
                     values = list(batch.itertuples(index=False, name=None))
                     if not values:
@@ -503,7 +525,8 @@ class WarehouseLoader:
             rows_inserted=rows_inserted,
             duration_ms=duration_ms,
         )
-        # Use rows_updated to report deleted count for consistency with LoadResult structure
+        # Use rows_updated to report deleted count for consistency with LoadResult
+        # structure
         return LoadResult(
             success=True,
             rows_inserted=rows_inserted,
@@ -834,7 +857,7 @@ def _prepare_unique_pk_tuples(
     return unique_tuples
 
 
-def _adapt_param(v):
+def _adapt_param(v: Any) -> Any:
     """
     Adapt dict/list parameters for JSONB columns.
 
@@ -1306,7 +1329,7 @@ def load(
                 elif op_type == "INSERT":
                     # Use execute_values for performance
                     try:
-                        from psycopg2.extras import execute_values  # type: ignore
+                        from psycopg2.extras import execute_values
                     except ImportError:
                         raise DataWarehouseLoaderError(
                             "psycopg2 not available for bulk operations"

@@ -27,7 +27,7 @@ class CrawlerFactory:
         :param mappings: List of dictionaries containing mapping data.
         """
         self.mappings = mappings
-        self.crawler_module = r'crawler.eqc_crawler'
+        self.crawler_module = r"crawler.eqc_crawler"
 
     def create_crawler(self, crawler_name):
         try:
@@ -35,7 +35,7 @@ class CrawlerFactory:
             crawler_class = getattr(module, crawler_name)
             return crawler_class
         except Exception as e:
-            logger.error(f'Error creating crawler {crawler_name}. Error: {e}')
+            logger.error(f"Error creating crawler {crawler_name}. Error: {e}")
             return None
 
     def create_crawlers(self, keyword: str = None) -> list:
@@ -47,13 +47,19 @@ class CrawlerFactory:
         :return: A list of crawler instances corresponding to the matched keyword.
         """
         if keyword:
-            matched_mappings = [m for m in self.mappings if m['keyword'] == keyword]
+            matched_mappings = [m for m in self.mappings if m["keyword"] == keyword]
             crawlers = []
             for m in matched_mappings:
                 try:
                     module = import_module(self.crawler_module)
-                    crawler_class = getattr(module, m['crawler_class'])
-                    crawlers.append(crawler_class(m['auth_token'], m['target_database'], m['target_collection']))
+                    crawler_class = getattr(module, m["crawler_class"])
+                    crawlers.append(
+                        crawler_class(
+                            m["auth_token"],
+                            m["target_database"],
+                            m["target_collection"],
+                        )
+                    )
                 except KeyError as e:
                     logger.error(f"Error fetching the crawler class: {e}")
                 except Exception as e:

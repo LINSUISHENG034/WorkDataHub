@@ -31,7 +31,9 @@ class TestCleansingRegistry:
         domain_rules = self.registry.get_domain_rules("annuity_performance", "客户名称")
         assert "normalize_company_name" in domain_rules
 
-        missing_field_rules = self.registry.get_domain_rules("annuity_performance", "未知字段")
+        missing_field_rules = self.registry.get_domain_rules(
+            "annuity_performance", "未知字段"
+        )
         assert missing_field_rules == []
 
         default_rules = self.registry.get_domain_rules("unknown-domain", "plan_code")

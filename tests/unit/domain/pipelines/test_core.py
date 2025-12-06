@@ -8,7 +8,10 @@ import pandas as pd
 import pytest
 
 from work_data_hub.config import get_settings
-from src.work_data_hub.domain.pipelines.pipeline_config import PipelineConfig, StepConfig
+from src.work_data_hub.domain.pipelines.pipeline_config import (
+    PipelineConfig,
+    StepConfig,
+)
 from src.work_data_hub.domain.pipelines.core import Pipeline
 from src.work_data_hub.domain.pipelines.examples import build_reference_pipeline
 from src.work_data_hub.domain.pipelines.exceptions import PipelineStepError, StepSkipped
@@ -30,7 +33,9 @@ class AddOneStep(DataFrameStep):
     def name(self) -> str:
         return self._name
 
-    def execute(self, dataframe: pd.DataFrame, context: PipelineContext) -> pd.DataFrame:
+    def execute(
+        self, dataframe: pd.DataFrame, context: PipelineContext
+    ) -> pd.DataFrame:
         updated = dataframe.copy(deep=True)
         updated["value"] = updated["value"] + 1
         return updated
@@ -74,7 +79,9 @@ class OptionalStep(DataFrameStep):
     def name(self) -> str:
         return self._name
 
-    def execute(self, dataframe: pd.DataFrame, context: PipelineContext) -> pd.DataFrame:
+    def execute(
+        self, dataframe: pd.DataFrame, context: PipelineContext
+    ) -> pd.DataFrame:
         raise StepSkipped(self.reason)
 
 
@@ -219,7 +226,9 @@ def test_pipeline_logging_events(monkeypatch, pipeline_config):
     pipeline = Pipeline(steps=[AddOneStep()], config=pipeline_config)
     pipeline.run(pd.DataFrame([{"value": 1}]))
 
-    emitted_events = [event["event"] for event in stub_logger.events if "event" in event]
+    emitted_events = [
+        event["event"] for event in stub_logger.events if "event" in event
+    ]
     assert "pipeline.started" in emitted_events
     assert "pipeline.step.started" in emitted_events
     assert "pipeline.step.completed" in emitted_events
@@ -242,7 +251,12 @@ def test_reference_pipeline_chaining():
     assert result.success
     assert not result.output_data.empty
     assert set(result.output_data.columns) == {"region", "region_total"}
-    assert result.output_data.loc[result.output_data["region"] == "APAC", "region_total"].iloc[0] == 10
+    assert (
+        result.output_data.loc[
+            result.output_data["region"] == "APAC", "region_total"
+        ].iloc[0]
+        == 10
+    )
 
 
 @pytest.mark.unit
@@ -388,7 +402,9 @@ def test_dataframe_step_performance_benchmark():
     pipeline.run(dataset)
 
     best_duration = _measure_runtime(lambda: pipeline.run(dataset))
-    assert best_duration < 0.1, f"DataFrame step exceeded 100ms budget ({best_duration:.4f}s)"
+    assert best_duration < 0.1, (
+        f"DataFrame step exceeded 100ms budget ({best_duration:.4f}s)"
+    )
 
 
 @pytest.mark.performance
@@ -494,26 +510,32 @@ class RetryableErrorStep(DataFrameStep):
     def name(self) -> str:
         return self._name
 
-    def execute(self, dataframe: pd.DataFrame, context: PipelineContext) -> pd.DataFrame:
+    def execute(
+        self, dataframe: pd.DataFrame, context: PipelineContext
+    ) -> pd.DataFrame:
         self.attempt_count += 1
         if self.attempt_count <= self.fail_count:
             if self.error_type == "database":
                 import psycopg2
+
                 raise psycopg2.OperationalError("connection lost")
             elif self.error_type == "network":
                 raise ConnectionResetError("network connection reset")
             elif self.error_type == "http_500":
                 from requests import HTTPError, Response
+
                 resp = Response()
                 resp.status_code = 500
                 raise HTTPError(response=resp)
             elif self.error_type == "http_429":
                 from requests import HTTPError, Response
+
                 resp = Response()
                 resp.status_code = 429
                 raise HTTPError(response=resp)
             elif self.error_type == "http_404":
                 from requests import HTTPError, Response
+
                 resp = Response()
                 resp.status_code = 404
                 raise HTTPError(response=resp)

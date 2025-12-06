@@ -84,18 +84,20 @@ class TestConvertDataframeToModels:
     def test_converts_valid_rows(self):
         """Converts valid DataFrame rows to models."""
         # Story 5.5.5: Updated to use four income fields instead of 收入金额
-        df = pd.DataFrame({
-            "月度": [date(2024, 12, 1), date(2024, 11, 1)],
-            "计划号": ["FP0001", "FP0002"],
-            "客户名称": ["公司A", "公司B"],
-            "company_id": ["COMP001", "COMP002"],
-            "产品线代码": ["PL201", "PL201"],
-            "机构代码": ["G00", "G00"],
-            "固费": [500000.0, 1000000.0],
-            "浮费": [300000.0, 600000.0],
-            "回补": [200000.0, 400000.0],
-            "税": [50000.0, 100000.0],
-        })
+        df = pd.DataFrame(
+            {
+                "月度": [date(2024, 12, 1), date(2024, 11, 1)],
+                "计划号": ["FP0001", "FP0002"],
+                "客户名称": ["公司A", "公司B"],
+                "company_id": ["COMP001", "COMP002"],
+                "产品线代码": ["PL201", "PL201"],
+                "机构代码": ["G00", "G00"],
+                "固费": [500000.0, 1000000.0],
+                "浮费": [300000.0, 600000.0],
+                "回补": [200000.0, 400000.0],
+                "税": [50000.0, 100000.0],
+            }
+        )
 
         records, unknown_names = convert_dataframe_to_models(df)
 
@@ -107,18 +109,20 @@ class TestConvertDataframeToModels:
     def test_skips_rows_without_plan_code(self):
         """Skips rows without 计划号."""
         # Story 5.5.5: Updated to use four income fields instead of 收入金额
-        df = pd.DataFrame({
-            "月度": [date(2024, 12, 1), date(2024, 11, 1)],
-            "计划号": ["FP0001", None],
-            "客户名称": ["公司A", "公司B"],
-            "company_id": ["COMP001", "COMP002"],
-            "产品线代码": ["PL201", "PL201"],
-            "机构代码": ["G00", "G00"],
-            "固费": [10.0, 20.0],
-            "浮费": [5.0, 10.0],
-            "回补": [3.0, 6.0],
-            "税": [1.0, 2.0],
-        })
+        df = pd.DataFrame(
+            {
+                "月度": [date(2024, 12, 1), date(2024, 11, 1)],
+                "计划号": ["FP0001", None],
+                "客户名称": ["公司A", "公司B"],
+                "company_id": ["COMP001", "COMP002"],
+                "产品线代码": ["PL201", "PL201"],
+                "机构代码": ["G00", "G00"],
+                "固费": [10.0, 20.0],
+                "浮费": [5.0, 10.0],
+                "回补": [3.0, 6.0],
+                "税": [1.0, 2.0],
+            }
+        )
 
         records, unknown_names = convert_dataframe_to_models(df)
 
@@ -128,18 +132,20 @@ class TestConvertDataframeToModels:
     def test_skips_rows_without_date(self):
         """Skips rows without 月度."""
         # Story 5.5.5: Updated to use four income fields instead of 收入金额
-        df = pd.DataFrame({
-            "月度": [date(2024, 12, 1), None],
-            "计划号": ["FP0001", "FP0002"],
-            "客户名称": ["公司A", "公司B"],
-            "company_id": ["COMP001", "COMP002"],
-            "产品线代码": ["PL201", "PL201"],
-            "机构代码": ["G00", "G00"],
-            "固费": [10.0, 20.0],
-            "浮费": [5.0, 10.0],
-            "回补": [3.0, 6.0],
-            "税": [1.0, 2.0],
-        })
+        df = pd.DataFrame(
+            {
+                "月度": [date(2024, 12, 1), None],
+                "计划号": ["FP0001", "FP0002"],
+                "客户名称": ["公司A", "公司B"],
+                "company_id": ["COMP001", "COMP002"],
+                "产品线代码": ["PL201", "PL201"],
+                "机构代码": ["G00", "G00"],
+                "固费": [10.0, 20.0],
+                "浮费": [5.0, 10.0],
+                "回补": [3.0, 6.0],
+                "税": [1.0, 2.0],
+            }
+        )
 
         records, unknown_names = convert_dataframe_to_models(df)
 
@@ -148,18 +154,20 @@ class TestConvertDataframeToModels:
     def test_tracks_unknown_names(self):
         """Tracks customer names with temp IDs (IN_ prefix)."""
         # Story 5.5.5: Updated to use four income fields instead of 收入金额
-        df = pd.DataFrame({
-            "月度": [date(2024, 12, 1), date(2024, 11, 1)],
-            "计划号": ["FP0001", "FP0002"],
-            "客户名称": ["公司A", "公司B"],
-            "company_id": ["COMP001", "IN_ABC123"],  # Second has temp ID
-            "产品线代码": ["PL201", "PL201"],
-            "机构代码": ["G00", "G00"],
-            "固费": [1.0, 2.0],
-            "浮费": [0.5, 1.0],
-            "回补": [0.3, 0.6],
-            "税": [0.1, 0.2],
-        })
+        df = pd.DataFrame(
+            {
+                "月度": [date(2024, 12, 1), date(2024, 11, 1)],
+                "计划号": ["FP0001", "FP0002"],
+                "客户名称": ["公司A", "公司B"],
+                "company_id": ["COMP001", "IN_ABC123"],  # Second has temp ID
+                "产品线代码": ["PL201", "PL201"],
+                "机构代码": ["G00", "G00"],
+                "固费": [1.0, 2.0],
+                "浮费": [0.5, 1.0],
+                "回补": [0.3, 0.6],
+                "税": [0.1, 0.2],
+            }
+        )
 
         records, unknown_names = convert_dataframe_to_models(df)
 
@@ -169,18 +177,20 @@ class TestConvertDataframeToModels:
     def test_handles_nan_values(self):
         """Handles NaN values in DataFrame."""
         # Story 5.5.5: Updated to use four income fields instead of 收入金额
-        df = pd.DataFrame({
-            "月度": [date(2024, 12, 1)],
-            "计划号": ["FP0001"],
-            "客户名称": ["公司A"],
-            "company_id": ["COMP001"],
-            "产品线代码": ["PL201"],
-            "机构代码": ["G00"],
-            "固费": [float("nan")],
-            "浮费": [1.0],
-            "回补": [1.0],
-            "税": [1.0],
-        })
+        df = pd.DataFrame(
+            {
+                "月度": [date(2024, 12, 1)],
+                "计划号": ["FP0001"],
+                "客户名称": ["公司A"],
+                "company_id": ["COMP001"],
+                "产品线代码": ["PL201"],
+                "机构代码": ["G00"],
+                "固费": [float("nan")],
+                "浮费": [1.0],
+                "回补": [1.0],
+                "税": [1.0],
+            }
+        )
 
         records, unknown_names = convert_dataframe_to_models(df)
 

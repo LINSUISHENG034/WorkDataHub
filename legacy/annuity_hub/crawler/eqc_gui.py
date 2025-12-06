@@ -13,7 +13,13 @@ class EqcGUI:
         self.style = ttk.Style()
         self.style.configure("TFrame", background="#f0f0f0")
         self.style.configure("TLabel", background="#f0f0f0", font=("Helvetica", 12))
-        self.style.configure("TButton", background="#007bff", foreground="white", font=("Helvetica", 12), padding=10)
+        self.style.configure(
+            "TButton",
+            background="#007bff",
+            foreground="white",
+            font=("Helvetica", 12),
+            padding=10,
+        )
         self.style.map("TButton", background=[("active", "#0056b3")])
 
         self.create_widgets()
@@ -32,10 +38,19 @@ class EqcGUI:
         self.search_button = ttk.Button(frame, text="查询", command=self.search_data)
         self.search_button.grid(row=1, column=0, columnspan=2, pady=10)
 
-        self.result_label = ttk.Label(frame, text="查询结果:", font=("Helvetica", 14, "bold"))
+        self.result_label = ttk.Label(
+            frame, text="查询结果:", font=("Helvetica", 14, "bold")
+        )
         self.result_label.grid(row=2, column=0, columnspan=2, pady=10)
 
-        self.result_text = tk.Text(frame, height=15, width=80, font=("Helvetica", 12), borderwidth=2, relief="groove")
+        self.result_text = tk.Text(
+            frame,
+            height=15,
+            width=80,
+            font=("Helvetica", 12),
+            borderwidth=2,
+            relief="groove",
+        )
         self.result_text.grid(row=3, column=0, columnspan=2, padx=5, pady=5)
         self.result_text.config(state=tk.DISABLED)
 
@@ -49,7 +64,9 @@ class EqcGUI:
         is_id = search_key.isdigit()
 
         try:
-            base_info, business_info, biz_label = self.crawler.scrape_data(search_key, is_id)
+            base_info, business_info, biz_label = self.crawler.scrape_data(
+                search_key, is_id
+            )
 
             if not base_info:
                 messagebox.showerror("查询失败", "未能找到相关信息")

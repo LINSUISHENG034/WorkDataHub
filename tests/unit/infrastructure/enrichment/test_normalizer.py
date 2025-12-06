@@ -101,7 +101,9 @@ class TestNormalizationConsistency:
         ]
 
         normalized = [normalize_for_temp_id(v) for v in variants]
-        assert len(set(normalized)) == 1, "All whitespace variants should normalize same"
+        assert len(set(normalized)) == 1, (
+            "All whitespace variants should normalize same"
+        )
 
     def test_status_marker_variants_same_result(self):
         """Test status marker variants produce same normalized result."""
@@ -232,10 +234,7 @@ class TestAllStatusMarkers:
 class TestLegacyParity:
     """Tests for parity with legacy clean_company_name behavior."""
 
-    @pytest.mark.parametrize(
-        "original,expected_normalized",
-        LEGACY_TEST_CASES
-    )
+    @pytest.mark.parametrize("original,expected_normalized", LEGACY_TEST_CASES)
     def test_normalization_parity(self, original, expected_normalized):
         """Test normalization matches expected legacy behavior."""
         result = normalize_for_temp_id(original)

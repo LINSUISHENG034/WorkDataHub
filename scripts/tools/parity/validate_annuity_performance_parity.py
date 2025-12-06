@@ -44,7 +44,10 @@ logging.basicConfig(
 LOGGER = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-DEFAULT_DATA = PROJECT_ROOT / "tests/fixtures/real_data/202412/收集数据/数据采集/V2/【for年金分战区经营分析】24年12月年金终稿数据0109采集-补充企年投资收入.xlsx"
+DEFAULT_DATA = (
+    PROJECT_ROOT
+    / "tests/fixtures/real_data/202412/收集数据/数据采集/V2/【for年金分战区经营分析】24年12月年金终稿数据0109采集-补充企年投资收入.xlsx"
+)
 DEFAULT_MAPPING = PROJECT_ROOT / "tests/fixtures/sample_legacy_mappings.json"
 DEFAULT_SHEET = "规模明细"
 OUTPUT_DIR = PROJECT_ROOT / "tests/fixtures/validation_results"
@@ -60,7 +63,9 @@ def load_real_data(excel_path: Path, sheet_name: str) -> List[Dict[str, Any]]:
     return rows
 
 
-def process_with_legacy(rows: List[Dict[str, Any]], mappings: Dict[str, Any]) -> pd.DataFrame:
+def process_with_legacy(
+    rows: List[Dict[str, Any]], mappings: Dict[str, Any]
+) -> pd.DataFrame:
     cleaner = ExtractedAnnuityPerformanceCleaner(mappings)
     df = cleaner.clean(pd.DataFrame(rows))
     df["_source"] = "legacy"
@@ -101,9 +106,15 @@ def build_report(legacy_df: pd.DataFrame, pipeline_df: pd.DataFrame) -> Dict[str
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Validate annuity_performance parity vs legacy.")
-    parser.add_argument("--data", type=Path, default=DEFAULT_DATA, help="Path to real data Excel")
-    parser.add_argument("--sheet", default=DEFAULT_SHEET, help="Sheet name (default: 规模明细)")
+    parser = argparse.ArgumentParser(
+        description="Validate annuity_performance parity vs legacy."
+    )
+    parser.add_argument(
+        "--data", type=Path, default=DEFAULT_DATA, help="Path to real data Excel"
+    )
+    parser.add_argument(
+        "--sheet", default=DEFAULT_SHEET, help="Sheet name (default: 规模明细)"
+    )
     parser.add_argument(
         "--mapping",
         type=Path,
@@ -135,8 +146,12 @@ def main() -> int:
         )
 
         report = build_report(legacy_df, pipeline_df)
-        saved = save_results(legacy_df, pipeline_df, report, OUTPUT_DIR, prefix="annuity_performance")
-        print_report_summary(report, title="ANNUITY PERFORMANCE PARITY VALIDATION REPORT")
+        saved = save_results(
+            legacy_df, pipeline_df, report, OUTPUT_DIR, prefix="annuity_performance"
+        )
+        print_report_summary(
+            report, title="ANNUITY PERFORMANCE PARITY VALIDATION REPORT"
+        )
 
         LOGGER.info("Results saved to %s", OUTPUT_DIR)
         for name, path in saved.items():

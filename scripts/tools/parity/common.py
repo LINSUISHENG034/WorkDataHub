@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence
 
 import pandas as pd
 
@@ -48,7 +48,10 @@ def compare_dataframes(
     report: Dict[str, object] = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "legacy_shape": {"rows": len(legacy_df), "columns": len(legacy_df.columns)},
-        "pipeline_shape": {"rows": len(pipeline_df), "columns": len(pipeline_df.columns)},
+        "pipeline_shape": {
+            "rows": len(pipeline_df),
+            "columns": len(pipeline_df.columns),
+        },
         "column_comparison": {},
         "data_differences": [],
         "summary": {},
@@ -79,7 +82,9 @@ def compare_dataframes(
         "unexpected_legacy_only": sorted(unexpected_legacy_only),
     }
 
-    comparison_cols = [c for c in legacy_df.columns if c in common_cols and c not in exclude_cols]
+    comparison_cols = [
+        c for c in legacy_df.columns if c in common_cols and c not in exclude_cols
+    ]
 
     legacy_norm = legacy_df[comparison_cols].copy()
     pipeline_norm = pipeline_df[comparison_cols].copy()
@@ -92,8 +97,12 @@ def compare_dataframes(
         legacy_norm[col] = legacy_norm[col].fillna("__NULL__").astype(str)
         pipeline_norm[col] = pipeline_norm[col].fillna("__NULL__").astype(str)
 
-    legacy_norm["_row_sig"] = legacy_norm.apply(lambda row: "|".join(row.values), axis=1)
-    pipeline_norm["_row_sig"] = pipeline_norm.apply(lambda row: "|".join(row.values), axis=1)
+    legacy_norm["_row_sig"] = legacy_norm.apply(
+        lambda row: "|".join(row.values), axis=1
+    )
+    pipeline_norm["_row_sig"] = pipeline_norm.apply(
+        lambda row: "|".join(row.values), axis=1
+    )
 
     legacy_sigs = set(legacy_norm["_row_sig"].tolist())
     pipeline_sigs = set(pipeline_norm["_row_sig"].tolist())

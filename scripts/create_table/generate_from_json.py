@@ -68,6 +68,7 @@ def _emit_table_sql(
     delete_scope_key: List[str],
 ) -> str:
     lines: List[str] = []
+
     def q(s):
         escaped = s.replace('"', '""')
         return f'"{escaped}"'
@@ -118,32 +119,41 @@ def _emit_table_sql(
 
     # Common indexes - only for columns that exist
     existing_columns = {col["name"] for col in columns}
-    common_idx_cols = ["月度", "计划代码", "company_id", "机构代码", "产品线代码", "年金账户号", "年金计划号", "组合代码"]
-    
+    common_idx_cols = [
+        "月度",
+        "计划代码",
+        "company_id",
+        "机构代码",
+        "产品线代码",
+        "年金账户号",
+        "年金计划号",
+        "组合代码",
+    ]
+
     for idx_col in common_idx_cols:
         if idx_col in existing_columns:
             lines.append(
                 f"CREATE INDEX IF NOT EXISTS {q('idx_' + table_name + '_' + idx_col)} ON {q(table_name)} ({q(idx_col)});"
             )
-    
+
     # Composite indexes - only for columns that exist
     composite_indexes = [
         ("月度", "计划代码"),
         ("月度", "company_id"),
         ("年金计划号", "组合代码"),
-        ("年金计划号", "company_id")
+        ("年金计划号", "company_id"),
     ]
-    
+
     for col1, col2 in composite_indexes:
         if col1 in existing_columns and col2 in existing_columns:
-            idx_name = 'idx_' + table_name + '_' + col1 + '_' + col2
+            idx_name = "idx_" + table_name + "_" + col1 + "_" + col2
             lines.append(
                 f"CREATE INDEX IF NOT EXISTS {q(idx_name)} ON {q(table_name)} ({q(col1)}, {q(col2)});"
             )
-    
+
     # Delete scope key index
     if delete_scope_key and all(col in existing_columns for col in delete_scope_key):
-        idx_name = 'idx_' + table_name + '_' + '_'.join(delete_scope_key)
+        idx_name = "idx_" + table_name + "_" + "_".join(delete_scope_key)
         cols = ", ".join(q(c) for c in delete_scope_key)
         lines.append(
             f"CREATE INDEX IF NOT EXISTS {q(idx_name)} ON {q(table_name)} ({cols});"
@@ -169,9 +179,7 @@ def _emit_table_sql(
     # Notices
     lines.append("DO $$")
     lines.append("BEGIN")
-    lines.append(
-        f"    RAISE NOTICE '=== {table_name} Table Creation Complete ===';"
-    )
+    lines.append(f"    RAISE NOTICE '=== {table_name} Table Creation Complete ===';")
     lines.append(
         f"    RAISE NOTICE 'Primary Key: {entity}_id (GENERATED ALWAYS AS IDENTITY)';"
     )
@@ -194,7 +202,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Generate PostgreSQL DDL from db_structure.json with project conventions",
     )
-    parser.add_argument("--domain", required=True, help="Domain name, e.g., annuity_performance")
+    parser.add_argument(
+        "--domain", required=True, help="Domain name, e.g., annuity_performance"
+    )
     parser.add_argument("--out", default=None, help="Output path for DDL (optional)")
     args = parser.parse_args()
 
@@ -210,14 +220,14 @@ def main() -> int:
     delete_scope_key = dom.get("delete_scope_key", [])
 
     struct = _load_structure()
-    
+
     # Search for table in nested structure
     tables = None
     for category in struct.values():
         if isinstance(category, dict) and table_name in category:
             tables = category
             break
-    
+
     if not tables or table_name not in tables:
         print(f"Table not found in db_structure.json: {table_name}")
         return 2

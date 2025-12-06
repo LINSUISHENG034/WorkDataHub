@@ -4,7 +4,9 @@ in the exception handling of the trustee performance service.
 """
 
 import pytest
-from src.work_data_hub.domain.sample_trustee_performance.service import _transform_single_row
+from src.work_data_hub.domain.sample_trustee_performance.service import (
+    _transform_single_row,
+)
 
 pytestmark = pytest.mark.sample_domain
 
@@ -33,4 +35,6 @@ def test_transform_row_with_invalid_month_reproduces_bug():
     result = _transform_single_row(bug_trigger_row, data_source="bug_test", row_index=0)
 
     # Verify that the row is filtered out due to invalid date
-    assert result is None, "Row with invalid month=13 should be filtered out (return None)"
+    assert result is None, (
+        "Row with invalid month=13 should be filtered out (return None)"
+    )

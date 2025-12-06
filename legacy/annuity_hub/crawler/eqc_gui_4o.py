@@ -2,8 +2,17 @@
 
 import sys
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QSizePolicy
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QSizePolicy,
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
@@ -53,7 +62,9 @@ class EqcGUI(QMainWindow):
     def create_table_section(self):
         self.table = QTableWidget(self)
         self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["Company ID", "Name", "Unite Code", "Former Name"])
+        self.table.setHorizontalHeaderLabels(
+            ["Company ID", "Name", "Unite Code", "Former Name"]
+        )
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.layout.addWidget(self.table)
 
@@ -104,7 +115,9 @@ class EqcGUI(QMainWindow):
             # Populate Table
             self.table.setRowCount(1)
             self.table.setItem(0, 0, QTableWidgetItem(base_info.get("companyId", "")))
-            self.table.setItem(0, 1, QTableWidgetItem(base_info.get("companyFullName", "")))
+            self.table.setItem(
+                0, 1, QTableWidgetItem(base_info.get("companyFullName", ""))
+            )
             self.table.setItem(0, 2, QTableWidgetItem(base_info.get("unite_code", "")))
             self.table.setItem(0, 3, QTableWidgetItem(base_info.get("formerName", "")))
         except Exception as e:
@@ -112,6 +125,7 @@ class EqcGUI(QMainWindow):
 
     def show_message(self, message):
         from PyQt5.QtWidgets import QMessageBox
+
         QMessageBox.warning(self, "Warning", message, QMessageBox.Ok)
 
 

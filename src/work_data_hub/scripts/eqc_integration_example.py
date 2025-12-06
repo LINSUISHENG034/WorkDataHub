@@ -6,7 +6,7 @@ in the modern WorkDataHub architecture, replacing legacy manual token management
 with automated browser-based authentication.
 
 Example usage:
-    from src.work_data_hub.scripts.eqc_integration_example import EqcIntegrationExample
+    from work_data_hub.scripts.eqc_integration_example import EqcIntegrationExample
 
     example = EqcIntegrationExample()
     await example.authenticate_and_search("中国平安")
@@ -15,10 +15,10 @@ Example usage:
 import asyncio
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
-from src.work_data_hub.auth.eqc_auth_handler import get_auth_token_interactively
-from src.work_data_hub.config.settings import get_settings
+from work_data_hub.auth.eqc_auth_handler import get_auth_token_interactively
+from work_data_hub.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +32,11 @@ class EqcIntegrationExample:
     browser-based authentication and clean async API patterns.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the EQC integration with settings."""
         self.settings = get_settings()
         self.token: Optional[str] = None
-        self.session_info: Dict = {}
+        self.session_info: Dict[str, Any] = {}
 
     async def authenticate_interactive(self, timeout_seconds: int = 600) -> bool:
         """
@@ -79,7 +79,7 @@ class EqcIntegrationExample:
             logger.error(f"Unexpected error during authentication: {e}")
             return False
 
-    def get_session_info(self) -> Dict:
+    def get_session_info(self) -> Dict[str, Any]:
         """
         Get current session information.
 
@@ -96,7 +96,7 @@ class EqcIntegrationExample:
 
         return base_info
 
-    async def simulate_eqc_search(self, company_name: str) -> Dict:
+    async def simulate_eqc_search(self, company_name: str) -> Dict[str, Any]:
         """
         Simulate an EQC search operation using the authenticated token.
 
@@ -143,7 +143,9 @@ class EqcIntegrationExample:
         logger.info(f"Search completed for {company_name}")
         return simulated_result
 
-    async def batch_search_example(self, company_names: List[str]) -> List[Dict]:
+    async def batch_search_example(
+        self, company_names: List[str]
+    ) -> List[Dict[str, Any]]:
         """
         Example of batch processing multiple companies.
 
@@ -182,7 +184,7 @@ class EqcIntegrationExample:
 # Example usage functions for demonstration
 
 
-async def example_single_search():
+async def example_single_search() -> None:
     """Example: Single company search with interactive authentication."""
     print("🔍 Single Company Search Example")
     print("=" * 50)
@@ -216,7 +218,7 @@ async def example_single_search():
         print(f"❌ Search failed: {e}")
 
 
-async def example_batch_search():
+async def example_batch_search() -> None:
     """Example: Batch company search with authentication."""
     print("📊 Batch Company Search Example")
     print("=" * 50)
@@ -249,12 +251,12 @@ async def example_batch_search():
         print(f"   {i}. {company}: {status}")
 
 
-def run_single_search_example():
+def run_single_search_example() -> None:
     """Synchronous wrapper for single search example."""
     asyncio.run(example_single_search())
 
 
-def run_batch_search_example():
+def run_batch_search_example() -> None:
     """Synchronous wrapper for batch search example."""
     asyncio.run(example_batch_search())
 

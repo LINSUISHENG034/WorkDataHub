@@ -11,7 +11,11 @@ from psycopg2 import sql
 
 from work_data_hub.domain.pipelines.pipeline_config import PipelineConfig, StepConfig
 from work_data_hub.domain.pipelines.core import Pipeline
-from work_data_hub.domain.pipelines.types import DataFrameStep, RowTransformStep, StepResult
+from work_data_hub.domain.pipelines.types import (
+    DataFrameStep,
+    RowTransformStep,
+    StepResult,
+)
 from work_data_hub.io.loader.warehouse_loader import WarehouseLoader
 
 
@@ -42,7 +46,9 @@ class ValidateAndNormalize(RowTransformStep):
 
 
 @pytest.mark.integration
-def test_pipeline_end_to_end_loads_into_database(postgres_db_with_migrations: str) -> None:
+def test_pipeline_end_to_end_loads_into_database(
+    postgres_db_with_migrations: str,
+) -> None:
     """Run a minimal pipeline then load results into PostgreSQL."""
     input_df = pd.DataFrame(
         [
@@ -65,7 +71,9 @@ def test_pipeline_end_to_end_loads_into_database(postgres_db_with_migrations: st
     ]
     pipeline = Pipeline(
         steps=[AddRunMetadata(), ValidateAndNormalize()],
-        config=PipelineConfig(name="ci_sample_pipeline", steps=step_config, stop_on_error=True),
+        config=PipelineConfig(
+            name="ci_sample_pipeline", steps=step_config, stop_on_error=True
+        ),
     )
 
     result = pipeline.run(input_df)
@@ -108,7 +116,9 @@ def test_pipeline_end_to_end_loads_into_database(postgres_db_with_migrations: st
 
     with connect(dsn) as conn:
         with conn.cursor() as cursor:
-            cursor.execute(sql.SQL("SELECT COUNT(*) FROM {}").format(sql.Identifier(table_name)))
+            cursor.execute(
+                sql.SQL("SELECT COUNT(*) FROM {}").format(sql.Identifier(table_name))
+            )
             assert cursor.fetchone()[0] == 3
 
     loader.close()

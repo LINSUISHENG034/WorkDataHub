@@ -87,13 +87,13 @@ def _build_source_dataframe(valid: int = 4, invalid: int = 1) -> pd.DataFrame:
                 "年": "2024",
                 "月": "11",
                 "月度": "202411",
-                "计划代码": f"PLAN{i+1:03d}",
-                "客户名称": f"公司{i+1}",
-                "公司代码": f"COMP{i+1:03d}",
+                "计划代码": f"PLAN{i + 1:03d}",
+                "客户名称": f"公司{i + 1}",
+                "公司代码": f"COMP{i + 1:03d}",
                 "期初资产规模": "1000",
                 "期末资产规模": "1500",
                 "投资收益": "500",
-                "年金账户名": f"账户{i+1}",
+                "年金账户名": f"账户{i + 1}",
             }
         )
     for j in range(invalid):
@@ -181,12 +181,16 @@ class TestProcessAnnuityPerformance:
                 "20251",  # malformed
                 file_discovery=discovery,
                 warehouse_loader=loader,
-                )
+            )
 
     def test_discovery_failure_bubbles_up(self):
         class FailingDiscovery:
-            def discover_and_load(self, domain: str, month: str, **_: str) -> DataDiscoveryResult:
-                raise DiscoveryError("annuity", "file_matching", RuntimeError("boom"), "boom")
+            def discover_and_load(
+                self, domain: str, month: str, **_: str
+            ) -> DataDiscoveryResult:
+                raise DiscoveryError(
+                    "annuity", "file_matching", RuntimeError("boom"), "boom"
+                )
 
         loader = _default_loader(result_rows=0)
 
@@ -195,7 +199,7 @@ class TestProcessAnnuityPerformance:
                 "202501",
                 file_discovery=FailingDiscovery(),  # type: ignore[arg-type]
                 warehouse_loader=loader,
-                )
+            )
 
     def test_loader_failure_propagates(self):
         df = _build_source_dataframe()
@@ -212,4 +216,4 @@ class TestProcessAnnuityPerformance:
                 "202501",
                 file_discovery=discovery,
                 warehouse_loader=loader,
-                )
+            )

@@ -12,7 +12,7 @@ from database_operations.mongo_ops import MongoDBManager
 
 
 class DataCrawler:
-    def __init__(self, eqc_token, db_name='enterprise_data'):
+    def __init__(self, eqc_token, db_name="enterprise_data"):
         # 初始化数据库管理器
         self.mdb = MongoDBManager(database_name=db_name)
 
@@ -30,10 +30,14 @@ class DataCrawler:
         for key_word in keywords:
             if key_word:
                 # EQC 平台抓取数据
-                base_info, business_info, biz_label = self.eqc_crawler.scrape_data(key_word, is_id)
+                base_info, business_info, biz_label = self.eqc_crawler.scrape_data(
+                    key_word, is_id
+                )
                 if base_info and business_info and biz_label:
                     # 将 EQC 数据保存到 MongoDB
-                    self.eqc_crawler.save_to_mongodb(key_word, base_info, business_info, biz_label, self.mdb)
+                    self.eqc_crawler.save_to_mongodb(
+                        key_word, base_info, business_info, biz_label, self.mdb
+                    )
 
             # 更新进度条
             progress_bar.update(1)
@@ -51,34 +55,38 @@ class DataCrawler:
             # 将 QCC 数据保存到 MongoDB
             QccCrawler.save_to_mongodb(qcc_data, self.mdb)
             # 提取公司代码并用于 EQC 平台的抓取
-            company_code = qcc_data.get('code')
+            company_code = qcc_data.get("code")
             if company_code:
                 # EQC 平台抓取数据
-                base_info, business_info, biz_label = self.eqc_crawler.scrape_data(company_code)
+                base_info, business_info, biz_label = self.eqc_crawler.scrape_data(
+                    company_code
+                )
                 if base_info and business_info and biz_label:
                     # 将 EQC 数据保存到 MongoDB
-                    self.eqc_crawler.save_to_mongodb(key_word, base_info, business_info, biz_label, self.mdb)
+                    self.eqc_crawler.save_to_mongodb(
+                        key_word, base_info, business_info, biz_label, self.mdb
+                    )
 
 
 # 使用示例
-if __name__ == '__main__':
+if __name__ == "__main__":
     # region >> 从配置中读取cookie和token
     # qcc_cookie = config.get_qcc_cookie(is_manual=True)
     # eqc_token = config.get_eqc_token(is_manual=True)
     # endregion
 
     # 手动配置token
-    eqc_token = r'9d64a51d3435558e656c2956f962414d'
+    eqc_token = r"9d64a51d3435558e656c2956f962414d"
 
     # 初始化DataScraper类
     crawler = DataCrawler(eqc_token=eqc_token)
 
-    selected_sub_process = int(input('Please enter an integer: '))
+    selected_sub_process = int(input("Please enter an integer: "))
 
     # region >> 输入获取
     if selected_sub_process == 1:
-        crawl_str = r'625091657,603254227,607519948,1904944425,608347154,616074572,641181923,641182935,637402542,601513054,601497262,631321723,600102670,602784500,613591762,604856838,602728951,638795949,1899177652,607380538,601730004,894741248,855791001'
-        crawl_list = crawl_str.split(',')
+        crawl_str = r"625091657,603254227,607519948,1904944425,608347154,616074572,641181923,641182935,637402542,601513054,601497262,631321723,600102670,602784500,613591762,604856838,602728951,638795949,1899177652,607380538,601730004,894741248,855791001"
+        crawl_list = crawl_str.split(",")
 
         # manual crawl
         crawler.scrape(crawl_list, is_id=True)
@@ -93,9 +101,12 @@ if __name__ == '__main__':
     elif selected_sub_process == 2:
         from database_operations.mysql_ops import MySqlDBManager
 
-        with MySqlDBManager(database='business') as mysqldb:
-            data = pd.read_sql('SELECT DISTINCT `客户名称` FROM `规模明细` WHERE `company_id` IS NULL;', mysqldb.engine)
-            unique_list = data['客户名称'].dropna().tolist()
+        with MySqlDBManager(database="business") as mysqldb:
+            data = pd.read_sql(
+                "SELECT DISTINCT `客户名称` FROM `规模明细` WHERE `company_id` IS NULL;",
+                mysqldb.engine,
+            )
+            unique_list = data["客户名称"].dropna().tolist()
 
             # 执行数据爬取并存储
             crawler.scrape(unique_list)

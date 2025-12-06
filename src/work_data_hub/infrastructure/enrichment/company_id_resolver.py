@@ -161,9 +161,7 @@ class CompanyIdResolver:
             stats.plan_override_hits = plan_hits.sum()
             resolution_mask |= plan_hits
 
-            logger.debug(
-                f"Plan override lookup: {stats.plan_override_hits} hits"
-            )
+            logger.debug(f"Plan override lookup: {stats.plan_override_hits} hits")
 
         # Step 2: Fill remaining with existing company_id column
         mask_missing = result_df[strategy.output_column].isna()
@@ -178,9 +176,7 @@ class CompanyIdResolver:
                 valid_mask, strategy.company_id_column
             ]
 
-            existing_hits = (
-                result_df[strategy.output_column].notna() & ~resolution_mask
-            )
+            existing_hits = result_df[strategy.output_column].notna() & ~resolution_mask
             stats.existing_column_hits = existing_hits.sum()
             resolution_mask |= existing_hits
 

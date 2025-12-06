@@ -12,7 +12,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 from src.work_data_hub.config.settings import Settings, get_settings
-from src.work_data_hub.infrastructure.settings.data_source_schema import DataSourcesValidationError
+from src.work_data_hub.infrastructure.settings.data_source_schema import (
+    DataSourcesValidationError,
+)
 
 
 @pytest.fixture
@@ -27,9 +29,9 @@ def valid_epic3_config():
                 "exclude_patterns": ["~$*", "*回复*", "*.eml"],
                 "sheet_name": "规模明细",
                 "version_strategy": "highest_number",
-                "fallback": "error"
+                "fallback": "error",
             }
-        }
+        },
     }
 
 
@@ -44,9 +46,9 @@ def invalid_epic3_config_missing_field():
                 "file_patterns": ["*年金终稿*.xlsx"],
                 # Missing sheet_name
                 "version_strategy": "highest_number",
-                "fallback": "error"
+                "fallback": "error",
             }
-        }
+        },
     }
 
 
@@ -62,13 +64,15 @@ def invalid_epic3_config_invalid_enum():
                 "exclude_patterns": ["~$*"],
                 "sheet_name": "规模明细",
                 "version_strategy": "newest",  # Invalid enum
-                "fallback": "error"
+                "fallback": "error",
             }
-        }
+        },
     }
 
 
-@pytest.mark.skip(reason="Tests require rewrite - mock strategy causes recursion with pydantic-settings")
+@pytest.mark.skip(
+    reason="Tests require rewrite - mock strategy causes recursion with pydantic-settings"
+)
 class TestSettingsInitialization:
     """Integration tests for Settings class with Epic 3 configuration."""
 
@@ -79,12 +83,17 @@ class TestSettingsInitialization:
             yaml.dump(valid_epic3_config, f, allow_unicode=True)
 
         # Patch the config file path to our temporary file
-        with patch('src.work_data_hub.config.settings.Path') as mock_path:
+        with patch("src.work_data_hub.config.settings.Path") as mock_path:
             mock_path.return_value.exists.return_value = True
             mock_path.return_value.__str__ = lambda: str(config_path)
 
             # Mock open function to return our test config
-            with patch('builtins.open', side_effect=lambda path, *args, **kwargs: open(config_path, *args, **kwargs)):
+            with patch(
+                "builtins.open",
+                side_effect=lambda path, *args, **kwargs: open(
+                    config_path, *args, **kwargs
+                ),
+            ):
                 settings = Settings()
 
         assert settings.data_sources is not None
@@ -97,41 +106,53 @@ class TestSettingsInitialization:
         assert domain_config.sheet_name == "规模明细"
         assert domain_config.version_strategy == "highest_number"
 
-    def test_settings_fails_with_invalid_config_missing_field(self, tmp_path, invalid_epic3_config_missing_field):
+    def test_settings_fails_with_invalid_config_missing_field(
+        self, tmp_path, invalid_epic3_config_missing_field
+    ):
         """AC-5.2: Settings initialization fails with invalid config."""
         config_path = tmp_path / "invalid_config.yml"
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(invalid_epic3_config_missing_field, f, allow_unicode=True)
 
-        with patch('src.work_data_hub.config.settings.Path') as mock_path:
+        with patch("src.work_data_hub.config.settings.Path") as mock_path:
             mock_path.return_value.exists.return_value = True
             mock_path.return_value.__str__ = lambda: str(config_path)
 
             with pytest.raises(Exception) as exc_info:
                 Settings()
 
-        assert "sheet_name" in str(exc_info.value) or "validation failed" in str(exc_info.value).lower()
+        assert (
+            "sheet_name" in str(exc_info.value)
+            or "validation failed" in str(exc_info.value).lower()
+        )
 
-    def test_settings_fails_with_invalid_config_enum(self, tmp_path, invalid_epic3_config_invalid_enum):
+    def test_settings_fails_with_invalid_config_enum(
+        self, tmp_path, invalid_epic3_config_invalid_enum
+    ):
         """AC-5.2: Settings initialization fails with invalid enum value."""
         config_path = tmp_path / "invalid_enum.yml"
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(invalid_epic3_config_invalid_enum, f, allow_unicode=True)
 
-        with patch('src.work_data_hub.config.settings.Path') as mock_path:
+        with patch("src.work_data_hub.config.settings.Path") as mock_path:
             mock_path.return_value.exists.return_value = True
             mock_path.return_value.__str__ = lambda: str(config_path)
 
             with pytest.raises(Exception) as exc_info:
                 Settings()
 
-        assert "version_strategy" in str(exc_info.value) or "validation failed" in str(exc_info.value).lower()
+        assert (
+            "version_strategy" in str(exc_info.value)
+            or "validation failed" in str(exc_info.value).lower()
+        )
 
     def test_settings_fails_with_missing_config_file(self):
         """AC-5.2: Settings initialization fails when config file doesn't exist."""
-        with patch('src.work_data_hub.config.settings.Path') as mock_path:
+        with patch("src.work_data_hub.config.settings.Path") as mock_path:
             mock_path.return_value.exists.return_value = False
-            mock_path.return_value.__str__ = lambda: "/nonexistent/config/data_sources.yml"
+            mock_path.return_value.__str__ = (
+                lambda: "/nonexistent/config/data_sources.yml"
+            )
 
             with pytest.raises(FileNotFoundError, match="Configuration file not found"):
                 Settings()
@@ -140,6 +161,7 @@ class TestSettingsInitialization:
         """AC-5.4: get_settings() returns cached instance."""
         # Clear any existing singleton
         import src.work_data_hub.config.settings
+
         src.work_data_hub.config.settings._settings_instance = None
 
         settings1 = get_settings()
@@ -155,25 +177,30 @@ class TestSettingsInitialization:
                 "annuity_performance": {
                     "base_path": "reference/monthly/{YYYYMM}/收集数据/数据采集",
                     "file_patterns": ["*年金终稿*.xlsx"],
-                    "sheet_name": "规模明细"
+                    "sheet_name": "规模明细",
                 },
                 "universal_insurance": {
                     "base_path": "reference/monthly/{YYYYMM}/收集数据/业务收集",
                     "file_patterns": ["*万能险*.xlsx"],
-                    "sheet_name": "明细数据"
-                }
-            }
+                    "sheet_name": "明细数据",
+                },
+            },
         }
 
         config_path = tmp_path / "multi_domain.yml"
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(multi_domain_config, f, allow_unicode=True)
 
-        with patch('src.work_data_hub.config.settings.Path') as mock_path:
+        with patch("src.work_data_hub.config.settings.Path") as mock_path:
             mock_path.return_value.exists.return_value = True
             mock_path.return_value.__str__ = lambda: str(config_path)
 
-            with patch('builtins.open', side_effect=lambda path, *args, **kwargs: open(config_path, *args, **kwargs)):
+            with patch(
+                "builtins.open",
+                side_effect=lambda path, *args, **kwargs: open(
+                    config_path, *args, **kwargs
+                ),
+            ):
                 settings = Settings()
 
         assert len(settings.data_sources.domains) == 2
@@ -195,15 +222,20 @@ class TestSettingsInitialization:
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(valid_epic3_config, f, allow_unicode=True)
 
-        with patch('src.work_data_hub.config.settings.Path') as mock_path:
+        with patch("src.work_data_hub.config.settings.Path") as mock_path:
             mock_path.return_value.exists.return_value = True
             mock_path.return_value.__str__ = lambda: str(config_path)
 
-            with patch('builtins.open', side_effect=lambda path, *args, **kwargs: open(config_path, *args, **kwargs)):
+            with patch(
+                "builtins.open",
+                side_effect=lambda path, *args, **kwargs: open(
+                    config_path, *args, **kwargs
+                ),
+            ):
                 settings = Settings()
 
         # Test accessing configuration through settings
-        assert hasattr(settings, 'data_sources')
+        assert hasattr(settings, "data_sources")
         assert settings.data_sources is not None
 
         # Test domain access
@@ -229,9 +261,9 @@ class TestEndToEndIntegration:
                     "exclude_patterns": ["~$*", "*回复*"],
                     "sheet_name": "规模明细",
                     "version_strategy": "highest_number",
-                    "fallback": "error"
+                    "fallback": "error",
                 }
-            }
+            },
         }
 
         config_path = tmp_path / "end_to_end.yml"
@@ -239,7 +271,9 @@ class TestEndToEndIntegration:
             yaml.dump(config_data, f, allow_unicode=True)
 
         # Test that configuration system can load and validate this without errors
-        from src.work_data_hub.infrastructure.settings.data_source_schema import validate_data_sources_config_v2
+        from src.work_data_hub.infrastructure.settings.data_source_schema import (
+            validate_data_sources_config_v2,
+        )
 
         try:
             # This should not raise any errors if system works correctly
@@ -247,11 +281,18 @@ class TestEndToEndIntegration:
             assert result is True
 
             # Test that we can get domain configuration
-            from src.work_data_hub.infrastructure.settings.data_source_schema import get_domain_config_v2
-            domain_config = get_domain_config_v2("annuity_performance", str(config_path))
+            from src.work_data_hub.infrastructure.settings.data_source_schema import (
+                get_domain_config_v2,
+            )
+
+            domain_config = get_domain_config_v2(
+                "annuity_performance", str(config_path)
+            )
 
             # Verify configuration matches what we expect
-            assert domain_config.base_path == "reference/monthly/202411/收集数据/数据采集"
+            assert (
+                domain_config.base_path == "reference/monthly/202411/收集数据/数据采集"
+            )
             assert domain_config.file_patterns == ["*年金终稿*.xlsx"]
             assert domain_config.sheet_name == "规模明细"
             assert domain_config.version_strategy == "highest_number"
@@ -265,15 +306,22 @@ class TestEndToEndIntegration:
 
         if Path(config_path).exists():
             # Test loading real configuration file
-            from src.work_data_hub.infrastructure.settings.data_source_schema import validate_data_sources_config_v2
+            from src.work_data_hub.infrastructure.settings.data_source_schema import (
+                validate_data_sources_config_v2,
+            )
 
             try:
                 result = validate_data_sources_config_v2(config_path)
                 assert result is True
 
                 # Test getting annuity_performance domain
-                from src.work_data_hub.infrastructure.settings.data_source_schema import get_domain_config_v2
-                annuity_config = get_domain_config_v2("annuity_performance", config_path)
+                from src.work_data_hub.infrastructure.settings.data_source_schema import (
+                    get_domain_config_v2,
+                )
+
+                annuity_config = get_domain_config_v2(
+                    "annuity_performance", config_path
+                )
 
                 assert annuity_config.sheet_name == "规模明细"
                 assert annuity_config.version_strategy == "highest_number"
@@ -283,4 +331,6 @@ class TestEndToEndIntegration:
                 pytest.fail(f"Real config file validation failed: {e}")
         else:
             # Config file doesn't exist yet, which is expected before Story 3.0 completion
-            pytest.skip("Real config/data_sources.yml not found - expected before Story 3.0 completion")
+            pytest.skip(
+                "Real config/data_sources.yml not found - expected before Story 3.0 completion"
+            )

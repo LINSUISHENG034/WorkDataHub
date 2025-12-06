@@ -60,7 +60,9 @@ class TestMonthlyDataSmoke:
             if discovered_files:
                 # Validate file structure
                 first_file = discovered_files[0]
-                assert hasattr(first_file, "path"), "Discovered files should have path attribute"
+                assert hasattr(first_file, "path"), (
+                    "Discovered files should have path attribute"
+                )
                 print(f"Sample discovered file: {first_file.path}")
 
     def test_plan_only_smoke(self):
@@ -68,9 +70,13 @@ class TestMonthlyDataSmoke:
         from src.work_data_hub.config.settings import Settings
 
         # Override settings for this test
-        test_settings = Settings(data_base_dir="./reference/monthly", dev_sample_size=None)
+        test_settings = Settings(
+            data_base_dir="./reference/monthly", dev_sample_size=None
+        )
 
-        with patch("src.work_data_hub.config.settings.get_settings", return_value=test_settings):
+        with patch(
+            "src.work_data_hub.config.settings.get_settings", return_value=test_settings
+        ):
             with patch.dict(os.environ, {"WDH_DATA_BASE_DIR": "./reference/monthly"}):
                 # Mock the job execution to avoid actual Dagster machinery
                 mock_context = MagicMock()
@@ -93,7 +99,9 @@ class TestMonthlyDataSmoke:
                     # Basic validation - files should be accessible
                     for file_info in limited_files:
                         file_path = Path(file_info.path)
-                        assert file_path.exists(), f"Discovered file should exist: {file_path}"
+                        assert file_path.exists(), (
+                            f"Discovered file should exist: {file_path}"
+                        )
                         assert file_path.suffix.lower() in [".xlsx", ".xls"], (
                             f"Should be Excel file: {file_path}"
                         )

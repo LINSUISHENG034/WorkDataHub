@@ -13,9 +13,9 @@ and modern EQC client integration with comprehensive service architecture.
 import logging
 from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Literal, Optional
+from typing import Any, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ class CompanyMappingRecord(BaseModel):
 
     @field_validator("alias_name", "canonical_id", mode="before")
     @classmethod
-    def clean_identifiers(cls, v):
+    def clean_identifiers(cls, v: Any) -> Optional[str]:
         """Clean and normalize identifier fields."""
         if v is None:
             return v
@@ -76,7 +76,7 @@ class CompanyMappingRecord(BaseModel):
 
     @field_validator("match_type", mode="after")
     @classmethod
-    def validate_match_type_priority(cls, v, info):
+    def validate_match_type_priority(cls, v: str, info: ValidationInfo) -> str:
         """Validate match_type aligns with expected priority mappings."""
         # Priority mapping per legacy logic:
         # plan=1, account=2, hardcode=3, name=4, account_name=5
@@ -130,7 +130,7 @@ class CompanyMappingQuery(BaseModel):
         "plan_code", "account_number", "customer_name", "account_name", mode="before"
     )
     @classmethod
-    def normalize_query_fields(cls, v):
+    def normalize_query_fields(cls, v: Any) -> Optional[str]:
         """Normalize query field values for consistent lookup."""
         if v is None:
             return None
@@ -165,7 +165,7 @@ class CompanyResolutionResult(BaseModel):
 
     @field_validator("company_id", mode="after")
     @classmethod
-    def validate_company_id_format(cls, v):
+    def validate_company_id_format(cls, v: Optional[str]) -> Optional[str]:
         """Basic validation for company_id format."""
         if v is None:
             return v
@@ -211,7 +211,7 @@ class CompanySearchResult(BaseModel):
 
     @field_validator("company_id", mode="before")
     @classmethod
-    def normalize_company_id(cls, v):
+    def normalize_company_id(cls, v: Any) -> str:
         """Normalize company ID to string format."""
         if v is None:
             return v
@@ -219,7 +219,7 @@ class CompanySearchResult(BaseModel):
 
     @field_validator("unite_code", mode="before")
     @classmethod
-    def normalize_unite_code(cls, v):
+    def normalize_unite_code(cls, v: Any) -> Optional[str]:
         """Normalize and validate unite code format."""
         if v is None or str(v).strip() == "":
             return None
@@ -261,7 +261,7 @@ class CompanyDetail(BaseModel):
 
     @field_validator("company_id", mode="before")
     @classmethod
-    def normalize_company_id(cls, v):
+    def normalize_company_id(cls, v: Any) -> str:
         """Normalize company ID to string format."""
         if v is None:
             return v
@@ -269,7 +269,7 @@ class CompanyDetail(BaseModel):
 
     @field_validator("unite_code", mode="before")
     @classmethod
-    def normalize_unite_code(cls, v):
+    def normalize_unite_code(cls, v: Any) -> Optional[str]:
         """Normalize and validate unite code format."""
         if v is None or str(v).strip() == "":
             return None
@@ -279,7 +279,7 @@ class CompanyDetail(BaseModel):
 
     @field_validator("aliases", mode="before")
     @classmethod
-    def normalize_aliases(cls, v):
+    def normalize_aliases(cls, v: Any) -> List[str]:
         """Normalize aliases list, filtering out empty values."""
         if v is None:
             return []
@@ -338,7 +338,7 @@ class CompanyIdResult(BaseModel):
 
     @field_validator("temp_id", mode="after")
     @classmethod
-    def validate_temp_id_format(cls, v):
+    def validate_temp_id_format(cls, v: Optional[str]) -> Optional[str]:
         """Validate temporary ID format if provided."""
         if v is None:
             return v
@@ -396,7 +396,7 @@ class LookupRequest(BaseModel):
 
     @field_validator("status", mode="after")
     @classmethod
-    def validate_status_enum(cls, v):
+    def validate_status_enum(cls, v: str) -> str:
         """Validate status is one of the allowed queue states."""
         allowed_statuses = {"pending", "processing", "done", "failed"}
         if v not in allowed_statuses:
@@ -405,7 +405,7 @@ class LookupRequest(BaseModel):
 
     @field_validator("name", "normalized_name", mode="before")
     @classmethod
-    def clean_name_fields(cls, v):
+    def clean_name_fields(cls, v: Any) -> Optional[str]:
         """Clean and normalize name fields."""
         if v is None:
             return v

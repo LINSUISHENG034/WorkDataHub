@@ -95,7 +95,14 @@ def main() -> int:
     args = parse_args()
     if getattr(args, "list", False):
         try:
-            m = yaml.safe_load(Path("scripts/create_table/manifest.yml").read_text(encoding="utf-8")) or {}
+            m = (
+                yaml.safe_load(
+                    Path("scripts/create_table/manifest.yml").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                or {}
+            )
             domains = sorted((m.get("domains") or {}).keys())
             print("Available domains:")
             for d in domains:

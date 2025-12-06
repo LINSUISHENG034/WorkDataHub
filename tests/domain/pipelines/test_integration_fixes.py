@@ -22,15 +22,18 @@ def test_major_issues_fixed():
     """
 
     # This would have failed before due to import path mismatch
-    with patch('work_data_hub.domain.pipelines.adapters.registry') as mock_registry:
-        from work_data_hub.infrastructure.cleansing.registry import CleansingRule, RuleCategory
+    with patch("work_data_hub.domain.pipelines.adapters.registry") as mock_registry:
+        from work_data_hub.infrastructure.cleansing.registry import (
+            CleansingRule,
+            RuleCategory,
+        )
 
         # Mock the registry
         mock_rule = CleansingRule(
             name="test_rule",
             category=RuleCategory.NUMERIC,
             func=lambda x: str(x) + "_cleaned",
-            description="Test cleaning rule"
+            description="Test cleaning rule",
         )
         mock_registry.get_rule.return_value = mock_rule
 
@@ -45,11 +48,11 @@ def test_major_issues_fixed():
                     "import_path": "work_data_hub.domain.pipelines.adapters.CleansingRuleStep.from_registry",
                     "options": {
                         "rule_name": "test_rule",
-                        "target_fields": ["test_field"]
-                    }
+                        "target_fields": ["test_field"],
+                    },
                 }
             ],
-            "stop_on_error": True
+            "stop_on_error": True,
         }
 
         # This would have raised PipelineAssemblyError before the fixes

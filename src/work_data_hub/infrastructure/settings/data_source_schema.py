@@ -7,9 +7,10 @@ present and properly typed.
 
 IMPORTANT: This module contains TWO schema versions:
 1. Legacy schema (DomainConfig, DataSourcesConfig) - for existing pattern-based config
-2. Epic 3 schema (DomainConfigV2, DataSourceConfigV2) - for new base_path + version_strategy config
+2. Epic 3 schema (DomainConfigV2, DataSourceConfigV2) - for new base_path +
+    version_strategy config
 
-Story 3.0 implements Epic 3 schema while maintaining backward compatibility.
+12. Story 3.0 implements Epic 3 schema while maintaining backward compatibility.
 
 Migrated from config/schema.py in Story 5.3.
 """
@@ -296,7 +297,9 @@ class DataSourceConfigV2(BaseModel):
 
     @field_validator("domains")
     @classmethod
-    def validate_domains(cls, v: Dict[str, DomainConfigV2]) -> Dict[str, DomainConfigV2]:
+    def validate_domains(
+        cls, v: Dict[str, DomainConfigV2]
+    ) -> Dict[str, DomainConfigV2]:
         """
         Ensure at least one domain is configured.
 

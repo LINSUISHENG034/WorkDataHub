@@ -19,25 +19,41 @@ def sample_multi_sheet_excel_file(tmp_path):
     # Create realistic data similar to 202411 data
     data = {
         "规模明细": [
-            {"月度": "202411", "计划代码": "PLAN001", "客户名称": "客户A",
-             "期初资产规模": 1000000, "期末资产规模": 1050000, "当期收益率": "5.5%"},
-            {"月度": "202411", "计划代码": "PLAN002", "客户名称": "客户B",
-             "期初资产规模": 2000000, "期末资产规模": 2100000, "当期收益率": "5.2%"},
-            {"月度": "202411", "计划代码": "PLAN003", "客户名称": "客户C",
-             "期初资产规模": 1500000, "期末资产规模": 1575000, "当期收益率": "5.0%"}
+            {
+                "月度": "202411",
+                "计划代码": "PLAN001",
+                "客户名称": "客户A",
+                "期初资产规模": 1000000,
+                "期末资产规模": 1050000,
+                "当期收益率": "5.5%",
+            },
+            {
+                "月度": "202411",
+                "计划代码": "PLAN002",
+                "客户名称": "客户B",
+                "期初资产规模": 2000000,
+                "期末资产规模": 2100000,
+                "当期收益率": "5.2%",
+            },
+            {
+                "月度": "202411",
+                "计划代码": "PLAN003",
+                "客户名称": "客户C",
+                "期初资产规模": 1500000,
+                "期末资产规模": 1575000,
+                "当期收益率": "5.0%",
+            },
         ],
         "Summary": [
             {"报表类型": "月度报表", "总客户数": 3, "总资产规模": 4500000},
-            {"报表类型": "季度报表", "总客户数": 5, "总资产规模": 7500000}
+            {"报表类型": "季度报表", "总客户数": 5, "总资产规模": 7500000},
         ],
-        "Notes": [
-            {"备注": "数据采集于2024年11月", "处理人": "张三"}
-        ]
+        "Notes": [{"备注": "数据采集于2024年11月", "处理人": "张三"}],
     }
 
     # Create Excel file
     excel_path = tmp_path / "test_multi_sheet_integration.xlsx"
-    with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
+    with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
         for sheet_name, sheet_data in data.items():
             df = pd.DataFrame(sheet_data)
             df.to_excel(writer, sheet_name=sheet_name, index=False)
@@ -51,12 +67,12 @@ def chinese_sheet_names_excel_file(tmp_path):
     data = {
         "年金数据明细": [
             {"产品名称": "年金产品A", "客户编号": "C001", "金额": 100000},
-            {"产品名称": "年金产品B", "客户编号": "C002", "金额": 200000}
+            {"产品名称": "年金产品B", "客户编号": "C002", "金额": 200000},
         ]
     }
 
     excel_path = tmp_path / "test_chinese_sheet_names.xlsx"
-    with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
+    with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
         for sheet_name, sheet_data in data.items():
             df = pd.DataFrame(sheet_data)
             df.to_excel(writer, sheet_name=sheet_name, index=False)
@@ -69,22 +85,44 @@ def empty_rows_excel_file(tmp_path):
     """Create Excel file with empty formatted rows."""
     data = {
         "规模明细": [
-            {"月度": "202411", "计划代码": "PLAN001", "客户名称": "客户A",
-             "期初资产规模": 1000000, "期末资产规模": 1050000, "当期收益率": "5.5%"},
-            {"月度": None, "计划代码": None, "客户名称": None,
-             "期初资产规模": None, "期末资产规模": None, "当期收益率": None},  # Empty row 1
-            {"月度": None, "计划代码": None, "客户名称": None,
-             "期初资产规模": None, "期末资产规模": None, "当期收益率": None},  # Empty row 2
-            {"月度": "", "计划代码": "", "客户名称": "",
-             "期初资产规模": "", "期末资产规模": "", "当期收益率": ""},  # Empty row 3
+            {
+                "月度": "202411",
+                "计划代码": "PLAN001",
+                "客户名称": "客户A",
+                "期初资产规模": 1000000,
+                "期末资产规模": 1050000,
+                "当期收益率": "5.5%",
+            },
+            {
+                "月度": None,
+                "计划代码": None,
+                "客户名称": None,
+                "期初资产规模": None,
+                "期末资产规模": None,
+                "当期收益率": None,
+            },  # Empty row 1
+            {
+                "月度": None,
+                "计划代码": None,
+                "客户名称": None,
+                "期初资产规模": None,
+                "期末资产规模": None,
+                "当期收益率": None,
+            },  # Empty row 2
+            {
+                "月度": "",
+                "计划代码": "",
+                "客户名称": "",
+                "期初资产规模": "",
+                "期末资产规模": "",
+                "当期收益率": "",
+            },  # Empty row 3
         ],
-        "Notes": [
-            {"备注": "测试文件", "处理人": "测试"}
-        ]
+        "Notes": [{"备注": "测试文件", "处理人": "测试"}],
     }
 
     excel_path = tmp_path / "test_empty_rows.xlsx"
-    with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
+    with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
         for sheet_name, sheet_data in data.items():
             df = pd.DataFrame(sheet_data)
             df.to_excel(writer, sheet_name=sheet_name, index=False)
@@ -97,13 +135,21 @@ def merged_cells_excel_file(tmp_path):
     """Create Excel file with merged cells."""
     data = {
         "规模明细": [
-            {"月度": "202411", "计划代码": "PLAN001", "客户名称": "客户A"},  # A1:A3 merged
-            {"月度": "202411", "计划代码": "PLAN002", "客户名称": "客户B"}   # A4:A5 merged
+            {
+                "月度": "202411",
+                "计划代码": "PLAN001",
+                "客户名称": "客户A",
+            },  # A1:A3 merged
+            {
+                "月度": "202411",
+                "计划代码": "PLAN002",
+                "客户名称": "客户B",
+            },  # A4:A5 merged
         ]
     }
 
     excel_path = tmp_path / "test_merged_cells.xlsx"
-    with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
+    with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
         df = pd.DataFrame(data["规模明细"])
         df.to_excel(writer, sheet_name="规模明细", index=False)
 
@@ -116,7 +162,7 @@ def corrupted_excel_file(tmp_path):
     excel_path = tmp_path / "test_corrupted.xlsx"
 
     # Create a file with invalid content (not a real Excel file)
-    with open(excel_path, 'wb') as f:
+    with open(excel_path, "wb") as f:
         f.write(b"This is not a valid Excel file - just text for testing")
 
     return excel_path
@@ -145,7 +191,14 @@ class TestExcelReadSheetIntegration:
 
         # Verify Chinese characters in DataFrame
         df = result.df
-        expected_columns = ["月度", "计划代码", "客户名称", "期初资产规模", "期末资产规模", "当期收益率"]
+        expected_columns = [
+            "月度",
+            "计划代码",
+            "客户名称",
+            "期初资产规模",
+            "期末资产规模",
+            "当期收益率",
+        ]
         assert list(df.columns) == expected_columns
 
         # Verify data content
@@ -204,7 +257,9 @@ class TestExcelReadSheetIntegration:
         """TC-3.3-4: Empty Row Handling with Count Logging."""
         reader = ExcelReader()
 
-        result = reader.read_sheet(empty_rows_excel_file, sheet_name="规模明细", skip_empty_rows=True)
+        result = reader.read_sheet(
+            empty_rows_excel_file, sheet_name="规模明细", skip_empty_rows=True
+        )
 
         # Should skip 3 empty rows, keep only 1 data row
         assert result.row_count == 1

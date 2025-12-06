@@ -12,6 +12,9 @@ from work_data_hub.domain.annuity_performance.models import (
     EnrichmentStats,
 )
 from work_data_hub.domain.pipelines.types import ErrorContext
+
+# Shared helper imported from infrastructure (Story 5.5.4 extraction)
+from work_data_hub.infrastructure.helpers import normalize_month
 from work_data_hub.infrastructure.validation import export_error_csv
 from work_data_hub.utils.date_parser import (
     parse_chinese_date,
@@ -27,11 +30,9 @@ class FileDiscoveryProtocol(Protocol):
     def discover_and_load(self, *, domain: str, month: str) -> Any: ...
 
 
-# Shared helper imported from infrastructure (Story 5.5.4 extraction)
-from work_data_hub.infrastructure.helpers import normalize_month
-
-
-def run_discovery(*, file_discovery: FileDiscoveryProtocol, domain: str, month: str) -> Any:
+def run_discovery(
+    *, file_discovery: FileDiscoveryProtocol, domain: str, month: str
+) -> Any:
     try:
         return file_discovery.discover_and_load(domain=domain, month=month)
     except Exception as exc:  # noqa: BLE001
@@ -56,7 +57,10 @@ def convert_dataframe_to_models(
 
     for idx, row in df.iterrows():
         try:
-            row_dict = {key: (None if pd.isna(val) else val) for key, val in row.to_dict().items()}
+            row_dict = {
+                key: (None if pd.isna(val) else val)
+                for key, val in row.to_dict().items()
+            }
             row_dict = {k: v for k, v in row_dict.items() if k in allowed_fields}
             if not row_dict.get("计划代码") or row_dict.get("月度") is None:
                 continue
@@ -70,13 +74,13 @@ def convert_dataframe_to_models(
                 if customer_name:
                     unknown_names.append(str(customer_name))
         except ValidationError as exc:
-            event_logger.bind(domain="annuity_performance", step="convert_to_models").debug(
-                "Row validation failed", row_index=idx, error=str(exc)
-            )
+            event_logger.bind(
+                domain="annuity_performance", step="convert_to_models"
+            ).debug("Row validation failed", row_index=idx, error=str(exc))
         except Exception as exc:  # pragma: no cover - defensive logging
-            event_logger.bind(domain="annuity_performance", step="convert_to_models").warning(
-                "Row unexpected error", row_index=idx, error=str(exc)
-            )
+            event_logger.bind(
+                domain="annuity_performance", step="convert_to_models"
+            ).warning("Row unexpected error", row_index=idx, error=str(exc))
 
     return records, unknown_names
 
@@ -102,16 +106,18 @@ def export_unknown_names_csv(
             filename_prefix=f"unknown_companies_{data_source}",
             output_dir=Path("logs"),
         )
-        event_logger.bind(domain="annuity_performance", step="export_unknown_names").info(
+        event_logger.bind(
+            domain="annuity_performance", step="export_unknown_names"
+        ).info(
             "Exported unknown company names",
             count=len(unknown_names),
             path=str(csv_path),
         )
         return str(csv_path)
     except Exception as exc:  # pragma: no cover - defensive logging
-        event_logger.bind(domain="annuity_performance", step="export_unknown_names").warning(
-            "Failed to export unknown names CSV", error=str(exc)
-        )
+        event_logger.bind(
+            domain="annuity_performance", step="export_unknown_names"
+        ).warning("Failed to export unknown names CSV", error=str(exc))
         return None
 
 

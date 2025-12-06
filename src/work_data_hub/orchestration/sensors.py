@@ -10,9 +10,9 @@ from typing import Any, Dict
 import yaml
 from dagster import RunRequest, SensorEvaluationContext, SkipReason, sensor
 
-from src.work_data_hub.config.settings import get_settings
-from src.work_data_hub.io.connectors.file_connector import DataSourceConnector
-from src.work_data_hub.io.loader.warehouse_loader import build_insert_sql
+from work_data_hub.config.settings import get_settings
+from work_data_hub.io.connectors.file_connector import DataSourceConnector
+from work_data_hub.io.loader.warehouse_loader import build_insert_sql
 
 from .jobs import sample_trustee_performance_multi_file_job
 

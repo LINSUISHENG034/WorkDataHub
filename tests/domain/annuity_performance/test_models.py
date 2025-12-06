@@ -490,8 +490,6 @@ class TestLegacyParityAC414:
 
         # Output model accepts both forms
         model_out = AnnuityPerformanceOut(
-            计划代码="TEST001",
-            company_id="COMP001",
-            **{"流失(含待遇支付)": "2000.0"}
+            计划代码="TEST001", company_id="COMP001", **{"流失(含待遇支付)": "2000.0"}
         )
         assert model_out.流失_含待遇支付 == Decimal("2000.0000")

@@ -55,9 +55,7 @@ class TestHandleValidationErrors:
 
     def test_exact_threshold_raises(self) -> None:
         """Test that error rate exactly at threshold raises exception."""
-        errors = [
-            ValidationErrorDetail(i, "f", "t", "m", "v") for i in range(10)
-        ]
+        errors = [ValidationErrorDetail(i, "f", "t", "m", "v") for i in range(10)]
 
         with pytest.raises(ValidationThresholdExceeded):
             handle_validation_errors(errors, threshold=0.1, total_rows=100)

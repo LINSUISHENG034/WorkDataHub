@@ -22,7 +22,7 @@ import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set
 
 import pandas as pd
 
@@ -106,7 +106,7 @@ DOMAIN_CONFIGS: Dict[str, DomainConfig] = {
             "固费",  # Fixed fee income
             "浮费",  # Variable fee income
             "回补",  # Rebate income
-            "税",    # Tax amount
+            "税",  # Tax amount
         },
         optional_columns={
             "机构代码",
@@ -118,8 +118,8 @@ DOMAIN_CONFIGS: Dict[str, DomainConfig] = {
         },
         column_aliases={
             # Column names vary between data source versions
-            "计划号": "计划代码",      # 202411 uses 计划号, 202412 uses 计划代码
-            "机构": "机构代码",        # 202411 uses 机构, 202412 uses 机构代码
+            "计划号": "计划代码",  # 202411 uses 计划号, 202412 uses 计划代码
+            "机构": "机构代码",  # 202411 uses 机构, 202412 uses 机构代码
         },
         numeric_columns={
             "固费",
@@ -217,7 +217,12 @@ def validate_file(file_path: Path, domain: str) -> ValidationResult:
             missing_required.append(req_col)
 
     # Check for extra columns (informational)
-    known_columns = config.required_columns | config.optional_columns | set(config.column_aliases.keys()) | set(config.column_aliases.values())
+    known_columns = (
+        config.required_columns
+        | config.optional_columns
+        | set(config.column_aliases.keys())
+        | set(config.column_aliases.values())
+    )
     extra_columns = [col for col in actual_columns if col not in known_columns]
 
     success = len(missing_required) == 0
@@ -234,7 +239,9 @@ def validate_file(file_path: Path, domain: str) -> ValidationResult:
     )
 
 
-def validate_domain(domain: str, base_path: Path, verbose: bool = False) -> List[ValidationResult]:
+def validate_domain(
+    domain: str, base_path: Path, verbose: bool = False
+) -> List[ValidationResult]:
     """Validate all data files for a domain."""
     files = find_real_data_files(base_path, domain)
     results = []
@@ -251,7 +258,7 @@ def validate_domain(domain: str, base_path: Path, verbose: bool = False) -> List
             if result.alias_matches:
                 print(f"  ℹ️  Aliases: {result.alias_matches}")
             if result.success:
-                print(f"  ✅ Valid")
+                print("  ✅ Valid")
 
     return results
 
@@ -262,15 +269,15 @@ def print_summary(results: List[ValidationResult], domain: str) -> bool:
     invalid_files = [r for r in results if not r.success and r.actual_columns]
     skipped_files = [r for r in results if not r.actual_columns]
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Domain: {domain}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Files validated: {len(valid_files)}")
     print(f"Files with issues: {len(invalid_files)}")
     print(f"Files skipped (no sheet): {len(skipped_files)}")
 
     if invalid_files:
-        print(f"\n❌ VALIDATION FAILURES:")
+        print("\n❌ VALIDATION FAILURES:")
         for r in invalid_files:
             print(f"\n  {r.file_path.name}:")
             print(f"    Missing required columns: {r.missing_required}")
@@ -283,7 +290,7 @@ def print_summary(results: List[ValidationResult], domain: str) -> bool:
             all_columns.update(r.actual_columns)
 
         config = DOMAIN_CONFIGS[domain]
-        print(f"\n📊 Column Analysis:")
+        print("\n📊 Column Analysis:")
         print(f"  Required: {sorted(config.required_columns)}")
         print(f"  Found across files: {sorted(all_columns)}")
 
@@ -295,7 +302,7 @@ def print_summary(results: List[ValidationResult], domain: str) -> bool:
                 alias_usage[key] = alias_usage.get(key, 0) + 1
 
         if alias_usage:
-            print(f"\n  Column Aliases Used:")
+            print("\n  Column Aliases Used:")
             for alias, count in alias_usage.items():
                 print(f"    {alias}: {count} files")
 
@@ -319,7 +326,8 @@ def main() -> int:
         help="Path to real data directory",
     )
     parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Show detailed output for each file",
     )
@@ -371,12 +379,12 @@ def main() -> int:
         print(json.dumps(output, indent=2, ensure_ascii=False))
 
     if not args.json:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         if all_success:
             print("✅ All validations passed")
         else:
             print("❌ Some validations failed")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
     return 0 if all_success else 1
 

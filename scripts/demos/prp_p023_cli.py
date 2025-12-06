@@ -31,10 +31,15 @@ try:
 
     import psycopg2
 
-    from src.work_data_hub.infrastructure.cleansing.rules.numeric_rules import comprehensive_decimal_cleaning
     from src.work_data_hub.config.settings import get_settings
     from src.work_data_hub.domain.annuity_performance.models import AnnuityPerformanceIn
-    from src.work_data_hub.domain.annuity_performance.service import _extract_plan_code, process
+    from src.work_data_hub.domain.annuity_performance.service import (
+        _extract_plan_code,
+        process,
+    )
+    from src.work_data_hub.infrastructure.cleansing.rules.numeric_rules import (
+        comprehensive_decimal_cleaning,
+    )
     from src.work_data_hub.io.connectors.file_connector import DataSourceConnector
     from src.work_data_hub.io.readers.excel_reader import ExcelReader
 except ImportError as e:
@@ -239,7 +244,9 @@ def discover_files(data_dir: str):
                 for i, file_info in enumerate(files[:10], 1):  # 显示前10个
                     print(f"  {i:2d}. {Path(file_info.path).name}")
                     print(f"      路径: {file_info.path}")
-                    print(f"      修改时间: {file_info.metadata.get('modified_time', '未知')}")
+                    print(
+                        f"      修改时间: {file_info.metadata.get('modified_time', '未知')}"
+                    )
 
                 if len(files) > 10:
                     print(f"  ... 还有 {len(files) - 10} 个文件")
@@ -301,13 +308,21 @@ def process_sample_file(data_dir: str, max_rows: int = 10):
 
                 # 检查清洗效果
                 print("\n🔍 数据清洗效果验证:")
-                negative_rates = [r for r in processed if r.当期收益率 and r.当期收益率 < 0]
+                negative_rates = [
+                    r for r in processed if r.当期收益率 and r.当期收益率 < 0
+                ]
                 if negative_rates:
-                    print(f"  发现 {len(negative_rates)} 条负收益率记录（验证负百分比功能）")
+                    print(
+                        f"  发现 {len(negative_rates)} 条负收益率记录（验证负百分比功能）"
+                    )
 
-                f_prefixed = [r for r in processed if r.计划代码 and r.计划代码.startswith("F")]
+                f_prefixed = [
+                    r for r in processed if r.计划代码 and r.计划代码.startswith("F")
+                ]
                 if f_prefixed:
-                    print(f"  发现 {len(f_prefixed)} 条F前缀计划代码（可能需要检查清理逻辑）")
+                    print(
+                        f"  发现 {len(f_prefixed)} 条F前缀计划代码（可能需要检查清理逻辑）"
+                    )
                 else:
                     print("  ✅ 未发现F前缀计划代码（F前缀清理正常）")
 
@@ -370,7 +385,9 @@ def verify_database():
                             WHERE "当期收益率" < 0;
                         """)
                         negative_count = cur.fetchone()[0]
-                        print(f"\n负收益率记录数: {negative_count} （验证负百分比功能）")
+                        print(
+                            f"\n负收益率记录数: {negative_count} （验证负百分比功能）"
+                        )
 
                         # 检查F前缀数据
                         cur.execute("""
@@ -398,7 +415,9 @@ def verify_database():
         return False
 
 
-def run_full_pipeline(data_dir: str, plan_only: bool = True, max_files: Optional[int] = None):
+def run_full_pipeline(
+    data_dir: str, plan_only: bool = True, max_files: Optional[int] = None
+):
     """运行完整数据处理流程"""
     action = "计划模式验证" if plan_only else "实际数据导入"
     print(f"\n🚀 运行完整数据处理流程 ({action})\n")
@@ -515,7 +534,9 @@ def main():
     # 完整流程
     pipeline_parser = subparsers.add_parser("pipeline", help="运行完整数据处理流程")
     pipeline_parser.add_argument("--data-dir", required=True, help="数据目录路径")
-    pipeline_parser.add_argument("--plan-only", action="store_true", help="仅运行计划模式")
+    pipeline_parser.add_argument(
+        "--plan-only", action="store_true", help="仅运行计划模式"
+    )
     pipeline_parser.add_argument("--max-files", type=int, help="最大处理文件数")
 
     args = parser.parse_args()

@@ -228,7 +228,9 @@ class TestGenericStepsPipeline:
         assert result.success is True
         # Performance target: <100ms for full pipeline with 10k rows
         # Allow generous margin for CI environments
-        assert duration_ms < 1000, f"Pipeline took {duration_ms:.2f}ms, expected <1000ms"
+        assert duration_ms < 1000, (
+            f"Pipeline took {duration_ms:.2f}ms, expected <1000ms"
+        )
 
     def test_empty_dataframe_through_pipeline(
         self, pipeline_context: PipelineContext

@@ -7,7 +7,10 @@ import pandas as pd
 import pytest
 from unittest.mock import Mock
 
-from src.work_data_hub.domain.pipelines.pipeline_config import PipelineConfig, StepConfig
+from src.work_data_hub.domain.pipelines.pipeline_config import (
+    PipelineConfig,
+    StepConfig,
+)
 from src.work_data_hub.domain.pipelines.core import Pipeline
 from src.work_data_hub.domain.pipelines.exceptions import PipelineStepError
 from src.work_data_hub.domain.pipelines.types import Row, StepResult
@@ -29,8 +32,14 @@ def build_row_pipeline(stop_on_error: bool = True) -> Pipeline:
     config = PipelineConfig(
         name="legacy_row_pipeline",
         steps=[
-            StepConfig(name="step1", import_path="tests.domain.pipelines.test_core.LegacyRowStep"),
-            StepConfig(name="step2", import_path="tests.domain.pipelines.test_core.LegacyRowStep"),
+            StepConfig(
+                name="step1",
+                import_path="tests.domain.pipelines.test_core.LegacyRowStep",
+            ),
+            StepConfig(
+                name="step2",
+                import_path="tests.domain.pipelines.test_core.LegacyRowStep",
+            ),
         ],
         stop_on_error=stop_on_error,
     )
@@ -67,8 +76,12 @@ def test_execute_aggregates_warnings_and_errors():
     config = PipelineConfig(
         name="warnings",
         steps=[
-            StepConfig(name="warn", import_path="tests.domain.pipelines.test_core.WarningStep"),
-            StepConfig(name="err", import_path="tests.domain.pipelines.test_core.ErrorStep"),
+            StepConfig(
+                name="warn", import_path="tests.domain.pipelines.test_core.WarningStep"
+            ),
+            StepConfig(
+                name="err", import_path="tests.domain.pipelines.test_core.ErrorStep"
+            ),
         ],
         stop_on_error=False,
     )
@@ -87,7 +100,11 @@ def test_execute_stop_on_error_true():
 
     config = PipelineConfig(
         name="boom",
-        steps=[StepConfig(name="boom", import_path="tests.domain.pipelines.test_core.BoomStep")],
+        steps=[
+            StepConfig(
+                name="boom", import_path="tests.domain.pipelines.test_core.BoomStep"
+            )
+        ],
         stop_on_error=True,
     )
 

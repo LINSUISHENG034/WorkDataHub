@@ -22,12 +22,14 @@ def pipeline_context() -> PipelineContext:
 @pytest.fixture
 def sample_dataframe() -> pd.DataFrame:
     """Create a sample DataFrame for testing."""
-    return pd.DataFrame({
-        "old_col": ["value1", "value2", "value3"],
-        "status": ["draft", "active", "draft"],
-        "a": [10, 20, 30],
-        "b": [5, 10, 15],
-    })
+    return pd.DataFrame(
+        {
+            "old_col": ["value1", "value2", "value3"],
+            "status": ["draft", "active", "draft"],
+            "a": [10, 20, 30],
+            "b": [5, 10, 15],
+        }
+    )
 
 
 @pytest.fixture

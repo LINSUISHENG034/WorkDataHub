@@ -10,7 +10,11 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from src.work_data_hub.io.readers.excel_reader import ExcelReader, ExcelReadError, read_excel_rows
+from src.work_data_hub.io.readers.excel_reader import (
+    ExcelReader,
+    ExcelReadError,
+    read_excel_rows,
+)
 
 
 @pytest.fixture
@@ -258,7 +262,10 @@ class TestExcelReader:
     def test_dataframe_to_rows_string_cleaning(self, tmp_path):
         """Test that string values are properly cleaned."""
         df_with_spaces = pd.DataFrame(
-            {"field1": ["  value with spaces  ", "normal", "  leading"], "field2": [123, 456, 789]}
+            {
+                "field1": ["  value with spaces  ", "normal", "  leading"],
+                "field2": [123, 456, 789],
+            }
         )
 
         file_path = tmp_path / "with_spaces.xlsx"

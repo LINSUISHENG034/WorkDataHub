@@ -120,10 +120,12 @@ class TestCalculationStep:
         self, sample_dataframe: pd.DataFrame, pipeline_context: PipelineContext
     ) -> None:
         """CalculationStep adds calculated fields correctly."""
-        step = CalculationStep({
-            "sum": lambda df: df["a"] + df["b"],
-            "product": lambda df: df["a"] * df["b"],
-        })
+        step = CalculationStep(
+            {
+                "sum": lambda df: df["a"] + df["b"],
+                "product": lambda df: df["a"] * df["b"],
+            }
+        )
         result = step.apply(sample_dataframe, pipeline_context)
 
         assert "sum" in result.columns
@@ -135,9 +137,11 @@ class TestCalculationStep:
         self, sample_dataframe: pd.DataFrame, pipeline_context: PipelineContext
     ) -> None:
         """CalculationStep raises on calculation error."""
-        step = CalculationStep({
-            "bad": lambda df: df["nonexistent_column"] + 1,
-        })
+        step = CalculationStep(
+            {
+                "bad": lambda df: df["nonexistent_column"] + 1,
+            }
+        )
         with pytest.raises(KeyError):
             step.apply(sample_dataframe, pipeline_context)
 

@@ -51,6 +51,7 @@ extend-select = ["TID"]
 "src/work_data_hub/io/**/*.py" = ["TID251"]
 "src/work_data_hub/orchestration/**/*.py" = ["TID251"]
 "src/work_data_hub/domain/annuity_performance/*.py" = ["E501"]
+"src/work_data_hub/scripts/**/*.py" = ["TID251"]
 "scripts/**/*.py" = ["TID251"]
 "tests/**/*.py" = ["ALL"]
 "legacy/**/*.py" = ["ALL"]
@@ -124,3 +125,7 @@ module = [
     "gmssl.*",
 ]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "legacy.*"
+ignore_errors = true
