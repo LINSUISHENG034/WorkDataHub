@@ -128,8 +128,11 @@ development_status:
   5.6-4-domain-development-guide: done  # OPT-004: Create domain development documentation (updated with loading modes)
   epic-5.6-retrospective: optional
 
-  # Epic 6: Company Enrichment Service
-  epic-6: in-progress
+  # Epic 6: Company Enrichment Service - COMPLETED
+  # Multi-tier resolution: YAML → DB Cache → Existing Column → EQC Sync → Temp ID
+  # Retrospective completed 2025-12-08, identified action items for Golden Dataset testing
+  # Reference: docs/sprint-artifacts/retrospective/epic-6-retro-2025-12-08.md
+  epic-6: done
   6-1-enterpriseinfoprovider-protocol-and-stub-implementation: done
   6-2-temporary-company-id-generation-hmac-based: done
   6-3-internal-mapping-tables-and-database-schema: done
@@ -139,7 +142,7 @@ development_status:
   6-6-eqc-api-provider-sync-lookup-with-budget: done
   6-7-async-enrichment-queue-deferred-resolution: done
   6-8-enrichment-observability-and-export: done
-  epic-6-retrospective: optional
+  epic-6-retrospective: completed  # 2025-12-08 - Action items: Legacy migration, Golden Dataset testing
 
   # Epic 7: Testing & Validation Infrastructure
   epic-7: backlog
