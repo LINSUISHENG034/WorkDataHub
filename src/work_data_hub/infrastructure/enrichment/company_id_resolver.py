@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
+from work_data_hub.infrastructure.cleansing import normalize_company_name
 from work_data_hub.utils.logging import get_logger
 
 from .normalizer import generate_temp_company_id, normalize_for_temp_id
@@ -423,6 +424,9 @@ class CompanyIdResolver:
         Uses CompanyMappingRepository.lookup_batch() for batch-optimized
         single SQL round-trip.
 
+        Story 6.4.1: P4 (customer_name) uses normalized values for lookup,
+        while P1 (plan_code), P2 (account_number), P5 (account_name) use RAW values.
+
         Args:
             df: Input DataFrame.
             mask_unresolved: Boolean mask of unresolved rows.
@@ -435,18 +439,32 @@ class CompanyIdResolver:
             return pd.Series(pd.NA, index=df.index, dtype=object), 0
 
         # Collect all potential lookup values from unresolved rows
+        # Story 6.4.1: P4 (customer_name) needs normalization, others use RAW values
         lookup_columns = [
-            strategy.plan_code_column,
-            strategy.account_number_column,
-            strategy.customer_name_column,
-            strategy.account_name_column,
+            (strategy.plan_code_column, False),       # P1: RAW
+            (strategy.account_number_column, False),  # P2: RAW
+            (strategy.customer_name_column, True),    # P4: NORMALIZED
+            (strategy.account_name_column, False),    # P5: RAW
         ]
 
         alias_names: set[str] = set()
-        for col in lookup_columns:
-            if col in df.columns:
-                values = df.loc[mask_unresolved, col].dropna().astype(str).unique()
-                alias_names.update(values)
+        # Track normalized -> original mapping for P4 lookups
+        normalized_to_original: Dict[str, List[str]] = {}
+
+        for col, needs_normalization in lookup_columns:
+            if col not in df.columns:
+                continue
+            values = df.loc[mask_unresolved, col].dropna().astype(str).unique()
+            for v in values:
+                if needs_normalization:
+                    normalized = normalize_company_name(v)
+                    if normalized:
+                        alias_names.add(normalized)
+                        if normalized not in normalized_to_original:
+                            normalized_to_original[normalized] = []
+                        normalized_to_original[normalized].append(v)
+                else:
+                    alias_names.add(v)
 
         if not alias_names:
             return pd.Series(pd.NA, index=df.index, dtype=object), 0
@@ -467,15 +485,24 @@ class CompanyIdResolver:
 
         for idx in df[mask_unresolved].index:
             row = df.loc[idx]
-            for col in lookup_columns:
+            for col, needs_normalization in lookup_columns:
                 if col not in df.columns:
                     continue
                 value = row[col]
                 if pd.isna(value):
                     continue
                 str_value = str(value)
-                if str_value in results:
-                    resolved.loc[idx] = results[str_value].company_id
+
+                # Story 6.4.1: Use normalized value for P4 lookup
+                if needs_normalization:
+                    lookup_key = normalize_company_name(str_value)
+                    if not lookup_key:
+                        continue
+                else:
+                    lookup_key = str_value
+
+                if lookup_key in results:
+                    resolved.loc[idx] = results[lookup_key].company_id
                     hit_count += 1
                     break
 
@@ -539,7 +566,8 @@ class CompanyIdResolver:
 
                     cache_payloads.append(
                         {
-                            "alias_name": str(customer_name),
+                            # Align EQC cache entries with P4 normalization so lookups hit
+                            "alias_name": normalize_company_name(str(customer_name)) or str(customer_name).strip(),
                             "canonical_id": result.company_id,
                             "match_type": "eqc",
                             "priority": 6,
@@ -586,6 +614,9 @@ class CompanyIdResolver:
         Collects mappings from rows resolved via existing column and inserts
         them into the database for future cache hits.
 
+        Story 6.4.1: P4 (customer_name) uses normalized values for backflow,
+        while P2 (account_number), P5 (account_name) use RAW values.
+
         Args:
             df: DataFrame with resolved company IDs.
             resolved_indices: Indices of rows resolved via existing column.
@@ -598,10 +629,11 @@ class CompanyIdResolver:
             return {"inserted": 0, "skipped": 0, "conflicts": 0}
 
         new_mappings: List[Dict[str, Any]] = []
+        # Story 6.4.1: P4 (customer_name) needs normalization, others use RAW values
         backflow_fields = [
-            (strategy.account_number_column, "account", 2),
-            (strategy.customer_name_column, "name", 4),
-            (strategy.account_name_column, "account_name", 5),
+            (strategy.account_number_column, "account", 2, False),     # P2: RAW
+            (strategy.customer_name_column, "name", 4, True),          # P4: NORMALIZED
+            (strategy.account_name_column, "account_name", 5, False),  # P5: RAW
         ]
 
         for idx in resolved_indices:
@@ -612,16 +644,24 @@ class CompanyIdResolver:
             if company_id.startswith("IN_"):
                 continue
 
-            for column, match_type, priority in backflow_fields:
+            for column, match_type, priority, needs_normalization in backflow_fields:
                 if column not in df.columns:
                     continue
                 alias_value = row.get(column)
                 if pd.isna(alias_value) or not str(alias_value).strip():
                     continue
 
+                # Story 6.4.1: Apply normalization for P4 only
+                if needs_normalization:
+                    alias_name = normalize_company_name(str(alias_value))
+                    if not alias_name:
+                        continue  # Skip if normalization returns empty
+                else:
+                    alias_name = str(alias_value).strip()
+
                 new_mappings.append(
                     {
-                        "alias_name": str(alias_value).strip(),
+                        "alias_name": alias_name,
                         "canonical_id": company_id,
                         "match_type": match_type,
                         "priority": priority,

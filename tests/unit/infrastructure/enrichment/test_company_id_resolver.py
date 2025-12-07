@@ -1133,3 +1133,446 @@ class TestAsyncQueueIntegration:
         assert len(call_args) == 1
         assert call_args[0]["temp_id"].startswith("IN_")
         assert call_args[0]["raw_name"] == "公司A"
+
+
+# =============================================================================
+# Story 6.4.1: P4 Customer Name Normalization Alignment Tests
+# =============================================================================
+
+
+class TestP4NormalizationDbCacheLookup:
+    """Tests for P4 (customer_name) normalization in DB cache lookup (AC1, AC3)."""
+
+    def test_db_cache_lookup_normalizes_p4_customer_name(self, default_strategy):
+        """P4 (customer_name) should be normalized before DB lookup (AC1)."""
+        from unittest.mock import MagicMock
+        from work_data_hub.infrastructure.enrichment.mapping_repository import MatchResult
+
+        mock_repo = MagicMock()
+        # DB has normalized key "公司A" (without brackets/status markers)
+        mock_repo.lookup_batch.return_value = {
+            "公司A": MatchResult(
+                company_id="normalized_company_123",
+                match_type="name",
+                priority=4,
+                source="internal",
+            )
+        }
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        # Input has raw value with bracket content that normalizes to "公司A"
+        # normalize_company_name removes leading/trailing bracket content
+        df = pd.DataFrame({
+            "计划代码": ["UNKNOWN"],
+            "客户名称": ["（核心）公司A"],  # Should normalize to "公司A"
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+
+        # Should hit cache because normalized("（核心）公司A") == "公司A"
+        assert result.data.loc[0, "company_id"] == "normalized_company_123"
+        assert result.statistics.db_cache_hits == 1
+
+    def test_db_cache_lookup_raw_for_p1_plan_code(self, default_strategy):
+        """P1 (plan_code) should use RAW values for DB lookup (AC3)."""
+        from unittest.mock import MagicMock
+        from work_data_hub.infrastructure.enrichment.mapping_repository import MatchResult
+
+        mock_repo = MagicMock()
+        # DB has raw key "PLAN001" (exact match required)
+        mock_repo.lookup_batch.return_value = {
+            "PLAN001": MatchResult(
+                company_id="plan_company_123",
+                match_type="plan",
+                priority=1,
+                source="internal",
+            )
+        }
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        df = pd.DataFrame({
+            "计划代码": ["PLAN001"],
+            "客户名称": ["公司A"],
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+
+        # Should hit cache with exact raw match
+        assert result.data.loc[0, "company_id"] == "plan_company_123"
+        assert result.statistics.db_cache_hits == 1
+
+    def test_db_cache_lookup_raw_for_p2_account_number(self, default_strategy):
+        """P2 (account_number) should use RAW values for DB lookup (AC3)."""
+        from unittest.mock import MagicMock
+        from work_data_hub.infrastructure.enrichment.mapping_repository import MatchResult
+
+        mock_repo = MagicMock()
+        mock_repo.lookup_batch.return_value = {
+            "ACC001": MatchResult(
+                company_id="account_company_123",
+                match_type="account",
+                priority=2,
+                source="internal",
+            )
+        }
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        df = pd.DataFrame({
+            "计划代码": ["UNKNOWN"],
+            "客户名称": ["公司A"],
+            "年金账户号": ["ACC001"],
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+
+        assert result.data.loc[0, "company_id"] == "account_company_123"
+        assert result.statistics.db_cache_hits == 1
+
+    def test_db_cache_lookup_raw_for_p5_account_name(self, default_strategy):
+        """P5 (account_name) should use RAW values for DB lookup (AC3)."""
+        from unittest.mock import MagicMock
+        from work_data_hub.infrastructure.enrichment.mapping_repository import MatchResult
+
+        mock_repo = MagicMock()
+        mock_repo.lookup_batch.return_value = {
+            "账户名A": MatchResult(
+                company_id="account_name_company_123",
+                match_type="account_name",
+                priority=5,
+                source="internal",
+            )
+        }
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        df = pd.DataFrame({
+            "计划代码": ["UNKNOWN"],
+            "客户名称": ["公司A"],
+            "年金账户名": ["账户名A"],
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+
+        assert result.data.loc[0, "company_id"] == "account_name_company_123"
+        assert result.statistics.db_cache_hits == 1
+
+
+class TestP4NormalizationBackflow:
+    """Tests for P4 (customer_name) normalization in backflow (AC2, AC3)."""
+
+    def test_backflow_normalizes_p4_customer_name(self, default_strategy):
+        """P4 backflow should write normalized value to DB (AC2)."""
+        from unittest.mock import MagicMock
+        from work_data_hub.infrastructure.enrichment.mapping_repository import InsertBatchResult
+
+        mock_repo = MagicMock()
+        mock_repo.lookup_batch.return_value = {}
+        mock_repo.insert_batch_with_conflict_check.return_value = InsertBatchResult(
+            inserted_count=1,
+            skipped_count=0,
+            conflicts=[],
+        )
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        # Input has raw customer_name with bracket content
+        # normalize_company_name removes leading/trailing bracket content
+        df = pd.DataFrame({
+            "计划代码": ["UNKNOWN"],
+            "客户名称": ["公司B（非核心）"],  # Should normalize to "公司B"
+            "公司代码": ["existing_456"],
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+
+        # Verify backflow was called
+        mock_repo.insert_batch_with_conflict_check.assert_called_once()
+        call_args = mock_repo.insert_batch_with_conflict_check.call_args[0][0]
+
+        # Find the name mapping entry
+        name_entries = [e for e in call_args if e["match_type"] == "name"]
+        assert len(name_entries) == 1
+        # Should be normalized (no bracket content)
+        assert name_entries[0]["alias_name"] == "公司B"
+
+    def test_backflow_raw_for_p2_account_number(self, default_strategy):
+        """P2 backflow should write RAW value to DB (AC3)."""
+        from unittest.mock import MagicMock
+        from work_data_hub.infrastructure.enrichment.mapping_repository import InsertBatchResult
+
+        mock_repo = MagicMock()
+        mock_repo.lookup_batch.return_value = {}
+        mock_repo.insert_batch_with_conflict_check.return_value = InsertBatchResult(
+            inserted_count=1,
+            skipped_count=0,
+            conflicts=[],
+        )
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        df = pd.DataFrame({
+            "计划代码": ["UNKNOWN"],
+            "客户名称": ["公司A"],
+            "年金账户号": ["ACC001"],
+            "公司代码": ["existing_789"],
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+
+        mock_repo.insert_batch_with_conflict_check.assert_called_once()
+        call_args = mock_repo.insert_batch_with_conflict_check.call_args[0][0]
+
+        # Find the account mapping entry
+        account_entries = [e for e in call_args if e["match_type"] == "account"]
+        assert len(account_entries) == 1
+        # Should be raw (exact value)
+        assert account_entries[0]["alias_name"] == "ACC001"
+
+    def test_backflow_raw_for_p5_account_name(self, default_strategy):
+        """P5 backflow should write RAW value to DB (AC3)."""
+        from unittest.mock import MagicMock
+        from work_data_hub.infrastructure.enrichment.mapping_repository import InsertBatchResult
+
+        mock_repo = MagicMock()
+        mock_repo.lookup_batch.return_value = {}
+        mock_repo.insert_batch_with_conflict_check.return_value = InsertBatchResult(
+            inserted_count=1,
+            skipped_count=0,
+            conflicts=[],
+        )
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        df = pd.DataFrame({
+            "计划代码": ["UNKNOWN"],
+            "客户名称": ["公司A"],
+            "年金账户名": ["账户名B"],
+            "公司代码": ["existing_999"],
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+
+        mock_repo.insert_batch_with_conflict_check.assert_called_once()
+        call_args = mock_repo.insert_batch_with_conflict_check.call_args[0][0]
+
+        # Find the account_name mapping entry
+        account_name_entries = [e for e in call_args if e["match_type"] == "account_name"]
+        assert len(account_name_entries) == 1
+        # Should be raw (exact value)
+        assert account_name_entries[0]["alias_name"] == "账户名B"
+
+    def test_backflow_skips_empty_normalized_p4(self, default_strategy):
+        """If P4 normalization returns empty string, skip backflow (AC2)."""
+        from unittest.mock import MagicMock
+        from work_data_hub.infrastructure.enrichment.mapping_repository import InsertBatchResult
+
+        mock_repo = MagicMock()
+        mock_repo.lookup_batch.return_value = {}
+        mock_repo.insert_batch_with_conflict_check.return_value = InsertBatchResult(
+            inserted_count=0,
+            skipped_count=0,
+            conflicts=[],
+        )
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        # Customer name that might normalize to empty (edge case)
+        df = pd.DataFrame({
+            "计划代码": ["UNKNOWN"],
+            "客户名称": ["   "],  # Whitespace only - normalizes to empty
+            "公司代码": ["existing_111"],
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+
+        # Backflow may be called but should not include empty alias_name
+        if mock_repo.insert_batch_with_conflict_check.called:
+            call_args = mock_repo.insert_batch_with_conflict_check.call_args[0][0]
+            name_entries = [e for e in call_args if e["match_type"] == "name"]
+            # Should have no name entries (empty normalized value skipped)
+            assert len(name_entries) == 0
+
+
+class TestP4NormalizationEdgeCases:
+    """Tests for P4 normalization edge cases (AC4)."""
+
+    def test_p4_normalization_special_characters(self, default_strategy):
+        """Test P4 normalization handles special characters correctly."""
+        from unittest.mock import MagicMock
+        from work_data_hub.infrastructure.enrichment.mapping_repository import MatchResult
+
+        mock_repo = MagicMock()
+        # DB has normalized key without decorative characters
+        mock_repo.lookup_batch.return_value = {
+            "公司C": MatchResult(
+                company_id="special_company_123",
+                match_type="name",
+                priority=4,
+                source="internal",
+            )
+        }
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        # Input has decorative characters that should be removed
+        df = pd.DataFrame({
+            "计划代码": ["UNKNOWN"],
+            "客户名称": ["「公司C」"],  # Decorative brackets should be removed
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+
+        assert result.data.loc[0, "company_id"] == "special_company_123"
+        assert result.statistics.db_cache_hits == 1
+
+    def test_p4_normalization_full_width_conversion(self, default_strategy):
+        """Test P4 normalization converts full-width ASCII to half-width."""
+        from unittest.mock import MagicMock
+        from work_data_hub.infrastructure.enrichment.mapping_repository import MatchResult
+
+        mock_repo = MagicMock()
+        # DB has half-width version
+        mock_repo.lookup_batch.return_value = {
+            "ABC公司": MatchResult(
+                company_id="fullwidth_company_123",
+                match_type="name",
+                priority=4,
+                source="internal",
+            )
+        }
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        # Input has full-width ASCII
+        df = pd.DataFrame({
+            "计划代码": ["UNKNOWN"],
+            "客户名称": ["ＡＢＣ公司"],  # Full-width ABC
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+
+        assert result.data.loc[0, "company_id"] == "fullwidth_company_123"
+        assert result.statistics.db_cache_hits == 1
+
+    def test_p3_hardcode_yaml_uses_raw_values(self, default_strategy):
+        """P3 (hardcode/plan_code) YAML lookup should use RAW values (AC3 regression guard)."""
+        # P3 hardcode uses the same column as P1 (plan_code_column)
+        # This test ensures YAML lookup path remains RAW for P3
+        yaml_overrides = {
+            "plan": {},
+            "account": {},
+            "hardcode": {"FP0001": "hardcode_company_123"},  # P3 hardcode mapping
+            "name": {},
+            "account_name": {},
+        }
+        resolver = CompanyIdResolver(yaml_overrides=yaml_overrides)
+
+        df = pd.DataFrame({
+            "计划代码": ["FP0001"],  # Exact raw match required
+            "客户名称": ["公司A"],
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+
+        # Should hit via hardcode YAML with exact raw match
+        assert result.data.loc[0, "company_id"] == "hardcode_company_123"
+        assert result.statistics.yaml_hits.get("hardcode", 0) == 1
+
+
+class TestP4NormalizationIntegration:
+    """Integration tests for P4 normalization cache hit improvement (AC5)."""
+
+    def test_cache_hit_after_backflow_with_normalized_p4(self, default_strategy):
+        """Test round-trip: backflow writes normalized → lookup finds normalized (AC5)."""
+        from unittest.mock import MagicMock
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            InsertBatchResult,
+            MatchResult,
+        )
+
+        mock_repo = MagicMock()
+
+        # Phase 1: Backflow - simulate existing column resolution
+        mock_repo.lookup_batch.return_value = {}  # No cache hit initially
+        mock_repo.insert_batch_with_conflict_check.return_value = InsertBatchResult(
+            inserted_count=1,
+            skipped_count=0,
+            conflicts=[],
+        )
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        # First batch: has existing company_id, triggers backflow
+        df1 = pd.DataFrame({
+            "计划代码": ["UNKNOWN"],
+            "客户名称": ["公司D（核心）"],  # Will normalize to "公司D"
+            "公司代码": ["real_company_789"],
+        })
+
+        result1 = resolver.resolve_batch(df1, default_strategy)
+        assert result1.data.loc[0, "company_id"] == "real_company_789"
+        assert result1.statistics.existing_column_hits == 1
+
+        # Verify backflow wrote normalized value
+        backflow_call = mock_repo.insert_batch_with_conflict_check.call_args[0][0]
+        name_entries = [e for e in backflow_call if e["match_type"] == "name"]
+        assert len(name_entries) == 1
+        assert name_entries[0]["alias_name"] == "公司D"  # Normalized
+
+        # Phase 2: Lookup - simulate cache hit with normalized key
+        mock_repo.lookup_batch.return_value = {
+            "公司D": MatchResult(
+                company_id="real_company_789",
+                match_type="name",
+                priority=4,
+                source="internal",
+            )
+        }
+
+        # Second batch: different raw value that normalizes to same key
+        df2 = pd.DataFrame({
+            "计划代码": ["UNKNOWN"],
+            "客户名称": ["（非核心）公司D"],  # Also normalizes to "公司D"
+        })
+
+        result2 = resolver.resolve_batch(df2, default_strategy)
+
+        # Should hit cache because normalized("（非核心）公司D") == "公司D"
+        assert result2.data.loc[0, "company_id"] == "real_company_789"
+        assert result2.statistics.db_cache_hits == 1
