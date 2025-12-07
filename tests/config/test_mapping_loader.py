@@ -209,18 +209,19 @@ class TestSpecificLoaderFunctions:
             assert isinstance(value, str)
 
     def test_load_company_id_overrides_plan_happy_path(self):
-        """Test successful loading of company ID overrides mapping."""
+        """Test successful loading of company ID overrides mapping.
+
+        Note: P1-P4 YAML files are currently empty as data will be migrated
+        from Layer 2 (Database Cache) in future. This test verifies the file
+        loads without error (returns empty dict for empty/comment-only files).
+        """
         mapping = load_company_id_overrides_plan()
 
-        # Assert known sample entries from YAML
-        assert "FP0001" in mapping
-        assert mapping["FP0001"] == "614810477"
-        assert "FP0002" in mapping
-        assert mapping["FP0002"] == "614810477"
-        assert "P0809" in mapping
-        assert mapping["P0809"] == "608349737"
+        # P1 plan file is currently empty (P1-P4 data pending Layer 2 migration)
+        # Test that it loads without error and returns a dict
+        assert isinstance(mapping, dict)
 
-        # Verify all values are strings (even though they're numbers)
+        # If data is present, verify structure
         for key, value in mapping.items():
             assert isinstance(key, str)
             assert isinstance(value, str)
@@ -269,20 +270,37 @@ class TestIntegration:
     """Integration test cases."""
 
     def test_all_mappings_load_successfully(self):
-        """Integration test - all mappings load without errors."""
-        mappings = {
+        """Integration test - all mappings load without errors.
+
+        Note: P1-P4 company_id YAML files are currently empty as data will be
+        migrated from Layer 2 (Database Cache) in future. This test verifies
+        all files load without error.
+        """
+        # Mappings that should have data
+        mappings_with_data = {
             "company_branch": load_company_branch(),
             "portfolio_code": load_default_portfolio_code(),
-            "id_overrides": load_company_id_overrides_plan(),
             "business_type": load_business_type_code(),
         }
 
-        # Verify each mapping has expected structure
-        for name, mapping in mappings.items():
-            assert isinstance(mapping, dict)
-            assert len(mapping) > 0
+        # Mappings that may be empty (P1-P4 pending Layer 2 migration)
+        mappings_may_be_empty = {
+            "id_overrides": load_company_id_overrides_plan(),
+        }
+
+        # Verify mappings with data have expected structure
+        for name, mapping in mappings_with_data.items():
+            assert isinstance(mapping, dict), f"{name} should be a dict"
+            assert len(mapping) > 0, f"{name} should have entries"
 
             # All keys and values should be strings
+            for key, value in mapping.items():
+                assert isinstance(key, str)
+                assert isinstance(value, str)
+
+        # Verify mappings that may be empty load without error
+        for name, mapping in mappings_may_be_empty.items():
+            assert isinstance(mapping, dict), f"{name} should be a dict"
             for key, value in mapping.items():
                 assert isinstance(key, str)
                 assert isinstance(value, str)

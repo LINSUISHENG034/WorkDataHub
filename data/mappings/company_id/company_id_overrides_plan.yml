@@ -1,0 +1,33 @@
+# Company ID Overrides - Plan Code Mappings (Priority 1)
+# Story 6.x: Internal Mapping Tables and Database Schema
+#
+# Format: plan_code: company_id
+# Example:
+#   "FP0001": "614810477"
+#
+# This file maps plan codes to company IDs.
+# P1-P4 data will be migrated from Layer 2 (Database Cache) in future.
+#
+# New Pipeline Priority Order:
+#   P1: plan (本文件 - 计划代码)
+#   P2: account_name (年金账户名)
+#   P3: account (年金账户号)
+#   P4: name (客户名称)
+#   P5: hardcode (组合映射特殊情况)
+
+# 福利计划 (FP) 系列
+FP0001: "614810477"
+FP0002: "614810477"
+FP0003: "610081428"
+
+# 标准计划 (P) 系列
+P0809: "608349737"
+
+# 特殊计划 (SC) 系列
+SC002: "604809109"
+SC007: "602790403"
+
+# 新年金计划 (XNP) 系列
+XNP466: "603968573"
+XNP467: "603968573"
+XNP596: "601038164"

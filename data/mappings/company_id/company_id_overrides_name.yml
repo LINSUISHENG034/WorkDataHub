@@ -1,0 +1,18 @@
+# Company ID Overrides - Customer Name Mappings (Priority 4)
+# Story 6.x: Internal Mapping Tables and Database Schema
+#
+# Format: customer_name: company_id
+# Example:
+#   "中国平安": "600866980"
+#   "平安保险": "600866980"
+#
+# This file maps customer names (客户名称) to company IDs.
+# Names should be normalized (trimmed, consistent encoding).
+# P1-P4 data will be migrated from Layer 2 (Database Cache) in future.
+#
+# New Pipeline Priority Order:
+#   P1: plan (计划代码)
+#   P2: account_name (年金账户名)
+#   P3: account (年金账户号)
+#   P4: name (本文件 - 客户名称)
+#   P5: hardcode (组合映射特殊情况)

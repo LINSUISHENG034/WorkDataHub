@@ -240,7 +240,8 @@ def load_plan_override_mapping(mapping_path: Optional[str] = None) -> Dict[str, 
 
     if mapping_path is None:
         # Default path for plan override mappings
-        mapping_path = "data/mappings/company_id_overrides_plan.yml"
+        # Story 6.x: Reorganized to company_id/ subdirectory
+        mapping_path = "data/mappings/company_id/company_id_overrides_plan.yml"
 
     path = Path(mapping_path)
     if not path.exists():

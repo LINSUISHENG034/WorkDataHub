@@ -1,0 +1,16 @@
+# Company ID Overrides - Account Number Mappings (Priority 3)
+# Story 6.x: Internal Mapping Tables and Database Schema
+#
+# Format: account_number: company_id
+# Example:
+#   "12345678": "601234567"
+#
+# This file maps account numbers (年金账户号) to company IDs.
+# P1-P4 data will be migrated from Layer 2 (Database Cache) in future.
+#
+# New Pipeline Priority Order:
+#   P1: plan (计划代码)
+#   P2: account_name (年金账户名)
+#   P3: account (本文件 - 年金账户号)
+#   P4: name (客户名称)
+#   P5: hardcode (组合映射特殊情况)

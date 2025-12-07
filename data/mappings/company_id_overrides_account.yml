@@ -1,9 +1,0 @@
-# Company ID Overrides - Account Number Mappings (Priority 2)
-# Story 6.3: Internal Mapping Tables and Database Schema
-#
-# Format: account_number: company_id
-# Example:
-#   "12345678": "601234567"
-#
-# This file maps account numbers to company IDs.
-# Add mappings as needed for account-based resolution.

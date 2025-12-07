@@ -8,12 +8,12 @@ hierarchical resolution strategy used by CompanyIdResolver.
 Story 6.3: Internal Mapping Tables and Database Schema
 Architecture Reference: AD-010 Infrastructure Layer
 
-Priority Levels:
+Priority Levels (New Pipeline Order):
 1. plan - Plan code mappings (highest priority)
-2. account - Account number mappings
-3. hardcode - Hardcoded special cases
-4. name - Customer name mappings
-5. account_name - Account name mappings (lowest priority)
+2. account_name - Account name mappings (年金账户名)
+3. account - Account number mappings (年金账户号)
+4. name - Customer name mappings (客户名称)
+5. hardcode - Hardcoded special cases (lowest priority)
 """
 
 import os
@@ -27,10 +27,17 @@ import structlog
 logger = structlog.get_logger(__name__)
 
 # Default mappings directory relative to project root
-DEFAULT_MAPPINGS_DIR = Path("data/mappings")
+# Story 6.x: Reorganized to data/mappings/company_id/ subdirectory
+DEFAULT_MAPPINGS_DIR = Path("data/mappings/company_id")
 
 # Priority level file suffixes (in priority order)
-PRIORITY_LEVELS = ["plan", "account", "hardcode", "name", "account_name"]
+# New Pipeline Priority Order (per company-enrichment-service.md):
+#   P1: plan_code → company_id
+#   P2: account_name → company_id (年金账户名)
+#   P3: account_number → company_id (年金账户号)
+#   P4: customer_name → company_id (客户名称)
+#   P5: plan_code + customer_name → company_id (hardcode组合映射)
+PRIORITY_LEVELS = ["plan", "account_name", "account", "name", "hardcode"]
 
 # Environment variable for custom mappings directory
 MAPPINGS_DIR_ENV_VAR = "WDH_MAPPINGS_DIR"
@@ -166,10 +173,10 @@ def load_company_id_overrides(
         Dict with priority level keys mapping to their respective mappings:
         {
             "plan": {"FP0001": "614810477", ...},         # Priority 1
-            "account": {"12345678": "601234567", ...},    # Priority 2
-            "hardcode": {"FP0001": "614810477", ...},     # Priority 3
+            "account_name": {"平安年金账户": "600866980", ...},  # Priority 2
+            "account": {"12345678": "601234567", ...},    # Priority 3
             "name": {"中国平安": "600866980", ...},        # Priority 4
-            "account_name": {"平安年金账户": "600866980", ...},  # Priority 5
+            "hardcode": {"FP0001": "614810477", ...},     # Priority 5
         }
 
     Raises:

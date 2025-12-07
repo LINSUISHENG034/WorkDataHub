@@ -114,7 +114,8 @@ def load_default_portfolio_code() -> Dict[str, str]:
 
 def load_company_id_overrides_plan() -> Dict[str, str]:
     """Load company ID override mapping for plans."""
-    return load_yaml_mapping(str(get_mappings_dir() / "company_id_overrides_plan.yml"))
+    # Story 6.x: Reorganized to company_id/ subdirectory
+    return load_yaml_mapping(str(get_mappings_dir() / "company_id" / "company_id_overrides_plan.yml"))
 
 
 def load_business_type_code() -> Dict[str, str]:

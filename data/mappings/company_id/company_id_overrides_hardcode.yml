@@ -1,0 +1,16 @@
+# Company ID Overrides - Hardcoded Special Cases (Priority 5)
+# Story 6.x: Migrated from Legacy COMPANY_ID3_MAPPING
+#
+# Format: plan_code: company_id
+# These are plan codes that map to specific company IDs as special business rules.
+#
+# New Pipeline Priority Order:
+#   P1: plan (计划代码)
+#   P2: account_name (年金账户名)
+#   P3: account (年金账户号)
+#   P4: name (客户名称)
+#   P5: hardcode (本文件 - 组合映射特殊情况)
+#
+# Source: legacy/annuity_hub/data_handler/mappings.py - COMPANY_ID3_MAPPING
+# Migration Date: 2025-12-08
+
