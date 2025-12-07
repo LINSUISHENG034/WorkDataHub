@@ -18,14 +18,13 @@ Resolution Priority (Story 6.4 - Multi-Tier Lookup):
 """
 
 import os
-import warnings
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
 from work_data_hub.utils.logging import get_logger
 
-from .normalizer import generate_temp_company_id
+from .normalizer import generate_temp_company_id, normalize_for_temp_id
 from .types import ResolutionResult, ResolutionStatistics, ResolutionStrategy
 
 if TYPE_CHECKING:
@@ -84,7 +83,6 @@ class CompanyIdResolver:
     def __init__(
         self,
         enrichment_service: Optional["CompanyEnrichmentService"] = None,
-        plan_override_mapping: Optional[Dict[str, str]] = None,
         yaml_overrides: Optional[Dict[str, Dict[str, str]]] = None,
         mapping_repository: Optional["CompanyMappingRepository"] = None,
     ) -> None:
@@ -93,8 +91,6 @@ class CompanyIdResolver:
 
         Args:
             enrichment_service: Optional CompanyEnrichmentService for EQC lookup.
-            plan_override_mapping: DEPRECATED - Use yaml_overrides instead.
-                Kept for backward compatibility; merged into yaml_overrides["plan"].
             yaml_overrides: Dict of priority level -> {alias: company_id} mappings.
                 If not provided, auto-loads from load_company_id_overrides().
             mapping_repository: Optional CompanyMappingRepository for database cache.
@@ -119,20 +115,6 @@ class CompanyIdResolver:
                 )
         else:
             self.yaml_overrides = yaml_overrides
-
-        # Backward compatibility: merge plan_override_mapping into yaml_overrides
-        if plan_override_mapping:
-            warnings.warn(
-                "plan_override_mapping is deprecated, use yaml_overrides instead",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            if "plan" not in self.yaml_overrides:
-                self.yaml_overrides["plan"] = {}
-            self.yaml_overrides["plan"].update(plan_override_mapping)
-
-        # Legacy attribute for backward compatibility
-        self.plan_override_mapping = self.yaml_overrides.get("plan", {})
 
         # Load salt from environment with safety check
         self.salt = os.environ.get(SALT_ENV_VAR, DEFAULT_SALT)
@@ -327,17 +309,32 @@ class CompanyIdResolver:
 
         # Step 5: Generate temp IDs for remaining (vectorized apply)
         mask_still_missing = result_df[strategy.output_column].isna()
+        temp_id_indices: List[int] = []
         if strategy.generate_temp_ids and mask_still_missing.any():
             result_df.loc[mask_still_missing, strategy.output_column] = result_df.loc[
                 mask_still_missing, strategy.customer_name_column
             ].apply(lambda x: self._generate_temp_id(x))
 
             stats.temp_ids_generated = mask_still_missing.sum()
+            temp_id_indices = list(result_df[mask_still_missing].index)
 
             logger.debug(
                 "company_id_resolver.temp_ids_generated",
                 count=stats.temp_ids_generated,
             )
+
+        # Step 5b: Enqueue for async enrichment (Story 6.5)
+        if (
+            strategy.enable_async_queue
+            and self.mapping_repository
+            and temp_id_indices
+        ):
+            async_queued = self._enqueue_for_async_enrichment(
+                result_df,
+                temp_id_indices,
+                strategy,
+            )
+            stats.async_queued = async_queued
 
         # Count unresolved
         stats.unresolved = result_df[strategy.output_column].isna().sum()
@@ -665,6 +662,79 @@ class CompanyIdResolver:
                 error=str(e),
             )
             return {"inserted": 0, "skipped": 0, "conflicts": 0}
+
+    def _enqueue_for_async_enrichment(
+        self,
+        df: pd.DataFrame,
+        temp_id_indices: List[int],
+        strategy: ResolutionStrategy,
+    ) -> int:
+        """
+        Enqueue unresolved company names for async enrichment (Story 6.5).
+
+        Called after temp ID generation to queue names for background
+        resolution via the enterprise.enrichment_requests table.
+
+        Args:
+            df: DataFrame with resolved company IDs (including temp IDs).
+            temp_id_indices: Indices of rows that received temp IDs.
+            strategy: Resolution strategy configuration.
+
+        Returns:
+            Number of requests actually enqueued (excludes duplicates).
+        """
+        if not self.mapping_repository or not temp_id_indices:
+            return 0
+
+        # Build enqueue requests using normalize_for_temp_id for dedup parity
+        enqueue_requests: List[Dict[str, str]] = []
+        seen_normalized: set[str] = set()
+
+        for idx in temp_id_indices:
+            row = df.loc[idx]
+            raw_name = row.get(strategy.customer_name_column)
+            temp_id = row.get(strategy.output_column)
+
+            if pd.isna(raw_name) or not str(raw_name).strip():
+                continue
+
+            raw_name_str = str(raw_name)
+            normalized = normalize_for_temp_id(raw_name_str)
+
+            # Deduplicate within batch by normalized name
+            if normalized in seen_normalized:
+                continue
+            seen_normalized.add(normalized)
+
+            enqueue_requests.append(
+                {
+                    "raw_name": raw_name_str,
+                    "normalized_name": normalized,
+                    "temp_id": str(temp_id) if pd.notna(temp_id) else "",
+                }
+            )
+
+        if not enqueue_requests:
+            return 0
+
+        # Graceful degradation: enqueue failures don't block pipeline
+        try:
+            result = self.mapping_repository.enqueue_for_enrichment(enqueue_requests)
+
+            logger.info(
+                "company_id_resolver.async_enqueue.completed",
+                queued_count=result.queued_count,
+                skipped_count=result.skipped_count,
+            )
+
+            return result.queued_count
+
+        except Exception as e:
+            logger.warning(
+                "company_id_resolver.async_enqueue.failed",
+                error=str(e),
+            )
+            return 0
 
     def _generate_temp_id(self, customer_name: Optional[str]) -> str:
         """

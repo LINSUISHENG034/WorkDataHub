@@ -98,9 +98,18 @@ class CompanyIdResolutionStep(TransformStep):
         sync_lookup_budget: int = 0,
         generate_temp_ids: bool = True,
     ) -> None:
+        yaml_overrides = None
+        if plan_override_mapping is not None:
+            yaml_overrides = {
+                "plan": plan_override_mapping,
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            }
         self._resolver = CompanyIdResolver(
             enrichment_service=enrichment_service,
-            plan_override_mapping=plan_override_mapping,
+            yaml_overrides=yaml_overrides,
         )
         self._sync_lookup_budget = sync_lookup_budget
         self._use_enrichment = enrichment_service is not None

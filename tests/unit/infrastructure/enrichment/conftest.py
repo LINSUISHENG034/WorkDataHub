@@ -39,8 +39,16 @@ def sample_dataframe():
 
 @pytest.fixture
 def resolver_with_overrides(sample_plan_override_mapping):
-    """CompanyIdResolver with plan override mapping."""
-    return CompanyIdResolver(plan_override_mapping=sample_plan_override_mapping)
+    """CompanyIdResolver with explicit YAML overrides (plan only)."""
+    return CompanyIdResolver(
+        yaml_overrides={
+            "plan": sample_plan_override_mapping,
+            "account": {},
+            "hardcode": {},
+            "name": {},
+            "account_name": {},
+        }
+    )
 
 
 @pytest.fixture

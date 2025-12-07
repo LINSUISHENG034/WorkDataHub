@@ -30,12 +30,6 @@ class TestCompanyIdResolverInit:
         """Test resolver can be created without any dependencies."""
         resolver = CompanyIdResolver()
         assert resolver.enrichment_service is None
-        assert resolver.plan_override_mapping == {}
-
-    def test_init_with_plan_overrides(self, sample_plan_override_mapping):
-        """Test resolver with plan override mapping."""
-        resolver = CompanyIdResolver(plan_override_mapping=sample_plan_override_mapping)
-        assert resolver.plan_override_mapping == sample_plan_override_mapping
 
     def test_init_with_enrichment_service(self, mock_enrichment_service):
         """Test resolver with enrichment service."""
@@ -169,7 +163,7 @@ class TestExistingColumnPassthrough:
         from work_data_hub.config.mapping_loader import load_company_id_overrides
 
         overrides = load_company_id_overrides(mappings_dir)
-        resolver = CompanyIdResolver(plan_override_mapping=overrides["plan"])
+        resolver = CompanyIdResolver(yaml_overrides=overrides)
 
         df = pd.DataFrame({
             "计划代码": ["FP0001"],
@@ -820,34 +814,6 @@ class TestBackflowMechanism:
         assert result.statistics.backflow_stats.get("conflicts", 0) == 1
 
 
-class TestBackwardCompatibility:
-    """Tests for backward compatibility (AC8)."""
-
-    def test_backward_compatibility_plan_override(self, default_strategy):
-        """Test old plan_override_mapping API still works."""
-        import warnings
-
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            resolver = CompanyIdResolver(
-                plan_override_mapping={"FP0001": "614810477"}
-            )
-            # Should emit deprecation warning
-            assert len(w) == 1
-            assert issubclass(w[0].category, DeprecationWarning)
-            assert "deprecated" in str(w[0].message).lower()
-
-        df = pd.DataFrame({
-            "计划代码": ["FP0001"],
-            "客户名称": ["公司A"],
-        })
-
-        result = resolver.resolve_batch(df, default_strategy)
-        assert result.data.loc[0, "company_id"] == "614810477"
-        # Legacy attribute should still work
-        assert resolver.plan_override_mapping == {"FP0001": "614810477"}
-
-
 class TestStatisticsExtended:
     """Tests for extended statistics (AC7)."""
 
@@ -935,3 +901,235 @@ class TestPerformanceExtended:
         elapsed_ms = (time.time() - start_time) * 1000
 
         assert elapsed_ms < 150, f"Processing took {elapsed_ms:.2f}ms, expected <150ms"
+
+
+# =============================================================================
+# Story 6.5: Async Enrichment Queue Tests
+# =============================================================================
+
+
+class TestAsyncQueueIntegration:
+    """Tests for async enrichment queue integration (Story 6.5)."""
+
+    def test_resolve_batch_enqueues_temp_ids(self, default_strategy):
+        """Test temp IDs trigger enqueue (AC1)."""
+        from unittest.mock import MagicMock
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            EnqueueResult,
+        )
+
+        mock_repo = MagicMock()
+        mock_repo.lookup_batch.return_value = {}
+        mock_repo.enqueue_for_enrichment.return_value = EnqueueResult(
+            queued_count=2, skipped_count=0
+        )
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        df = pd.DataFrame({
+            "计划代码": ["UNKNOWN", "UNKNOWN"],
+            "客户名称": ["公司A", "公司B"],
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+
+        # Verify enqueue was called
+        mock_repo.enqueue_for_enrichment.assert_called_once()
+        # Verify statistics
+        assert result.statistics.async_queued == 2
+        assert result.statistics.temp_ids_generated == 2
+
+    def test_resolve_batch_enqueue_disabled(self, default_strategy):
+        """Test enable_async_queue=False skips enqueue (AC4)."""
+        from unittest.mock import MagicMock
+
+        mock_repo = MagicMock()
+        mock_repo.lookup_batch.return_value = {}
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        strategy = ResolutionStrategy(enable_async_queue=False)
+
+        df = pd.DataFrame({
+            "计划代码": ["UNKNOWN"],
+            "客户名称": ["公司A"],
+        })
+
+        result = resolver.resolve_batch(df, strategy)
+
+        # Enqueue should NOT be called
+        mock_repo.enqueue_for_enrichment.assert_not_called()
+        assert result.statistics.async_queued == 0
+        assert result.statistics.temp_ids_generated == 1
+
+    def test_resolve_batch_enqueue_graceful_degradation(self, default_strategy):
+        """Test enqueue failure doesn't block pipeline (AC6)."""
+        from unittest.mock import MagicMock
+
+        mock_repo = MagicMock()
+        mock_repo.lookup_batch.return_value = {}
+        mock_repo.enqueue_for_enrichment.side_effect = Exception("DB Error")
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        df = pd.DataFrame({
+            "计划代码": ["UNKNOWN"],
+            "客户名称": ["公司A"],
+        })
+
+        # Should not raise, should continue with temp ID
+        result = resolver.resolve_batch(df, default_strategy)
+
+        assert result.data.loc[0, "company_id"].startswith("IN_")
+        assert result.statistics.temp_ids_generated == 1
+        assert result.statistics.async_queued == 0  # Failed, so 0
+
+    def test_resolve_batch_enqueue_uses_normalize_for_temp_id(self, default_strategy):
+        """Test enqueue uses normalize_for_temp_id for dedup parity (AC2)."""
+        from unittest.mock import MagicMock
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            EnqueueResult,
+        )
+
+        mock_repo = MagicMock()
+        mock_repo.lookup_batch.return_value = {}
+        mock_repo.enqueue_for_enrichment.return_value = EnqueueResult(
+            queued_count=1, skipped_count=0
+        )
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        # Two rows with same normalized name (whitespace variant)
+        df = pd.DataFrame({
+            "计划代码": ["UNKNOWN", "UNKNOWN"],
+            "客户名称": ["公司A", "公司A "],  # Second has trailing space
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+
+        # Should deduplicate within batch
+        call_args = mock_repo.enqueue_for_enrichment.call_args[0][0]
+        # Only 1 unique normalized name should be enqueued
+        assert len(call_args) == 1
+        assert call_args[0]["normalized_name"] == "公司a"  # lowercase after normalization
+
+    def test_statistics_async_queued_in_to_dict(self, default_strategy):
+        """Test async_queued is included in statistics to_dict (AC5)."""
+        from unittest.mock import MagicMock
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            EnqueueResult,
+        )
+
+        mock_repo = MagicMock()
+        mock_repo.lookup_batch.return_value = {}
+        mock_repo.enqueue_for_enrichment.return_value = EnqueueResult(
+            queued_count=3, skipped_count=0
+        )
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        df = pd.DataFrame({
+            "计划代码": ["UNKNOWN"] * 3,
+            "客户名称": ["公司A", "公司B", "公司C"],
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+        stats_dict = result.statistics.to_dict()
+
+        assert "async_queued" in stats_dict
+        assert stats_dict["async_queued"] == 3
+
+    def test_resolve_batch_no_enqueue_without_repository(self, default_strategy):
+        """Test no enqueue when repository not provided."""
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=None,
+        )
+
+        df = pd.DataFrame({
+            "计划代码": ["UNKNOWN"],
+            "客户名称": ["公司A"],
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+
+        # Should still generate temp ID
+        assert result.data.loc[0, "company_id"].startswith("IN_")
+        assert result.statistics.temp_ids_generated == 1
+        assert result.statistics.async_queued == 0
+
+    def test_resolve_batch_no_enqueue_when_all_resolved(self, default_strategy):
+        """Test no enqueue when all rows resolved (no temp IDs)."""
+        from unittest.mock import MagicMock
+
+        mock_repo = MagicMock()
+        mock_repo.lookup_batch.return_value = {}
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={
+                "plan": {"FP0001": "614810477"},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
+            mapping_repository=mock_repo,
+        )
+
+        df = pd.DataFrame({
+            "计划代码": ["FP0001"],
+            "客户名称": ["公司A"],
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+
+        # All resolved via YAML, no temp IDs
+        mock_repo.enqueue_for_enrichment.assert_not_called()
+        assert result.statistics.temp_ids_generated == 0
+        assert result.statistics.async_queued == 0
+
+    def test_enqueue_request_includes_temp_id(self, default_strategy):
+        """Test enqueue request includes generated temp_id (AC3)."""
+        from unittest.mock import MagicMock
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            EnqueueResult,
+        )
+
+        mock_repo = MagicMock()
+        mock_repo.lookup_batch.return_value = {}
+        mock_repo.enqueue_for_enrichment.return_value = EnqueueResult(
+            queued_count=1, skipped_count=0
+        )
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        df = pd.DataFrame({
+            "计划代码": ["UNKNOWN"],
+            "客户名称": ["公司A"],
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+
+        # Verify enqueue request includes temp_id
+        call_args = mock_repo.enqueue_for_enrichment.call_args[0][0]
+        assert len(call_args) == 1
+        assert call_args[0]["temp_id"].startswith("IN_")
+        assert call_args[0]["raw_name"] == "公司A"

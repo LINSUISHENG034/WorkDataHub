@@ -66,6 +66,8 @@ class ResolutionStrategy:
         sync_lookup_budget: Maximum synchronous API lookups allowed.
         generate_temp_ids: Whether to generate temp IDs for unresolved.
         enable_backflow: Whether to backflow new mappings to database (Story 6.4).
+        enable_async_queue: Whether to enqueue unresolved names for async
+            enrichment when generating temp IDs (Story 6.5).
     """
 
     plan_code_column: str = "计划代码"
@@ -78,6 +80,7 @@ class ResolutionStrategy:
     sync_lookup_budget: int = 0
     generate_temp_ids: bool = True
     enable_backflow: bool = True
+    enable_async_queue: bool = True
 
 
 @dataclass
@@ -101,6 +104,7 @@ class ResolutionStatistics:
         budget_consumed: Number of EQC lookups consumed (Story 6.4).
         budget_remaining: Remaining EQC lookup budget (Story 6.4).
         backflow_stats: Backflow operation statistics (Story 6.4).
+        async_queued: Number of requests enqueued for async enrichment (Story 6.5).
     """
 
     total_rows: int = 0
@@ -118,6 +122,9 @@ class ResolutionStatistics:
     budget_remaining: int = 0
     backflow_stats: Dict[str, int] = field(default_factory=dict)
 
+    # Story 6.5: Async queue statistics
+    async_queued: int = 0
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert statistics to dictionary for logging."""
         return {
@@ -133,6 +140,7 @@ class ResolutionStatistics:
             "temp_ids_generated": self.temp_ids_generated,
             "unresolved": self.unresolved,
             "backflow": self.backflow_stats,
+            "async_queued": self.async_queued,
             # Backward compatibility
             "plan_override_hits": self.yaml_hits.get("plan", self.plan_override_hits),
         }

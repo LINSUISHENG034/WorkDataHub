@@ -58,6 +58,20 @@ class InsertBatchResult:
     conflicts: List[Dict[str, Any]] = field(default_factory=list)
 
 
+@dataclass
+class EnqueueResult:
+    """
+    Result of an async enrichment queue operation (Story 6.5).
+
+    Attributes:
+        queued_count: Number of requests actually enqueued.
+        skipped_count: Number of requests skipped (duplicates via partial unique index).
+    """
+
+    queued_count: int
+    skipped_count: int
+
+
 class CompanyMappingRepository:
     """
     Database access layer for enterprise.company_mapping table.
@@ -423,3 +437,83 @@ class CompanyMappingRepository:
         )
 
         return deleted_count
+
+    def enqueue_for_enrichment(
+        self,
+        requests: List[Dict[str, str]],
+    ) -> EnqueueResult:
+        """
+        Batch enqueue company names for async enrichment (Story 6.5).
+
+        Inserts requests into enterprise.enrichment_requests table with
+        ON CONFLICT DO NOTHING to handle the partial unique index on
+        normalized_name for pending/processing status.
+
+        Args:
+            requests: List of dicts with keys:
+                - raw_name: str (original company name)
+                - normalized_name: str (normalized for deduplication)
+                - temp_id: str (generated temporary ID)
+
+        Returns:
+            EnqueueResult with queued_count and skipped_count.
+
+        Performance:
+            Single batch INSERT statement; target <50ms for 100 requests.
+
+        Example:
+            >>> requests = [
+            ...     {"raw_name": "公司A", "normalized_name": "公司a",
+            ...      "temp_id": "IN_ABC123"},
+            ... ]
+            >>> result = repo.enqueue_for_enrichment(requests)
+            >>> print(f"Queued: {result.queued_count}")
+        """
+        if not requests:
+            logger.debug("mapping_repository.enqueue_for_enrichment.empty_input")
+            return EnqueueResult(queued_count=0, skipped_count=0)
+
+        raw_names = [req["raw_name"] for req in requests]
+        normalized_names = [req["normalized_name"] for req in requests]
+        temp_ids = [req["temp_id"] for req in requests]
+
+        # Single-statement INSERT ... SELECT with UNNEST to avoid executemany
+        # and honor the partial unique index on normalized_name for pending/processing.
+        query = text(
+            """
+            INSERT INTO enterprise.enrichment_requests
+                (raw_name, normalized_name, temp_id, status, created_at)
+            SELECT
+                raw_name,
+                normalized_name,
+                temp_id,
+                'pending' AS status,
+                NOW() AS created_at
+            FROM unnest(
+                :raw_names::text[],
+                :normalized_names::text[],
+                :temp_ids::text[]
+            ) AS t(raw_name, normalized_name, temp_id)
+            ON CONFLICT DO NOTHING
+            """
+        )
+
+        result = self.connection.execute(
+            query,
+            {
+                "raw_names": raw_names,
+                "normalized_names": normalized_names,
+                "temp_ids": temp_ids,
+            },
+        )
+        queued_count = result.rowcount
+        skipped_count = len(requests) - queued_count
+
+        logger.info(
+            "mapping_repository.enqueue_for_enrichment.completed",
+            input_count=len(requests),
+            queued_count=queued_count,
+            skipped_count=skipped_count,
+        )
+
+        return EnqueueResult(queued_count=queued_count, skipped_count=skipped_count)

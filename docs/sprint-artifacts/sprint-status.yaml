@@ -134,7 +134,7 @@ development_status:
   6-2-temporary-company-id-generation-hmac-based: done
   6-3-internal-mapping-tables-and-database-schema: done
   6-4-internal-mapping-resolver-multi-tier-lookup: done
-  6-5-enrichmentgateway-integration-and-fallback-logic: backlog
+  6-5-enrichmentgateway-integration-and-fallback-logic: review
   6-6-eqc-api-provider-sync-lookup-with-budget: backlog
   6-7-async-enrichment-queue-deferred-resolution: backlog
   6-8-enrichment-observability-and-export: backlog

@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.work_data_hub.infrastructure.enrichment.mapping_repository import (
+from work_data_hub.infrastructure.enrichment.mapping_repository import (
     CompanyMappingRepository,
     MatchResult,
     InsertBatchResult,
@@ -532,4 +532,122 @@ class TestDeleteBySource:
         deleted = repository.delete_by_source("pipeline_backflow")
 
         assert deleted == 5
+        mock_connection.execute.assert_called_once()
+
+
+# =============================================================================
+# Story 6.5: Async Enrichment Queue Tests
+# =============================================================================
+
+
+class TestEnqueueResult:
+    """Test cases for EnqueueResult dataclass (Story 6.5)."""
+
+    def test_enqueue_result_creation(self):
+        """EnqueueResult can be created with all fields."""
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            EnqueueResult,
+        )
+
+        result = EnqueueResult(queued_count=5, skipped_count=2)
+        assert result.queued_count == 5
+        assert result.skipped_count == 2
+
+
+class TestEnqueueForEnrichment:
+    """Test cases for enqueue_for_enrichment method (Story 6.5)."""
+
+    def test_enqueue_batch_success(self, repository, mock_connection):
+        """Batch enqueue returns correct counts (AC7)."""
+        mock_result = MagicMock()
+        mock_result.rowcount = 3
+        mock_connection.execute.return_value = mock_result
+
+        requests = [
+            {"raw_name": "公司A", "normalized_name": "公司a", "temp_id": "IN_ABC123"},
+            {"raw_name": "公司B", "normalized_name": "公司b", "temp_id": "IN_DEF456"},
+            {"raw_name": "公司C", "normalized_name": "公司c", "temp_id": "IN_GHI789"},
+        ]
+
+        result = repository.enqueue_for_enrichment(requests)
+
+        assert result.queued_count == 3
+        assert result.skipped_count == 0
+        mock_connection.execute.assert_called_once()
+        query_text = str(mock_connection.execute.call_args[0][0])
+        params = mock_connection.execute.call_args[0][1]
+        assert "unnest" in query_text
+        assert params["raw_names"] == ["公司A", "公司B", "公司C"]
+        assert params["normalized_names"] == ["公司a", "公司b", "公司c"]
+        assert params["temp_ids"] == ["IN_ABC123", "IN_DEF456", "IN_GHI789"]
+
+    def test_enqueue_empty_input(self, repository, mock_connection):
+        """Empty input returns zero counts without database call."""
+        result = repository.enqueue_for_enrichment([])
+
+        assert result.queued_count == 0
+        assert result.skipped_count == 0
+        mock_connection.execute.assert_not_called()
+
+    def test_enqueue_deduplication_via_conflict(self, repository, mock_connection):
+        """Duplicates are skipped via ON CONFLICT DO NOTHING (AC2)."""
+        # Simulate 2 of 3 being duplicates (rowcount=1)
+        mock_result = MagicMock()
+        mock_result.rowcount = 1
+        mock_connection.execute.return_value = mock_result
+
+        requests = [
+            {"raw_name": "公司A", "normalized_name": "公司a", "temp_id": "IN_ABC123"},
+            {"raw_name": "公司A变体", "normalized_name": "公司a", "temp_id": "IN_ABC123"},
+            {"raw_name": "公司B", "normalized_name": "公司b", "temp_id": "IN_DEF456"},
+        ]
+
+        result = repository.enqueue_for_enrichment(requests)
+
+        assert result.queued_count == 1
+        assert result.skipped_count == 2
+        # Still single-statement execution
+        mock_connection.execute.assert_called_once()
+
+    def test_enqueue_includes_required_fields(self, repository, mock_connection):
+        """Enqueue includes raw_name, normalized_name, temp_id, status (AC3)."""
+        mock_result = MagicMock()
+        mock_result.rowcount = 1
+        mock_connection.execute.return_value = mock_result
+
+        requests = [
+            {"raw_name": "公司A", "normalized_name": "公司a", "temp_id": "IN_ABC123"},
+        ]
+
+        repository.enqueue_for_enrichment(requests)
+
+        # Verify arrays passed to execute
+        call_args = mock_connection.execute.call_args
+        params = call_args[0][1]
+        assert params["raw_names"] == ["公司A"]
+        assert params["normalized_names"] == ["公司a"]
+        assert params["temp_ids"] == ["IN_ABC123"]
+
+    def test_enqueue_performance_100_requests(self, repository, mock_connection):
+        """100 enqueues complete in <50ms with mock (AC9)."""
+        mock_result = MagicMock()
+        mock_result.rowcount = 100
+        mock_connection.execute.return_value = mock_result
+
+        requests = [
+            {
+                "raw_name": f"公司{i}",
+                "normalized_name": f"公司{i}",
+                "temp_id": f"IN_{i:016d}",
+            }
+            for i in range(100)
+        ]
+
+        start_time = time.perf_counter()
+        result = repository.enqueue_for_enrichment(requests)
+        elapsed_ms = (time.perf_counter() - start_time) * 1000
+
+        assert result.queued_count == 100
+        assert elapsed_ms < 50, f"Enqueue took {elapsed_ms:.2f}ms, expected <50ms"
+        # Single batch insert
         mock_connection.execute.assert_called_once()
