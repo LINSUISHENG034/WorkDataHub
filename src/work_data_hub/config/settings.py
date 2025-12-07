@@ -182,6 +182,10 @@ class Settings(BaseSettings):
     )
 
     # EQC Configuration - Enterprise Query Center API settings
+    eqc_token: str = Field(
+        default="",
+        description="EQC API token; loaded from WDH_EQC_TOKEN environment variable",
+    )
     eqc_enabled: bool = Field(default=True, description="Enable EQC API integration")
 
     eqc_timeout: int = Field(

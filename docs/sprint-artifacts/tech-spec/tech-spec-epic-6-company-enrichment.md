@@ -54,7 +54,8 @@ WorkDataHub 需要为每条业务记录确定稳定、唯一、可追溯的客�
 | `CompanyEnrichmentService` | `domain/company_enrichment/service.py` | ✅ 框架完成 | 内部映射→EQC→队列→临时ID |
 | `EQCClient` | `io/connectors/eqc_client.py` | ✅ 完整实现 | retry、rate limit、error handling |
 | `CompanyIdResolutionStep` | `domain/annuity_performance/pipeline_builder.py` | ✅ 已集成 | Pipeline Step 模式 |
-| EQC Token 获取 | `auth/eqc_auth_handler.py` | ✅ 已实现 | Playwright + 用户手动验证 |
+| EQC Token 获取 | `io/auth/eqc_auth_handler.py` | ✅ 已实现 | Playwright + 用户手动验证 (迁移自 auth/) |
+| `EqcProvider` | `infrastructure/enrichment/eqc_provider.py` | 🔲 Story 6.6 | EQC 适配器，budget 限制，Token 预检测 |
 
 **Pipeline 集成模式：**
 ```python
@@ -103,9 +104,12 @@ data/mappings/
 | 临时 ID 格式 | `IN_<16位Base32>` (HMAC-SHA1) | 与现有实现一致，稳定可追溯 |
 | 数据库 Schema | `enterprise` schema | 与业务表隔离，便于管理 |
 | Legacy 映射迁移 | 全部迁移 | 保持 Legacy Parity |
-| EQC Token 管理 | 用户手动验证 + 程序自动获取 | 已有实现，安全可控 |
+| EQC Token 管理 | 用户手动获取 + `.env` 配置 + 预检测 | Token 暂无有效期，统一配置管理 |
+| Token 配置方式 | 统一使用 `.env` 文件 | 与 pydantic-settings 一致，便于环境切换 |
+| Token 预检测 | Pipeline 启动前验证 | 避免运行后才发现 Token 无效 |
 | 集成模式 | 增强 Pipeline Step | 最小改动，保持架构一致 |
 | 映射配置架构 | 多文件 YAML + 数据库双层 | YAML 补充数据库缺失，灵活且可版本控制 |
+| auth/ 目录迁移 | `auth/` → `io/auth/` | 符合 Clean Architecture 层级规范 |
 
 ## Implementation Plan
 
@@ -599,7 +603,59 @@ if strategy.generate_temp_ids and mask_still_missing.any():
 
 ---
 
-#### Story 6.6: 异步回填 Dagster Job
+#### Story 6.6: EQC API Provider (Sync Lookup with Budget)
+
+**目标：** 验证、重构、集成现有 EQC 代码，创建 `EqcProvider` 适配器
+
+**背景：** 现有 EQC 代码分散在多个位置，需要整合并符合 Clean Architecture：
+- `io/connectors/eqc_client.py` - HTTP 客户端 ✅ 保留
+- `auth/` - Token 获取 → 迁移到 `io/auth/`
+- `domain/company_enrichment/service.py` - 违反 Clean Architecture，需重构
+
+**Tasks:**
+
+**Phase 1: 审核验证**
+- [ ] 验证现有 `EQCClient` 功能完整性
+- [ ] 审核 `auth/` 目录结构
+
+**Phase 2: Token 管理增强**
+- [ ] Token 自动保存功能：`run_get_token(save_to_env=True)`
+- [ ] Token 预检测机制：`validate_eqc_token()` + `EqcTokenInvalidError`
+
+**Phase 3: 架构重构**
+- [ ] 迁移 `auth/` → `io/auth/`
+- [ ] 合并 `EQCAuthSettings` 到 `config/settings.py`
+
+**Phase 4: 创建 EqcProvider 适配器**
+- [ ] 创建 `infrastructure/enrichment/eqc_provider.py`
+- [ ] 实现 `EnterpriseInfoProvider` 协议
+- [ ] 包装 `EQCClient`，添加 budget 限制
+- [ ] 集成到 `CompanyIdResolver`
+
+**Token 管理策略：**
+```python
+# Token 从 .env 文件统一获取
+# .env
+WDH_EQC_TOKEN=your_token_here
+
+# Token 预检测（Pipeline 启动前）
+class EqcProvider:
+    def __init__(self, validate_on_init: bool = True):
+        if validate_on_init:
+            if not validate_eqc_token(self.token):
+                raise EqcTokenInvalidError("Token 无效，请运行: uv run python -m work_data_hub.io.auth --capture --save")
+```
+
+**Acceptance Criteria:**
+- [ ] `auth/` 成功迁移到 `io/auth/`
+- [ ] Token 可自动保存到 `.env`
+- [ ] Pipeline 启动前 Token 预检测
+- [ ] `EqcProvider` 集成到 `CompanyIdResolver`
+- [ ] 所有测试通过
+
+---
+
+#### Story 6.7: 异步回填 Dagster Job
 
 **目标：** 创建 Dagster Job 消费队列并调用 EQC 回填
 
@@ -647,7 +703,7 @@ def enrich_company_master():
 
 ### Phase 4: 可观测性
 
-#### Story 6.7: 统计和导出
+#### Story 6.8: 统计和导出
 
 **目标：** 实现命中率统计和 unknown CSV 导出
 
@@ -742,21 +798,39 @@ def enrich_company_master():
 
 | 风险 | 缓解措施 |
 |------|----------|
-| EQC Token 过期 | 用户手动刷新，程序检测 401 后提示 |
+| EQC Token 无效 | Pipeline 启动前预检测 + 明确错误提示 + 一键更新命令 |
+| Token 配置遗漏 | 统一 `.env` 配置 + 启动时检查 |
 | EQC API 不稳定 | retry + rate limit + graceful degradation |
 | 映射数据不一致 | Parity 测试 + 导入前备份 |
 | 队列积压 | 监控队列深度，告警阈值 10000 |
 
 ### Notes
 
-**环境变量：**
+**环境变量（统一配置在 `.env` 文件）：**
 ```bash
+# .env 文件示例
+
 # 必需
 WDH_ALIAS_SALT=<production_salt>  # 临时 ID 生成盐值
 
+# EQC 平台配置
+WDH_EQC_TOKEN=<token>             # EQC API Token（通过交互式获取）
+WDH_EQC_BASE_URL=https://eqc.pingan.com  # EQC API 基础 URL
+WDH_EQC_TIMEOUT=5                 # 请求超时（秒）
+WDH_EQC_RETRY_MAX=2               # 最大重试次数
+WDH_EQC_RATE_LIMIT=60             # 每分钟请求限制
+
 # 可选
 WDH_ENRICH_SYNC_BUDGET=5          # 同步 EQC 调用预算
-WDH_EQC_TOKEN=<token>             # EQC API Token
+```
+
+**Token 获取命令：**
+```bash
+# 交互式获取 Token（手动登录）
+uv run python -m work_data_hub.io.auth --capture
+
+# 交互式获取并自动保存到 .env
+uv run python -m work_data_hub.io.auth --capture --save
 ```
 
 **CLI 命令：**

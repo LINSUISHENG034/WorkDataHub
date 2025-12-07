@@ -1,4 +1,4 @@
-# Epic 5: Company Enrichment Service
+# Epic 6: Company Enrichment Service
 
 **Goal:** Build a flexible company ID enrichment service using the Provider abstraction pattern, supporting multi-tier resolution (internal mappings → EQC API → async queue) with temporary ID generation for unresolved companies. This epic enables cross-domain joins with consistent enterprise company IDs.
 
@@ -10,7 +10,7 @@
 
 ---
 
-### Story 5.1: EnterpriseInfoProvider Protocol and Stub Implementation
+### Story 6.1: EnterpriseInfoProvider Protocol and Stub Implementation
 
 As a **data engineer**,
 I want **a Provider protocol defining the enrichment contract with a testable stub implementation**,
@@ -63,7 +63,7 @@ class EnterpriseInfoProvider(Protocol):
 
 ---
 
-### Story 5.2: Temporary Company ID Generation (HMAC-based)
+### Story 6.2: Temporary Company ID Generation (HMAC-based)
 
 As a **data engineer**,
 I want **stable temporary IDs for unresolved companies using HMAC**,
@@ -113,7 +113,7 @@ So that **same company always maps to same temporary ID across runs, enabling co
 
 ---
 
-### Story 5.3: Internal Mapping Tables and Database Schema
+### Story 6.3: Internal Mapping Tables and Database Schema
 
 As a **data engineer**,
 I want **database tables for internal company mappings with migration**,
@@ -170,7 +170,7 @@ So that **high-confidence mappings are cached locally without API calls**.
 
 ---
 
-### Story 5.4: Internal Mapping Resolver (Multi-Tier Lookup)
+### Story 6.4: Internal Mapping Resolver (Multi-Tier Lookup)
 
 As a **data engineer**,
 I want **multi-tier lookup checking internal mappings before expensive API calls**,
@@ -202,12 +202,12 @@ So that **90%+ of lookups are resolved locally with zero API cost and sub-millis
 **And** When lookup succeeds from cache
 **Then** Response time <5ms (measured in integration tests)
 
-**Prerequisites:** Story 5.3 (database tables), Story 5.1 (provider protocol)
+**Prerequisites:** Story 6.3 (database tables), Story 6.1 (provider protocol)
 
 **Technical Notes:**
 - Implement in `domain/enrichment/internal_resolver.py` as `InternalMappingResolver`
-- Implements `EnterpriseInfoProvider` protocol (Story 5.1)
-- Normalization function shared with temporary ID generator (Story 5.2)
+- Implements `EnterpriseInfoProvider` protocol (Story 6.1)
+- Normalization function shared with temporary ID generator (Story 6.2)
 - Fuzzy matching: Use `fuzzywuzzy` or `RapidFuzz` library (Levenshtein distance)
 - SQL query optimization:
   ```sql
@@ -222,7 +222,7 @@ So that **90%+ of lookups are resolved locally with zero API cost and sub-millis
 
 ---
 
-### Story 5.5: EnrichmentGateway Integration and Fallback Logic
+### Story 6.5: EnrichmentGateway Integration and Fallback Logic
 
 As a **data engineer**,
 I want **unified gateway coordinating internal resolver, temporary ID generation, and async queueing**,
@@ -230,13 +230,13 @@ So that **enrichment never blocks pipelines and all companies get valid IDs (rea
 
 **Acceptance Criteria:**
 
-**Given** I have internal resolver (Story 5.4) and temp ID generator (Story 5.2)
+**Given** I have internal resolver (Story 6.4) and temp ID generator (Story 6.2)
 **When** I implement `EnrichmentGateway` class
 **Then** Gateway should:
-1. Try internal resolver first (Story 5.4)
-2. If not found AND budget available: try EQC API (Story 5.6, future)
-3. If still not found: generate temporary ID (Story 5.2)
-4. If confidence <0.60: queue for async enrichment (Story 5.7, future)
+1. Try internal resolver first (Story 6.4)
+2. If not found AND budget available: try EQC API (Story 6.6, future)
+3. If still not found: generate temporary ID (Story 6.2)
+4. If confidence <0.60: queue for async enrichment (Story 6.7, future)
 5. Return `CompanyInfo` with appropriate match_type and confidence
 
 **And** When internal resolver finds exact match
@@ -263,7 +263,7 @@ CompanyInfo(
 **And** When enrichment fails completely
 **Then** Pipeline continues with temporary IDs (graceful degradation)
 
-**Prerequisites:** Stories 5.1-5.4 (protocol, temp ID, internal resolver)
+**Prerequisites:** Stories 6.1-6.4 (protocol, temp ID, internal resolver)
 
 **Technical Notes:**
 - Implement in `domain/enrichment/gateway.py` as `EnrichmentGateway`
@@ -275,15 +275,15 @@ CompanyInfo(
   EnrichmentStats:
       cache_hits: int
       temp_ids_generated: int
-      api_calls: int  # For Story 5.6
-      queue_depth: int  # For Story 5.7
+      api_calls: int  # For Story 6.6
+      queue_depth: int  # For Story 6.7
   ```
 - Integration with Story 4.3 annuity pipeline: inject gateway via DI
 - Reference: PRD §836 (Gateway pattern), §855 (Graceful degradation)
 
 ---
 
-### Story 5.6: EQC API Provider (Sync Lookup with Budget)
+### Story 6.6: EQC API Provider (Sync Lookup with Budget)
 
 As a **data engineer**,
 I want **synchronous EQC platform API lookup with budget limits**,
@@ -294,7 +294,7 @@ So that **high-value enrichment requests are resolved in real-time without runaw
 **Given** I have EQC API credentials configured via `WDH_PROVIDER_EQC_TOKEN`
 **When** I implement `EqcProvider` class
 **Then** Provider should:
-- Implement `EnterpriseInfoProvider` protocol (Story 5.1)
+- Implement `EnterpriseInfoProvider` protocol (Story 6.1)
 - Call EQC API endpoint: `POST /api/enterprise/search` with company name
 - Parse response: extract `company_id`, `official_name`, `unified_credit_code`, confidence
 - Respect budget: max `WDH_ENRICH_SYNC_BUDGET` calls per run (default: 0 for MVP, 5 for production)
@@ -316,7 +316,7 @@ So that **high-value enrichment requests are resolved in real-time without runaw
 **And** When API call succeeds
 **Then** Cache result in `enterprise.company_name_index` for future runs
 
-**Prerequisites:** Story 5.1 (provider protocol), Story 5.3 (database for caching)
+**Prerequisites:** Story 6.1 (provider protocol), Story 6.3 (database for caching)
 
 **Technical Notes:**
 - Implement in `domain/enrichment/eqc_provider.py`
@@ -336,7 +336,7 @@ So that **high-value enrichment requests are resolved in real-time without runaw
 
 ---
 
-### Story 5.7: Async Enrichment Queue (Deferred Resolution)
+### Story 6.7: Async Enrichment Queue (Deferred Resolution)
 
 As a **data engineer**,
 I want **async enrichment queue for low-confidence matches and unknowns**,
@@ -368,7 +368,7 @@ So that **temporary IDs are resolved to real IDs in background without blocking 
 **And** When queue depth exceeds 10,000
 **Then** Log warning: "Enrichment queue backlog high, consider increasing async processing frequency"
 
-**Prerequisites:** Story 5.3 (enrichment_requests table), Story 5.6 (EQC provider for API calls)
+**Prerequisites:** Story 6.3 (enrichment_requests table), Story 6.6 (EQC provider for API calls)
 
 **Technical Notes:**
 - Implement async processor in `orchestration/jobs.py` as `async_enrichment_job`
@@ -381,7 +381,7 @@ So that **temporary IDs are resolved to real IDs in background without blocking 
 
 ---
 
-### Story 5.8: Enrichment Observability and Export
+### Story 6.8: Enrichment Observability and Export
 
 As a **data engineer**,
 I want **comprehensive metrics and CSV export of unknown companies**,
@@ -421,10 +421,10 @@ So that **I can monitor enrichment effectiveness and manually backfill critical 
 **And** When enrichment disabled via `WDH_ENRICH_ENABLED=False`
 **Then** All companies get temporary IDs, stats show 100% temp ID rate
 
-**Prerequisites:** Story 5.5 (gateway with metrics), Story 5.2 (temporary IDs)
+**Prerequisites:** Story 6.5 (gateway with metrics), Story 6.2 (temporary IDs)
 
 **Technical Notes:**
-- Implement metrics collection in `EnrichmentGateway` (Story 5.5)
+- Implement metrics collection in `EnrichmentGateway` (Story 6.5)
 - CSV export in `domain/enrichment/observability.py`
 - Log stats via Epic 1 Story 1.3 structured logging
 - CSV location: `logs/` directory (configurable via settings)

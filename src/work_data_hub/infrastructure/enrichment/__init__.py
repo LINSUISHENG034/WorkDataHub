@@ -6,6 +6,7 @@ company information resolution and standardization.
 
 Components:
 - CompanyIdResolver: Batch-optimized company ID resolution with hierarchical strategy
+- EqcProvider: EQC platform API provider for sync company ID lookup (Story 6.6)
 - ResolutionStrategy: Configuration for resolution behavior
 - ResolutionStatistics: Statistics from batch resolution operations
 - normalize_for_temp_id: Legacy-compatible name normalization for temp ID generation
@@ -16,6 +17,13 @@ Architecture Reference:
 """
 
 from .company_id_resolver import CompanyIdResolver
+from .eqc_provider import (
+    CompanyInfo,
+    EnterpriseInfoProvider,
+    EqcProvider,
+    EqcTokenInvalidError,
+    validate_eqc_token,
+)
 from .mapping_repository import (
     CompanyMappingRepository,
     InsertBatchResult,
@@ -40,4 +48,10 @@ __all__ = [
     "ResolutionSource",
     "normalize_for_temp_id",
     "generate_temp_company_id",
+    # Story 6.6: EQC Provider
+    "EqcProvider",
+    "EqcTokenInvalidError",
+    "CompanyInfo",
+    "EnterpriseInfoProvider",
+    "validate_eqc_token",
 ]

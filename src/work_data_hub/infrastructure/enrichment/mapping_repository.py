@@ -101,6 +101,69 @@ class CompanyMappingRepository:
         """
         self.connection = connection
 
+    def insert_company_name_index_batch(
+        self,
+        rows: List[Dict[str, Any]],
+    ) -> InsertBatchResult:
+        """
+        Batch insert into enterprise.company_name_index (Story 6.6 cache).
+
+        Writes normalized name → company_id mappings for EQC results. Uses
+        ON CONFLICT DO NOTHING to remain idempotent and avoid blocking
+        failures. Minimal column set to avoid schema drift issues.
+
+        Args:
+            rows: List of dicts with keys:
+                - normalized_name: str
+                - company_id: str
+                - match_type: str
+                - confidence: float
+
+        Returns:
+            InsertBatchResult indicating inserted/skipped counts.
+        """
+        if not rows:
+            logger.debug(
+                "mapping_repository.insert_company_name_index_batch.empty_input"
+            )
+            return InsertBatchResult(inserted_count=0, skipped_count=0)
+
+        # Prepare payload; keep only expected columns to avoid schema errors
+        values = [
+            {
+                "normalized_name": row["normalized_name"],
+                "company_id": row["company_id"],
+                "match_type": row.get("match_type", "eqc"),
+                "confidence": row.get("confidence", 0.0),
+            }
+            for row in rows
+        ]
+
+        query = text(
+            """
+            INSERT INTO enterprise.company_name_index
+                (normalized_name, company_id, match_type, confidence)
+            VALUES
+                (:normalized_name, :company_id, :match_type, :confidence)
+            ON CONFLICT (normalized_name) DO NOTHING
+            """
+        )
+
+        result = self.connection.execute(query, values)
+        inserted = result.rowcount
+        skipped = len(values) - inserted
+
+        logger.info(
+            "mapping_repository.insert_company_name_index_batch.completed",
+            input_count=len(values),
+            inserted_count=inserted,
+            skipped_count=skipped,
+        )
+
+        return InsertBatchResult(
+            inserted_count=inserted, skipped_count=skipped, conflicts=[]
+        )
+
     def lookup_batch(
         self,
         alias_names: List[str],

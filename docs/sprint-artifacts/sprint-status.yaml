@@ -135,8 +135,8 @@ development_status:
   6-3-internal-mapping-tables-and-database-schema: done
   6-4-internal-mapping-resolver-multi-tier-lookup: done
   6-4-1-p4-customer-name-normalization-alignment: done  # Patch for 6.4 - P4 normalization fix (SCP 2025-12-07)
-  6-5-enrichmentgateway-integration-and-fallback-logic: review
-  6-6-eqc-api-provider-sync-lookup-with-budget: backlog
+  6-5-enrichmentgateway-integration-and-fallback-logic: done
+  6-6-eqc-api-provider-sync-lookup-with-budget: done
   6-7-async-enrichment-queue-deferred-resolution: backlog
   6-8-enrichment-observability-and-export: backlog
   epic-6-retrospective: optional

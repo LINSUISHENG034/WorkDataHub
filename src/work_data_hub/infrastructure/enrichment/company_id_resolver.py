@@ -30,6 +30,7 @@ from .types import ResolutionResult, ResolutionStatistics, ResolutionStrategy
 
 if TYPE_CHECKING:
     from work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
+    from work_data_hub.infrastructure.enrichment.eqc_provider import EqcProvider
     from work_data_hub.infrastructure.enrichment.mapping_repository import (
         CompanyMappingRepository,
     )
@@ -86,19 +87,23 @@ class CompanyIdResolver:
         enrichment_service: Optional["CompanyEnrichmentService"] = None,
         yaml_overrides: Optional[Dict[str, Dict[str, str]]] = None,
         mapping_repository: Optional["CompanyMappingRepository"] = None,
+        eqc_provider: Optional["EqcProvider"] = None,
     ) -> None:
         """
         Initialize the CompanyIdResolver.
 
         Args:
-            enrichment_service: Optional CompanyEnrichmentService for EQC lookup.
+            enrichment_service: Optional CompanyEnrichmentService for EQC lookup (legacy).
             yaml_overrides: Dict of priority level -> {alias: company_id} mappings.
                 If not provided, auto-loads from load_company_id_overrides().
             mapping_repository: Optional CompanyMappingRepository for database cache.
                 If not provided, database lookup is skipped.
+            eqc_provider: Optional EqcProvider for EQC sync lookup (Story 6.6).
+                If provided, takes precedence over enrichment_service for EQC lookups.
         """
         self.enrichment_service = enrichment_service
         self.mapping_repository = mapping_repository
+        self.eqc_provider = eqc_provider
 
         # Initialize YAML overrides
         if yaml_overrides is None:
@@ -279,9 +284,9 @@ class CompanyIdResolver:
         mask_missing = result_df[strategy.output_column].isna()
         if (
             strategy.use_enrichment_service
-            and self.enrichment_service
             and mask_missing.any()
             and strategy.sync_lookup_budget > 0
+            and (self.eqc_provider is not None or self.enrichment_service is not None)
         ):
             eqc_resolved, eqc_hits, budget_remaining = self._resolve_via_eqc_sync(
                 result_df, mask_missing, strategy
@@ -517,6 +522,8 @@ class CompanyIdResolver:
         """
         Resolve via EQC within budget; cache results to enterprise.company_mapping.
 
+        Story 6.6: Supports both EqcProvider (preferred) and legacy enrichment_service.
+
         Args:
             df: Input DataFrame.
             mask_unresolved: Boolean mask of unresolved rows.
@@ -525,12 +532,20 @@ class CompanyIdResolver:
         Returns:
             Tuple of (resolved_series, eqc_hits, budget_remaining)
         """
-        if not self.enrichment_service or strategy.sync_lookup_budget <= 0:
+        # Story 6.6: Use EqcProvider if available, otherwise fall back to enrichment_service
+        use_eqc_provider = self.eqc_provider is not None and self.eqc_provider.is_available
+        use_enrichment_service = self.enrichment_service is not None and not use_eqc_provider
+
+        if not (use_eqc_provider or use_enrichment_service) or strategy.sync_lookup_budget <= 0:
             return (
                 pd.Series(pd.NA, index=df.index, dtype=object),
                 0,
                 strategy.sync_lookup_budget,
             )
+
+        # Story 6.6: Use EqcProvider path if available
+        if use_eqc_provider:
+            return self._resolve_via_eqc_provider(df, mask_unresolved, strategy)
 
         budget_remaining = strategy.sync_lookup_budget
         resolved = pd.Series(pd.NA, index=df.index, dtype=object)
@@ -599,6 +614,70 @@ class CompanyIdResolver:
                     "company_id_resolver.eqc_cache_failed",
                     error=str(cache_err),
                 )
+
+        return resolved, eqc_hits, budget_remaining
+
+    def _resolve_via_eqc_provider(
+        self,
+        df: pd.DataFrame,
+        mask_unresolved: pd.Series,
+        strategy: ResolutionStrategy,
+    ) -> Tuple[pd.Series, int, int]:
+        """
+        Resolve via EqcProvider (Story 6.6).
+
+        Uses the new EqcProvider adapter for EQC API lookups with built-in
+        budget management, caching, and error handling.
+
+        Args:
+            df: Input DataFrame.
+            mask_unresolved: Boolean mask of unresolved rows.
+            strategy: Resolution strategy configuration.
+
+        Returns:
+            Tuple of (resolved_series, eqc_hits, budget_remaining)
+        """
+        resolved = pd.Series(pd.NA, index=df.index, dtype=object)
+        eqc_hits = 0
+
+        # EqcProvider manages its own budget internally
+        # Set provider budget to match strategy budget
+        if self.eqc_provider.budget != strategy.sync_lookup_budget:
+            self.eqc_provider.budget = strategy.sync_lookup_budget
+            self.eqc_provider.remaining_budget = strategy.sync_lookup_budget
+
+        for idx in df[mask_unresolved].index:
+            # Check if provider still has budget
+            if not self.eqc_provider.is_available:
+                break
+
+            row = df.loc[idx]
+            customer_name = row.get(strategy.customer_name_column)
+            if pd.isna(customer_name):
+                continue
+
+            try:
+                # EqcProvider.lookup() handles budget, caching, and errors internally
+                result = self.eqc_provider.lookup(str(customer_name))
+
+                if result:
+                    resolved.loc[idx] = result.company_id
+                    eqc_hits += 1
+
+            except Exception as e:
+                logger.warning(
+                    "company_id_resolver.eqc_provider_lookup_failed",
+                    error_type=type(e).__name__,
+                )
+                # Continue to next row - don't block pipeline
+
+        budget_remaining = self.eqc_provider.remaining_budget
+
+        logger.info(
+            "company_id_resolver.eqc_provider_completed",
+            eqc_hits=eqc_hits,
+            budget_remaining=budget_remaining,
+        )
 
         return resolved, eqc_hits, budget_remaining
 

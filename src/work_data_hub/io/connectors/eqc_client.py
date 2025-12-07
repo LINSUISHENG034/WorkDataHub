@@ -347,24 +347,20 @@ class EQCClient:
         if not name or not name.strip():
             raise ValueError("Company name cannot be empty")
 
-        # Clean and encode the search name for URL
+        # Clean the search name (do NOT pre-encode - requests handles encoding)
         cleaned_name = name.strip()
-        encoded_name = quote(cleaned_name, safe="")
 
-        # Construct search URL - using searchAll endpoint from PRP specification
-        url = f"{self.base_url}/kg-api-hfd/api/search/searchAll"
-        params = {
-            "keyword": encoded_name,
-            "currentPage": 1,
-            "pageSize": 10,
-        }
+        # Construct search URL - using legacy endpoint format
+        # Note: searchAll endpoint requires different permissions, use /search/ instead
+        url = f"{self.base_url}/kg-api-hfd/api/search/"
+        params = {"key": cleaned_name}  # requests will handle URL encoding
 
         logger.info(
             "Searching companies via EQC",
             extra={
                 "query": cleaned_name,
-                "encoded_length": len(encoded_name),
-                "endpoint": "searchAll",
+                "query_length": len(cleaned_name),
+                "endpoint": "search",
             },
         )
 

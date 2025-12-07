@@ -4,6 +4,8 @@ Pydantic models and exception hierarchy for EQC authentication flows.
 These abstractions are consumed both by runtime code and the unit tests in
 ``tests/auth`` that assert strict validation behaviour, so they intentionally
 mirror the constraints described in Story 1.2.
+
+Story 6.6: Migrated from auth/ to io/auth/ for Clean Architecture compliance.
 """
 
 from __future__ import annotations
