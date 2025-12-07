@@ -1125,6 +1125,15 @@ def process_company_lookup_queue_op(
             queue = LookupQueue(conn)
             eqc_client = EQCClient()  # Uses settings for auth
 
+            # Story 6.7 AC6: Reset stale processing rows BEFORE processing
+            stale_reset_count = queue.reset_stale_processing(stale_minutes=15)
+            if stale_reset_count > 0:
+                context.log.warning(
+                    "Reset %s stale processing rows to pending (AC6 idempotent recovery)",
+                    stale_reset_count,
+                )
+                conn.commit()  # Commit the reset before processing
+
             enrichment_service = CompanyEnrichmentService(
                 loader=loader,
                 queue=queue,
@@ -1140,12 +1149,41 @@ def process_company_lookup_queue_op(
             # Get final queue status
             queue_status = enrichment_service.get_queue_status()
 
+            # Story 6.7 AC4: Log warning when queue depth exceeds threshold
+            pending_count = queue_status.get("pending", 0)
+            warning_threshold = settings.enrichment_queue_warning_threshold
+            if pending_count > warning_threshold:
+                context.log.warning(
+                    "Enrichment queue backlog high: %s pending requests (threshold: %s)",
+                    pending_count,
+                    warning_threshold,
+                )
+
+            # Story 6.7 AC7: Log queue statistics after each run
+            context.log.info(
+                "Queue statistics after processing: pending=%s, processing=%s, done=%s, failed=%s",
+                queue_status.get("pending", 0),
+                queue_status.get("processing", 0),
+                queue_status.get("done", 0),
+                queue_status.get("failed", 0),
+            )
+
             result: Dict[str, Any] = {
                 "processed_count": processed_count,
                 "batch_size": config.batch_size,
                 "plan_only": config.plan_only,
                 "queue_status": queue_status,
+                "stale_reset_count": stale_reset_count,
             }
+
+            # Persist queue state transitions (done/failed/backoff) before closing
+            try:
+                conn.commit()
+                context.log.info("Queue processing transaction committed")
+            except Exception as commit_error:
+                context.log.warning(
+                    "Queue processing commit warning: %s", commit_error
+                )
 
         else:
             # Plan-only: simulate queue processing

@@ -3,16 +3,21 @@
 Schedules only configure how and when jobs run; they never introduce domain or
 I/O logic directly. Instead they call the same dependency-injected jobs that
 wire Story 1.5 pipelines to I/O adapters, preserving the inward dependency flow.
+
+Story 6.7: Added async_enrichment_schedule for hourly queue processing.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
+import structlog
 import yaml
-from dagster import schedule
+from dagster import RunRequest, ScheduleEvaluationContext, schedule
 
 from work_data_hub.config.settings import get_settings
 
-from .jobs import sample_trustee_performance_multi_file_job
+from .jobs import process_company_lookup_queue_job, sample_trustee_performance_multi_file_job
+
+logger = structlog.get_logger(__name__)
 
 
 def _build_schedule_run_config() -> Dict[str, Any]:
@@ -88,3 +93,57 @@ def trustee_daily_schedule(_context):
     to ensure consistent behavior between manual and automated execution.
     """
     return _build_schedule_run_config()
+
+
+@schedule(
+    cron_schedule="0 * * * *",  # Every hour at minute 0
+    job=process_company_lookup_queue_job,
+    execution_timezone="Asia/Shanghai",
+)
+def async_enrichment_schedule(
+    context: ScheduleEvaluationContext,
+) -> Optional[RunRequest]:
+    """
+    Hourly schedule for async enrichment queue processing.
+
+    Story 6.7 AC1: Runs process_company_lookup_queue_job hourly.
+    Story 6.7 AC9: Disabled via WDH_ASYNC_ENRICHMENT_ENABLED=False.
+
+    Processes pending company lookup requests from the enrichment queue
+    using EQC API with exponential backoff retry logic.
+    """
+    settings = get_settings()
+
+    # AC9: Check if async enrichment is enabled
+    if not settings.async_enrichment_enabled:
+        logger.info(
+            "async_enrichment_schedule.disabled",
+            reason="WDH_ASYNC_ENRICHMENT_ENABLED=False",
+        )
+        return None  # Skip this run
+
+    batch_size = settings.enrichment_batch_size
+
+    logger.info(
+        "async_enrichment_schedule.triggered",
+        scheduled_time=context.scheduled_execution_time.isoformat()
+        if context.scheduled_execution_time
+        else "unknown",
+        batch_size=batch_size,
+    )
+
+    return RunRequest(
+        run_key=f"async_enrichment_{context.scheduled_execution_time.isoformat()}"
+        if context.scheduled_execution_time
+        else "async_enrichment_manual",
+        run_config={
+            "ops": {
+                "process_company_lookup_queue_op": {
+                    "config": {
+                        "batch_size": batch_size,
+                        "plan_only": False,
+                    }
+                }
+            }
+        },
+    )

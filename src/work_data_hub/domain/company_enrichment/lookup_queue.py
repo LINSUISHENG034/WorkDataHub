@@ -4,22 +4,51 @@ Lookup queue DAO for asynchronous EQC company lookup processing.
 This module provides atomic queue operations for managing EQC lookup requests
 with proper concurrency control using PostgreSQL FOR UPDATE SKIP LOCKED patterns.
 Supports both plan_only and execute modes for validation and execution.
+
+Story 6.7: Added exponential backoff support for retry logic with next_retry_at
+column filtering and configurable backoff schedule.
 """
 
 import logging
 import re
 import unicodedata
-from typing import List, Optional
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional, Tuple
 
 from .models import LookupRequest
 
 logger = logging.getLogger(__name__)
+
+# Exponential backoff schedule in minutes for retry attempts 1, 2, 3
+# AC2: Failed requests use exponential backoff: 1min, 5min, 15min delays
+BACKOFF_SCHEDULE_MINUTES: Tuple[int, ...] = (1, 5, 15)
+
+# AC3: Maximum retry attempts before permanent failure
+MAX_RETRY_ATTEMPTS: int = 3
 
 
 class LookupQueueError(Exception):
     """Base exception for lookup queue operations."""
 
     pass
+
+
+def calculate_next_retry_at(attempts: int) -> datetime:
+    """
+    Calculate next retry time with bounded exponential backoff.
+
+    AC2: Delays for attempts 1/2/3 → 1min, 5min, 15min (capped at 15min).
+
+    Args:
+        attempts: Current attempt count (1-based after failure)
+
+    Returns:
+        UTC datetime for next retry attempt
+    """
+    # Clamp index to valid range (0 to len-1)
+    idx = min(max(attempts - 1, 0), len(BACKOFF_SCHEDULE_MINUTES) - 1)
+    delay_minutes = BACKOFF_SCHEDULE_MINUTES[idx]
+    return datetime.now(timezone.utc) + timedelta(minutes=delay_minutes)
 
 
 def normalize_name(name: str) -> str:
@@ -133,15 +162,16 @@ class LookupQueue:
             return mock_request
 
         sql = """
-            INSERT INTO enterprise.lookup_requests (
-                name,
+            INSERT INTO enterprise.enrichment_requests (
+                raw_name,
                 normalized_name,
                 status,
-                attempts
+                attempts,
+                next_retry_at
             )
-            VALUES (%s, %s, 'pending', 0)
+            VALUES (%s, %s, 'pending', 0, NOW())
             RETURNING id,
-                      name,
+                      raw_name AS name,
                       normalized_name,
                       status,
                       attempts,
@@ -248,20 +278,22 @@ class LookupQueue:
 
         # Atomic dequeue with status update using CTE pattern to avoid
         # FOR UPDATE in subquery
+        # AC2: Filter by next_retry_at <= NOW() for exponential backoff
         sql = """
             WITH pending AS (
-                SELECT id FROM enterprise.lookup_requests
+                SELECT id FROM enterprise.enrichment_requests
                 WHERE status = 'pending'
+                  AND (next_retry_at IS NULL OR next_retry_at <= NOW())
                 ORDER BY created_at ASC
                 LIMIT %s
                 FOR UPDATE SKIP LOCKED
             )
-            UPDATE enterprise.lookup_requests
+            UPDATE enterprise.enrichment_requests
             SET status = 'processing', updated_at = now()
             FROM pending
-            WHERE enterprise.lookup_requests.id = pending.id
-            RETURNING enterprise.lookup_requests.id,
-                      name,
+            WHERE enterprise.enrichment_requests.id = pending.id
+            RETURNING enterprise.enrichment_requests.id,
+                      raw_name AS name,
                       normalized_name,
                       status,
                       attempts,
@@ -343,7 +375,7 @@ class LookupQueue:
             return
 
         sql = """
-            UPDATE enterprise.lookup_requests
+            UPDATE enterprise.enrichment_requests
             SET status = 'done', updated_at = now()
             WHERE id = %s AND status = 'processing'
         """
@@ -399,15 +431,38 @@ class LookupQueue:
             )
             return
 
-        sql = """
-            UPDATE enterprise.lookup_requests
-            SET status = 'failed', last_error = %s, attempts = %s, updated_at = now()
-            WHERE id = %s AND status = 'processing'
-        """
+        # AC2/AC3: Determine if this is a permanent failure or retry with backoff
+        if attempts >= MAX_RETRY_ATTEMPTS:
+            # AC3: Permanently failed - no more retries
+            sql = """
+                UPDATE enterprise.enrichment_requests
+                SET status = 'failed',
+                    last_error = %s,
+                    attempts = %s,
+                    next_retry_at = NULL,
+                    updated_at = now()
+                WHERE id = %s AND status = 'processing'
+            """
+            params = (error_message, attempts, request_id)
+            final_status = "failed"
+        else:
+            # AC2: Schedule retry with exponential backoff (keep as pending)
+            next_retry = calculate_next_retry_at(attempts)
+            sql = """
+                UPDATE enterprise.enrichment_requests
+                SET status = 'pending',
+                    last_error = %s,
+                    attempts = %s,
+                    next_retry_at = %s,
+                    updated_at = now()
+                WHERE id = %s AND status = 'processing'
+            """
+            params = (error_message, attempts, next_retry, request_id)
+            final_status = "pending"
 
         try:
             with self.connection.cursor() as cursor:
-                cursor.execute(sql, (error_message, attempts, request_id))
+                cursor.execute(sql, params)
 
                 if cursor.rowcount == 0:
                     logger.warning(
@@ -419,11 +474,14 @@ class LookupQueue:
                     )
 
                 logger.info(
-                    "Request marked as failed",
+                    "Request marked as %s",
+                    final_status,
                     extra={
                         "request_id": request_id,
                         "attempts": attempts,
+                        "max_attempts": MAX_RETRY_ATTEMPTS,
                         "error": error_message,
+                        "will_retry": final_status == "pending",
                     },
                 )
 
@@ -550,7 +608,7 @@ class LookupQueue:
             SELECT
                 status,
                 COUNT(*) as count
-            FROM enterprise.lookup_requests
+            FROM enterprise.enrichment_requests
             GROUP BY status
         """
 
@@ -573,3 +631,130 @@ class LookupQueue:
         except Exception as e:
             logger.error("Database error during stats query", extra={"error": str(e)})
             raise LookupQueueError(f"Failed to get queue stats: {e}")
+
+    def get_queue_depth(self, status: str = "pending", ready_only: bool = False) -> int:
+        """
+        Get count of requests with specified status for monitoring.
+
+        AC4/AC5: Used for queue depth monitoring and sensor triggering.
+
+        Args:
+            status: Queue status to count (default: 'pending')
+            ready_only: When True and status='pending', only count rows whose
+                backoff window has elapsed (next_retry_at IS NULL OR <= NOW())
+
+        Returns:
+            Integer count of requests with specified status
+
+        Raises:
+            LookupQueueError: If query fails
+        """
+        if self.plan_only:
+            logger.info(
+                "PLAN ONLY: Would get queue depth",
+                extra={"status": status, "ready_only": ready_only, "mock_depth": 5},
+            )
+            return 5  # Mock value for plan-only mode
+
+        # Apply backoff filter only to pending queue depth when requested
+        backoff_clause = ""
+        params = (status,)
+        if status == "pending" and ready_only:
+            backoff_clause = " AND (next_retry_at IS NULL OR next_retry_at <= NOW())"
+
+        sql = (
+            """
+            SELECT COUNT(*) FROM enterprise.enrichment_requests
+            WHERE status = %s
+            """
+            + backoff_clause
+        )
+
+        try:
+            with self.connection.cursor() as cursor:
+                cursor.execute(sql, params)
+                row = cursor.fetchone()
+
+                count = row[0] if row else 0
+
+                logger.debug(
+                    "Queue depth retrieved",
+                    extra={"status": status, "count": count, "ready_only": ready_only},
+                )
+
+                return count
+
+        except Exception as e:
+            logger.error(
+                "Database error during queue depth query",
+                extra={"status": status, "error": str(e)},
+            )
+            raise LookupQueueError(f"Failed to get queue depth: {e}")
+
+    def reset_stale_processing(self, stale_minutes: int = 15) -> int:
+        """
+        Reset stale 'processing' rows back to 'pending' for recovery.
+
+        AC6: Startup recovery hook to resume interrupted batches.
+        Rows older than stale_minutes in 'processing' status are reset
+        to 'pending' with incremented attempts and backoff delay.
+
+        Args:
+            stale_minutes: Minutes after which processing rows are considered stale
+
+        Returns:
+            Number of rows reset
+
+        Raises:
+            LookupQueueError: If reset operation fails
+        """
+        if self.plan_only:
+            logger.info(
+                "PLAN ONLY: Would reset stale processing rows",
+                extra={"stale_minutes": stale_minutes},
+            )
+            return 0
+
+        # Reset stale processing rows back to pending with backoff that matches AC2
+        sql = """
+            UPDATE enterprise.enrichment_requests
+            SET status = 'pending',
+                attempts = attempts + 1,
+                next_retry_at = CASE
+                    WHEN attempts + 1 >= 3 THEN NOW() + INTERVAL '15 minutes'
+                    WHEN attempts + 1 = 2 THEN NOW() + INTERVAL '5 minutes'
+                    ELSE NOW() + INTERVAL '1 minute'
+                END,
+                updated_at = NOW()
+            WHERE status = 'processing'
+              AND updated_at < NOW() - INTERVAL '%s minutes'
+            RETURNING id
+        """
+
+        try:
+            with self.connection.cursor() as cursor:
+                cursor.execute(sql, (stale_minutes,))
+                reset_count = cursor.rowcount
+
+                if reset_count > 0:
+                    logger.warning(
+                        "Reset stale processing rows to pending",
+                        extra={
+                            "reset_count": reset_count,
+                            "stale_minutes": stale_minutes,
+                        },
+                    )
+                else:
+                    logger.debug(
+                        "No stale processing rows found",
+                        extra={"stale_minutes": stale_minutes},
+                    )
+
+                return reset_count
+
+        except Exception as e:
+            logger.error(
+                "Database error during stale processing reset",
+                extra={"stale_minutes": stale_minutes, "error": str(e)},
+            )
+            raise LookupQueueError(f"Failed to reset stale processing rows: {e}")

@@ -9,7 +9,7 @@ access scenarios for multi-worker queue processing.
 import time
 from unittest.mock import Mock, patch
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import psycopg2
@@ -129,7 +129,7 @@ class TestEnqueueOperations:
         # Verify SQL was executed correctly
         mock_cursor.execute.assert_called_once()
         sql_call = mock_cursor.execute.call_args[0]
-        assert "INSERT INTO enterprise.lookup_requests" in sql_call[0]
+        assert "INSERT INTO enterprise.enrichment_requests" in sql_call[0]
         assert "RETURNING" in sql_call[0]
 
         # Verify parameters
@@ -238,11 +238,11 @@ class TestDequeueAtomicOperations:
         mock_cursor.execute.assert_called_once()
         sql_call = mock_cursor.execute.call_args[0]
         assert "WITH pending AS (" in sql_call[0]
-        assert "SELECT id FROM enterprise.lookup_requests" in sql_call[0]
+        assert "SELECT id FROM enterprise.enrichment_requests" in sql_call[0]
         assert "FOR UPDATE SKIP LOCKED" in sql_call[0]
-        assert "UPDATE enterprise.lookup_requests" in sql_call[0]
+        assert "UPDATE enterprise.enrichment_requests" in sql_call[0]
         assert "FROM pending" in sql_call[0]
-        assert "WHERE enterprise.lookup_requests.id = pending.id" in sql_call[0]
+        assert "WHERE enterprise.enrichment_requests.id = pending.id" in sql_call[0]
         assert "SET status = 'processing'" in sql_call[0]
 
         # Verify batch_size parameter
@@ -303,7 +303,7 @@ class TestMarkDoneAndFailedOperations:
         # Verify SQL execution
         mock_cursor.execute.assert_called_once()
         sql_call = mock_cursor.execute.call_args[0]
-        assert "UPDATE enterprise.lookup_requests" in sql_call[0]
+        assert "UPDATE enterprise.enrichment_requests" in sql_call[0]
         assert "SET status = 'done'" in sql_call[0]
         assert "WHERE id = %s AND status = 'processing'" in sql_call[0]
 
@@ -321,25 +321,45 @@ class TestMarkDoneAndFailedOperations:
         ):
             lookup_queue.mark_done(request_id=999)
 
-    def test_mark_failed_successful(self, lookup_queue, mock_connection):
-        """Test successful mark_failed operation."""
+    def test_mark_failed_successful_with_retry(self, lookup_queue, mock_connection):
+        """Test mark_failed with retry (attempts < MAX_RETRY_ATTEMPTS)."""
         mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
         mock_cursor.rowcount = 1
 
+        # With attempts=2 (< MAX_RETRY_ATTEMPTS=3), should schedule retry
         lookup_queue.mark_failed(
             request_id=456, error_message="EQC lookup failed", attempts=2
         )
 
-        # Verify SQL execution
+        # Verify SQL execution - should set status to 'pending' for retry
+        mock_cursor.execute.assert_called_once()
+        sql_call = mock_cursor.execute.call_args[0]
+        assert "SET status = 'pending'" in sql_call[0]
+        assert "last_error = %s" in sql_call[0]
+        assert "attempts = %s" in sql_call[0]
+        assert "next_retry_at = %s" in sql_call[0]
+
+    def test_mark_failed_permanent_failure(self, lookup_queue, mock_connection):
+        """Test mark_failed with permanent failure (attempts >= MAX_RETRY_ATTEMPTS)."""
+        mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
+        mock_cursor.rowcount = 1
+
+        # With attempts=3 (>= MAX_RETRY_ATTEMPTS=3), should mark as failed
+        lookup_queue.mark_failed(
+            request_id=456, error_message="EQC lookup failed", attempts=3
+        )
+
+        # Verify SQL execution - should set status to 'failed'
         mock_cursor.execute.assert_called_once()
         sql_call = mock_cursor.execute.call_args[0]
         assert "SET status = 'failed'" in sql_call[0]
         assert "last_error = %s" in sql_call[0]
         assert "attempts = %s" in sql_call[0]
+        assert "next_retry_at = NULL" in sql_call[0]
 
         # Verify parameters
         params = mock_cursor.execute.call_args[0][1]
-        assert params == ("EQC lookup failed", 2, 456)
+        assert params == ("EQC lookup failed", 3, 456)
 
     def test_mark_failed_validation(self, lookup_queue):
         """Test mark_failed input validation."""
@@ -681,3 +701,139 @@ class TestIntegrationPatterns:
         # Second attempt should succeed
         result = lookup_queue.enqueue("Retry Company")
         assert result.name == "Retry Company"
+
+
+class TestStory67ExponentialBackoff:
+    """Story 6.7: Test exponential backoff and new queue methods."""
+
+    def test_calculate_next_retry_at_first_attempt(self):
+        """Test backoff calculation for first retry (1 minute)."""
+        from work_data_hub.domain.company_enrichment.lookup_queue import (
+            BACKOFF_SCHEDULE_MINUTES,
+            calculate_next_retry_at,
+        )
+
+        before = datetime.now(timezone.utc)
+        result = calculate_next_retry_at(attempts=1)
+        after = datetime.now(timezone.utc)
+
+        # Should be approximately 1 minute in the future
+        expected_delay = timedelta(minutes=BACKOFF_SCHEDULE_MINUTES[0])
+        assert before + expected_delay <= result <= after + expected_delay + timedelta(seconds=1)
+
+    def test_calculate_next_retry_at_second_attempt(self):
+        """Test backoff calculation for second retry (5 minutes)."""
+        from work_data_hub.domain.company_enrichment.lookup_queue import (
+            BACKOFF_SCHEDULE_MINUTES,
+            calculate_next_retry_at,
+        )
+
+        before = datetime.now(timezone.utc)
+        result = calculate_next_retry_at(attempts=2)
+        after = datetime.now(timezone.utc)
+
+        # Should be approximately 5 minutes in the future
+        expected_delay = timedelta(minutes=BACKOFF_SCHEDULE_MINUTES[1])
+        assert before + expected_delay <= result <= after + expected_delay + timedelta(seconds=1)
+
+    def test_calculate_next_retry_at_capped_at_max(self):
+        """Test backoff calculation caps at maximum delay (15 minutes)."""
+        from work_data_hub.domain.company_enrichment.lookup_queue import (
+            BACKOFF_SCHEDULE_MINUTES,
+            calculate_next_retry_at,
+        )
+
+        before = datetime.now(timezone.utc)
+        # Attempt 10 should still use max delay (15 min)
+        result = calculate_next_retry_at(attempts=10)
+        after = datetime.now(timezone.utc)
+
+        # Should be capped at 15 minutes
+        expected_delay = timedelta(minutes=BACKOFF_SCHEDULE_MINUTES[-1])
+        assert before + expected_delay <= result <= after + expected_delay + timedelta(seconds=1)
+
+    def test_get_queue_depth_successful(self, lookup_queue, mock_connection):
+        """Test get_queue_depth returns correct count."""
+        mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
+        mock_cursor.fetchone.return_value = (42,)
+
+        depth = lookup_queue.get_queue_depth(status="pending")
+
+        # Verify SQL query
+        mock_cursor.execute.assert_called_once()
+        sql_call = mock_cursor.execute.call_args[0]
+        assert "SELECT COUNT(*)" in sql_call[0]
+        assert "enterprise.enrichment_requests" in sql_call[0]
+        assert "WHERE status = %s" in sql_call[0]
+
+        # Verify result
+        assert depth == 42
+
+    def test_get_queue_depth_plan_only_mode(self, plan_only_queue):
+        """Test get_queue_depth in plan-only mode returns mock value."""
+        depth = plan_only_queue.get_queue_depth(status="pending")
+        assert depth == 5  # Mock value
+
+    def test_get_queue_depth_database_error(self, lookup_queue, mock_connection):
+        """Test get_queue_depth handles database errors."""
+        mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
+        mock_cursor.execute.side_effect = psycopg2.Error("Query failed")
+
+        with pytest.raises(LookupQueueError, match="Failed to get queue depth"):
+            lookup_queue.get_queue_depth()
+
+    def test_get_queue_depth_ready_only_filters_backoff(self, lookup_queue, mock_connection):
+        """Test ready_only adds backoff clause for pending items."""
+        mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
+        mock_cursor.fetchone.return_value = (5,)
+
+        depth = lookup_queue.get_queue_depth(status="pending", ready_only=True)
+
+        sql_call = mock_cursor.execute.call_args[0]
+        assert "next_retry_at IS NULL" in sql_call[0]
+        # Params should remain a single-element tuple for status
+        assert sql_call[1] == ("pending",)
+        assert depth == 5
+
+    def test_reset_stale_processing_successful(self, lookup_queue, mock_connection):
+        """Test reset_stale_processing resets stale rows."""
+        mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
+        mock_cursor.rowcount = 3  # 3 rows reset
+
+        reset_count = lookup_queue.reset_stale_processing(stale_minutes=15)
+
+        # Verify SQL query
+        mock_cursor.execute.assert_called_once()
+        sql_call = mock_cursor.execute.call_args[0]
+        assert "UPDATE enterprise.enrichment_requests" in sql_call[0]
+        assert "SET status = 'pending'" in sql_call[0]
+        assert "attempts = attempts + 1" in sql_call[0]
+        assert "WHERE status = 'processing'" in sql_call[0]
+
+        # Verify result
+        assert reset_count == 3
+
+    def test_reset_stale_processing_no_stale_rows(self, lookup_queue, mock_connection):
+        """Test reset_stale_processing when no stale rows exist."""
+        mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
+        mock_cursor.rowcount = 0
+
+        reset_count = lookup_queue.reset_stale_processing(stale_minutes=15)
+
+        assert reset_count == 0
+
+    def test_reset_stale_processing_plan_only_mode(self, plan_only_queue):
+        """Test reset_stale_processing in plan-only mode."""
+        reset_count = plan_only_queue.reset_stale_processing(stale_minutes=15)
+        assert reset_count == 0  # No actual reset in plan-only mode
+
+    def test_dequeue_filters_by_next_retry_at(self, lookup_queue, mock_connection):
+        """Test dequeue SQL includes next_retry_at filter (AC2)."""
+        mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
+        mock_cursor.fetchall.return_value = []
+
+        lookup_queue.dequeue(batch_size=10)
+
+        # Verify SQL includes next_retry_at filter
+        sql_call = mock_cursor.execute.call_args[0]
+        assert "next_retry_at IS NULL OR next_retry_at <= NOW()" in sql_call[0]

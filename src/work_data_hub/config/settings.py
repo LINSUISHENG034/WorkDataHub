@@ -225,6 +225,28 @@ class Settings(BaseSettings):
         default=300, description="Delay in seconds between lookup retry attempts"
     )
 
+    # Story 6.7: Async enrichment schedule configuration
+    async_enrichment_enabled: bool = Field(
+        default=True,
+        description="Enable/disable async enrichment schedule (AC9)",
+    )
+    enrichment_sensor_enabled: bool = Field(
+        default=False,
+        description="Enable/disable enrichment queue sensor (AC5)",
+    )
+    enrichment_queue_threshold: int = Field(
+        default=1000,
+        description="Queue depth threshold for sensor triggering (AC5)",
+    )
+    enrichment_queue_warning_threshold: int = Field(
+        default=10000,
+        description="Queue depth threshold for warning logs (AC4)",
+    )
+    enrichment_batch_size: int = Field(
+        default=100,
+        description="Batch size for async enrichment processing",
+    )
+
     enrichment_export_unknowns: bool = Field(
         default=True,
         description="Export unknown company names to CSV for manual review",

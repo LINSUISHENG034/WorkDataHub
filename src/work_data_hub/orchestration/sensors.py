@@ -3,10 +3,13 @@
 Sensors react to filesystem and data-quality events, then call orchestration
 jobs that already inject Story 1.5 domain pipelines with I/O adapters. Keeping
 logic here ensures domain modules stay unaware of eventing or infrastructure.
+
+Story 6.7: Added enrichment_queue_sensor for queue depth monitoring.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Union
 
+import structlog
 import yaml
 from dagster import RunRequest, SensorEvaluationContext, SkipReason, sensor
 
@@ -14,7 +17,9 @@ from work_data_hub.config.settings import get_settings
 from work_data_hub.io.connectors.file_connector import DataSourceConnector
 from work_data_hub.io.loader.warehouse_loader import build_insert_sql
 
-from .jobs import sample_trustee_performance_multi_file_job
+from .jobs import process_company_lookup_queue_job, sample_trustee_performance_multi_file_job
+
+logger = structlog.get_logger(__name__)
 
 
 def _build_sensor_run_config() -> Dict[str, Any]:
@@ -233,4 +238,83 @@ def trustee_data_quality_sensor(context: SensorEvaluationContext):
 
     except Exception as e:
         context.log.error(f"DATA QUALITY SENSOR ERROR: {e}")
+        return SkipReason(f"Sensor error: {e}")
+
+
+@sensor(
+    job=process_company_lookup_queue_job,
+    minimum_interval_seconds=300,  # Check every 5 minutes
+)
+def enrichment_queue_sensor(
+    context: SensorEvaluationContext,
+) -> Union[RunRequest, SkipReason]:
+    """
+    Sensor that triggers queue processing when backlog exceeds threshold.
+
+    Story 6.7 AC5: Optional sensor triggers job when queue depth > threshold.
+    Disabled via WDH_ENRICHMENT_SENSOR_ENABLED=False (default).
+
+    This sensor provides reactive queue processing for high-volume scenarios
+    where the hourly schedule may not be sufficient to keep up with demand.
+    """
+    settings = get_settings()
+
+    # Check if sensor is enabled (default: False)
+    if not settings.enrichment_sensor_enabled:
+        return SkipReason("Sensor disabled via WDH_ENRICHMENT_SENSOR_ENABLED=False")
+
+    threshold = settings.enrichment_queue_threshold
+    batch_size = settings.enrichment_batch_size
+
+    try:
+        # Import here to avoid circular imports and allow lazy DB connection
+        import psycopg2
+
+        from work_data_hub.domain.company_enrichment.lookup_queue import LookupQueue
+
+        # Get database connection
+        dsn = settings.get_database_connection_string()
+        conn = psycopg2.connect(dsn)
+
+        try:
+            queue = LookupQueue(conn, plan_only=False)
+            # Only count requests whose backoff window has elapsed to avoid
+            # noise from items still waiting for retry (AC2/AC5 alignment)
+            pending_count = queue.get_queue_depth(
+                status="pending", ready_only=True
+            )
+        finally:
+            conn.close()
+
+        if pending_count > threshold:
+            logger.info(
+                "enrichment_queue_sensor.triggered",
+                pending_count=pending_count,
+                threshold=threshold,
+                batch_size=batch_size,
+            )
+
+            return RunRequest(
+                run_key=f"queue_depth_trigger_{pending_count}",
+                run_config={
+                    "ops": {
+                        "process_company_lookup_queue_op": {
+                            "config": {
+                                "batch_size": batch_size,
+                                "plan_only": False,
+                            }
+                        }
+                    }
+                },
+            )
+
+        return SkipReason(
+            f"Queue depth {pending_count} below threshold {threshold}"
+        )
+
+    except Exception as e:
+        logger.error(
+            "enrichment_queue_sensor.error",
+            error=str(e),
+        )
         return SkipReason(f"Sensor error: {e}")
