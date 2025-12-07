@@ -22,6 +22,7 @@ from src.work_data_hub.domain.company_enrichment.models import (
     ResolutionStatus,
 )
 from src.work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
+from src.work_data_hub.domain.company_enrichment.observability import EnrichmentObserver
 from src.work_data_hub.io.connectors.eqc_client import EQCClientError
 
 
@@ -653,6 +654,57 @@ class TestQueueStatusReporting:
 
         # Should return default values on error
         assert status == {"pending": 0, "processing": 0, "done": 0, "failed": 0}
+
+
+class TestObserverIntegration:
+    """Observer wiring and disabled-mode coverage."""
+
+    def test_disabled_mode_generates_temp_ids_and_logs_stats(
+        self, mock_loader, mock_queue, mock_eqc_client
+    ):
+        observer = EnrichmentObserver()
+        service = CompanyEnrichmentService(
+            loader=mock_loader,
+            queue=mock_queue,
+            eqc_client=mock_eqc_client,
+            enrich_enabled=False,
+            observer=observer,
+        )
+
+        result = service.resolve_company_id(customer_name="Disabled Co")
+
+        assert result.status == ResolutionStatus.TEMP_ASSIGNED
+        assert result.temp_id == "TEMP_000001"
+        stats = observer.get_stats()
+        assert stats.total_lookups == 1
+        assert stats.temp_ids_generated == 1
+        assert stats.api_calls == 0
+        assert stats.async_queued == 0
+        assert stats.cache_hits == 0
+
+    def test_process_lookup_queue_records_observer_stats(
+        self, mock_loader, mock_queue, mock_eqc_client
+    ):
+        observer = EnrichmentObserver()
+        service = CompanyEnrichmentService(
+            loader=mock_loader,
+            queue=mock_queue,
+            eqc_client=mock_eqc_client,
+            observer=observer,
+        )
+        mock_request = Mock(id=1, name="Test Company", attempts=0)
+        mock_queue.dequeue.side_effect = [[mock_request], []]
+
+        processed_count = service.process_lookup_queue(
+            batch_size=5, observer=observer
+        )
+
+        assert processed_count == 1
+        stats = observer.get_stats()
+        assert stats.total_lookups == 1
+        assert stats.api_calls == 1
+        assert stats.sync_budget_used == 1
+        assert stats.temp_ids_generated == 0
 
 
 class TestEdgeCasesAndValidation:

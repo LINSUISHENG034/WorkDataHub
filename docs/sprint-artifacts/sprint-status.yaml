@@ -138,7 +138,7 @@ development_status:
   6-5-enrichmentgateway-integration-and-fallback-logic: done
   6-6-eqc-api-provider-sync-lookup-with-budget: done
   6-7-async-enrichment-queue-deferred-resolution: done
-  6-8-enrichment-observability-and-export: backlog
+  6-8-enrichment-observability-and-export: done
   epic-6-retrospective: optional
 
   # Epic 7: Testing & Validation Infrastructure

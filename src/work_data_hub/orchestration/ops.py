@@ -302,11 +302,17 @@ def process_annuity_performance_op(
 
     # Conditional enrichment service setup
     enrichment_service = None
+    observer = None
     conn = None
+    settings = get_settings()
 
     try:
         # GUARD: Only setup enrichment in execute mode
-        if not config.plan_only and config.enrichment_enabled:
+        use_enrichment = (not config.plan_only) and (
+            config.enrichment_enabled or not settings.enrich_enabled
+        )
+
+        if use_enrichment:
             # Import enrichment components (lazy import to avoid circular dependencies)
             from work_data_hub.domain.company_enrichment.lookup_queue import LookupQueue
             from work_data_hub.domain.company_enrichment.service import (
@@ -315,6 +321,12 @@ def process_annuity_performance_op(
             from work_data_hub.io.connectors.eqc_client import EQCClient
             from work_data_hub.io.loader.company_enrichment_loader import (
                 CompanyEnrichmentLoader,
+            )
+            from work_data_hub.domain.company_enrichment.observability import (
+                EnrichmentObserver,
+            )
+            from work_data_hub.infrastructure.enrichment.csv_exporter import (
+                export_unknown_companies,
             )
 
             # Lazy import psycopg2 for database connection (following load_op pattern)
@@ -330,7 +342,6 @@ def process_annuity_performance_op(
                     )
 
             # Create database connection only in execute mode
-            settings = get_settings()
             dsn = settings.get_database_connection_string()
             conn = psycopg2.connect(dsn)
 
@@ -338,12 +349,15 @@ def process_annuity_performance_op(
             loader = CompanyEnrichmentLoader(conn)
             queue = LookupQueue(conn)
             eqc_client = EQCClient()  # Uses settings for auth
+            observer = EnrichmentObserver()
 
             enrichment_service = CompanyEnrichmentService(
                 loader=loader,
                 queue=queue,
                 eqc_client=eqc_client,
                 sync_lookup_budget=config.enrichment_sync_budget,
+                observer=observer,
+                enrich_enabled=settings.enrich_enabled,
             )
 
             context.log.info(
@@ -351,6 +365,7 @@ def process_annuity_performance_op(
                 extra={
                     "sync_budget": config.enrichment_sync_budget,
                     "export_unknowns": config.export_unknown_names,
+                    "enrich_enabled": settings.enrich_enabled,
                 },
             )
 
@@ -385,6 +400,33 @@ def process_annuity_performance_op(
                     "csv_exported": bool(result.unknown_names_csv),
                 },
             )
+
+        # Story 6.8: Log observer stats + CSV export (AC1, AC2, AC5)
+        if observer:
+            enrichment_stats = observer.get_stats()
+            context.log.info(
+                "Enrichment stats",
+                extra={"enrichment_stats": enrichment_stats.to_dict()},
+            )
+            if (
+                observer.has_unknown_companies()
+                and settings.enrichment_export_unknowns
+            ):
+                try:
+                    csv_path = export_unknown_companies(
+                        observer, output_dir=settings.observability_log_dir
+                    )
+                    if csv_path:
+                        # Update result for downstream consumption
+                        result.unknown_names_csv = str(csv_path)
+                        context.log.info(
+                            "Exported unknown companies to CSV",
+                            extra={"csv_path": str(csv_path)},
+                        )
+                except Exception as export_error:
+                    context.log.warning(
+                        "Failed to export unknown companies CSV: %s", export_error
+                    )
 
         # Enhanced logging with execution mode
         mode_text = "EXECUTED" if not config.plan_only else "PLAN-ONLY"
@@ -1125,6 +1167,16 @@ def process_company_lookup_queue_op(
             queue = LookupQueue(conn)
             eqc_client = EQCClient()  # Uses settings for auth
 
+            # Story 6.8: Create observer for metrics collection (AC1, AC5)
+            from work_data_hub.domain.company_enrichment.observability import (
+                EnrichmentObserver,
+            )
+            from work_data_hub.infrastructure.enrichment.csv_exporter import (
+                export_unknown_companies,
+            )
+
+            observer = EnrichmentObserver()
+
             # Story 6.7 AC6: Reset stale processing rows BEFORE processing
             stale_reset_count = queue.reset_stale_processing(stale_minutes=15)
             if stale_reset_count > 0:
@@ -1139,15 +1191,20 @@ def process_company_lookup_queue_op(
                 queue=queue,
                 eqc_client=eqc_client,
                 sync_lookup_budget=0,  # No sync budget for queue processing
+                observer=observer,
+                enrich_enabled=settings.enrich_enabled,
             )
 
             # Process the queue
             processed_count = enrichment_service.process_lookup_queue(
-                batch_size=config.batch_size
+                batch_size=config.batch_size, observer=observer
             )
 
             # Get final queue status
             queue_status = enrichment_service.get_queue_status()
+
+            # Story 6.8: Set queue depth in observer (AC1)
+            observer.set_queue_depth(queue_status.get("pending", 0))
 
             # Story 6.7 AC4: Log warning when queue depth exceeds threshold
             pending_count = queue_status.get("pending", 0)
@@ -1168,12 +1225,38 @@ def process_company_lookup_queue_op(
                 queue_status.get("failed", 0),
             )
 
+            # Story 6.8 AC1, AC5: Log enrichment stats in JSON format
+            enrichment_stats = observer.get_stats()
+            context.log.info(
+                "Enrichment stats",
+                extra={"enrichment_stats": enrichment_stats.to_dict()},
+            )
+
+            # Story 6.8 AC2, AC3: Export unknown companies to CSV if any
+            csv_path = None
+            if observer.has_unknown_companies() and settings.enrichment_export_unknowns:
+                try:
+                    csv_path = export_unknown_companies(
+                        observer, output_dir=settings.observability_log_dir
+                    )
+                    if csv_path:
+                        context.log.info(
+                            "Exported unknown companies to CSV",
+                            extra={"csv_path": str(csv_path)},
+                        )
+                except Exception as export_error:
+                    context.log.warning(
+                        "Failed to export unknown companies CSV: %s", export_error
+                    )
+
             result: Dict[str, Any] = {
                 "processed_count": processed_count,
                 "batch_size": config.batch_size,
                 "plan_only": config.plan_only,
                 "queue_status": queue_status,
                 "stale_reset_count": stale_reset_count,
+                "enrichment_stats": enrichment_stats.to_dict(),
+                "unknown_companies_csv": str(csv_path) if csv_path else None,
             }
 
             # Persist queue state transitions (done/failed/backoff) before closing

@@ -252,6 +252,16 @@ class Settings(BaseSettings):
         description="Export unknown company names to CSV for manual review",
     )
 
+    # Story 6.8: Observability configuration
+    observability_log_dir: str = Field(
+        default="logs/",
+        description="Directory for observability CSV exports (AC8)",
+    )
+    enrich_enabled: bool = Field(
+        default=True,
+        description="Enable/disable enrichment (AC6). When False, all companies get temp IDs",
+    )
+
     # Pipeline Framework Configuration - shared transformation pipeline settings
     annuity_pipeline_enabled: bool = Field(
         default=True,

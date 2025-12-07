@@ -17,6 +17,7 @@ from .models import (
     CompanyResolutionResult,
     ResolutionStatus,
 )
+from .observability import EnrichmentObserver
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +120,7 @@ def resolve_company_id(
                 source_value=search_value,
                 priority=mapping.priority,
             )
-            logger.info(
+            logger.debug(
                 "Company ID resolved",
                 extra={
                     "company_id": result.company_id,
@@ -142,14 +143,14 @@ def resolve_company_id(
             source_value=None,
             priority=None,
         )
-        logger.info(
+        logger.debug(
             "Applied default fallback",
             extra={"company_id": result.company_id, "reason": "empty_customer_name"},
         )
         return result
 
     # No match found and customer_name is not empty
-    logger.info(
+    logger.debug(
         "No company ID match found",
         extra={
             "query_fields_provided": [
@@ -341,6 +342,8 @@ class CompanyEnrichmentService:
         eqc_client,  # EQCClient
         *,
         sync_lookup_budget: int = 0,
+        observer: Optional[EnrichmentObserver] = None,
+        enrich_enabled: bool = True,
     ):
         """
         Initialize company enrichment service with dependency injection.
@@ -350,11 +353,15 @@ class CompanyEnrichmentService:
             queue: LookupQueue instance for async processing
             eqc_client: EQCClient instance for EQC API operations
             sync_lookup_budget: Default budget for synchronous EQC lookups
+            observer: Optional EnrichmentObserver for metrics collection
+            enrich_enabled: Flag to enable/disable enrichment (AC6)
         """
         self.loader = loader
         self.queue = queue
         self.eqc_client = eqc_client
         self.sync_lookup_budget = sync_lookup_budget
+        self.observer = observer
+        self.enrich_enabled = enrich_enabled
 
         logger.info(
             "CompanyEnrichmentService initialized",
@@ -363,6 +370,7 @@ class CompanyEnrichmentService:
                 "has_loader": bool(loader),
                 "has_queue": bool(queue),
                 "has_eqc_client": bool(eqc_client),
+                "enrich_enabled": enrich_enabled,
             },
         )
 
@@ -373,6 +381,7 @@ class CompanyEnrichmentService:
         customer_name: Optional[str] = None,
         account_name: Optional[str] = None,
         sync_lookup_budget: Optional[int] = None,
+        observer: Optional[EnrichmentObserver] = None,
     ) -> CompanyIdResult:
         """
         Resolve company ID using priority-based lookup with EQC integration.
@@ -427,6 +436,7 @@ class CompanyEnrichmentService:
             if sync_lookup_budget is not None
             else self.sync_lookup_budget
         )
+        observer = observer or self.observer
 
         logger.debug(
             "Starting unified company ID resolution",
@@ -435,8 +445,41 @@ class CompanyEnrichmentService:
                 "customer_name": customer_name,
                 "account_name": account_name,
                 "sync_lookup_budget": budget,
+                "enrich_enabled": self.enrich_enabled,
             },
         )
+
+        # Story 6.8: Record lookup attempt (AC1)
+        if observer:
+            observer.record_lookup()
+
+        # AC6: Enrichment disabled → always generate temp IDs, skip API/queue paths
+        if not self.enrich_enabled:
+            try:
+                temp_id = self.queue.get_next_temp_id()
+            except Exception as e:
+                logger.error(f"Failed to generate temporary ID (disabled mode): {e}")
+                return CompanyIdResult(
+                    company_id=None,
+                    status=ResolutionStatus.TEMP_ASSIGNED,
+                    source="disabled",
+                    temp_id=None,
+                )
+
+            if observer:
+                observer.record_temp_id(customer_name or "", temp_id)
+
+            logger.debug(
+                "Enrichment disabled - generated temp ID",
+                extra={"temp_id": temp_id, "customer_name": customer_name},
+            )
+
+            return CompanyIdResult(
+                company_id=temp_id,
+                status=ResolutionStatus.TEMP_ASSIGNED,
+                source="disabled",
+                temp_id=temp_id,
+            )
 
         # Step 1: Try internal mappings first (highest priority)
         try:
@@ -450,7 +493,7 @@ class CompanyEnrichmentService:
             internal_result = resolve_company_id(mappings, query)
 
             if internal_result.company_id:
-                logger.info(
+                logger.debug(
                     "Company ID resolved via internal mappings",
                     extra={
                         "company_id": internal_result.company_id,
@@ -458,6 +501,9 @@ class CompanyEnrichmentService:
                         "priority": internal_result.priority,
                     },
                 )
+                # Story 6.8: Record cache hit (AC1)
+                if observer:
+                    observer.record_cache_hit(match_type=internal_result.match_type or "unknown")
                 return CompanyIdResult(
                     company_id=internal_result.company_id,
                     status=ResolutionStatus.SUCCESS_INTERNAL,
@@ -475,6 +521,10 @@ class CompanyEnrichmentService:
                     "Attempting EQC lookup with budget",
                     extra={"customer_name": customer_name, "budget": budget},
                 )
+
+                # Story 6.8: Record API call (AC1)
+                if observer:
+                    observer.record_api_call()
 
                 # EQC search
                 search_results = self.eqc_client.search_company(customer_name.strip())
@@ -495,7 +545,7 @@ class CompanyEnrichmentService:
                     except Exception as cache_error:
                         logger.warning(f"Failed to cache EQC result: {cache_error}")
 
-                    logger.info(
+                    logger.debug(
                         "Company ID resolved via EQC lookup",
                         extra={
                             "company_id": detail.company_id,
@@ -533,7 +583,11 @@ class CompanyEnrichmentService:
                 normalized = normalize_name(customer_name.strip())
                 self.queue.enqueue(customer_name.strip(), normalized)
 
-                logger.info(
+                # Story 6.8: Record async queued (AC1)
+                if observer:
+                    observer.record_async_queued()
+
+                logger.debug(
                     "Company lookup queued for async processing",
                     extra={
                         "customer_name": customer_name,
@@ -556,7 +610,11 @@ class CompanyEnrichmentService:
         try:
             temp_id = self.queue.get_next_temp_id()
 
-            logger.info(
+            # Story 6.8: Record temp ID generation (AC1, AC2)
+            if observer:
+                observer.record_temp_id(customer_name or "", temp_id)
+
+            logger.debug(
                 "Generated temporary company ID",
                 extra={
                     "temp_id": temp_id,
@@ -583,7 +641,12 @@ class CompanyEnrichmentService:
                 temp_id=None,
             )
 
-    def process_lookup_queue(self, *, batch_size: Optional[int] = None) -> int:
+    def process_lookup_queue(
+        self,
+        *,
+        batch_size: Optional[int] = None,
+        observer: Optional[EnrichmentObserver] = None,
+    ) -> int:
         """
         Process pending lookup requests in the queue using EQC API.
 
@@ -606,6 +669,7 @@ class CompanyEnrichmentService:
             >>> logger.info(f"Processed {processed_count} lookup requests")
         """
         processed_count = 0
+        observer = observer or self.observer
 
         logger.info(
             "Starting lookup queue processing",
@@ -630,6 +694,9 @@ class CompanyEnrichmentService:
                 # Process each request in the batch
                 for request in requests:
                     try:
+                        # Story 6.8: Don't record lookup here as it was already recorded
+                        # during initial processing. We only track API calls and success/failure.
+
                         # Extract a robust name value (supports unittest.mock
                         # usage in tests)
                         req_name = None
@@ -654,6 +721,9 @@ class CompanyEnrichmentService:
 
                         # Perform EQC lookup
                         search_results = self.eqc_client.search_company(req_name)
+
+                        if observer:
+                            observer.record_api_call()
 
                         if search_results:
                             # Take first result and get details
@@ -682,7 +752,7 @@ class CompanyEnrichmentService:
                             self.queue.mark_done(request.id)
                             processed_count += 1
 
-                            logger.info(
+                            logger.debug(
                                 "Lookup request processed successfully",
                                 extra={
                                     "request_id": request.id,
