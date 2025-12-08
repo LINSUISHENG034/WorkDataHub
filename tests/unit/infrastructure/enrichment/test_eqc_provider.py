@@ -271,22 +271,23 @@ class TestEqcProviderCache:
             )
         ]
 
-        # Mock normalize_company_name at the module where it's imported in _cache_result
-        with patch("work_data_hub.infrastructure.cleansing.normalize_company_name") as mock_norm:
+        # Mock normalize_for_temp_id at the module where it's imported in _cache_result
+        with patch("work_data_hub.infrastructure.enrichment.normalizer.normalize_for_temp_id") as mock_norm:
             mock_norm.return_value = "中国平安"
 
             provider.lookup("中国平安")
 
-            mock_repo.insert_company_name_index_batch.assert_called_once()
-            call_args = mock_repo.insert_company_name_index_batch.call_args[0][0]
+            mock_repo.insert_enrichment_index_batch.assert_called_once()
+            call_args = mock_repo.insert_enrichment_index_batch.call_args[0][0]
             assert len(call_args) == 1
-            assert call_args[0]["company_id"] == "614810477"
-            assert call_args[0]["match_type"] == "eqc"
+            assert call_args[0].company_id == "614810477"
+            assert call_args[0].source.value == "eqc_api"
+            assert call_args[0].lookup_type.value == "customer_name"
 
     def test_lookup_cache_failure_graceful(self) -> None:
         """Cache failure doesn't block lookup."""
         mock_repo = MagicMock()
-        mock_repo.insert_company_name_index_batch.side_effect = Exception("DB error")
+        mock_repo.insert_enrichment_index_batch.side_effect = Exception("DB error")
 
         with patch("work_data_hub.infrastructure.enrichment.eqc_provider.get_settings") as mock_settings:
             mock_settings.return_value.eqc_token = ""

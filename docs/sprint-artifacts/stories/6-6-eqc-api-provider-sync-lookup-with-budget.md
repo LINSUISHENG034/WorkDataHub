@@ -573,10 +573,10 @@ class EqcProvider:
             base_url: EQC API base URL. If None, loads from WDH_EQC_API_BASE_URL.
             mapping_repository: Optional repository for caching results.
         """
-        self.api_token = api_token or os.environ.get(EQC_TOKEN_ENV_VAR, "")
-        self.base_url = base_url or os.environ.get(
-            EQC_API_BASE_URL_ENV_VAR, DEFAULT_EQC_API_BASE_URL
-        )
+        from work_data_hub.config.settings import get_settings
+        settings = get_settings()
+        self.api_token = api_token or settings.eqc_token
+        self.base_url = base_url or settings.eqc_api_base_url or DEFAULT_EQC_API_BASE_URL
         self.budget = budget
         self.remaining_budget = budget
         self.mapping_repository = mapping_repository

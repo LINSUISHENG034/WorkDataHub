@@ -31,6 +31,7 @@ class InMemoryMappingRepo:
         self.name_index_payloads: List[List[Dict[str, Any]]] = []
         self.backflow_payloads: List[List[Dict[str, Any]]] = []
         self.async_enqueue_payloads: List[List[Dict[str, str]]] = []
+        self.enrichment_index_payloads: List[List[Any]] = []
 
     def lookup_batch(self, alias_names, match_types=None):  # noqa: ANN001
         return {}
@@ -44,6 +45,10 @@ class InMemoryMappingRepo:
     def insert_company_name_index_batch(self, rows: List[Dict[str, Any]]) -> InsertBatchResult:
         self.name_index_payloads.append(rows)
         return InsertBatchResult(inserted_count=len(rows), skipped_count=0, conflicts=[])
+
+    def insert_enrichment_index_batch(self, records: List[Any]) -> InsertBatchResult:
+        self.enrichment_index_payloads.append(records)
+        return InsertBatchResult(inserted_count=len(records), skipped_count=0, conflicts=[])
 
     def insert_batch_with_conflict_check(self, mappings: List[Dict[str, Any]]) -> InsertBatchResult:
         self.backflow_payloads.append(mappings)
@@ -111,11 +116,11 @@ def test_resolver_uses_eqc_provider_and_caches(eqc_provider_with_client: EqcProv
     # EQC hits recorded, budget decremented
     assert result.statistics.eqc_sync_hits == 1
     assert result.statistics.budget_remaining == 0
-    # Cache write to company_name_index was attempted
-    assert repo.name_index_payloads
-    payload = repo.name_index_payloads[0][0]
-    assert payload["company_id"] == "C123"
-    assert payload["match_type"] == "eqc"
+    # Cache write to enrichment_index was attempted
+    assert repo.enrichment_index_payloads
+    payload = repo.enrichment_index_payloads[0][0]
+    assert payload.company_id == "C123"
+    assert payload.source.value == "eqc_api"
 
 
 def test_resolver_backflow_existing_column(monkeypatch) -> None:

@@ -106,10 +106,52 @@ class CompanyIdResolver:
                 If not provided, database lookup is skipped.
             eqc_provider: Optional EqcProvider for EQC sync lookup (Story 6.6).
                 If provided, takes precedence over enrichment_service for EQC lookups.
+                If not provided, will auto-create one with mapping_repository.
         """
         self.enrichment_service = enrichment_service
         self.mapping_repository = mapping_repository
-        self.eqc_provider = eqc_provider
+
+        # Auto-create EqcProvider if not provided and mapping_repository is available
+        if eqc_provider is None and mapping_repository is not None:
+            try:
+                from work_data_hub.config.settings import get_settings
+                from work_data_hub.infrastructure.enrichment.eqc_provider import EqcProvider
+                settings = get_settings()
+                if hasattr(settings, 'eqc_token') and settings.eqc_token:
+                    self.eqc_provider = EqcProvider(
+                        token=settings.eqc_token,
+                        budget=getattr(settings, 'company_sync_lookup_limit', 5),
+                        base_url=getattr(settings, 'eqc_base_url', None),
+                        mapping_repository=mapping_repository,  # 关键：传入 mapping_repository
+                        validate_on_init=False
+                    )
+                    logger.info(
+                        "company_id_resolver.eqc_provider_auto_created",
+                        msg="Auto-created EqcProvider with mapping_repository"
+                    )
+                else:
+                    self.eqc_provider = None
+                    logger.debug(
+                        "company_id_resolver.no_eqc_token",
+                        msg="No EQC token configured, EqcProvider not created"
+                    )
+            except Exception as e:
+                logger.warning(
+                    "company_id_resolver.eqc_provider_creation_failed",
+                    error=str(e),
+                    msg="Failed to create EqcProvider"
+                )
+                self.eqc_provider = None
+        else:
+            self.eqc_provider = eqc_provider
+
+            # If eqc_provider is provided but no mapping_repository, try to set it
+            if self.eqc_provider and self.mapping_repository and not getattr(self.eqc_provider, 'mapping_repository', None):
+                self.eqc_provider.mapping_repository = self.mapping_repository
+                logger.info(
+                    "company_id_resolver.eqc_provider_repo_set",
+                    msg="Set mapping_repository on existing EqcProvider"
+                )
 
         # Initialize YAML overrides
         if yaml_overrides is None:

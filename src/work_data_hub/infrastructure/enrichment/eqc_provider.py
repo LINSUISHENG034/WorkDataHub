@@ -347,25 +347,29 @@ class EqcProvider:
             result: CompanyInfo from successful lookup.
         """
         try:
-            from work_data_hub.infrastructure.cleansing import normalize_company_name
-
-            normalized = normalize_company_name(company_name) or company_name.strip()
-
-            # Write to enterprise.company_name_index with match_type=eqc
-            self.mapping_repository.insert_company_name_index_batch(
-                [
-                    {
-                        "normalized_name": normalized,
-                        "company_id": result.company_id,
-                        "match_type": result.match_type,
-                        "confidence": result.confidence,
-                    }
-                ]
+            from work_data_hub.infrastructure.enrichment.normalizer import normalize_for_temp_id
+            from work_data_hub.infrastructure.enrichment.types import (
+                EnrichmentIndexRecord, LookupType, SourceType
             )
+
+            # Normalize using the same method as Layer 2 lookup for consistency
+            normalized = normalize_for_temp_id(company_name) or company_name.strip()
+
+            # Write to enterprise.enrichment_index with match_type=eqc (Epic 6.1)
+            record = EnrichmentIndexRecord(
+                lookup_key=normalized,
+                lookup_type=LookupType.CUSTOMER_NAME,
+                company_id=result.company_id,
+                confidence=result.confidence,
+                source=SourceType.EQC_API,
+                source_domain="eqc_sync_lookup"
+            )
+
+            self.mapping_repository.insert_enrichment_index_batch([record])
 
             logger.debug(
                 "eqc_provider.cached_result",
-                msg="Cached EQC lookup result to company_name_index",
+                msg="Cached EQC lookup result to enrichment_index",
             )
         except Exception:
             # Non-blocking: log and continue

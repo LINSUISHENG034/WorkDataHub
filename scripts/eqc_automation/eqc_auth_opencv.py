@@ -18,7 +18,12 @@ Environment variables:
 
 Usage example:
     from work_data_hub.auth.eqc_auth_opencv import run_get_token
+
+    # Get token only
     token = run_get_token(180)
+
+    # Get token and save to .env
+    token = run_get_token(180, save_to_env=True)
 """
 
 from __future__ import annotations
@@ -522,9 +527,40 @@ async def get_auth_token_interactively(
                 pass
 
 
-def run_get_token(timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS) -> Optional[str]:
+def run_get_token(
+    timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
+    save_to_env: bool = False,
+    env_file: str = ".env"
+) -> Optional[str]:
+    """
+    Synchronous wrapper for async authentication with optional .env save.
+
+    This function provides a synchronous interface to the async authentication
+    process for compatibility with sync code. Optionally saves the captured
+    token to a .env file for persistence.
+
+    Args:
+        timeout_seconds: Maximum time to wait for authentication
+        save_to_env: If True, save captured token to .env file
+        env_file: Path to .env file (default: ".env")
+
+    Returns:
+        Captured authentication token string, or None if authentication failed
+    """
     try:
-        return asyncio.run(get_auth_token_interactively(timeout_seconds))
+        token = asyncio.run(get_auth_token_interactively(timeout_seconds))
+
+        if token and save_to_env:
+            # Import the update function from the main module
+            from work_data_hub.io.auth.eqc_auth_handler import _update_env_file, EQC_TOKEN_KEY
+            success = _update_env_file(env_file, EQC_TOKEN_KEY, token)
+            if success:
+                print(f"✅ Token 已自动保存到 {env_file}")
+            else:
+                print(f"⚠️ Token 保存失败，请手动更新 {env_file}")
+                print(f"   {EQC_TOKEN_KEY}={token}")
+
+        return token
     except Exception as e:
         logger.error(f"Synchronous wrapper failed: {e}")
         return None

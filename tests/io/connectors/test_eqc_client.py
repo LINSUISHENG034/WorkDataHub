@@ -40,15 +40,26 @@ class TestEQCClientInitialization:
         assert "WorkDataHub EQC Client" in client.session.headers["User-Agent"]
 
     def test_client_initialization_with_env_token(self):
-        """Test client reads token from environment variable."""
-        with patch.dict(os.environ, {"WDH_EQC_TOKEN": "env_token"}):
+        """Test client reads token from settings (which loads from .env file)."""
+        # Mock settings to return a specific token
+        with patch("work_data_hub.io.connectors.eqc_client.get_settings") as mock_get_settings:
+            from work_data_hub.config.settings import Settings
+            mock_settings = Settings()
+            mock_settings.eqc_token = "env_token"
+            mock_get_settings.return_value = mock_settings
+
             client = EQCClient()
             assert client.token == "env_token"
             assert client.session.headers["token"] == "env_token"
 
     def test_client_initialization_no_token_raises_error(self):
         """Test client raises error when no token is provided."""
-        with patch.dict(os.environ, {}, clear=True):
+        with patch("work_data_hub.io.connectors.eqc_client.get_settings") as mock_get_settings:
+            from work_data_hub.config.settings import Settings
+            mock_settings = Settings()
+            mock_settings.eqc_token = ""
+            mock_get_settings.return_value = mock_settings
+
             with pytest.raises(EQCAuthenticationError) as exc_info:
                 EQCClient()
             assert "EQC token required" in str(exc_info.value)
@@ -612,9 +623,11 @@ class TestEQCClientIntegration:
 
     def test_integration_search_and_detail(self):
         """Test integration with real EQC API."""
-        token = os.getenv("WDH_EQC_TOKEN")
+        from work_data_hub.config.settings import get_settings
+        settings = get_settings()
+        token = settings.eqc_token
         if not token:
-            pytest.skip("WDH_EQC_TOKEN not set - skipping integration tests")
+            pytest.skip("WDH_EQC_TOKEN not found in .env - skipping integration tests")
 
         client = EQCClient(token=token)
 

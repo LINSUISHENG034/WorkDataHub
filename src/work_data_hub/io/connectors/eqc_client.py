@@ -92,12 +92,12 @@ class EQCClient:
         # Load settings for configuration defaults
         self.settings = get_settings()
 
-        # Token priority: constructor parameter > environment variable
-        self.token = token or os.getenv("WDH_EQC_TOKEN")
+        # Token priority: constructor parameter > settings
+        self.token = token or self.settings.eqc_token
         if not self.token:
             raise EQCAuthenticationError(
                 "EQC token required via constructor parameter or "
-                "WDH_EQC_TOKEN environment variable"
+                "WDH_EQC_TOKEN in .env configuration file"
             )
 
         # Configuration with settings fallbacks
