@@ -18,7 +18,8 @@ Repository Pattern:
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, bindparam, text
+from sqlalchemy.dialects.postgresql import ARRAY, NUMERIC, TEXT
 
 from work_data_hub.infrastructure.enrichment.normalizer import normalize_for_temp_id
 from work_data_hub.infrastructure.enrichment.types import (
@@ -844,13 +845,13 @@ class CompanyMappingRepository:
                 source_domain, source_table, 0 AS hit_count,
                 NOW() AS created_at, NOW() AS updated_at
             FROM unnest(
-                :lookup_keys::text[],
-                :lookup_types::text[],
-                :company_ids::text[],
-                :confidences::numeric[],
-                :sources::text[],
-                :source_domains::text[],
-                :source_tables::text[]
+                CAST(:lookup_keys AS text[]),
+                CAST(:lookup_types AS text[]),
+                CAST(:company_ids AS text[]),
+                CAST(:confidences AS numeric[]),
+                CAST(:sources AS text[]),
+                CAST(:source_domains AS text[]),
+                CAST(:source_tables AS text[])
             ) AS t(lookup_key, lookup_type, company_id, confidence, source,
                    source_domain, source_table)
             ON CONFLICT (lookup_key, lookup_type) DO UPDATE SET
@@ -881,7 +882,15 @@ class CompanyMappingRepository:
                 hit_count = enterprise.enrichment_index.hit_count + 1,
                 last_hit_at = NOW(),
                 updated_at = NOW()
-        """)
+        """).bindparams(
+            bindparam("lookup_keys", type_=ARRAY(TEXT())),
+            bindparam("lookup_types", type_=ARRAY(TEXT())),
+            bindparam("company_ids", type_=ARRAY(TEXT())),
+            bindparam("confidences", type_=ARRAY(NUMERIC())),
+            bindparam("sources", type_=ARRAY(TEXT())),
+            bindparam("source_domains", type_=ARRAY(TEXT())),
+            bindparam("source_tables", type_=ARRAY(TEXT())),
+        )
 
         result = self.connection.execute(
             query,
