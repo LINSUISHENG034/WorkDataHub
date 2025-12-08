@@ -248,10 +248,11 @@ class TestPriorityLevels:
 
     def test_priority_levels_order(self):
         """Priority levels are in correct order."""
+        # Order matches mapping_loader.py: plan (highest) → account_name → account → name → hardcode (lowest)
         assert PRIORITY_LEVELS == [
             "plan",
-            "account",
-            "hardcode",
-            "name",
             "account_name",
+            "account",
+            "name",
+            "hardcode",
         ]

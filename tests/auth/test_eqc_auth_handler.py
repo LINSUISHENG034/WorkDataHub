@@ -6,13 +6,13 @@ from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from pydantic import ValidationError
 
-from src.work_data_hub.auth.models import (
+from work_data_hub.io.auth.models import (
     AuthTokenResult,
     AuthenticationError,
     AuthTimeoutError,
     BrowserError,
 )
-from src.work_data_hub.auth.eqc_auth_handler import (
+from work_data_hub.io.auth.eqc_auth_handler import (
     get_auth_token_interactively,
     get_auth_token_with_validation,
     run_get_token,

@@ -702,7 +702,8 @@ class TestDatabaseCacheLookup:
 
         result = resolver.resolve_batch(df, default_strategy)
         assert result.data.loc[0, "company_id"] == "db_company_123"
-        assert result.statistics.db_cache_hits == 1
+        assert result.statistics.db_cache_hits["legacy"] == 1
+        assert result.statistics.db_cache_hits_total == 1
         mock_repo.lookup_batch.assert_called_once()
 
     def test_db_cache_lookup_no_repository(self, default_strategy):
@@ -720,7 +721,7 @@ class TestDatabaseCacheLookup:
         result = resolver.resolve_batch(df, default_strategy)
         # Should fall through to temp ID
         assert result.data.loc[0, "company_id"].startswith("IN_")
-        assert result.statistics.db_cache_hits == 0
+        assert result.statistics.db_cache_hits_total == 0
 
 
 class TestBackflowMechanism:
@@ -1180,9 +1181,44 @@ class TestEnrichmentIndexDbCache:
         result = resolver.resolve_batch(df, default_strategy)
 
         assert result.data.loc[0, "company_id"] == "C_PLAN"
-        assert result.statistics.db_cache_hits == 1
+        assert result.statistics.db_cache_hits["plan_code"] == 1
+        assert result.statistics.db_cache_hits_total == 1
         mock_repo.lookup_enrichment_index_batch.assert_called_once()
         mock_repo.update_hit_count.assert_called()
+
+    def test_enrichment_index_logs_decision_path(self, default_strategy, caplog):
+        """Decision path logging should include priority outcome."""
+        mock_repo = MagicMock()
+        mock_repo.lookup_enrichment_index_batch.return_value = {
+            (LookupType.PLAN_CODE, "PLAN001"): EnrichmentIndexRecord(
+                lookup_key="PLAN001",
+                lookup_type=LookupType.PLAN_CODE,
+                company_id="C_PLAN",
+                source=SourceType.YAML,
+            ),
+        }
+        mock_repo.update_hit_count.return_value = True
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        df = pd.DataFrame({
+            "计划代码": ["PLAN001"],
+            "客户名称": [" Customer_A  "],
+        })
+
+        with caplog.at_level("DEBUG"):
+            resolver.resolve_batch(df, default_strategy)
+
+        # structlog outputs JSON; check for decision_path in log message text
+        decision_path_logs = [
+            record.getMessage()
+            for record in caplog.records
+            if "db_cache_decision_path" in record.getMessage()
+        ]
+        assert any("DB-P1:HIT" in log for log in decision_path_logs)
 
     def test_enrichment_index_fallbacks_to_legacy_on_no_hits(self, default_strategy):
         """If enrichment_index misses, resolver should fall back to legacy table when available."""
@@ -1213,7 +1249,71 @@ class TestEnrichmentIndexDbCache:
         result = resolver.resolve_batch(df, default_strategy)
 
         assert result.data.loc[0, "company_id"] == "C_LEGACY"
-        assert result.statistics.db_cache_hits == 1
+        assert result.statistics.db_cache_hits["legacy"] == 1
+        assert result.statistics.db_cache_hits_total == 1
+
+    def test_enrichment_index_updates_hit_count_per_hit(self, default_strategy):
+        """Hit count should increment per-row hit, not per-unique key."""
+        mock_repo = MagicMock()
+        mock_repo.lookup_enrichment_index_batch.return_value = {
+            (LookupType.PLAN_CODE, "PLAN001"): EnrichmentIndexRecord(
+                lookup_key="PLAN001",
+                lookup_type=LookupType.PLAN_CODE,
+                company_id="C_PLAN",
+                source=SourceType.YAML,
+            ),
+        }
+        mock_repo.update_hit_count.return_value = True
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        df = pd.DataFrame({
+            "计划代码": ["PLAN001", "PLAN001"],  # Same key hit twice
+            "客户名称": ["Customer A", "Customer B"],
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+
+        assert result.statistics.db_cache_hits["plan_code"] == 2
+        assert result.statistics.db_cache_hits_total == 2
+        assert mock_repo.update_hit_count.call_count == 2
+        assert result.statistics.db_decision_path_counts.get("DB-P1:HIT") == 2
+
+    def test_enrichment_index_emits_metrics_log(self, default_strategy, caplog):
+        """Metrics log should include per-priority hits and decision-path counts."""
+        mock_repo = MagicMock()
+        mock_repo.lookup_enrichment_index_batch.return_value = {
+            (LookupType.PLAN_CODE, "PLAN001"): EnrichmentIndexRecord(
+                lookup_key="PLAN001",
+                lookup_type=LookupType.PLAN_CODE,
+                company_id="C_PLAN",
+                source=SourceType.YAML,
+            ),
+        }
+        mock_repo.update_hit_count.return_value = True
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        df = pd.DataFrame({
+            "计划代码": ["PLAN001"],
+            "客户名称": [" Customer_A  "],
+        })
+
+        with caplog.at_level("INFO"):
+            resolver.resolve_batch(df, default_strategy)
+
+        metric_logs = [
+            record.getMessage()
+            for record in caplog.records
+            if "db_cache_metrics" in record.getMessage()
+        ]
+        assert metric_logs, "Expected db_cache_metrics log entry"
 
 
 class TestP4NormalizationDbCacheLookup:
@@ -1251,7 +1351,8 @@ class TestP4NormalizationDbCacheLookup:
 
         # Should hit cache because normalized("（核心）公司A") == "公司A"
         assert result.data.loc[0, "company_id"] == "normalized_company_123"
-        assert result.statistics.db_cache_hits == 1
+        assert result.statistics.db_cache_hits["legacy"] == 1
+        assert result.statistics.db_cache_hits_total == 1
 
     def test_db_cache_lookup_raw_for_p1_plan_code(self, default_strategy):
         """P1 (plan_code) should use RAW values for DB lookup (AC3)."""
@@ -1283,7 +1384,8 @@ class TestP4NormalizationDbCacheLookup:
 
         # Should hit cache with exact raw match
         assert result.data.loc[0, "company_id"] == "plan_company_123"
-        assert result.statistics.db_cache_hits == 1
+        assert result.statistics.db_cache_hits["legacy"] == 1
+        assert result.statistics.db_cache_hits_total == 1
 
     def test_db_cache_lookup_raw_for_p2_account_number(self, default_strategy):
         """P2 (account_number) should use RAW values for DB lookup (AC3)."""
@@ -1314,7 +1416,8 @@ class TestP4NormalizationDbCacheLookup:
         result = resolver.resolve_batch(df, default_strategy)
 
         assert result.data.loc[0, "company_id"] == "account_company_123"
-        assert result.statistics.db_cache_hits == 1
+        assert result.statistics.db_cache_hits["legacy"] == 1
+        assert result.statistics.db_cache_hits_total == 1
 
     def test_db_cache_lookup_raw_for_p5_account_name(self, default_strategy):
         """P5 (account_name) should use RAW values for DB lookup (AC3)."""
@@ -1345,7 +1448,8 @@ class TestP4NormalizationDbCacheLookup:
         result = resolver.resolve_batch(df, default_strategy)
 
         assert result.data.loc[0, "company_id"] == "account_name_company_123"
-        assert result.statistics.db_cache_hits == 1
+        assert result.statistics.db_cache_hits["legacy"] == 1
+        assert result.statistics.db_cache_hits_total == 1
 
 
 class TestP4NormalizationBackflow:
@@ -1529,7 +1633,8 @@ class TestP4NormalizationEdgeCases:
         result = resolver.resolve_batch(df, default_strategy)
 
         assert result.data.loc[0, "company_id"] == "special_company_123"
-        assert result.statistics.db_cache_hits == 1
+        assert result.statistics.db_cache_hits["legacy"] == 1
+        assert result.statistics.db_cache_hits_total == 1
 
     def test_p4_normalization_full_width_conversion(self, default_strategy):
         """Test P4 normalization converts full-width ASCII to half-width."""
@@ -1561,7 +1666,8 @@ class TestP4NormalizationEdgeCases:
         result = resolver.resolve_batch(df, default_strategy)
 
         assert result.data.loc[0, "company_id"] == "fullwidth_company_123"
-        assert result.statistics.db_cache_hits == 1
+        assert result.statistics.db_cache_hits["legacy"] == 1
+        assert result.statistics.db_cache_hits_total == 1
 
     def test_p3_hardcode_yaml_uses_raw_values(self, default_strategy):
         """P3 (hardcode/plan_code) YAML lookup should use RAW values (AC3 regression guard)."""
@@ -1651,4 +1757,5 @@ class TestP4NormalizationIntegration:
 
         # Should hit cache because normalized("（非核心）公司D") == "公司D"
         assert result2.data.loc[0, "company_id"] == "real_company_789"
-        assert result2.statistics.db_cache_hits == 1
+        assert result2.statistics.db_cache_hits["legacy"] == 1
+        assert result2.statistics.db_cache_hits_total == 1

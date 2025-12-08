@@ -119,7 +119,17 @@ class ResolutionStatistics:
 
     # Story 6.4: Multi-tier lookup statistics
     yaml_hits: Dict[str, int] = field(default_factory=dict)
-    db_cache_hits: int = 0
+    db_cache_hits: Dict[str, int] = field(
+        default_factory=lambda: {
+            "plan_code": 0,
+            "account_name": 0,
+            "account_number": 0,
+            "customer_name": 0,
+            "plan_customer": 0,
+            "legacy": 0,  # Legacy fallback (company_mapping) for backward compatibility
+        }
+    )
+    db_decision_path_counts: Dict[str, int] = field(default_factory=dict)
     eqc_sync_hits: int = 0
     budget_consumed: int = 0
     budget_remaining: int = 0
@@ -128,13 +138,34 @@ class ResolutionStatistics:
     # Story 6.5: Async queue statistics
     async_queued: int = 0
 
+    @property
+    def db_cache_hits_total(self) -> int:
+        """Total DB cache hits across all priorities (compatibility helper)."""
+        return sum(self.db_cache_hits.values())
+
+    def ensure_db_cache_keys(self) -> None:
+        """Ensure db_cache_hits contains all expected keys."""
+        defaults = {
+            "plan_code": 0,
+            "account_name": 0,
+            "account_number": 0,
+            "customer_name": 0,
+            "plan_customer": 0,
+            "legacy": 0,
+        }
+        for key, value in defaults.items():
+            self.db_cache_hits.setdefault(key, value)
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert statistics to dictionary for logging."""
+        self.ensure_db_cache_keys()
         return {
             "total_rows": self.total_rows,
             "yaml_hits": self.yaml_hits,
             "yaml_hits_total": sum(self.yaml_hits.values()),
             "db_cache_hits": self.db_cache_hits,
+            "db_cache_hits_total": self.db_cache_hits_total,
+            "db_decision_path_counts": self.db_decision_path_counts,
             "eqc_sync_hits": self.eqc_sync_hits,
             "budget_consumed": self.budget_consumed,
             "budget_remaining": self.budget_remaining,

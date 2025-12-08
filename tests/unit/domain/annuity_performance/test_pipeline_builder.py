@@ -125,14 +125,23 @@ class TestCompanyIdResolutionStep:
         assert "company_id" in result_df.columns
         assert result_df.loc[0, "company_id"] == "614810477"
 
-    def test_preserves_existing_company_id(self, sample_df, context):
-        """Step preserves existing company_id values."""
+    def test_preserves_existing_company_id(self, context):
+        """Step preserves existing company_id values when no YAML override exists."""
+        # Use a plan_code that is NOT in YAML mappings to test existing column passthrough
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNMAPPED_PLAN"],
+                "客户名称": ["公司B"],
+                "年金账户名": ["账户2"],
+                "公司代码": ["EXISTING123"],
+            }
+        )
         step = CompanyIdResolutionStep()
 
-        result_df = step.apply(sample_df, context)
+        result_df = step.apply(df, context)
 
-        # Row 1 has existing company_id "EXISTING123"
-        assert result_df.loc[1, "company_id"] == "EXISTING123"
+        # Row 0 has existing company_id "EXISTING123" and no YAML override
+        assert result_df.loc[0, "company_id"] == "EXISTING123"
 
     def test_generates_temp_id_for_unresolved(self, sample_df, context):
         """Step generates temp ID for unresolved rows."""

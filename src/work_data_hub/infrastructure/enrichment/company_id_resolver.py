@@ -228,7 +228,7 @@ class CompanyIdResolver:
         mask_missing = result_df[strategy.output_column].isna()
         if mask_missing.any() and self.mapping_repository:
             db_resolved, db_hits = self._resolve_via_db_cache(
-                result_df, mask_missing, strategy
+                result_df, mask_missing, strategy, stats
             )
             # Fill in DB results for unresolved rows
             result_df.loc[mask_missing, strategy.output_column] = result_df.loc[
@@ -236,6 +236,7 @@ class CompanyIdResolver:
             ].fillna(db_resolved.loc[mask_missing])
 
             stats.db_cache_hits = db_hits
+            stats.ensure_db_cache_keys()
             db_mask = result_df[strategy.output_column].notna() & ~resolution_mask
             resolution_mask |= db_mask
 
@@ -428,7 +429,8 @@ class CompanyIdResolver:
         df: pd.DataFrame,
         mask_unresolved: pd.Series,
         strategy: ResolutionStrategy,
-    ) -> Tuple[pd.Series, int]:
+        stats: Optional[ResolutionStatistics] = None,
+    ) -> Tuple[pd.Series, Dict[str, int]]:
         """
         Resolve company_id via database cache.
 
@@ -444,10 +446,10 @@ class CompanyIdResolver:
             strategy: Resolution strategy configuration.
 
         Returns:
-            Tuple of (resolved_series, hit_count)
+            Tuple of (resolved_series, hits_by_priority)
         """
         if not self.mapping_repository:
-            return pd.Series(pd.NA, index=df.index, dtype=object), 0
+            return pd.Series(pd.NA, index=df.index, dtype=object), {}
         # Prefer new enrichment_index path (Story 6.1.1)
         repo = self.mapping_repository
         use_enrichment_index = callable(
@@ -456,10 +458,12 @@ class CompanyIdResolver:
         if use_enrichment_index:
             try:
                 resolved, hits = self._resolve_via_enrichment_index(
-                    df, mask_unresolved, strategy
+                    df, mask_unresolved, strategy, stats
                 )
                 # Use legacy fallback only if nothing was resolved and legacy API exists
-                if hits > 0 or not callable(getattr(repo, "lookup_batch", None)):
+                if sum(hits.values()) > 0 or not callable(
+                    getattr(repo, "lookup_batch", None)
+                ):
                     return resolved, hits
             except Exception as e:  # Graceful fallback to legacy path
                 logger.warning(
@@ -475,7 +479,8 @@ class CompanyIdResolver:
         df: pd.DataFrame,
         mask_unresolved: pd.Series,
         strategy: ResolutionStrategy,
-    ) -> Tuple[pd.Series, int]:
+        stats: Optional[ResolutionStatistics] = None,
+    ) -> Tuple[pd.Series, Dict[str, int]]:
         """
         Resolve company_id via enrichment_index (DB-P1..P5).
 
@@ -519,11 +524,27 @@ class CompanyIdResolver:
         }
 
         if not keys_by_type:
-            return pd.Series(pd.NA, index=df.index, dtype=object), 0
+            return (
+                pd.Series(pd.NA, index=df.index, dtype=object),
+                {
+                    "plan_code": 0,
+                    "account_name": 0,
+                    "account_number": 0,
+                    "customer_name": 0,
+                    "plan_customer": 0,
+                },
+            )
 
         resolved = pd.Series(pd.NA, index=df.index, dtype=object)
-        hit_count = 0
-        used_keys: set[tuple[LookupType, str]] = set()
+        used_keys: list[tuple[LookupType, str]] = []
+        hits_by_priority: Dict[str, int] = {
+            "plan_code": 0,
+            "account_name": 0,
+            "account_number": 0,
+            "customer_name": 0,
+            "plan_customer": 0,
+        }
+        decision_paths: Dict[int, str] = {}
 
         try:
             results = self.mapping_repository.lookup_enrichment_index_batch(
@@ -534,7 +555,10 @@ class CompanyIdResolver:
                 "company_id_resolver.enrichment_index_query_failed",
                 error=str(e),
             )
-            return pd.Series(pd.NA, index=df.index, dtype=object), 0
+            return (
+                pd.Series(pd.NA, index=df.index, dtype=object),
+                hits_by_priority,
+            )
 
         # Apply priority order per row
         priority_order = [
@@ -544,6 +568,20 @@ class CompanyIdResolver:
             LookupType.CUSTOMER_NAME,
             LookupType.PLAN_CUSTOMER,
         ]
+        label_by_type = {
+            LookupType.PLAN_CODE: "plan_code",
+            LookupType.ACCOUNT_NAME: "account_name",
+            LookupType.ACCOUNT_NUMBER: "account_number",
+            LookupType.CUSTOMER_NAME: "customer_name",
+            LookupType.PLAN_CUSTOMER: "plan_customer",
+        }
+        path_label_by_type = {
+            LookupType.PLAN_CODE: "DB-P1",
+            LookupType.ACCOUNT_NAME: "DB-P2",
+            LookupType.ACCOUNT_NUMBER: "DB-P3",
+            LookupType.CUSTOMER_NAME: "DB-P4",
+            LookupType.PLAN_CUSTOMER: "DB-P5",
+        }
 
         for idx in df[mask_unresolved].index:
             row = df.loc[idx]
@@ -571,16 +609,57 @@ class CompanyIdResolver:
                 else None,
             }
 
+            path_segments: List[str] = []
+
             for lookup_type in priority_order:
                 key = candidate_keys.get(lookup_type)
+                label = path_label_by_type[lookup_type]
+                priority_key = label_by_type[lookup_type]
                 if not key:
+                    path_segments.append(f"{label}:MISS")
                     continue
+
                 record = results.get((lookup_type, key))
                 if isinstance(record, EnrichmentIndexRecord):
                     resolved.loc[idx] = record.company_id
-                    used_keys.add((lookup_type, key))
-                    hit_count += 1
+                    used_keys.append((lookup_type, key))
+                    hits_by_priority[priority_key] += 1
+                    path_segments.append(f"{label}:HIT")
                     break
+                else:
+                    path_segments.append(f"{label}:MISS")
+
+            decision_paths[idx] = "→".join(path_segments)
+
+        for row_idx, path in decision_paths.items():
+            logger.debug(
+                "company_id_resolver.db_cache_decision_path",
+                index=int(row_idx),
+                path=path,
+                decision_path=path,
+            )
+
+        decision_path_counts: Dict[str, int] = {}
+        for path in decision_paths.values():
+            decision_path_counts[path] = decision_path_counts.get(path, 0) + 1
+
+        if stats is not None:
+            stats.db_decision_path_counts = decision_path_counts
+
+        # Emit summary metrics/logs for per-priority hits (observable counters)
+        logger.info(
+            "company_id_resolver.db_cache_priority_summary",
+            hits_by_priority=hits_by_priority,
+            total_hits=sum(hits_by_priority.values()),
+            resolved_rows=int(resolved.notna().sum()),
+        )
+        logger.info(
+            "company_id_resolver.db_cache_metrics",
+            hits_by_priority=hits_by_priority,
+            decision_path_counts=decision_path_counts,
+            total_hits=sum(hits_by_priority.values()),
+            resolved_rows=int(resolved.notna().sum()),
+        )
 
         # Increment hit_count on matched records (best-effort)
         if used_keys and callable(getattr(self.mapping_repository, "update_hit_count", None)):
@@ -591,14 +670,14 @@ class CompanyIdResolver:
                     # Non-blocking
                     continue
 
-        return resolved, hit_count
+        return resolved, hits_by_priority
 
     def _resolve_via_company_mapping(
         self,
         df: pd.DataFrame,
         mask_unresolved: pd.Series,
         strategy: ResolutionStrategy,
-    ) -> Tuple[pd.Series, int]:
+    ) -> Tuple[pd.Series, Dict[str, int]]:
         """
         Legacy fallback: resolve via company_mapping table.
         """
@@ -624,7 +703,7 @@ class CompanyIdResolver:
                     alias_names.add(v)
 
         if not alias_names:
-            return pd.Series(pd.NA, index=df.index, dtype=object), 0
+            return pd.Series(pd.NA, index=df.index, dtype=object), {"legacy": 0}
 
         # Batch lookup from database
         try:
@@ -634,10 +713,10 @@ class CompanyIdResolver:
                 "company_id_resolver.db_cache_lookup_failed",
                 error=str(e),
             )
-            return pd.Series(pd.NA, index=df.index, dtype=object), 0
+            return pd.Series(pd.NA, index=df.index, dtype=object), {"legacy": 0}
 
         resolved = pd.Series(pd.NA, index=df.index, dtype=object)
-        hit_count = 0
+        hits_by_priority: Dict[str, int] = {"legacy": 0}
 
         for idx in df[mask_unresolved].index:
             row = df.loc[idx]
@@ -658,10 +737,10 @@ class CompanyIdResolver:
 
                 if lookup_key in results:
                     resolved.loc[idx] = results[lookup_key].company_id
-                    hit_count += 1
+                    hits_by_priority["legacy"] += 1
                     break
 
-        return resolved, hit_count
+        return resolved, hits_by_priority
 
     def _resolve_via_eqc_sync(
         self,
