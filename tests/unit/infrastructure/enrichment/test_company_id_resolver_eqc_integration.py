@@ -35,6 +35,12 @@ class InMemoryMappingRepo:
     def lookup_batch(self, alias_names, match_types=None):  # noqa: ANN001
         return {}
 
+    def lookup_enrichment_index_batch(self, keys_by_type):  # noqa: ANN001
+        return {}
+
+    def update_hit_count(self, lookup_key, lookup_type):  # noqa: ANN001
+        return False
+
     def insert_company_name_index_batch(self, rows: List[Dict[str, Any]]) -> InsertBatchResult:
         self.name_index_payloads.append(rows)
         return InsertBatchResult(inserted_count=len(rows), skipped_count=0, conflicts=[])

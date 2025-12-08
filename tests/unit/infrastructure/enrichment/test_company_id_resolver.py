@@ -21,6 +21,11 @@ from work_data_hub.infrastructure.enrichment import (
     CompanyIdResolver,
     ResolutionStrategy,
 )
+from work_data_hub.infrastructure.enrichment.types import (
+    EnrichmentIndexRecord,
+    LookupType,
+    SourceType,
+)
 
 
 class TestCompanyIdResolverInit:
@@ -1138,6 +1143,77 @@ class TestAsyncQueueIntegration:
 # =============================================================================
 # Story 6.4.1: P4 Customer Name Normalization Alignment Tests
 # =============================================================================
+
+
+class TestEnrichmentIndexDbCache:
+    """Tests for enrichment_index DB cache integration (Story 6.1.1)."""
+
+    def test_enrichment_index_priority_and_normalization(self, default_strategy):
+        """Plan_code hit should win and normalization should be applied for names."""
+        mock_repo = MagicMock()
+        mock_repo.lookup_enrichment_index_batch.return_value = {
+            (LookupType.PLAN_CODE, "PLAN001"): EnrichmentIndexRecord(
+                lookup_key="PLAN001",
+                lookup_type=LookupType.PLAN_CODE,
+                company_id="C_PLAN",
+                source=SourceType.YAML,
+            ),
+            (LookupType.CUSTOMER_NAME, "customer_a"): EnrichmentIndexRecord(
+                lookup_key="customer_a",
+                lookup_type=LookupType.CUSTOMER_NAME,
+                company_id="C_NAME",
+                source=SourceType.DOMAIN_LEARNING,
+            ),
+        }
+        mock_repo.update_hit_count.return_value = True
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        df = pd.DataFrame({
+            "计划代码": ["PLAN001"],
+            "客户名称": [" Customer_A  "],  # Will normalize to customer_a
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+
+        assert result.data.loc[0, "company_id"] == "C_PLAN"
+        assert result.statistics.db_cache_hits == 1
+        mock_repo.lookup_enrichment_index_batch.assert_called_once()
+        mock_repo.update_hit_count.assert_called()
+
+    def test_enrichment_index_fallbacks_to_legacy_on_no_hits(self, default_strategy):
+        """If enrichment_index misses, resolver should fall back to legacy table when available."""
+        mock_repo = MagicMock()
+        mock_repo.lookup_enrichment_index_batch.return_value = {}
+        # Legacy path result
+        from work_data_hub.infrastructure.enrichment.mapping_repository import MatchResult
+
+        mock_repo.lookup_batch.return_value = {
+            "legacy_key": MatchResult(
+                company_id="C_LEGACY",
+                match_type="name",
+                priority=4,
+                source="internal",
+            )
+        }
+
+        resolver = CompanyIdResolver(
+            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            mapping_repository=mock_repo,
+        )
+
+        df = pd.DataFrame({
+            "计划代码": [None],
+            "客户名称": ["legacy_key"],
+        })
+
+        result = resolver.resolve_batch(df, default_strategy)
+
+        assert result.data.loc[0, "company_id"] == "C_LEGACY"
+        assert result.statistics.db_cache_hits == 1
 
 
 class TestP4NormalizationDbCacheLookup:

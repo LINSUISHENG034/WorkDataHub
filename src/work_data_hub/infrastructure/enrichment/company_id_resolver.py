@@ -26,7 +26,13 @@ from work_data_hub.infrastructure.cleansing import normalize_company_name
 from work_data_hub.utils.logging import get_logger
 
 from .normalizer import generate_temp_company_id, normalize_for_temp_id
-from .types import ResolutionResult, ResolutionStatistics, ResolutionStrategy
+from .types import (
+    EnrichmentIndexRecord,
+    LookupType,
+    ResolutionResult,
+    ResolutionStatistics,
+    ResolutionStrategy,
+)
 
 if TYPE_CHECKING:
     from work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
@@ -442,9 +448,161 @@ class CompanyIdResolver:
         """
         if not self.mapping_repository:
             return pd.Series(pd.NA, index=df.index, dtype=object), 0
+        # Prefer new enrichment_index path (Story 6.1.1)
+        repo = self.mapping_repository
+        use_enrichment_index = callable(
+            getattr(repo, "lookup_enrichment_index_batch", None)
+        )
+        if use_enrichment_index:
+            try:
+                resolved, hits = self._resolve_via_enrichment_index(
+                    df, mask_unresolved, strategy
+                )
+                # Use legacy fallback only if nothing was resolved and legacy API exists
+                if hits > 0 or not callable(getattr(repo, "lookup_batch", None)):
+                    return resolved, hits
+            except Exception as e:  # Graceful fallback to legacy path
+                logger.warning(
+                    "company_id_resolver.enrichment_index_lookup_failed",
+                    error=str(e),
+                )
 
+        # Fallback: legacy company_mapping lookup
+        return self._resolve_via_company_mapping(df, mask_unresolved, strategy)
+
+    def _resolve_via_enrichment_index(
+        self,
+        df: pd.DataFrame,
+        mask_unresolved: pd.Series,
+        strategy: ResolutionStrategy,
+    ) -> Tuple[pd.Series, int]:
+        """
+        Resolve company_id via enrichment_index (DB-P1..P5).
+
+        Priority order: plan_code → account_name → account_number →
+        customer_name (normalized) → plan_customer (plan|normalized_customer).
+        """
+        keys_by_type: Dict[LookupType, set[str]] = {
+            LookupType.PLAN_CODE: set(),
+            LookupType.ACCOUNT_NAME: set(),
+            LookupType.ACCOUNT_NUMBER: set(),
+            LookupType.CUSTOMER_NAME: set(),
+            LookupType.PLAN_CUSTOMER: set(),
+        }
+
+        for idx in df[mask_unresolved].index:
+            row = df.loc[idx]
+            plan_code = row.get(strategy.plan_code_column)
+            account_name = row.get(strategy.account_name_column)
+            account_number = row.get(strategy.account_number_column)
+            customer_name = row.get(strategy.customer_name_column)
+
+            if pd.notna(plan_code):
+                keys_by_type[LookupType.PLAN_CODE].add(str(plan_code))
+            if pd.notna(account_name):
+                keys_by_type[LookupType.ACCOUNT_NAME].add(str(account_name))
+            if pd.notna(account_number):
+                keys_by_type[LookupType.ACCOUNT_NUMBER].add(str(account_number))
+            if pd.notna(customer_name):
+                normalized_customer = normalize_for_temp_id(str(customer_name))
+                if normalized_customer:
+                    keys_by_type[LookupType.CUSTOMER_NAME].add(normalized_customer)
+                    if pd.notna(plan_code):
+                        plan_customer_key = f"{plan_code}|{normalized_customer}"
+                        keys_by_type[LookupType.PLAN_CUSTOMER].add(plan_customer_key)
+
+        # Remove empty entry types to avoid unnecessary UNNEST arrays
+        keys_by_type = {
+            key_type: list(keys)
+            for key_type, keys in keys_by_type.items()
+            if keys
+        }
+
+        if not keys_by_type:
+            return pd.Series(pd.NA, index=df.index, dtype=object), 0
+
+        resolved = pd.Series(pd.NA, index=df.index, dtype=object)
+        hit_count = 0
+        used_keys: set[tuple[LookupType, str]] = set()
+
+        try:
+            results = self.mapping_repository.lookup_enrichment_index_batch(
+                keys_by_type
+            )
+        except Exception as e:
+            logger.warning(
+                "company_id_resolver.enrichment_index_query_failed",
+                error=str(e),
+            )
+            return pd.Series(pd.NA, index=df.index, dtype=object), 0
+
+        # Apply priority order per row
+        priority_order = [
+            LookupType.PLAN_CODE,
+            LookupType.ACCOUNT_NAME,
+            LookupType.ACCOUNT_NUMBER,
+            LookupType.CUSTOMER_NAME,
+            LookupType.PLAN_CUSTOMER,
+        ]
+
+        for idx in df[mask_unresolved].index:
+            row = df.loc[idx]
+            plan_code = row.get(strategy.plan_code_column)
+            account_name = row.get(strategy.account_name_column)
+            account_number = row.get(strategy.account_number_column)
+            customer_name = row.get(strategy.customer_name_column)
+            normalized_customer = (
+                normalize_for_temp_id(str(customer_name))
+                if pd.notna(customer_name)
+                else ""
+            )
+
+            candidate_keys = {
+                LookupType.PLAN_CODE: str(plan_code) if pd.notna(plan_code) else None,
+                LookupType.ACCOUNT_NAME: str(account_name)
+                if pd.notna(account_name)
+                else None,
+                LookupType.ACCOUNT_NUMBER: str(account_number)
+                if pd.notna(account_number)
+                else None,
+                LookupType.CUSTOMER_NAME: normalized_customer or None,
+                LookupType.PLAN_CUSTOMER: f"{plan_code}|{normalized_customer}"
+                if pd.notna(plan_code) and normalized_customer
+                else None,
+            }
+
+            for lookup_type in priority_order:
+                key = candidate_keys.get(lookup_type)
+                if not key:
+                    continue
+                record = results.get((lookup_type, key))
+                if isinstance(record, EnrichmentIndexRecord):
+                    resolved.loc[idx] = record.company_id
+                    used_keys.add((lookup_type, key))
+                    hit_count += 1
+                    break
+
+        # Increment hit_count on matched records (best-effort)
+        if used_keys and callable(getattr(self.mapping_repository, "update_hit_count", None)):
+            for lookup_type, key in used_keys:
+                try:
+                    self.mapping_repository.update_hit_count(key, lookup_type)
+                except Exception:
+                    # Non-blocking
+                    continue
+
+        return resolved, hit_count
+
+    def _resolve_via_company_mapping(
+        self,
+        df: pd.DataFrame,
+        mask_unresolved: pd.Series,
+        strategy: ResolutionStrategy,
+    ) -> Tuple[pd.Series, int]:
+        """
+        Legacy fallback: resolve via company_mapping table.
+        """
         # Collect all potential lookup values from unresolved rows
-        # Story 6.4.1: P4 (customer_name) needs normalization, others use RAW values
         lookup_columns = [
             (strategy.plan_code_column, False),       # P1: RAW
             (strategy.account_number_column, False),  # P2: RAW
@@ -453,9 +611,6 @@ class CompanyIdResolver:
         ]
 
         alias_names: set[str] = set()
-        # Track normalized -> original mapping for P4 lookups
-        normalized_to_original: Dict[str, List[str]] = {}
-
         for col, needs_normalization in lookup_columns:
             if col not in df.columns:
                 continue
@@ -465,9 +620,6 @@ class CompanyIdResolver:
                     normalized = normalize_company_name(v)
                     if normalized:
                         alias_names.add(normalized)
-                        if normalized not in normalized_to_original:
-                            normalized_to_original[normalized] = []
-                        normalized_to_original[normalized].append(v)
                 else:
                     alias_names.add(v)
 
@@ -484,7 +636,6 @@ class CompanyIdResolver:
             )
             return pd.Series(pd.NA, index=df.index, dtype=object), 0
 
-        # Apply results to DataFrame
         resolved = pd.Series(pd.NA, index=df.index, dtype=object)
         hit_count = 0
 
@@ -498,7 +649,6 @@ class CompanyIdResolver:
                     continue
                 str_value = str(value)
 
-                # Story 6.4.1: Use normalized value for P4 lookup
                 if needs_normalization:
                     lookup_key = normalize_company_name(str_value)
                     if not lookup_key:

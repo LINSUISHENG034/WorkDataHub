@@ -9,9 +9,12 @@ Architecture Reference:
 - AD-010: Infrastructure Layer
 
 Story 6.4: Extended with multi-tier lookup statistics and backflow tracking.
+Story 6.1.1: Added LookupType, SourceType enums and EnrichmentIndexRecord for enrichment_index table.
 """
 
 from dataclasses import dataclass, field
+from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 from typing import Any, Dict, Optional
 
@@ -162,3 +165,150 @@ class ResolutionResult:
     data: pd.DataFrame
     statistics: ResolutionStatistics = field(default_factory=ResolutionStatistics)
     resolution_sources: Optional[Dict[int, ResolutionSource]] = None
+
+
+# =============================================================================
+# Story 6.1.1: Enrichment Index Types
+# =============================================================================
+
+
+class LookupType(Enum):
+    """
+    Lookup type for enrichment_index table (Story 6.1.1).
+
+    Maps to DB-P1 through DB-P5 priority levels in Layer 2 cache.
+
+    Attributes:
+        PLAN_CODE: DB-P1 - Plan code lookup (highest priority)
+        ACCOUNT_NAME: DB-P2 - Annuity account name lookup
+        ACCOUNT_NUMBER: DB-P3 - Annuity account number lookup
+        CUSTOMER_NAME: DB-P4 - Customer name lookup (normalized)
+        PLAN_CUSTOMER: DB-P5 - Plan + Customer combo lookup (lowest priority)
+    """
+
+    PLAN_CODE = "plan_code"
+    ACCOUNT_NAME = "account_name"
+    ACCOUNT_NUMBER = "account_number"
+    CUSTOMER_NAME = "customer_name"
+    PLAN_CUSTOMER = "plan_customer"
+
+
+class SourceType(Enum):
+    """
+    Source type for enrichment_index records (Story 6.1.1).
+
+    Indicates how the mapping was created/discovered.
+
+    Attributes:
+        YAML: Synced from YAML configuration (confidence: 1.00)
+        EQC_API: EQC API query result (confidence: 1.00)
+        MANUAL: Manually added mapping (confidence: 1.00)
+        BACKFLOW: Layer 3 backflow from existing data (confidence: 1.00)
+        DOMAIN_LEARNING: Learned from domain data processing (confidence: 0.85-0.95)
+        LEGACY_MIGRATION: Migrated from legacy system (confidence: 0.90-1.00)
+    """
+
+    YAML = "yaml"
+    EQC_API = "eqc_api"
+    MANUAL = "manual"
+    BACKFLOW = "backflow"
+    DOMAIN_LEARNING = "domain_learning"
+    LEGACY_MIGRATION = "legacy_migration"
+
+
+@dataclass
+class EnrichmentIndexRecord:
+    """
+    Record for enrichment_index table (Story 6.1.1).
+
+    Represents a single lookup mapping in the Layer 2 database cache.
+    Used for batch insert/update operations.
+
+    Attributes:
+        lookup_key: The lookup key value. For customer_name and plan_customer,
+            this should be normalized using the shared normalizer.
+            Format for plan_customer: "{plan_code}|{normalized_customer_name}"
+        lookup_type: Type of lookup (plan_code, account_name, etc.)
+        company_id: Resolved company ID (aligned with enterprise.company_master)
+        confidence: Confidence score (0.00-1.00), default 1.00
+        source: Source of the mapping (yaml, eqc_api, etc.)
+        source_domain: Optional domain that learned this mapping
+        source_table: Optional table that provided this mapping
+        hit_count: Number of cache hits (default 0)
+        last_hit_at: Timestamp of last cache hit
+        created_at: Record creation timestamp
+        updated_at: Record last update timestamp
+
+    Example:
+        >>> from work_data_hub.infrastructure.enrichment.normalizer import normalize_for_temp_id
+        >>> # Plan code lookup (DB-P1)
+        >>> record = EnrichmentIndexRecord(
+        ...     lookup_key="FP0001",
+        ...     lookup_type=LookupType.PLAN_CODE,
+        ...     company_id="614810477",
+        ...     source=SourceType.YAML,
+        ... )
+        >>> # Customer name lookup (DB-P4) - normalized
+        >>> normalized = normalize_for_temp_id("中国平安")
+        >>> record = EnrichmentIndexRecord(
+        ...     lookup_key=normalized,
+        ...     lookup_type=LookupType.CUSTOMER_NAME,
+        ...     company_id="614810477",
+        ...     source=SourceType.EQC_API,
+        ... )
+        >>> # Plan + Customer combo (DB-P5)
+        >>> plan_customer_key = f"FP0001|{normalized}"
+        >>> record = EnrichmentIndexRecord(
+        ...     lookup_key=plan_customer_key,
+        ...     lookup_type=LookupType.PLAN_CUSTOMER,
+        ...     company_id="614810477",
+        ...     source=SourceType.DOMAIN_LEARNING,
+        ...     confidence=Decimal("0.90"),
+        ...     source_domain="annuity_performance",
+        ... )
+    """
+
+    lookup_key: str
+    lookup_type: LookupType
+    company_id: str
+    source: SourceType
+    confidence: Decimal = field(default_factory=lambda: Decimal("1.00"))
+    source_domain: Optional[str] = None
+    source_table: Optional[str] = None
+    hit_count: int = 0
+    last_hit_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert record to dictionary for database operations."""
+        return {
+            "lookup_key": self.lookup_key,
+            "lookup_type": self.lookup_type.value,
+            "company_id": self.company_id,
+            "confidence": float(self.confidence),
+            "source": self.source.value,
+            "source_domain": self.source_domain,
+            "source_table": self.source_table,
+            "hit_count": self.hit_count,
+            "last_hit_at": self.last_hit_at,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "EnrichmentIndexRecord":
+        """Create record from dictionary (e.g., database row)."""
+        return cls(
+            lookup_key=data["lookup_key"],
+            lookup_type=LookupType(data["lookup_type"]),
+            company_id=data["company_id"],
+            confidence=Decimal(str(data.get("confidence", "1.00"))),
+            source=SourceType(data["source"]),
+            source_domain=data.get("source_domain"),
+            source_table=data.get("source_table"),
+            hit_count=data.get("hit_count", 0),
+            last_hit_at=data.get("last_hit_at"),
+            created_at=data.get("created_at"),
+            updated_at=data.get("updated_at"),
+        )
