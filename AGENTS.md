@@ -53,7 +53,7 @@ cp source.txt dest.txt
 ## 🛠️ Project Environment Management: Using `uv` (For Senior Developers)
 
 * **Tool:** This project utilizes **`uv`** for ultra-fast package and virtual environment management.
-* **Execution Standard:** All Python script execution *must* be performed using **`uv run`** to ensure the correct environment and dependencies are loaded.
+* **Execution Standard:** All Python script execution *must* be performed using **`PYTHONPATH=src uv run`** to ensure the correct environment and dependencies are loaded.
 
 > **Key Action:** Always use `uv run --with [PATH]` for running scripts. Avoid direct `python` calls.
 

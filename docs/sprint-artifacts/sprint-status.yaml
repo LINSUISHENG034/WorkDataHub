@@ -151,8 +151,8 @@ development_status:
   # Dependency: Should complete before Epic 7 for better test coverage
   epic-6.1: in-progress
   6.1-1-enrichment-index-schema-enhancement: done  # Create enrichment_index table with multi-type support
-  6.1-2-layer2-multi-priority-lookup: review  # Implement DB-P1 to DB-P5 priority lookup
-  6.1-3-domain-learning-mechanism: backlog  # Self-learning from processed Domain data
+  6.1-2-layer2-multi-priority-lookup: done  # Implement DB-P1 to DB-P5 priority lookup
+  6.1-3-domain-learning-mechanism: done  # Self-learning from processed Domain data
   6.1-4-legacy-data-migration: backlog  # Migrate existing data to enrichment_index
   epic-6.1-retrospective: optional
 

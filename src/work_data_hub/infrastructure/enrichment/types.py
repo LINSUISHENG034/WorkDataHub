@@ -138,6 +138,9 @@ class ResolutionStatistics:
     # Story 6.5: Async queue statistics
     async_queued: int = 0
 
+    # Story 6.1.3: Domain learning statistics
+    domain_learning_stats: Dict[str, Any] = field(default_factory=dict)
+
     @property
     def db_cache_hits_total(self) -> int:
         """Total DB cache hits across all priorities (compatibility helper)."""
@@ -175,6 +178,7 @@ class ResolutionStatistics:
             "unresolved": self.unresolved,
             "backflow": self.backflow_stats,
             "async_queued": self.async_queued,
+            "domain_learning": self.domain_learning_stats,
             # Backward compatibility
             "plan_override_hits": self.yaml_hits.get("plan", self.plan_override_hits),
         }
@@ -343,3 +347,114 @@ class EnrichmentIndexRecord:
             created_at=data.get("created_at"),
             updated_at=data.get("updated_at"),
         )
+
+
+# =============================================================================
+# Story 6.1.3: Domain Learning Types
+# =============================================================================
+
+
+@dataclass
+class DomainLearningConfig:
+    """
+    Configuration for domain learning mechanism (Story 6.1.3).
+
+    Controls which domains and lookup types are enabled for learning,
+    confidence levels, and thresholds.
+
+    Attributes:
+        enabled_domains: List of domains enabled for learning.
+        confidence_levels: Confidence level per lookup type.
+        enabled_lookup_types: Enable/disable per lookup type.
+        min_records_for_learning: Minimum records required to trigger learning.
+        min_confidence_for_cache: Minimum confidence for cache writes.
+        column_mappings: Domain-specific column name mappings.
+    """
+
+    enabled_domains: list = field(
+        default_factory=lambda: ["annuity_performance", "annuity_income"]
+    )
+    confidence_levels: Dict[str, float] = field(
+        default_factory=lambda: {
+            "plan_code": 0.95,
+            "account_name": 0.90,
+            "account_number": 0.95,
+            "customer_name": 0.85,
+            "plan_customer": 0.90,
+        }
+    )
+    enabled_lookup_types: Dict[str, bool] = field(
+        default_factory=lambda: {
+            "plan_code": True,
+            "account_name": True,
+            "account_number": True,
+            "customer_name": True,
+            "plan_customer": True,
+        }
+    )
+    min_records_for_learning: int = 10
+    min_confidence_for_cache: float = 0.80
+    column_mappings: Dict[str, Dict[str, str]] = field(
+        default_factory=lambda: {
+            "annuity_performance": {
+                "plan_code": "计划代码",
+                "account_name": "年金账户名",
+                "account_number": "年金账户号",
+                "customer_name": "客户名称",
+                "company_id": "company_id",
+            },
+            "annuity_income": {
+                "plan_code": "计划代码",
+                "account_name": "年金账户名",
+                "account_number": "年金账户号",
+                "customer_name": "客户名称",
+                "company_id": "company_id",
+            },
+        }
+    )
+
+
+@dataclass
+class DomainLearningResult:
+    """
+    Result of domain learning operation (Story 6.1.3).
+
+    Tracks statistics from a learning run including extracted, inserted,
+    updated, and skipped counts.
+
+    Attributes:
+        domain_name: Name of the domain (e.g., 'annuity_performance').
+        table_name: Name of the source table.
+        total_records: Total records in the input DataFrame.
+        valid_records: Records with non-null, non-temp company_id.
+        extracted: Count of mappings extracted per lookup type.
+        inserted: Number of new mappings inserted.
+        updated: Number of existing mappings updated.
+        skipped: Number of mappings skipped (null, temp ID, low confidence).
+        skipped_by_reason: Breakdown of skipped counts by reason.
+    """
+
+    domain_name: str
+    table_name: str
+    total_records: int = 0
+    valid_records: int = 0
+    extracted: Dict[str, int] = field(default_factory=dict)
+    inserted: int = 0
+    updated: int = 0
+    skipped: int = 0
+    skipped_by_reason: Dict[str, int] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert result to dictionary for logging/reporting."""
+        return {
+            "domain_name": self.domain_name,
+            "table_name": self.table_name,
+            "total_records": self.total_records,
+            "valid_records": self.valid_records,
+            "extracted": self.extracted,
+            "extracted_total": sum(self.extracted.values()),
+            "inserted": self.inserted,
+            "updated": self.updated,
+            "skipped": self.skipped,
+            "skipped_by_reason": self.skipped_by_reason,
+        }

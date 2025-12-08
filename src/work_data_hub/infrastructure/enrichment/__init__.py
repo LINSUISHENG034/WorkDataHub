@@ -30,7 +30,10 @@ from .mapping_repository import (
     MatchResult,
 )
 from .normalizer import generate_temp_company_id, normalize_for_temp_id
+from .domain_learning_service import DomainLearningService
 from .types import (
+    DomainLearningConfig,
+    DomainLearningResult,
     ResolutionResult,
     ResolutionSource,
     ResolutionStatistics,
@@ -54,4 +57,8 @@ __all__ = [
     "CompanyInfo",
     "EnterpriseInfoProvider",
     "validate_eqc_token",
+    # Story 6.1.3: Domain Learning
+    "DomainLearningService",
+    "DomainLearningConfig",
+    "DomainLearningResult",
 ]
