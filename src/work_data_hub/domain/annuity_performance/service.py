@@ -24,6 +24,7 @@ from .pipeline_builder import (
     build_bronze_to_silver_pipeline,
     load_plan_override_mapping,
 )
+from .constants import DEFAULT_REFRESH_KEYS, DEFAULT_UPSERT_KEYS
 
 if TYPE_CHECKING:
     from work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
@@ -41,23 +42,11 @@ logger = structlog.get_logger(__name__)
 #
 # Legacy equivalent: annuity_mapping.update_based_on_field = "月度+业务类型"
 # Updated to: "月度+业务类型+计划类型" per Sprint Change Proposal 2025-12-06
+# Keys are imported from constants.py
 # =============================================================================
 
 # Enable/disable UPSERT mode (requires UNIQUE constraint on upsert_keys)
 ENABLE_UPSERT_MODE = False  # Detail table - use refresh mode instead
-
-# UPSERT keys (only used when ENABLE_UPSERT_MODE = True)
-# For aggregate tables with unique records per key combination
-DEFAULT_UPSERT_KEYS: Optional[List[str]] = [
-    "月度",
-    "计划代码",
-    "组合代码",
-    "company_id",
-]
-
-# REFRESH keys (used when ENABLE_UPSERT_MODE = False)
-# Defines scope for DELETE before INSERT (Legacy: update_based_on_field)
-DEFAULT_REFRESH_KEYS = ["月度", "业务类型", "计划类型"]
 
 
 def process_annuity_performance(

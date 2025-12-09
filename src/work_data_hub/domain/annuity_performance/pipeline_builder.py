@@ -24,6 +24,7 @@ from work_data_hub.utils.date_parser import parse_chinese_date
 from .constants import (
     BUSINESS_TYPE_CODE_MAPPING,
     COLUMN_ALIAS_MAPPING,
+    COLUMN_MAPPING,
     COMPANY_BRANCH_MAPPING,
     DEFAULT_PORTFOLIO_CODE_MAPPING,
     LEGACY_COLUMNS_TO_DELETE,
@@ -159,8 +160,8 @@ def build_bronze_to_silver_pipeline(
 ) -> Pipeline:
     """Compose the Bronze → Silver pipeline using shared infrastructure steps."""
     steps: list[TransformStep] = [
-        # Step 1: Column name standardization (机构 → 机构名称, 流失(含待遇支付) → 流失_含待遇支付)
-        MappingStep({**COLUMN_ALIAS_MAPPING, "机构": "机构名称"}),
+        # Step 1: Column name standardization (using comprehensive COLUMN_MAPPING)
+        MappingStep(COLUMN_MAPPING),
         # Step 2: Preserve original customer name before cleansing (年金账户名 = 客户名称)
         CalculationStep(
             {
@@ -187,7 +188,7 @@ def build_bronze_to_silver_pipeline(
                 else pd.Series(["G00"] * len(df)),
             }
         ),
-        # Step 5: Product line code derivation (业务类型 → 产品线代码)
+        # Step 6: Product line code derivation (业务类型 → 产品线代码)
         CalculationStep(
             {
                 "产品线代码": lambda df: df["业务类型"].map(BUSINESS_TYPE_CODE_MAPPING)
@@ -209,15 +210,23 @@ def build_bronze_to_silver_pipeline(
                 "组合代码": lambda df: _apply_portfolio_code_defaults(df),
             }
         ),
-        # Step 9: Data cleansing via CleansingRegistry
+        # Step 9: Clean Group Enterprise Customer Number (lstrip "C")
+        CalculationStep(
+            {
+                "集团企业客户号": lambda df: df["集团企业客户号"].str.lstrip("C")
+                if "集团企业客户号" in df.columns
+                else pd.Series([None] * len(df)),
+            }
+        ),
+        # Step 10: Data cleansing via CleansingRegistry
         CleansingStep(domain="annuity_performance"),
-        # Step 10: Company ID resolution
+        # Step 11: Company ID resolution
         CompanyIdResolutionStep(
             enrichment_service=enrichment_service,
             plan_override_mapping=plan_override_mapping,
             sync_lookup_budget=sync_lookup_budget,
         ),
-        # Step 9: Drop legacy columns
+        # Step 12: Drop legacy columns
         DropStep(list(LEGACY_COLUMNS_TO_DELETE)),
     ]
 

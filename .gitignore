@@ -66,6 +66,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+/temp.txt
 
 # PyInstaller
 *.manifest

@@ -25,6 +25,7 @@ dependencies = [
     "pyarrow>=21.0.0",
     "psutil>=7.0.0",
     "requests>=2.32.0",
+    "sqlglot>=28.1.0",
 ]
  
 [tool.setuptools.packages.find]

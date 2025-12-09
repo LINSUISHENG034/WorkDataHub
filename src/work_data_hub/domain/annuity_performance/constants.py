@@ -56,7 +56,22 @@ LEGACY_COLUMNS_TO_DELETE: Sequence[str] = (
 
 COLUMN_ALIAS_MAPPING: Dict[str, str] = {"流失(含待遇支付)": "流失_含待遇支付"}
 
+# Legacy column renames (Source: cleansing-rules Section 5)
+COLUMN_MAPPING: Dict[str, str] = {
+    "机构": "机构名称",
+    "计划号": "计划代码",
+    "流失（含待遇支付）": "流失_含待遇支付",
+    "流失(含待遇支付)": "流失_含待遇支付",
+}
+
 DEFAULT_COMPANY_ID: str = "600866980"
+
+# Data Loading Configuration (Source: cleansing-rules Section 3/Service Config)
+# For detail tables (REFRESH mode)
+DEFAULT_REFRESH_KEYS: Sequence[str] = ("月度", "业务类型", "计划类型")
+
+# For aggregate tables (UPSERT mode) - defined for completeness
+DEFAULT_UPSERT_KEYS: Sequence[str] = ("月度", "计划代码", "组合代码", "company_id")
 
 __all__: list[str] = [
     "DEFAULT_ALLOWED_GOLD_COLUMNS",
@@ -69,5 +84,8 @@ __all__: list[str] = [
     "DEFAULT_INSTITUTION_CODE",
     "LEGACY_COLUMNS_TO_DELETE",
     "COLUMN_ALIAS_MAPPING",
+    "COLUMN_MAPPING",
     "DEFAULT_COMPANY_ID",
+    "DEFAULT_REFRESH_KEYS",
+    "DEFAULT_UPSERT_KEYS",
 ]
