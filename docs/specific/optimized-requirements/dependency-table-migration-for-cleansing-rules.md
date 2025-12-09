@@ -1,0 +1,383 @@
+# Dependency Table Migration Requirements for Cleansing Rules
+
+**Document ID:** REQ-2025-12-09-001
+**Status:** Draft
+**Created:** 2025-12-09
+**Author:** Claude (AI)
+**Reviewer:** TBD
+
+---
+
+## Executive Summary
+
+This document defines requirements for enhancing the cleansing rules documentation template and workflow to include mandatory dependency table migration steps. Legacy Cleaners rely on multiple database tables for mapping data, and ensuring all dependencies are properly migrated to the New Pipeline architecture is critical for achieving 100% parity with legacy system behavior.
+
+## Background
+
+### Current State
+
+The current `cleansing-rules-template.md` documents mapping tables but does not provide:
+1. A systematic approach to identify ALL dependency tables
+2. Migration steps using existing migration modules
+3. Validation checklists to ensure complete migration
+4. Detection of missing or incomplete dependencies
+
+### Problem Statement
+
+When migrating Legacy Cleaners to New Pipeline domains, inconsistent behavior occurs when:
+- Mapping tables are referenced but not migrated
+- Partial migration leads to missing lookup values
+- Dependencies are not documented or tracked
+- No systematic validation exists to verify complete migration
+
+### Business Impact
+
+- **Data Quality**: Missing mappings can cause incorrect data enrichment
+- **Parity Risk**: Inconsistent results between legacy and new systems
+- **Debugging Complexity**: Hard to trace root causes of data discrepancies
+- **Migration Delays**: Ad-hoc fixes when issues are discovered late
+
+---
+
+## Requirements
+
+### REQ-001: Template Enhancement
+
+**Requirement**: Enhance `cleansing-rules-template.md` to include comprehensive dependency table documentation.
+
+**Acceptance Criteria**:
+
+1. Add new section "8. Dependency Table Inventory" after "Special Processing Notes"
+2. Include standardized table format:
+   ```
+   | # | Table Name | Database | Purpose | Row Count | Migration Status |
+   |---|------------|----------|---------|-----------|-----------------|
+   ```
+3. Document all tables referenced in cleansing rules
+4. Mark critical vs optional dependencies
+
+**Implementation Guide**:
+```markdown
+## 8. Dependency Table Inventory
+
+### Critical Dependencies (Must Migrate)
+
+| # | Table Name | Database | Purpose | Row Count | Migration Status |
+|---|------------|----------|---------|-----------|-----------------|
+| 1 | company_id_mapping | legacy | Company name to ID mapping | ~19,141 | [MIGRATED] |
+| 2 | eqc_search_result | legacy | EQC company lookups | ~11,820 | [MIGRATED] |
+| 3 | 年金计划 | mapping | Plan code mappings | TBD | [PENDING] |
+
+### Optional Dependencies
+
+| # | Table Name | Database | Purpose | Notes |
+|---|------------|----------|---------|-------|
+| 1 | manual_overrides | static | Hardcoded values | Stored in constants |
+```
+
+### REQ-002: Migration Workflow Integration
+
+**Requirement**: Integrate dependency table migration into the domain development workflow.
+
+**Acceptance Criteria**:
+
+1. Add new phase "Phase 1.5: Dependency Migration" in domain-development-guide.md
+2. Create checklist for migration validation
+3. Link to existing migration scripts
+
+**Enhanced Workflow**:
+```markdown
+### Phase 1.5: Dependency Migration (NEW)
+
+- [ ] Identify all dependency tables from legacy analysis
+- [ ] Document dependencies in cleansing rules document (Section 8)
+- [ ] **CRITICAL**: Complete Migration Strategy Decisions (Section 9)
+  - [ ] Review each dependency table with team
+  - [ ] Consider team-specific requirements and constraints
+  - [ ] Document chosen strategy and rationale (including why alternatives were not chosen)
+  - [ ] Team lead review and sign-off
+  - [ ] Note any future considerations or planned evolution of the strategy
+- [ ] Execute migration based on decided strategy
+  - [ ] For Enrichment Index: Use `scripts/migrations/migrate_legacy_to_enrichment_index.py`
+  - [ ] For Direct Migration: Use appropriate migration scripts
+  - [ ] For Transform & Load: Create ETL pipeline
+  - [ ] For Static Embedding: Update constants files
+- [ ] Validate migration outcomes match strategy
+- [ ] Update migration status in documentation
+```
+
+### REQ-003: Migration Strategy Decision Framework
+
+**Requirement**: Establish mandatory decision framework for how each legacy dependency table is handled in New Pipeline architecture.
+
+**Acceptance Criteria**:
+
+1. Decision framework with defined migration strategies
+2. Template section for documenting strategy decisions
+3. Required pre-migration strategy review process
+4. Documentation of architectural implications for each decision
+
+**Migration Strategy Options**:
+
+These are common strategies, but teams should adapt or create new approaches based on their specific requirements:
+
+| Strategy | Description | Typical Use Cases | Example |
+|----------|-------------|-------------------|---------|
+| **Direct Migration** | Move table as-is to target schema | Simple lookup tables, no schema changes | `reference_data` → `staging.reference_data` |
+| **Enrichment Index** | Migrate to `enterprise.enrichment_index` with normalization | Company/entity mappings needing unified access | `company_id_mapping` → enrichment_index |
+| **Transform & Load** | Restructure data to fit New Pipeline schema | Complex tables requiring schema changes | `legacy.年金计划` → `staging.annuity_plans` |
+| **Static Embedding** | Hardcode values in code/constants | Small, stable lookup tables | Manual overrides in constants.py |
+| **Decommission** | Mark as obsolete, no migration | Unused or deprecated tables | Old audit tables |
+| **Replace with Service** | Replace table lookup with service call | Dynamic data from external APIs | Exchange rate lookups |
+| **Custom Strategy** | Team-defined approach based on unique needs | Any case where standard strategies don't fit | e.g., Hybrid approach, incremental migration |
+
+**Guidelines for Custom Strategies**:
+- Document the new strategy in the team's knowledge base
+- Review with architecture team to ensure consistency
+- Consider future maintainability and team onboarding
+
+**Template Addition Required**:
+```markdown
+## 9. Migration Strategy Decisions
+
+### Decision Summary
+- **Decision Date**: YYYY-MM-DD
+- **Decision Maker**: [Name]
+- **Reviewed By**: [Name]
+
+### Dependency Table Strategies
+
+| # | Table Name | Legacy Schema | Target Strategy | Target Schema/Table | Rationale |
+|---|------------|---------------|-----------------|-------------------|-----------|
+| 1 | company_id_mapping | legacy.enterprise | Enrichment Index | enterprise.enrichment_index | Unified company lookup across domains |
+| 2 | 年金计划 | legacy.annuity | Transform & Load | staging.annuity_plans | Schema normalization, join with other plan data |
+| 3 | COMPANY_BRANCH_MAPPING | static | Static Embedding | N/A (constants.py) | Small static data, easier to maintain in code |
+
+### Strategy Considerations
+- **Team Decision**: Document team's specific context and constraints
+- **Alternatives Considered**: Brief note on why other strategies were not chosen
+- **Future Evolution**: Note if strategy might change as system evolves
+- **Dependencies**: Any prerequisites or dependencies for this strategy
+```
+
+### REQ-004: Migration Validation Checklist
+
+**Checklist Template**:
+```markdown
+## 10. Dependency Migration Validation
+
+### Pre-Migration Checklist
+
+- [ ] Source database accessible: `legacy_db`
+- [ ] Target enrichment index exists: `enterprise.enrichment_index`
+- [ ] Migration script tested in dry-run mode
+- [ ] Backup of target index created
+
+### Migration Execution
+
+- [ ] Run: `PYTHONPATH=src uv run python scripts/migrations/migrate_legacy_to_enrichment_index.py`
+- [ ] Verify batch completion without errors
+- [ ] Check for skipped records due to data quality issues
+- [ ] Monitor memory usage during migration
+
+### Post-Migration Validation
+
+- [ ] Row count validation:
+  - [ ] Source: `SELECT COUNT(*) FROM legacy.table_name`
+  - [ ] Target: `SELECT COUNT(*) FROM enterprise.enrichment_index WHERE source_table = 'table_name'`
+  - [ ] Counts match within acceptable variance (<0.1%)
+- [ ] Data sampling validation:
+  - [ ] Sample 10 random keys from source
+  - [ ] Verify each exists in target with correct mapping
+- [ ] Performance validation:
+  - [ ] Lookup latency < 10ms for 95th percentile
+  - [ ] Cache hit rate > 90% after warm-up
+
+### Rollback Verification (Optional)
+
+- [ ] Rollback script tested: `--rollback --force`
+- [ ] Can restore to pre-migration state
+- [ ] No orphaned records left behind
+```
+
+### REQ-004: Automated Dependency Detection
+
+**Requirement**: Automate detection of dependency tables from legacy code analysis.
+
+**Acceptance Criteria**:
+
+1. Script to scan legacy cleaner code for SQL queries
+2. Extract table names and connection strings
+3. Generate dependency inventory automatically
+4. Integration with documentation generation
+
+**Implementation Suggestion**:
+```python
+# scripts/analysis/extract_dependencies.py
+def analyze_legacy_cleaner(cleaner_class_name: str) -> List[DependencyTable]:
+    """Scan legacy cleaner source for database dependencies."""
+    dependencies = []
+
+    # Pattern matching for SQL queries
+    sql_patterns = [
+        r'SELECT.*FROM\s+([a-zA-Z_][a-zA-Z0-9_]*)',
+        r'JOIN\s+([a-zA-Z_][a-zA-Z0-9_]*)',
+        r'FROM\s+([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z_][a-zA-Z0-9_]*)',
+    ]
+
+    # Extract mapping table references
+    mapping_patterns = [
+        r'([A-Z_]+_MAPPING)',
+        r'MAPPING_TABLE\[.*?([a-zA-Z_][a-zA-Z0-9_]*)',
+    ]
+
+    return dependencies
+```
+
+### REQ-005: Migration Tracking Dashboard
+
+**Requirement**: Create tracking mechanism for migration progress across all domains.
+
+**Acceptance Criteria**:
+
+1. Central migration status document
+2. Progress tracking for each domain's dependencies
+3. Blocking dependency visualization
+4. Automated status updates from migration scripts
+
+**Dashboard Structure**:
+```markdown
+# Dependency Migration Status Dashboard
+
+## Summary
+- Total Domains: 22
+- Domains with Complete Migration: 2 (annuity_performance, annuity_income)
+- Domains In Progress: 0
+- Domains Not Started: 20
+- Total Dependencies: 156
+- Migrated Dependencies: 31 (19.9%)
+
+## Domain Details
+
+### annuity_performance
+- **Status**: ❌ Missing Documentation
+- **Dependencies Migrated**: 3/3 (inferred from code)
+- **Migration Date**: TBD (no documentation)
+- **Blocks**: Missing dependency inventory section
+- **Action**: Create cleansing rules document using template
+
+### annuity_income
+- **Status**: ⚠️ Documentation Incomplete
+- **Dependencies Migrated**: 3/3 (company_id_mapping, eqc_search_result)
+- **Migration Date**: 2025-12-08
+- **Blocks**: Missing dependency inventory section (Section 8)
+- **Action**: Update annuity-income.md to include dependency inventory
+
+### GroupRetirementCleaner
+- **Status**: ❌ Not Started
+- **Dependencies Identified**: 7
+- **Dependencies Migrated**: 0/7
+- **Blocks**: 2 (company_id_mapping, plan_code_mapping)
+```
+
+---
+
+## Implementation Plan
+
+### Phase 1: Template Enhancement (1 day)
+1. Update `cleansing-rules-template.md`
+   - Add Section 8: Dependency Table Inventory
+   - Add Section 9: Migration Strategy Decisions
+2. Add migration checklist template (Section 10)
+3. Update existing `annuity_income.md` with dependency inventory and strategy decisions
+4. Create `annuity_performance.md` cleansing rules document (missing)
+
+### Phase 2: Workflow Integration (1 day)
+1. Update `domain-development-guide.md`
+2. Add Phase 1.5 to workflow
+3. Update checklists
+4. Create migration scripts reference
+
+### Phase 3: Automation Tools (3 days)
+1. Create dependency extraction script
+2. Implement migration validation script
+3. Add migration status tracking
+4. Integrate with CI/CD pipeline
+
+### Phase 4: Documentation & Training (2 days)
+1. Create migration SOP document
+2. Record training video for migration process
+3. Update project onboarding materials
+4. Conduct team training session
+
+---
+
+## Success Metrics
+
+### Primary Metrics
+- **Migration Completeness**: 100% of dependencies identified and migrated
+- **Parity Accuracy**: 99.9%+ matching results between legacy and new system
+- **Documentation Coverage**: 100% of domains have documented dependencies
+- **Template Compliance**: 100% of cleansing rules documents include dependency inventory
+
+### Secondary Metrics
+- **Migration Velocity**: Average 2 days per domain for dependency migration
+- **Defect Rate**: <5% of migrations require rollback
+- **Automation Coverage**: 80%+ of dependencies auto-detected
+
+---
+
+## Risks & Mitigations
+
+| Risk | Impact | Probability | Mitigation |
+|------|--------|-------------|------------|
+| Hidden dependencies not detected | High | Medium | Automated code analysis + manual review |
+| Migration script fails mid-process | Medium | Low | Transaction support + rollback procedures |
+| Performance degradation in production | High | Low | Load testing + gradual rollout |
+| Data loss during migration | Critical | Very Low | Full backups + validation checks |
+| **Wrong migration strategy chosen** | Critical | Medium | Team-based strategy review with documented rationale |
+
+---
+
+## Dependencies
+
+### Prerequisites
+- Legacy database access: `tests/fixtures/legacy_db/alldb_backup_20251208.sql`
+- Enrichment Index implementation (Story 6.1.x)
+- Migration module: `scripts/migrations/migrate_legacy_to_enrichment_index.py`
+
+### Blocked By
+- None
+
+### Blocks
+- Epic 6.1: Domain Learning Mechanism
+- Future domain migrations (Epic 7+)
+
+---
+
+## References
+
+1. [Legacy Database Backup](../../../tests/fixtures/legacy_db/alldb_backup_20251208.sql)
+2. [Migration Script](../../../scripts/migrations/migrate_legacy_to_enrichment_index.py)
+3. [Cleansing Rules Template](../templates/cleansing-rules-template.md)
+4. [Domain Development Guide](../guides/domain-development-guide.md)
+5. [Annuity Income Cleansing Rules](../cleansing-rules/annuity-income.md) - needs Section 8 update
+6. [Cleansing Rules Index](../cleansing-rules/index.md) - shows annuity_performance missing documentation
+7. [Story 6.1.4: Legacy Data Migration](../../../docs/sprint-artifacts/stories/6.1-4-domain-learning-mechanism.md)
+8. [Annuity Performance Legacy Analysis](../specific/annuity-performance/annuity-performance-refactoring-analysis-report_1.md)
+
+---
+
+## Change History
+
+| Date | Author | Changes |
+|------|--------|---------|
+| 2025-12-09 | Claude (AI) | Initial draft |
+| | | |
+
+---
+
+**Review Sign-off**
+
+_________________________
+Date: _______________

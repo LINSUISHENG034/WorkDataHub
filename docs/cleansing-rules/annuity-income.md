@@ -9,9 +9,70 @@
 | Excel Sheet Name | `收入明细` |
 | Target Database Table | `business.annuity_income` (TODO: confirm schema/table in Story 5.5.2) |
 
+## 2. Dependency Table Inventory
+
+### Critical Dependencies (Migrated)
+
+| # | Table Name | Database | Purpose | Row Count | Migration Status |
+|---|------------|----------|---------|-----------|-----------------|
+| 1 | company_id_mapping | legacy | Company name to ID mapping | ~19,141 | [MIGRATED] |
+| 2 | eqc_search_result | legacy | EQC company lookups | ~11,820 | [MIGRATED] |
+
+### Optional Dependencies
+
+| # | Table Name | Database | Purpose | Notes |
+|---|------------|----------|---------|-------|
+| 1 |年金计划 | legacy | Plan information lookup | Migrated as enrichment index mapping |
+
 ---
 
-## 2. Column Mappings
+## 3. Migration Strategy Decisions
+
+### Decision Summary
+- **Decision Date**: 2025-12-08
+- **Decision Maker**: Technical Lead
+- **Reviewed By**: Development Team
+
+### Strategy Options Reference
+
+| Strategy | Description | Typical Use Cases |
+|----------|-------------|-------------------|
+| Direct Migration | Move table as-is | Simple lookup tables |
+| Enrichment Index | Migrate to enterprise.enrichment_index | Company/entity mappings |
+| Transform & Load | Restructure data | Complex schema changes |
+| Static Embedding | Hardcode in constants | Small, stable lookups |
+| Decommission | Mark obsolete | Unused tables |
+| Custom Strategy | Team-defined approach | Unique requirements |
+
+### Dependency Table Strategies
+
+| # | Table Name | Legacy Schema | Target Strategy | Target Location | Rationale |
+|---|------------|---------------|-----------------|-----------------|-----------|
+| 1 | company_id_mapping | legacy.company_id_mapping | Enrichment Index | enterprise.enrichment_index | Core company resolution system |
+| 2 | eqc_search_result | legacy.eqc_search_result | Enrichment Index | enterprise.enrichment_index | EQC provider integration |
+| 3 | 年金计划 | legacy.年金计划 | Static Embedding | domain constants | Small, stable mapping set |
+
+---
+
+## 4. Migration Validation Checklist
+
+### Pre-Migration
+- [x] Source database accessible
+- [x] Target schema/index exists
+- [x] Migration script tested in dry-run mode
+
+### Migration Execution
+- [x] Run migration script: `PYTHONPATH=src uv run python scripts/migrations/migrate_legacy_to_enrichment_index.py`
+- [x] Verify batch completion without errors
+
+### Post-Migration Validation
+- [x] Row count validation (source vs target)
+- [x] Data sampling validation (10 random keys)
+- [x] Performance validation (lookup latency < 10ms)
+
+---
+
+## 5. Column Mappings
 
 | # | Legacy Column | Target Column | Transformation | Notes |
 |---|---------------|---------------|----------------|-------|
@@ -28,11 +89,11 @@
 | 11 | 回补 | 回补 | None | Rebate income (numeric) |
 | 12 | 税 | 税 | None | Tax amount (numeric) |
 | 13 | 计划类型 | 计划类型 | None (used for conditional logic) | Input to DEFAULT_PORTFOLIO_CODE_MAPPING |
-| 14 | N/A | company_id | **DEPRECATED** ID5 fallback | See Section 4 - Dropped in Migration |
+| 14 | N/A | company_id | **DEPRECATED** ID5 fallback | See Section 7 - Dropped in Migration |
 
 ---
 
-## 3. Cleansing Rules
+## 6. Cleansing Rules
 
 | Rule ID | Field | Rule Type | Logic | Priority | Notes |
 |---------|-------|-----------|-------|----------|-------|
@@ -98,7 +159,7 @@ df['组合代码'] = df['组合代码'].mask(
 
 ---
 
-## 4. Company ID Resolution Strategy
+## 7. Company ID Resolution Strategy
 
 ### Standard Resolution Chain (via `_update_company_id`)
 
@@ -140,7 +201,7 @@ df.loc[mask, 'company_id'] = company_id_from_account[mask]
 
 ---
 
-## 5. Validation Rules
+## 8. Validation Rules
 
 ### Required Fields
 
@@ -183,7 +244,7 @@ df.loc[mask, 'company_id'] = company_id_from_account[mask]
 
 ---
 
-## 6. Special Processing Notes
+## 9. Special Processing Notes
 
 ### Edge Cases
 
@@ -244,7 +305,7 @@ DEFAULT_PORTFOLIO_CODE_MAPPING = {
 
 ---
 
-## 7. Parity Validation Checklist
+## 10. Parity Validation Checklist
 
 ### Row/Column Matching
 
@@ -290,7 +351,7 @@ DEFAULT_PORTFOLIO_CODE_MAPPING = {
 
 ---
 
-## 8. Security / Database / Performance
+## 11. Security / Database / Performance
 
 ### Target Database Schema
 
@@ -338,7 +399,7 @@ DEFAULT_PORTFOLIO_CODE_MAPPING = {
 
 ---
 
-## 9. Debugging & Exception Cases
+## 12. Debugging & Exception Cases
 
 ### Common Exceptions
 
@@ -387,7 +448,7 @@ DEFAULT_PORTFOLIO_CODE_MAPPING = {
 
 ---
 
-## 10. Compatibility Notes
+## 13. Compatibility Notes
 
 ### Technology Stack Alignment
 

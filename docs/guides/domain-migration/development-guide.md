@@ -1,14 +1,30 @@
 # Domain Development Guide
 
-**Version:** 1.0
-**Last Updated:** 2025-12-06
+**Version:** 1.1
+**Last Updated:** 2025-12-09
 **Based On:** Epic 5.5 Pipeline Architecture Validation
+
+---
+
+## Quick Links
+
+| Document | Purpose |
+|----------|---------|
+| [Domain Migration Workflow](./workflow.md) | **Start Here** - End-to-end migration process |
+| [Cleansing Rules to Code Mapping](./code-mapping.md) | How to translate documentation to code |
+| [Troubleshooting Guide](./troubleshooting.md) | Common issues and solutions |
+| [Cleansing Rules Template](../../templates/cleansing-rules-template.md) | Template for creating cleansing rules documents |
+| [Legacy Parity Validation Guide](../../runbooks/legacy-parity-validation.md) | Validation procedures |
 
 ---
 
 ## Overview
 
 This guide provides comprehensive instructions for implementing new data domains in WorkDataHub. It is based on lessons learned from Epic 5.5, which validated the Infrastructure Layer architecture by implementing the `annuity_income` domain as a second reference implementation alongside `annuity_performance`.
+
+> **Note:** For the complete end-to-end migration workflow, see [Domain Migration Workflow](./workflow.md).
+>
+> **Phase Mapping:** This guide's Phase 1-2 correspond to workflow.md's Phase 1-2. This guide's Phase 3-7 are detailed sub-phases of workflow.md's Phase 3 (Implementation).
 
 ### Purpose
 
@@ -85,7 +101,22 @@ src/work_data_hub/domain/{domain_name}/
 
 ## Development Checklist
 
-### Phase 1: Analysis (Before Coding)
+### Phase 1: Dependency Analysis & Migration (PREREQUISITE)
+
+- [ ] Identify all dependency tables from legacy code analysis
+- [ ] Document dependencies in cleansing rules document (Section 2)
+- [ ] **CRITICAL**: Complete Migration Strategy Decisions (Section 3)
+  - [ ] Review each dependency table with team
+  - [ ] Document chosen strategy and rationale
+  - [ ] Team lead review and sign-off
+- [ ] Execute migration based on decided strategy
+  - [ ] For Enrichment Index: Use `scripts/migrations/migrate_legacy_to_enrichment_index.py`
+  - [ ] For Direct Migration: Use appropriate migration scripts
+  - [ ] For Static Embedding: Update constants files
+- [ ] Complete Migration Validation Checklist (Section 4)
+- [ ] Update migration status in documentation
+
+### Phase 2: Analysis (Before Coding)
 
 - [ ] Analyze legacy data source structure and column names
 - [ ] Document column mappings (legacy name → new name)
@@ -94,7 +125,7 @@ src/work_data_hub/domain/{domain_name}/
 - [ ] Identify upsert keys (unique record identifiers)
 - [ ] Review existing domain implementations for patterns
 
-### Phase 2: Implementation
+### Phase 3: Implementation
 
 - [ ] Create domain directory: `src/work_data_hub/domain/{domain_name}/`
 - [ ] Define Pydantic models (`models.py`)
@@ -112,14 +143,14 @@ src/work_data_hub/domain/{domain_name}/
 - [ ] Configure pipeline steps (`pipeline_builder.py`)
   - [ ] `build_bronze_to_silver_pipeline()` - Pipeline composition
 
-### Phase 3: Configuration
+### Phase 4: Configuration
 
 - [ ] Configure upsert keys (`DEFAULT_UPSERT_KEYS` in service.py)
 - [ ] Add data source configuration (if using file discovery)
 - [ ] Register domain cleansing rules in `CleansingRegistry`
 - [ ] Create database migration (DDL + UNIQUE constraints)
 
-### Phase 4: Testing & Validation
+### Phase 5: Testing & Validation
 
 - [ ] Write unit tests for models (`tests/unit/domain/{domain}/`)
 - [ ] Write unit tests for helpers and schemas
@@ -127,14 +158,14 @@ src/work_data_hub/domain/{domain_name}/
 - [ ] Perform legacy parity validation (compare output with legacy system)
 - [ ] Establish performance baseline
 
-### Phase 5: Documentation
+### Phase 6: Documentation
 
 - [ ] Create domain documentation (`docs/domains/{domain}.md`)
 - [ ] Create operational runbook (`docs/runbooks/{domain}.md`)
 - [ ] Update `docs/bmm-index.md` with links to new documentation
 - [ ] Document any domain-specific cleansing rules
 
-### Phase 6: Deployment & Merge
+### Phase 7: Deployment & Merge
 
 - [ ] Create PR referencing story ID; include doc changes and checklists
 - [ ] Run smoke tests (minimum: `uv run pytest -m unit`) and attach results
