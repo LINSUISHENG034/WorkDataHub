@@ -72,27 +72,9 @@ def extract_legacy_mappings() -> List[CompanyMappingRecord]:
         "account_name": 0,
     }
 
-    # COMPANY_ID1_MAPPING: Plan codes (priority=1)
-    try:
-        plan_mappings = _extract_with_retry(
-            _extract_company_id1_mapping, "COMPANY_ID1_MAPPING (plan codes)"
-        )
-        for alias, company_id in plan_mappings.items():
-            if alias and company_id:
-                mappings.append(
-                    CompanyMappingRecord(
-                        alias_name=str(alias).strip(),
-                        canonical_id=str(company_id).strip(),
-                        match_type="plan",
-                        priority=1,
-                        source="internal",
-                        updated_at=datetime.now(timezone.utc),
-                    )
-                )
-                extraction_stats["plan"] += 1
-    except Exception as e:
-        logger.error(f"Failed to extract COMPANY_ID1_MAPPING: {e}")
-        raise CompanyMappingLoaderError(f"Plan code extraction failed: {e}")
+    # NOTE: COMPANY_ID1_MAPPING (Plan codes) extraction has been removed
+    # The plan code mapping data has been migrated to enterprise.enrichment_index
+    # This reduces dependency on Legacy database and improves system decoupling
 
     # COMPANY_ID2_MAPPING: Account numbers (priority=2)
     try:
@@ -252,21 +234,9 @@ def _extract_with_retry(
     raise last_exception
 
 
-def _extract_company_id1_mapping() -> Dict[str, str]:
-    """Extract COMPANY_ID1_MAPPING from MySQL (plan codes)."""
-    with MySqlDBManager(database="mapping") as mysqldb:
-        cursor = mysqldb.cursor
-        try:
-            cursor.execute("""
-                SELECT `年金计划号`, `company_id`
-                FROM mapping.`年金计划`
-                WHERE `计划类型`= '单一计划' AND `年金计划号` != 'AN002';
-            """)
-            rows = cursor.fetchall()
-        finally:
-            cursor.close()
-
-    return {row[0]: row[1] for row in rows if row[0] and row[1]}
+# NOTE: _extract_company_id1_mapping function has been removed
+# The plan code mapping data has been migrated to enterprise.enrichment_index
+# See migration script: scripts/migrations/migrate_plan_mapping_to_enrichment_index.py
 
 
 def _extract_company_id2_mapping() -> Dict[str, str]:

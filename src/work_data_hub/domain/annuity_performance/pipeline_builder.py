@@ -23,7 +23,6 @@ from work_data_hub.utils.date_parser import parse_chinese_date
 
 from .constants import (
     BUSINESS_TYPE_CODE_MAPPING,
-    COLUMN_ALIAS_MAPPING,
     COLUMN_MAPPING,
     COMPANY_BRANCH_MAPPING,
     DEFAULT_PORTFOLIO_CODE_MAPPING,
@@ -47,7 +46,8 @@ def _apply_plan_code_defaults(df: pd.DataFrame) -> pd.Series:
 
     if "计划类型" in df.columns:
         # Empty/null plan codes get defaults based on plan type
-        empty_mask = result.isna() | (result == "") | (result == "None")
+        # Note: Legacy only checks for isna() and empty string, NOT string "None"
+        empty_mask = result.isna() | (result == "")
         collective_mask = empty_mask & (df["计划类型"] == "集合计划")
         single_mask = empty_mask & (df["计划类型"] == "单一计划")
 
@@ -58,42 +58,77 @@ def _apply_plan_code_defaults(df: pd.DataFrame) -> pd.Series:
 
 
 def _apply_portfolio_code_defaults(df: pd.DataFrame) -> pd.Series:
-    """Apply default portfolio codes based on business type and plan type (legacy parity)."""
+    """Apply default portfolio codes based on business type and plan type.
+
+    Improvements over Legacy:
+    1. Preserves numeric portfolio codes (e.g., 12345 stays 12345, not NaN)
+    2. Handles mixed data types robustly
+    3. Strips whitespace and handles edge cases
+    4. Better data type consistency
+    """
     if "组合代码" not in df.columns:
         result = pd.Series([None] * len(df), index=df.index)
     else:
         result = df["组合代码"].copy()
-        # Legacy behavior: str.replace on numeric values converts them to NaN
-        # We need to replicate this by treating numeric-only values as empty
-        result = result.apply(
-            lambda x: None
-            if (isinstance(x, (int, float)) and not pd.isna(x))
-            else (
-                str(x).replace("F", "", 1)
-                if isinstance(x, str) and x.startswith("F")
-                else x
-            )
-        )
-        # Convert 'nan' and 'None' strings back to actual None
-        result = result.replace({"nan": None, "None": None, "": None})
+
+        # Improved processing: handle each value type appropriately
+        result = result.apply(lambda x: _clean_portfolio_code(x))
 
     if "业务类型" in df.columns and "计划类型" in df.columns:
-        empty_mask = result.isna() | (result == "") | (result == "None")
+        # Check for empty/invalid codes
+        empty_mask = result.isna() | (result == "")
 
-        # QTAN003 for 职年受托/职年投资
+        # QTAN003 for 职年受托/职年投资 (highest priority)
         qtan003_mask = empty_mask & df["业务类型"].isin(
             PORTFOLIO_QTAN003_BUSINESS_TYPES
         )
         result = result.mask(qtan003_mask, "QTAN003")
 
         # Default based on plan type for remaining empty values
-        still_empty = result.isna() | (result == "") | (result == "None")
+        still_empty = result.isna() | (result == "")
         for plan_type, default_code in DEFAULT_PORTFOLIO_CODE_MAPPING.items():
             if plan_type != "职业年金":  # Already handled by QTAN003
                 type_mask = still_empty & (df["计划类型"] == plan_type)
                 result = result.mask(type_mask, default_code)
 
     return result
+
+
+def _clean_portfolio_code(value) -> Optional[str]:
+    """Clean and normalize portfolio code value.
+
+    Args:
+        value: Raw portfolio code value
+
+    Returns:
+        Cleaned portfolio code or None if invalid
+    """
+    # Handle None values
+    if pd.isna(value):
+        return None
+
+    # Handle numeric values - preserve them as strings
+    if isinstance(value, (int, float)):
+        return str(int(value)) if isinstance(value, float) and value.is_integer() else str(value)
+
+    # Handle string values
+    if isinstance(value, str):
+        # Strip whitespace
+        cleaned = value.strip()
+
+        # Handle empty string after strip
+        if not cleaned:
+            return None
+
+        # Remove 'F' or 'f' prefix if present (Legacy behavior, case-insensitive)
+        if cleaned.upper().startswith('F'):
+            cleaned = cleaned[1:]
+
+        # Return cleaned value
+        return cleaned if cleaned else None
+
+    # Return None for any other type
+    return None
 
 
 class CompanyIdResolutionStep(TransformStep):
@@ -104,6 +139,7 @@ class CompanyIdResolutionStep(TransformStep):
         enrichment_service: Optional["CompanyEnrichmentService"] = None,
         plan_override_mapping: Optional[Dict[str, str]] = None,
         sync_lookup_budget: int = 0,
+        mapping_repository=None,
     ) -> None:
         yaml_overrides = None
         if plan_override_mapping is not None:
@@ -117,6 +153,7 @@ class CompanyIdResolutionStep(TransformStep):
         self._resolver = CompanyIdResolver(
             enrichment_service=enrichment_service,
             yaml_overrides=yaml_overrides,
+            mapping_repository=mapping_repository,
         )
         self._sync_lookup_budget = sync_lookup_budget
         self._use_enrichment = enrichment_service is not None
@@ -130,6 +167,7 @@ class CompanyIdResolutionStep(TransformStep):
             plan_code_column="计划代码",
             customer_name_column="客户名称",
             account_name_column="年金账户名",
+            account_number_column="集团企业客户号",  # Use 集团企业客户号 for account_number lookup
             company_id_column="公司代码",
             output_column="company_id",
             use_enrichment_service=self._use_enrichment,
@@ -157,6 +195,7 @@ def build_bronze_to_silver_pipeline(
     enrichment_service: Optional["CompanyEnrichmentService"] = None,
     plan_override_mapping: Optional[Dict[str, str]] = None,
     sync_lookup_budget: int = 0,
+    mapping_repository=None,
 ) -> Pipeline:
     """Compose the Bronze → Silver pipeline using shared infrastructure steps."""
     steps: list[TransformStep] = [
@@ -184,6 +223,7 @@ def build_bronze_to_silver_pipeline(
                 "机构代码": lambda df: df["机构名称"]
                 .map(COMPANY_BRANCH_MAPPING)
                 .fillna("G00")
+                .replace("null", "G00")
                 if "机构名称" in df.columns
                 else pd.Series(["G00"] * len(df)),
             }
@@ -225,6 +265,7 @@ def build_bronze_to_silver_pipeline(
             enrichment_service=enrichment_service,
             plan_override_mapping=plan_override_mapping,
             sync_lookup_budget=sync_lookup_budget,
+            mapping_repository=mapping_repository,
         ),
         # Step 12: Drop legacy columns
         DropStep(list(LEGACY_COLUMNS_TO_DELETE)),

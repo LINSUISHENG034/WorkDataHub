@@ -216,7 +216,7 @@ class LookupType(Enum):
     Attributes:
         PLAN_CODE: DB-P1 - Plan code lookup (highest priority)
         ACCOUNT_NAME: DB-P2 - Annuity account name lookup
-        ACCOUNT_NUMBER: DB-P3 - Annuity account number lookup
+        ACCOUNT_NUMBER: DB-P3 - Annuity account number lookup (集团企业客户号)
         CUSTOMER_NAME: DB-P4 - Customer name lookup (normalized)
         PLAN_CUSTOMER: DB-P5 - Plan + Customer combo lookup (lowest priority)
     """

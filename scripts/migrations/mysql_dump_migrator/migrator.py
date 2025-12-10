@@ -260,17 +260,25 @@ class PostgreSQLMigrator:
             logger.debug("migrator.execute.dry_run", description=description)
             return 0
 
-        # Split into statements and execute
-        statements = [s.strip() for s in sql_content.split(";") if s.strip()]
-        total_rows = 0
+        # Optimization: Don't split by semicolon.
+        # The converter usually returns single statements (CREATE or INSERT).
+        # Splitting by ";" is dangerous if data contains semicolons (e.g. inside strings).
+        stmt_text = sql_content.strip()
+        if not stmt_text:
+            return 0
 
-        for stmt in statements:
-            if stmt:
-                result = conn.execute(text(stmt))
-                if result.rowcount > 0:
-                    total_rows += result.rowcount
+        # Escape % to %% because SQLAlchemy/psycopg2 treats % as a parameter placeholder
+        # and we are executing raw SQL without parameters here.
+        stmt_text = stmt_text.replace("%", "%%")
 
-        return total_rows
+        # Execute as a single block
+        try:
+            result = conn.execute(text(stmt_text))
+            return result.rowcount
+        except Exception:
+            # Add context to the error
+            logger.error("migrator.execute_failed", description=description, sql_snippet=stmt_text[:200])
+            raise
 
     def migrate_table(
         self,

@@ -17,7 +17,7 @@ Use [cleansing-rules-template.md](../templates/cleansing-rules-template.md) when
 
 | Domain | Status | Document | Legacy Class | Dependencies Migrated |
 |--------|--------|----------|--------------|----------------------|
-| annuity_performance | Migrated (Epic 4-5) | (implicit in code) | `AnnuityPerformanceCleaner` | N/A |
+| annuity_performance | Partial (85% - 2 tables missing) | [annuity-performance.md](./annuity-performance.md) | `AnnuityPerformanceCleaner` | Partial (5/7 tables migrated) |
 | annuity_income | Pending (Epic 5.5) | [annuity-income.md](./annuity-income.md) | `AnnuityIncomeCleaner` | Yes (company_id_mapping, eqc_search_result) |
 
 ## Pending Domains (Epic 6+)

@@ -24,7 +24,11 @@ PYTHONPATH=src uv run python scripts/migrations/migrate_legacy_to_enrichment_ind
 # Create 6 files: models.py, schemas.py, service.py, etc.
 # Use: docs/guides/domain-migration/development-guide.md
 
-# Step 5: Validate parity (1-2 days)
+# Step 5: Validate mappings (critical!)
+# Verify all mappings from legacy are present and correctly handled
+# Reference: docs/guides/domain-migration/mapping-validation-best-practices.md
+
+# Step 6: Validate parity (1-2 days)
 # Compare new implementation with legacy output
 # Target: 100% match
 ```
@@ -35,11 +39,22 @@ PYTHONPATH=src uv run python scripts/migrations/migrate_legacy_to_enrichment_ind
 
 ## Documents
 
+### Phase 1: Initial Preparation
 | Document | Purpose | When to Use |
 |----------|---------|-------------|
 | [Workflow](./workflow.md) | End-to-end migration process | **Start here** - Follow phases 1-4 |
+| [Plan Code Migration](./initial-preparation/plan-code-migration.md) | Plan code mapping migration to enrichment_index | When migrating plan code mappings from Legacy |
+
+### Phase 2-4: Migration Process
+| Document | Purpose | When to Use |
+|----------|---------|-------------|
 | [Development Guide](./development-guide.md) | Implementation patterns and code templates | Phase 3 - Writing domain code |
 | [Code Mapping](./code-mapping.md) | Document → Code translation | Phase 3 - Converting docs to code |
+| [Mapping Validation Best Practices](./mapping-validation-best-practices.md) | Mapping integrity and validation strategies | **Critical** - Before and after implementation |
+
+### General
+| Document | Purpose | When to Use |
+|----------|---------|-------------|
 | [Troubleshooting](./troubleshooting.md) | Common issues and solutions | When you encounter problems |
 
 ## Migration Phases

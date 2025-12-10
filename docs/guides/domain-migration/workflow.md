@@ -81,6 +81,7 @@ This document provides a complete end-to-end workflow for migrating a legacy dom
 |----------|---------|
 | [Cleansing Rules Template](../../templates/cleansing-rules-template.md) | Section 2-4 for dependency documentation |
 | [Migration Script](../../scripts/migrations/migrate_legacy_to_enrichment_index.py) | Enrichment index migration |
+| [Plan Code Migration Guide](./initial-preparation/plan-code-migration.md) | Specific guide for plan code mappings |
 
 ### Exit Criteria
 
