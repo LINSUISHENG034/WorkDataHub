@@ -152,6 +152,13 @@ def get_domain_config(
 # ============================================================================
 
 
+class OutputConfig(BaseModel):
+    """Configuration for data output destination."""
+
+    table: str = Field(..., description="Target database table name")
+    schema_name: str = Field("public", description="Target database schema")
+
+
 class DomainConfigV2(BaseModel):
     """
     Epic 3 domain configuration schema with version-aware file discovery.
@@ -160,6 +167,7 @@ class DomainConfigV2(BaseModel):
     - base_path with template variables ({YYYYMM}, {YYYY}, {MM})
     - file_patterns for glob-based matching
     - version_strategy for intelligent version folder selection
+    - output configuration for database destination
     - Security: Path traversal prevention and template variable whitelist
     """
 
@@ -196,6 +204,11 @@ class DomainConfigV2(BaseModel):
     fallback: Literal["error", "use_latest_modified"] = Field(
         default="error",
         description="Fallback behavior when version detection ambiguous",
+    )
+
+    output: Optional[OutputConfig] = Field(
+        default=None,
+        description="Output destination configuration (table, schema)",
     )
 
     @field_validator("base_path")

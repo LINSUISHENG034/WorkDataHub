@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from src.work_data_hub.infrastructure.settings.data_source_schema import (
     DomainConfigV2,
     DataSourceConfigV2,
+    OutputConfig,
     DataSourcesValidationError,
     validate_data_sources_config_v2,
     get_domain_config_v2,
@@ -85,6 +86,23 @@ class TestDomainConfigV2:
         assert config.version_strategy == "highest_number"
         assert config.fallback == "error"
         assert config.exclude_patterns == []
+        assert config.output is None
+
+    def test_valid_config_with_output(self):
+        """Test configuration with output destination."""
+        config = DomainConfigV2(
+            base_path="reference/monthly/{YYYYMM}/数据采集",
+            file_patterns=["*.xlsx"],
+            sheet_name="Sheet1",
+            output={
+                "table": "target_table",
+                "schema_name": "target_schema"
+            }
+        )
+
+        assert config.output is not None
+        assert config.output.table == "target_table"
+        assert config.output.schema_name == "target_schema"
 
     def test_missing_required_field_raises_error(self):
         """AC-2: Missing required field raises ValidationError."""
@@ -486,3 +504,14 @@ class TestIntegration:
             assert annuity_config.sheet_name == "规模明细"
             assert annuity_config.version_strategy == "highest_number"
             assert "*年金终稿*.xlsx" in annuity_config.file_patterns
+            
+            # Verify output configuration
+            assert annuity_config.output is not None
+            assert annuity_config.output.table == "annuity_performance"
+            assert annuity_config.output.schema_name == "business"
+
+            # Test getting the annuity_income domain
+            income_config = get_domain_config_v2("annuity_income", config_path)
+            assert income_config.output is not None
+            assert income_config.output.table == "annuity_income"
+            assert income_config.output.schema_name == "business"

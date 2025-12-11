@@ -51,6 +51,11 @@ domains:
     # - use_latest_modified: Fall back to timestamp-based selection
     fallback: "error"
 
+    # Output destination configuration
+    output:
+      table: "annuity_performance"
+      schema_name: "business"
+
   # Annuity Income Domain (Epic 5.5 - Pipeline Architecture Validation)
   # Story 5.5.2: Second domain to validate Infrastructure Layer architecture
   annuity_income:
@@ -77,6 +82,11 @@ domains:
 
     # Fallback behavior when version detection ambiguous
     fallback: "error"
+
+    # Output destination configuration
+    output:
+      table: "annuity_income"
+      schema_name: "business"
 
   # Future domains (Epic 9) can be added here:
   # universal_insurance:

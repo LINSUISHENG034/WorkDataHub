@@ -18,6 +18,7 @@ from work_data_hub.config.mapping_loader import (
     get_flat_overrides,
     load_company_id_overrides,
 )
+from work_data_hub.config.output_config import get_domain_output_config
 from work_data_hub.config.settings import Settings, get_settings
 
 # Pre-instantiated singleton for convenient module-level import
@@ -37,4 +38,5 @@ __all__ = [
     "load_company_id_overrides",
     "get_flat_overrides",
     "PRIORITY_LEVELS",
+    "get_domain_output_config",
 ]

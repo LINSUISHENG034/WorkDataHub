@@ -1,52 +1,50 @@
-# Claude Code settings
-monthly/
-db_migration/
-reference/claude-code-full-guide/
-reference/patoken/
-real_data/
-fixtures/
+# ============================================================================
+# WorkDataHub .gitignore
+# ============================================================================
 
-/node_modules/
-/package-lock.json
-/package.json
+# ============================================================================
+# Operating System Files
+# ============================================================================
 
-# Ignore folders
-deprecated/
-/legacy/docs/
-archive/
-.kiro/
-.serena/
-.trae/
-.ruff_cache/
-.devcontainer/
-sample_data/
-bmad/
-.bmad/
-.bmad-ephemeral/
-.claude/
-.gemini/
-.github/
-docs/sprint*.md
-.tmp_dagster_*/
-.agentvibes/
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
 
-# Python Virtual Environments (Backend)
-# uv-managed environment
-backend/.venv/
-.venv/
-.uv-cache/
-.venv-linux/
-env/
-venv/
-test-results/
-tests/fixtures/
-reference/
+# Windows
+ehthumbs.db
+Thumbs.db
 
+# Linux
+*~
+
+# ============================================================================
+# IDEs and Editors
+# ============================================================================
+
+# Visual Studio Code
+.vscode/
+
+# PyCharm / IntelliJ
+.idea/
+
+# Vim
+*.swp
+*.swo
+
+# ============================================================================
 # Python
+# ============================================================================
+
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+
+# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -66,91 +64,155 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-/temp.txt
 
 # PyInstaller
 *.manifest
 *.spec
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-
-# Virtual environments
+# Virtual Environments
+.venv/
 .venv
 .venv_win
 .venv_linux
+.venv-linux/
+backend/.venv/
+env/
+venv/
+.uv-cache/
 
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# Type Checkers
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+# Linters and Formatters
+.ruff_cache/
 
-# Project specific
-data/*
-!data/mappings/
-storage/
-temp/
-downloads/
+# ============================================================================
+# Testing and Coverage
+# ============================================================================
 
-# Logs
-logs/
-*.log
+# Pytest
+.pytest_cache/
+test-results/
+
+# Coverage
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Other test tools
+.tox/
+.nox/
+.cache
+nosetests.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Performance baselines
 tests/.performance_baseline.json
 
-# Environment variables
+# ============================================================================
+# Environment Variables and Configuration
+# ============================================================================
+
+# Environment files
 .env*
 !.env.example
+.wdh_env
 
-# Database
+# ============================================================================
+# Database Files
+# ============================================================================
+
 *.db
 *.sqlite
 *.sqlite3
 
+# ============================================================================
+# Logs
+# ============================================================================
+
+logs/
+*.log
+
+# ============================================================================
+# Project-Specific Directories
+# ============================================================================
+
+# Data directories
+data/*
+!data/mappings/
+storage/
+temp/
+real_data/
+sample_data/
+monthly/
+
+# Reference and documentation
+reference/
+reference/claude-code-full-guide/
+reference/patoken/
+
+# Test fixtures
+fixtures/
+tests/fixtures/
+
+# Migration and legacy
+db_migration/
+deprecated/
+/legacy/docs/
+archive/
+
+# Temporary files
+/temp.txt
+.tmp_dagster_*/
+
+# Sprint documentation
+docs/sprint*.md
+
+# ============================================================================
+# AI Tools and Assistants
+# ============================================================================
+
+# Claude Code
+.claude/
+
+# BMAD (Build, Manage, Analyze, Deploy)
+bmad/
+.bmad/
+.bmad-core/
+.bmad-*/
+.bmad-ephemeral/
+
+# Other AI tools
+.gemini/
+.kiro/
+.serena/
+.trae/
+.agentvibes/
+
+# ============================================================================
+# Third-Party Services
+# ============================================================================
+
+# Node.js (if used)
+/node_modules/
+/package-lock.json
+/package.json
+
 # Docker
 .dockerignore
+.devcontainer/
 
-# MinIO data
+# MinIO
 minio-data/
 
 # Celery
 celerybeat-schedule
 celerybeat.pid
 
-# Coverage reports
-.coverage
-coverage.xml
-htmlcov/
-
-# Pytest
-.pytest_cache/
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# BMAD (local only)
-.bmad-core/
-.bmad-*/
+# GitHub (if not using GitHub)
+.github/

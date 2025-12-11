@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 import pandas as pd
 import structlog
 
+from work_data_hub.config import get_domain_output_config
 from work_data_hub.domain.pipelines.types import DomainPipelineResult, PipelineContext
 from work_data_hub.infrastructure.validation import export_error_csv
 
@@ -63,12 +64,13 @@ def process_annuity_income(
     warehouse_loader: Any,
     enrichment_service: Optional["CompanyEnrichmentService"] = None,
     domain: str = "annuity_income",
-    table_name: str = "annuity_income_NEW",
-    schema: str = "public",
+    table_name: Optional[str] = None,
+    schema: Optional[str] = None,
     sync_lookup_budget: int = 0,
     export_unknown_names: bool = True,
     upsert_keys: Optional[List[str]] = None,
     refresh_keys: Optional[List[str]] = None,
+    is_validation_mode: bool = True,
 ) -> DomainPipelineResult:
     """
     Process AnnuityIncome domain data from bronze to gold layer.
@@ -112,6 +114,17 @@ def process_annuity_income(
     Returns:
         DomainPipelineResult with processing metrics and status
     """
+    # Load output configuration from data_sources.yml if not explicitly provided
+    if table_name is None or schema is None:
+        config_table, config_schema = get_domain_output_config(
+            domain,
+            is_validation_mode=is_validation_mode,
+        )
+        if table_name is None:
+            table_name = config_table
+        if schema is None:
+            schema = config_schema
+
     normalized_month = normalize_month(month)
     start_time = time.perf_counter()
     logger.bind(domain=domain, step="pipeline_start").info(

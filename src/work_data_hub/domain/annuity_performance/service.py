@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 import pandas as pd
 import structlog
 
+from work_data_hub.config import get_domain_output_config
 from work_data_hub.domain.pipelines.types import DomainPipelineResult, PipelineContext
 from work_data_hub.infrastructure.validation import export_error_csv
 
@@ -56,13 +57,25 @@ def process_annuity_performance(
     warehouse_loader: Any,
     enrichment_service: Optional["CompanyEnrichmentService"] = None,
     domain: str = "annuity_performance",
-    table_name: str = "annuity_performance_NEW",
-    schema: str = "public",
+    table_name: Optional[str] = None,
+    schema: Optional[str] = None,
     sync_lookup_budget: int = 0,
     export_unknown_names: bool = True,
     upsert_keys: Optional[List[str]] = None,
     refresh_keys: Optional[List[str]] = None,
+    is_validation_mode: bool = True,
 ) -> DomainPipelineResult:
+    # Load output configuration from data_sources.yml if not explicitly provided
+    if table_name is None or schema is None:
+        config_table, config_schema = get_domain_output_config(
+            domain,
+            is_validation_mode=is_validation_mode,
+        )
+        if table_name is None:
+            table_name = config_table
+        if schema is None:
+            schema = config_schema
+
     normalized_month = normalize_month(month)
     start_time = time.perf_counter()
     logger.bind(domain=domain, step="pipeline_start").info(
@@ -88,7 +101,7 @@ def process_annuity_performance(
     if ENABLE_UPSERT_MODE:
         # UPSERT mode: ON CONFLICT DO UPDATE (for aggregate tables)
         actual_upsert_keys = (
-            upsert_keys if upsert_keys is not None else DEFAULT_UPSERT_KEYS
+            list(upsert_keys) if upsert_keys is not None else list(DEFAULT_UPSERT_KEYS)
         )
         load_result = warehouse_loader.load_dataframe(
             dataframe,
@@ -99,7 +112,7 @@ def process_annuity_performance(
     else:
         # REFRESH mode: DELETE + INSERT (for detail tables)
         actual_refresh_keys = (
-            refresh_keys if refresh_keys is not None else DEFAULT_REFRESH_KEYS
+            list(refresh_keys) if refresh_keys is not None else list(DEFAULT_REFRESH_KEYS)
         )
         load_result = warehouse_loader.load_with_refresh(
             dataframe,

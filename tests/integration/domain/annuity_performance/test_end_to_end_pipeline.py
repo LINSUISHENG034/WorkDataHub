@@ -179,7 +179,7 @@ class TestProcessAnnuityPerformance:
 
         assert first.rows_loaded == 4
         assert second.rows_loaded == 4  # Upsert path still loads same 4 rows
-        assert loader.calls[1]["schema"] == "public"
+        assert loader.calls[1]["schema"] == "business"
         assert loader.calls[1]["df"].shape[0] == 4
 
     def test_invalid_month_rejected(self):
