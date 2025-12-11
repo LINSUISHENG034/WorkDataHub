@@ -1,0 +1,6 @@
+# MySQL to PostgreSQL Schema Synchronization Tool Dependencies
+
+# PostgreSQL database adapter
+psycopg2-binary>=2.9.0
+
+# Note: argparse, logging, pathlib, re are part of Python standard library
