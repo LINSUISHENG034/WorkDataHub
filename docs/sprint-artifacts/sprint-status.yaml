@@ -1,4 +1,4 @@
-# generated: 2025-12-02
+# generated: 2025-12-12
 # project: WorkDataHub
 # project_key: WorkDataHub
 # tracking_system: file-system
@@ -29,7 +29,7 @@
 # - SM typically drafts next story ONLY after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', dev reviews, then Dev moves to 'done'
 
-generated: 2025-12-06
+generated: 2025-12-12
 project: WorkDataHub
 project_key: WorkDataHub
 tracking_system: file-system
@@ -85,7 +85,7 @@ development_status:
   4-10-refactor-annuity-performance-to-standard-domain-pattern: done
   epic-4-retrospective: optional
 
-  # Epic 5: Infrastructure Layer Architecture - IN PROGRESS
+  # Epic 5: Infrastructure Layer Architecture - COMPLETED
   # Tech spec approved 2025-12-01, Sprint Change Proposal approved
   # CRITICAL: Must be completed before Epic 9 (Growth Domains Migration)
   # Refactors domain layer to 6-file standard, establishes reusable infrastructure
@@ -102,7 +102,7 @@ development_status:
   5-9-epic5-migration-cleanup: done
   epic-5-retrospective: completed
 
-  # Epic 5.5: Pipeline Architecture Validation (AnnuityIncome Domain)
+  # Epic 5.5: Pipeline Architecture Validation (AnnuityIncome Domain) - COMPLETED
   # Added 2025-12-04 via Correct-Course workflow
   # BLOCKING: Must complete before Epic 6 to validate architecture generality
   # Validates Infrastructure Layer with second domain, establishes cleansing documentation standard
@@ -115,7 +115,7 @@ development_status:
   5.5-5-annuity-income-schema-correction: done
   epic-5.5-retrospective: optional
 
-  # Epic 5.6: Post-MVP Optimizations (Independent Stories)
+  # Epic 5.6: Post-MVP Optimizations (Independent Stories) - COMPLETED
   # Added 2025-12-06 via Correct-Course workflow
   # Contains 4 optimization items discovered during Epic 5.5 MVP validation
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-06-post-mvp-optimizations.md
@@ -144,7 +144,7 @@ development_status:
   6-8-enrichment-observability-and-export: done
   epic-6-retrospective: completed  # 2025-12-08 - Action items: Legacy migration, Golden Dataset testing
 
-  # Epic 6.1: Layer 2 Enrichment Index Enhancement
+  # Epic 6.1: Layer 2 Enrichment Index Enhancement - COMPLETED
   # Added 2025-12-08 via Correct-Course workflow (Epic 6 Retrospective)
   # Enhances DB Cache with multi-priority lookup (DB-P1 to DB-P5) and domain self-learning
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-08-layer2-enrichment-enhancement.md
@@ -157,6 +157,22 @@ development_status:
   6.1-3-domain-learning-mechanism: done  # Self-learning from processed Domain data
   6.1-4-legacy-data-migration: done  # Migrate existing data to enrichment_index
   epic-6.1-retrospective: completed  # 2025-12-08 - Action items: Production migration, Golden Dataset tests
+
+  # Epic 6.2: Generic Reference Data Management - APPROVED
+  # Added 2025-12-12 via Correct-Course workflow, Approved 2025-12-12 by PM
+  # Hybrid strategy: Pre-load (authoritative) + On-demand backfill (auto-derived)
+  # Addresses FK constraint violations for 产品线 and 组织架构 tables
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-12-generic-reference-management.md
+  # Dependencies: Epic 5 (Infrastructure Layer), Epic 6.1 (Enrichment Index)
+  # Verification: scripts/validation/verify_backfill_integrated.py (6/6 tests passed)
+  epic-6.2: in-progress
+  6.2-1-generic-backfill-framework-core: ready-for-dev  # Configuration-driven generic backfill framework - Story created 2025-12-12
+  6.2-2-reference-table-schema-enhancement: backlog  # Add _source, _needs_review tracking fields
+  6.2-3-fk-configuration-schema-extension: backlog  # FK relationships in data_sources.yml
+  6.2-4-pre-load-reference-sync-service: backlog  # Sync from Legacy MySQL and config files
+  6.2-5-hybrid-reference-service-integration: backlog  # Unified pre-load + backfill service
+  6.2-6-reference-data-observability: backlog  # Dashboard, alerts, CSV export for review
+  epic-6.2-retrospective: optional
 
   # Epic 7: Testing & Validation Infrastructure
   epic-7: backlog

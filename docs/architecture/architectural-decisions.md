@@ -1110,6 +1110,138 @@ pipeline.add_step(DataFrameFilterStep(FILTER_CONDITION))
 
 ---
 
+### Decision #11: Hybrid Reference Data Management Strategy ✅
+
+**Problem:** FK constraint violations block pipeline execution when fact data (e.g., `规模明细` table) contains new FK values not present in reference tables. The current `reference_backfill` mechanism only covers 2 out of 4 foreign keys (50%), leaving `产品线` (Product Lines) and `组织架构` (Organization) gaps that cannot be automatically handled.
+
+**Decision:** Implement hybrid strategy combining pre-load (authoritative data) with on-demand backfill (auto-derived data), with data quality tracking through source tracking fields.
+
+#### Two-Layer Data Quality Model
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 1: Authoritative Data (权威数据)                         │
+│  Source: Legacy MySQL, MDM, Config files                        │
+│  Characteristics: Complete fields, verified, audit trail        │
+│  Marker: _source = 'authoritative'                              │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 2: Auto-Derived Data (自动派生数据)                      │
+│  Source: New FK values from fact data                           │
+│  Characteristics: Minimal fields, needs review                  │
+│  Marker: _source = 'auto_derived', _needs_review = true         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Key Design Points
+
+1. **Two-layer data quality model** - Distinguish authoritative data from auto-derived data
+2. **Configuration-driven FK relationships** - Define FK relationships in `config/data_sources.yml`
+3. **Dependency-aware processing order** - Topological sort for FK with dependencies
+4. **Source tracking for data governance** - `_source`, `_needs_review`, `_derived_from_domain`, `_derived_at` columns
+5. **Graceful degradation** - Backfill provides fallback when pre-load fails
+
+#### FK Configuration Schema
+
+```yaml
+domains:
+  annuity_performance:
+    foreign_keys:
+      - name: "fk_plan"
+        source_column: "年金计划号"
+        target_table: "年金计划"
+        target_key: "年金计划号"
+        derive_columns: ["年金计划号"]
+      - name: "fk_portfolio"
+        source_column: "组合代码"
+        target_table: "组合计划"
+        target_key: "组合代码"
+        depends_on: ["fk_plan"]
+        derive_columns: ["组合代码", "年金计划号"]
+      - name: "fk_product_line"
+        source_column: "产品线"
+        target_table: "产品线"
+        target_key: "产品线代码"
+        derive_columns: ["产品线"]
+      - name: "fk_organization"
+        source_column: "组织代码"
+        target_table: "组织架构"
+        target_key: "组织代码"
+        derive_columns: ["组织代码"]
+```
+
+#### Reference Table Schema Enhancement
+
+All reference tables receive tracking columns:
+
+| Column | Type | Default | Purpose |
+|--------|------|---------|---------|
+| `_source` | VARCHAR(20) | 'authoritative' | Data origin: 'authoritative' or 'auto_derived' |
+| `_needs_review` | BOOLEAN | false | Flag for records requiring manual review |
+| `_derived_from_domain` | VARCHAR(50) | NULL | Domain that triggered auto-derivation |
+| `_derived_at` | TIMESTAMP | NULL | When auto-derivation occurred |
+
+#### Service Architecture
+
+```python
+class HybridReferenceService:
+    """Coordinates pre-load and backfill for reference data management."""
+
+    def __init__(self, sync_service: ReferenceSyncService,
+                 backfill_service: GenericBackfillService):
+        self.sync = sync_service      # Pre-load from authoritative sources
+        self.backfill = backfill_service  # On-demand derivation
+
+    def ensure_references(self, domain: str, df: pd.DataFrame) -> BackfillResult:
+        """
+        Ensure all FK references exist before fact data insertion.
+
+        1. Check which FK values are missing
+        2. For missing values, create auto-derived records
+        3. Mark auto-derived records with tracking fields
+        4. Return summary of actions taken
+        """
+        ...
+```
+
+#### Decision Table
+
+| Aspect | Decision | Rationale |
+|--------|----------|-----------|
+| **Strategy** | Hybrid (pre-load + backfill) | Balance data quality with automation |
+| **Pre-load Sources** | Legacy MySQL, config files | Authoritative data from existing systems |
+| **Backfill Trigger** | Missing FK values in fact data | On-demand, only when needed |
+| **Data Quality Tracking** | `_source`, `_needs_review` columns | Enable data governance and review workflows |
+| **FK Configuration** | YAML in `data_sources.yml` | Configuration-driven, no code changes for new FKs |
+| **Dependency Handling** | Topological sort via `depends_on` | Correct insertion order for dependent FKs |
+
+#### Success Criteria
+
+1. All 4 FK relationships covered (100% coverage, up from 50%)
+2. No FK constraint failures in pipeline execution
+3. Auto-derived records properly tracked and reviewable
+4. Pre-load covers >90% of FK values in normal operation
+5. Backfill provides reliable fallback for new values
+
+#### Implementation (Epic 6.2)
+
+- **Story 6.2.1:** Generic Backfill Framework Core
+- **Story 6.2.2:** Reference Table Schema Enhancement (tracking columns)
+- **Story 6.2.3:** FK Configuration Schema Extension
+- **Story 6.2.4:** Pre-load Reference Sync Service
+- **Story 6.2.5:** Hybrid Reference Service Integration
+- **Story 6.2.6:** Reference Data Observability
+
+#### Related Documents
+
+- Sprint Change Proposal: `docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-12-generic-reference-management.md`
+- Problem Analysis: `docs/specific/backfill-method/problem-analysis.md`
+- Mixed Strategy Solution: `docs/specific/backfill-method/mixed-strategy-solution.md`
+
+---
+
 ## Technical Debt & Future Considerations
 
 ### TD-001: Cross-Domain Mapping Data Consolidation

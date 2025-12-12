@@ -53,7 +53,7 @@ domains:
 
     # Output destination configuration
     output:
-      table: "annuity_performance"
+      table: "规模明细"
       schema_name: "business"
 
   # Annuity Income Domain (Epic 5.5 - Pipeline Architecture Validation)
@@ -85,7 +85,7 @@ domains:
 
     # Output destination configuration
     output:
-      table: "annuity_income"
+      table: "收入明细"
       schema_name: "business"
 
   # Future domains (Epic 9) can be added here:
