@@ -456,7 +456,7 @@ class CompanyEnrichmentService:
         # AC6: Enrichment disabled → always generate temp IDs, skip API/queue paths
         if not self.enrich_enabled:
             try:
-                temp_id = self.queue.get_next_temp_id()
+                temp_id = self.queue.get_next_temp_id(customer_name or "unknown")
             except Exception as e:
                 logger.error(f"Failed to generate temporary ID (disabled mode): {e}")
                 return CompanyIdResult(
@@ -608,7 +608,7 @@ class CompanyEnrichmentService:
 
         # Step 4: Generate temp ID when customer_name is empty or queueing failed
         try:
-            temp_id = self.queue.get_next_temp_id()
+            temp_id = self.queue.get_next_temp_id(customer_name or "unknown")
 
             # Story 6.8: Record temp ID generation (AC1, AC2)
             if observer:
@@ -718,6 +718,10 @@ class CompanyEnrichmentService:
                                 "company_name": req_name,
                             },
                         )
+
+                        # Record lookup attempt for observer stats
+                        if observer:
+                            observer.record_lookup()
 
                         # Perform EQC lookup
                         search_results = self.eqc_client.search_company(req_name)

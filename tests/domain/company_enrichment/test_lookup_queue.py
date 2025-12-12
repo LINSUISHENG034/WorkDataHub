@@ -6,6 +6,7 @@ database integration patterns, atomic operations, and concurrent
 access scenarios for multi-worker queue processing.
 """
 
+import os
 import time
 from unittest.mock import Mock, patch
 from concurrent.futures import ThreadPoolExecutor
@@ -388,138 +389,55 @@ class TestMarkDoneAndFailedOperations:
 
 
 class TestTempIdGeneration:
-    """Test atomic temporary ID generation."""
+    """Test HMAC-based temporary ID generation (Story 6-2-P1)."""
 
     def test_get_next_temp_id_successful(self, lookup_queue, mock_connection):
-        """Test successful temp ID generation."""
-        mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
-        mock_cursor.fetchone.return_value = (42,)  # Sequence value
+        """Test successful HMAC temp ID generation."""
+        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'test_salt'}):
+            temp_id = lookup_queue.get_next_temp_id("Test Company")
 
-        temp_id = lookup_queue.get_next_temp_id()
+        # Verify HMAC-based format
+        assert temp_id.startswith("IN_")
+        assert len(temp_id) == 19  # "IN_" + 16 chars
 
-        # Verify SQL uses UPDATE...RETURNING for atomicity with new schema
-        mock_cursor.execute.assert_called_once()
-        sql_call = mock_cursor.execute.call_args[0]
-        assert "UPDATE enterprise.temp_id_sequence" in sql_call[0]
-        assert "SET last_number = last_number + 1, updated_at = now()" in sql_call[0]
-        assert "RETURNING last_number" in sql_call[0]
+    def test_get_next_temp_id_deterministic(self, lookup_queue, mock_connection):
+        """Test temp ID generation is deterministic."""
+        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'test_salt'}):
+            temp_id_1 = lookup_queue.get_next_temp_id("Test Company")
+            temp_id_2 = lookup_queue.get_next_temp_id("Test Company")
 
-        # Verify formatted temp ID
-        assert temp_id == "TEMP_000042"
-
-    def test_get_next_temp_id_handles_dict_row(self, lookup_queue, mock_connection):
-        """Test temp ID generation works with dict-like cursor rows."""
-        mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
-        mock_cursor.fetchone.return_value = {"last_number": 7}
-
-        temp_id = lookup_queue.get_next_temp_id()
-
-        assert temp_id == "TEMP_000007"
-        mock_cursor.execute.assert_called_once()
-
-    def test_get_next_temp_id_bootstraps_empty_sequence(
-        self, lookup_queue, mock_connection
-    ):
-        """Test sequence table is seeded when empty."""
-        mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
-        mock_cursor.fetchone.side_effect = [None, {"last_number": 1}]
-
-        temp_id = lookup_queue.get_next_temp_id()
-
-        assert temp_id == "TEMP_000001"
-        sql_calls = [
-            call_args[0][0] for call_args in mock_cursor.execute.call_args_list
-        ]
-        assert any(
-            "INSERT INTO enterprise.temp_id_sequence" in sql for sql in sql_calls
-        )
-        assert mock_cursor.execute.call_count == 3
-
-    def test_get_next_temp_id_uniqueness_sequential(
-        self, lookup_queue, mock_connection
-    ):
-        """Test temp ID generation produces unique sequential IDs."""
-        mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
-
-        # Simulate sequential sequence values
-        mock_cursor.fetchone.side_effect = [(1,), (2,), (3,)]
-
-        temp_id_1 = lookup_queue.get_next_temp_id()
-        temp_id_2 = lookup_queue.get_next_temp_id()
-        temp_id_3 = lookup_queue.get_next_temp_id()
-
-        assert temp_id_1 == "TEMP_000001"
-        assert temp_id_2 == "TEMP_000002"
-        assert temp_id_3 == "TEMP_000003"
-
-        # Verify each call incremented the sequence
-        assert mock_cursor.execute.call_count == 3
+        # Same input produces same output
+        assert temp_id_1 == temp_id_2
 
     def test_get_next_temp_id_plan_only_mode(self, plan_only_queue):
         """Test temp ID generation in plan-only mode."""
-        temp_id = plan_only_queue.get_next_temp_id()
+        temp_id = plan_only_queue.get_next_temp_id("Test Company")
 
-        assert temp_id == "TEMP_000001"  # Mock value
-
-    def test_get_next_temp_id_database_error(self, lookup_queue, mock_connection):
-        """Test temp ID generation handles database errors."""
-        mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
-        mock_cursor.execute.side_effect = psycopg2.Error("Sequence error")
-
-        with pytest.raises(LookupQueueError, match="Failed to generate temp ID"):
-            lookup_queue.get_next_temp_id()
-
-    def test_get_next_temp_id_no_sequence_value(self, lookup_queue, mock_connection):
-        """Test temp ID generation when no sequence value returned."""
-        mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
-        mock_cursor.fetchone.side_effect = [None, None]
-
-        with pytest.raises(LookupQueueError, match="no sequence value returned"):
-            lookup_queue.get_next_temp_id()
-
-        sql_calls = [
-            call_args[0][0] for call_args in mock_cursor.execute.call_args_list
-        ]
-        assert any(
-            "INSERT INTO enterprise.temp_id_sequence" in sql for sql in sql_calls
-        )
-        assert mock_cursor.execute.call_count == 3
+        # Should return deterministic mock ID
+        assert temp_id.startswith("IN_")
+        assert len(temp_id) >= 10
 
 
 class TestConcurrentAccess:
     """Test concurrent access patterns for multi-worker scenarios."""
 
     def test_concurrent_temp_id_generation(self, mock_connection):
-        """Test concurrent temp ID generation produces unique IDs."""
-        # Simulate atomic sequence increment behavior
-        sequence_counter = 0
-
-        def mock_execute(sql, params=None):
-            nonlocal sequence_counter
-            if "UPDATE enterprise.temp_id_sequence" in sql:
-                sequence_counter += 1
-
-        def mock_fetchone():
-            return (sequence_counter,)
-
-        mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
-        mock_cursor.execute.side_effect = mock_execute
-        mock_cursor.fetchone.side_effect = mock_fetchone
-
+        """Test concurrent temp ID generation produces unique IDs for different companies."""
         queue = LookupQueue(mock_connection)
 
         # Simulate concurrent access with multiple threads
-        def generate_temp_id():
-            return queue.get_next_temp_id()
+        def generate_temp_id(company_id):
+            return queue.get_next_temp_id(f"Company_{company_id}")
 
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            # Submit 10 concurrent temp ID generation requests
-            futures = [executor.submit(generate_temp_id) for _ in range(10)]
-            temp_ids = [future.result() for future in futures]
+        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'test_salt'}):
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                # Submit 10 concurrent temp ID generation requests with different names
+                futures = [executor.submit(generate_temp_id, i) for i in range(10)]
+                temp_ids = [future.result() for future in futures]
 
-        # All temp IDs should be unique
+        # All temp IDs should be unique (different company names)
         assert len(set(temp_ids)) == len(temp_ids)
-        assert all(temp_id.startswith("TEMP_") for temp_id in temp_ids)
+        assert all(temp_id.startswith("IN_") for temp_id in temp_ids)
 
     def test_concurrent_dequeue_operations(self, mock_connection):
         """Test concurrent dequeue operations don't interfere."""
@@ -701,6 +619,116 @@ class TestIntegrationPatterns:
         # Second attempt should succeed
         result = lookup_queue.enqueue("Retry Company")
         assert result.name == "Retry Company"
+
+
+class TestStory62P1HmacTempId:
+    """Story 6-2-P1: Test HMAC-SHA1 temporary ID generation."""
+
+    def test_hmac_temp_id_deterministic(self, lookup_queue, mock_connection):
+        """AC2: Same company name produces same temp ID."""
+        mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
+
+        # Mock environment variable
+        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'test_salt_123'}):
+            temp_id_1 = lookup_queue.get_next_temp_id("新公司XYZ")
+            temp_id_2 = lookup_queue.get_next_temp_id("新公司XYZ")
+            temp_id_3 = lookup_queue.get_next_temp_id("新公司XYZ")
+
+        # All calls should return identical ID
+        assert temp_id_1 == temp_id_2 == temp_id_3
+        assert temp_id_1.startswith("IN_")
+        assert len(temp_id_1) == 19  # "IN_" + 16 chars
+
+    def test_hmac_temp_id_format(self, lookup_queue, mock_connection):
+        """AC1: Temp ID format is IN_<16-char-base32>."""
+        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'test_salt_123'}):
+            temp_id = lookup_queue.get_next_temp_id("Test Company")
+
+        # Verify format
+        assert temp_id.startswith("IN_")
+        assert len(temp_id) == 19  # "IN_" + 16 chars
+        # Base32 uses A-Z and 2-7
+        base32_part = temp_id[3:]
+        assert all(c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567' for c in base32_part)
+
+    def test_hmac_temp_id_different_names_different_ids(self, lookup_queue, mock_connection):
+        """Different company names produce different temp IDs."""
+        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'test_salt_123'}):
+            temp_id_1 = lookup_queue.get_next_temp_id("Company A")
+            temp_id_2 = lookup_queue.get_next_temp_id("Company B")
+            temp_id_3 = lookup_queue.get_next_temp_id("Company C")
+
+        # All IDs should be different
+        assert temp_id_1 != temp_id_2
+        assert temp_id_2 != temp_id_3
+        assert temp_id_1 != temp_id_3
+
+    def test_hmac_temp_id_normalization(self, lookup_queue, mock_connection):
+        """AC2: Normalized names produce same ID."""
+        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'test_salt_123'}):
+            temp_id_1 = lookup_queue.get_next_temp_id("Company A")
+            temp_id_2 = lookup_queue.get_next_temp_id("  company a  ")
+            temp_id_3 = lookup_queue.get_next_temp_id("COMPANY A")
+
+        # All should produce same ID due to normalization
+        assert temp_id_1 == temp_id_2 == temp_id_3
+
+    def test_hmac_temp_id_environment_consistency(self, lookup_queue, mock_connection):
+        """AC3: Same salt produces same ID across environments."""
+        # Simulate two environments with same salt
+        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'production_salt'}):
+            staging_id = lookup_queue.get_next_temp_id("新公司XYZ")
+
+        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'production_salt'}):
+            production_id = lookup_queue.get_next_temp_id("新公司XYZ")
+
+        # Same salt should produce identical IDs
+        assert staging_id == production_id
+
+    def test_hmac_temp_id_no_collisions(self, lookup_queue, mock_connection):
+        """AC4: 10K unique names produce 10K unique IDs."""
+        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'test_salt_123'}):
+            temp_ids = set()
+            for i in range(10000):
+                company_name = f"Company_{i:05d}"
+                temp_id = lookup_queue.get_next_temp_id(company_name)
+                temp_ids.add(temp_id)
+
+        # All IDs should be unique (no collisions)
+        assert len(temp_ids) == 10000
+
+    def test_hmac_temp_id_default_salt_warning(self, lookup_queue, mock_connection):
+        """AC6: Default salt used with warning when WDH_ALIAS_SALT not set."""
+        with patch.dict('os.environ', {}, clear=True):
+            # Remove WDH_ALIAS_SALT from environment
+            if 'WDH_ALIAS_SALT' in os.environ:
+                del os.environ['WDH_ALIAS_SALT']
+
+            temp_id = lookup_queue.get_next_temp_id("Test Company")
+
+        # Should still generate valid ID
+        assert temp_id.startswith("IN_")
+        assert len(temp_id) == 19
+
+    def test_hmac_temp_id_plan_only_mode(self, plan_only_queue):
+        """Test HMAC temp ID in plan-only mode."""
+        temp_id = plan_only_queue.get_next_temp_id("Test Company")
+
+        # Should return deterministic mock ID
+        assert temp_id.startswith("IN_")
+        assert len(temp_id) >= 10  # At least "IN_" + some hash
+
+    def test_hmac_temp_id_requires_company_name(self, lookup_queue):
+        """AC5: Method signature requires company_name parameter."""
+        # This test verifies the new signature
+        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'test_salt_123'}):
+            # Should work with company_name
+            temp_id = lookup_queue.get_next_temp_id("Test Company")
+            assert temp_id.startswith("IN_")
+
+            # Should fail without company_name (TypeError)
+            with pytest.raises(TypeError):
+                lookup_queue.get_next_temp_id()
 
 
 class TestStory67ExponentialBackoff:

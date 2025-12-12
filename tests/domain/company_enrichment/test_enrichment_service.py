@@ -44,7 +44,7 @@ def mock_queue():
 
     # Default: successful enqueue and temp ID generation
     queue.enqueue.return_value = Mock(id=1, name="Test Company", status="pending")
-    queue.get_next_temp_id.return_value = "TEMP_000001"
+    queue.get_next_temp_id.return_value = "IN_ABCDEFGHIJKLMNOP"
 
     return queue
 
@@ -315,7 +315,7 @@ class TestBudgetExhaustionQueuing:
     def test_no_customer_name_and_no_internal_match_generates_temp_id(
         self, enrichment_service, mock_loader, mock_queue
     ):
-        """Test empty customer_name generates TEMP_* ID."""
+        """Test empty customer_name generates IN_* ID."""
         mock_loader.load_mappings.return_value = []
 
         with patch(
@@ -332,9 +332,9 @@ class TestBudgetExhaustionQueuing:
 
             # Verify result
             assert result.status == ResolutionStatus.TEMP_ASSIGNED
-            assert result.company_id == "TEMP_000001"
+            assert result.company_id == "IN_ABCDEFGHIJKLMNOP"
             assert result.source == "generated"
-            assert result.temp_id == "TEMP_000001"
+            assert result.temp_id == "IN_ABCDEFGHIJKLMNOP"
 
 
 class TestBudgetDefaultBehavior:
@@ -450,7 +450,7 @@ class TestTempIdGeneration:
     def test_empty_customer_name_generates_temp_id(
         self, enrichment_service, mock_loader, mock_queue
     ):
-        """Test empty customer_name generates TEMP_* ID."""
+        """Test empty customer_name generates IN_* ID."""
         mock_loader.load_mappings.return_value = []
 
         with patch(
@@ -466,8 +466,8 @@ class TestTempIdGeneration:
             mock_queue.get_next_temp_id.assert_called_once()
 
             assert result.status == ResolutionStatus.TEMP_ASSIGNED
-            assert result.company_id == "TEMP_000001"
-            assert result.temp_id == "TEMP_000001"
+            assert result.company_id == "IN_ABCDEFGHIJKLMNOP"
+            assert result.temp_id == "IN_ABCDEFGHIJKLMNOP"
 
     def test_queue_failure_fallback_to_temp_id(
         self, enrichment_service, mock_loader, mock_queue
@@ -489,7 +489,7 @@ class TestTempIdGeneration:
             mock_queue.get_next_temp_id.assert_called_once()
 
             assert result.status == ResolutionStatus.TEMP_ASSIGNED
-            assert result.company_id == "TEMP_000001"
+            assert result.company_id == "IN_ABCDEFGHIJKLMNOP"
 
 
 class TestEQCErrorHandling:
@@ -674,7 +674,7 @@ class TestObserverIntegration:
         result = service.resolve_company_id(customer_name="Disabled Co")
 
         assert result.status == ResolutionStatus.TEMP_ASSIGNED
-        assert result.temp_id == "TEMP_000001"
+        assert result.temp_id == "IN_ABCDEFGHIJKLMNOP"
         stats = observer.get_stats()
         assert stats.total_lookups == 1
         assert stats.temp_ids_generated == 1

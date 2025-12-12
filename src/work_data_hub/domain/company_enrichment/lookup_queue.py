@@ -7,13 +7,23 @@ Supports both plan_only and execute modes for validation and execution.
 
 Story 6.7: Added exponential backoff support for retry logic with next_retry_at
 column filtering and configurable backoff schedule.
+
+Story 6-2-P1: Refactored get_next_temp_id() to use HMAC-SHA1 for deterministic
+temporary ID generation instead of database sequence.
 """
 
+import hashlib
 import logging
+import os
 import re
 import unicodedata
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
+
+from work_data_hub.infrastructure.enrichment.normalizer import (
+    generate_temp_company_id,
+    normalize_for_temp_id,
+)
 
 from .models import LookupRequest
 
@@ -492,97 +502,60 @@ class LookupQueue:
             )
             raise LookupQueueError(f"Failed to mark request as failed: {e}")
 
-    def get_next_temp_id(self) -> str:
+    def get_next_temp_id(self, company_name: str) -> str:
         """
-        Generate next temporary ID using atomic sequence increment.
+        Generate stable temporary ID using HMAC-SHA1.
 
-        Uses UPDATE...RETURNING pattern for thread-safe ID generation
-        across multiple workers and concurrent requests.
+        Same company name always produces same ID (deterministic).
+        This enables idempotent pipeline runs and consistent IDs across environments.
+
+        Story 6-2-P1: Refactored from database sequence to HMAC-SHA1 for determinism.
+
+        Args:
+            company_name: Company name to generate ID for
 
         Returns:
-            Temporary ID in TEMP_NNNNNN format (e.g., TEMP_000001)
+            Temporary ID in IN_<16-char-base32> format (e.g., IN_ABCD1234EFGH5678)
 
         Raises:
             LookupQueueError: If temp ID generation fails
         """
         if self.plan_only:
-            # Return a mock temp ID for plan-only mode
-            mock_temp_id = "TEMP_000001"
+            # Return deterministic mock for plan-only mode using shared normalization
+            normalized = normalize_for_temp_id(company_name or "")
+            if not normalized:
+                normalized = "__empty__"
+            mock_hash = hashlib.sha1(normalized.encode()).hexdigest()[:8]
+            mock_temp_id = f"IN_{mock_hash.upper()}"
             logger.info(
                 "PLAN ONLY: Would generate temp ID",
-                extra={"mock_temp_id": mock_temp_id},
+                extra={"mock_temp_id": mock_temp_id, "company_name": company_name},
             )
             return mock_temp_id
 
-        sql = """
-            UPDATE enterprise.temp_id_sequence
-            SET last_number = last_number + 1, updated_at = now()
-            RETURNING last_number
-        """
-
         try:
-            with self.connection.cursor() as cursor:
-
-                def _extract_sequence_value(result):
-                    """Normalize cursor row into an integer sequence value."""
-                    if result is None:
-                        return None
-                    if isinstance(result, dict):
-                        value = result.get("last_number")
-                        if value is not None:
-                            return value
-                        if len(result) == 1:
-                            try:
-                                return next(iter(result.values()))
-                            except StopIteration:
-                                return None
-                        return None
-                    try:
-                        return result[0]
-                    except (IndexError, TypeError):
-                        return None
-
-                cursor.execute(sql)
-                row = cursor.fetchone()
-                sequence_value = _extract_sequence_value(row)
-
-                if sequence_value is None:
-                    logger.debug(
-                        "Temp ID sequence empty - seeding initial row",
-                        extra={"bootstrap": True},
-                    )
-                    cursor.execute(
-                        """
-                        INSERT INTO enterprise.temp_id_sequence (
-                            last_number,
-                            updated_at
-                        )
-                        SELECT 0, now()
-                        WHERE NOT EXISTS (
-                            SELECT 1 FROM enterprise.temp_id_sequence
-                        )
-                        """
-                    )
-                    cursor.execute(sql)
-                    row = cursor.fetchone()
-                    sequence_value = _extract_sequence_value(row)
-
-                if sequence_value is None:
-                    raise LookupQueueError(
-                        "Failed to generate temp ID - no sequence value returned"
-                    )
-
-                temp_id = f"TEMP_{sequence_value:06d}"
-
-                logger.debug(
-                    "Generated temporary ID",
-                    extra={"temp_id": temp_id, "sequence_value": sequence_value},
+            # Get salt from environment
+            salt = os.getenv("WDH_ALIAS_SALT")
+            if not salt:
+                logger.warning(
+                    "WDH_ALIAS_SALT not set, using default development salt. "
+                    "This should be configured in production for security."
                 )
-                return temp_id
+                salt = "default_dev_salt"
+
+            temp_id = generate_temp_company_id(company_name or "", salt)
+
+            logger.debug(
+                "Generated temporary ID",
+                extra={"company_name": company_name, "temp_id": temp_id}
+            )
+
+            return temp_id
 
         except Exception as e:
             logger.error(
-                "Database error during temp ID generation", extra={"error": str(e)}
+                "Error during temp ID generation",
+                extra={"company_name": company_name, "error": str(e)}
             )
             raise LookupQueueError(f"Failed to generate temp ID: {e}")
 

@@ -143,6 +143,10 @@ development_status:
   6-7-async-enrichment-queue-deferred-resolution: done
   6-8-enrichment-observability-and-export: done
   epic-6-retrospective: completed  # 2025-12-08 - Action items: Legacy migration, Golden Dataset testing
+  # Patch Story for Story 6.2 - HMAC temp ID implementation fix
+  # Added 2025-12-13 via Correct-Course workflow
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-13-hmac-temp-id-fix.md
+  6-2-p1-hmac-temp-id-implementation: ready-for-dev  # Fix temp ID to use HMAC-SHA1 instead of DB sequence
 
   # Epic 6.1: Layer 2 Enrichment Index Enhancement - COMPLETED
   # Added 2025-12-08 via Correct-Course workflow (Epic 6 Retrospective)
