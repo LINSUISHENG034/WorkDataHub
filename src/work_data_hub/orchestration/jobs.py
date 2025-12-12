@@ -43,6 +43,8 @@ from .ops import (
     read_excel_op,
     validate_op,
 )
+from .reference_sync_jobs import reference_sync_job
+from .reference_sync_ops import ReferenceSyncOpConfig
 
 
 @job
@@ -601,6 +603,92 @@ def _execute_queue_processing_job(args: argparse.Namespace) -> int:
         return 1
 
 
+def _execute_reference_sync_job(args: argparse.Namespace) -> int:
+    """
+    Execute reference sync job for pre-loading authoritative data.
+
+    Story 6.2.4: Syncs reference data from Legacy MySQL and config files
+    to reference tables before fact processing.
+    """
+    effective_plan_only = not args.execute if hasattr(args, "execute") else True
+
+    print("🚀 Starting reference data sync...")
+    print(f"   Execute: {getattr(args, 'execute', False)}")
+    print(f"   Plan-only: {effective_plan_only}")
+    print("=" * 50)
+
+    try:
+        # Build run configuration for reference sync
+        run_config = {
+            "ops": {
+                "reference_sync_op": {
+                    "config": {
+                        "plan_only": effective_plan_only,
+                    }
+                }
+            }
+        }
+
+        # Execute reference sync job
+        instance = DagsterInstance.ephemeral() if args.debug else None
+
+        result = reference_sync_job.execute_in_process(
+            run_config=run_config, instance=instance, raise_on_error=args.raise_on_error
+        )
+
+        # Report results
+        print(f"✅ Reference sync completed: {result.success}")
+
+        if result.success:
+            # Extract sync results
+            output_data = result.output_for_node("reference_sync_op")
+
+            if output_data:
+                status = output_data.get("status", "unknown")
+                total_synced = output_data.get("total_synced", 0)
+                total_deleted = output_data.get("total_deleted", 0)
+                failed_count = output_data.get("failed_count", 0)
+                table_count = output_data.get("table_count", 0)
+
+                print("\nREFERENCE SYNC RESULTS:")
+                print(f"  Status: {status}")
+                print(f"  Tables processed: {table_count}")
+                print(f"  Rows synced: {total_synced}")
+                print(f"  Rows deleted: {total_deleted}")
+                print(f"  Failed tables: {failed_count}")
+
+                # Show per-table results if available
+                results_list = output_data.get("results", [])
+                if results_list:
+                    print("\n  Per-table breakdown:")
+                    for r in results_list:
+                        table = r.get("table", "unknown")
+                        synced = r.get("rows_synced", 0)
+                        deleted = r.get("rows_deleted", 0)
+                        error = r.get("error")
+                        if error:
+                            print(f"    ❌ {table}: ERROR - {error}")
+                        else:
+                            print(f"    ✓ {table}: {synced} synced, {deleted} deleted")
+
+        print("=" * 50)
+        if effective_plan_only:
+            print("✅ Reference sync plan complete - no database changes made")
+        else:
+            print("🎉 REFERENCE SYNC SUCCESS - Authoritative data loaded")
+        print("=" * 50)
+        return 0
+
+    except KeyboardInterrupt:
+        print("⚠️ Reference sync interrupted by user")
+        return 130
+    except Exception as e:
+        print(f"❌ Unexpected reference sync failure: {e}")
+        if args.raise_on_error:
+            raise
+        return 1
+
+
 def main() -> int:
     """
     CLI entry point for local execution.
@@ -784,11 +872,14 @@ def main() -> int:
     elif domain_key == "company_lookup_queue":
         # Special handling for company lookup queue processing
         return _execute_queue_processing_job(args)
+    elif domain_key == "reference_sync":
+        # Story 6.2.4: Reference sync from authoritative sources
+        return _execute_reference_sync_job(args)
     else:
         raise ValueError(
             f"Unsupported domain: {args.domain}. "
             f"Supported: sample_trustee_performance, annuity_performance, "
-            f"company_mapping, company_lookup_queue"
+            f"company_mapping, company_lookup_queue, reference_sync"
         )
 
     # Execute job with appropriate settings

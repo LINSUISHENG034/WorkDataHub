@@ -16,6 +16,7 @@ from dagster import RunRequest, ScheduleEvaluationContext, schedule
 from work_data_hub.config.settings import get_settings
 
 from .jobs import process_company_lookup_queue_job, sample_trustee_performance_multi_file_job
+from .reference_sync_jobs import reference_sync_job
 
 logger = structlog.get_logger(__name__)
 
@@ -141,6 +142,59 @@ def async_enrichment_schedule(
                 "process_company_lookup_queue_op": {
                     "config": {
                         "batch_size": batch_size,
+                        "plan_only": False,
+                    }
+                }
+            }
+        },
+    )
+
+
+@schedule(
+    cron_schedule="0 1 * * *",  # 01:00 daily
+    job=reference_sync_job,
+    execution_timezone="Asia/Shanghai",
+)
+def reference_sync_schedule(
+    context: ScheduleEvaluationContext,
+) -> Optional[RunRequest]:
+    """
+    Daily schedule for reference data pre-load sync.
+
+    Story 6.2.4: Syncs reference data from authoritative sources
+    before fact processing to maximize pre-load coverage.
+
+    Runs at 01:00 Asia/Shanghai timezone to sync:
+    - 年金计划 from Legacy MySQL
+    - 组合计划 from Legacy MySQL
+    - 组织架构 from Legacy MySQL (incremental)
+    - 产品线 from config file
+    """
+    settings = get_settings()
+
+    # Check if reference sync is enabled
+    if not settings.reference_sync_enabled:
+        logger.info(
+            "reference_sync_schedule.disabled",
+            reason="WDH_REFERENCE_SYNC_ENABLED=False",
+        )
+        return None
+
+    logger.info(
+        "reference_sync_schedule.triggered",
+        scheduled_time=context.scheduled_execution_time.isoformat()
+        if context.scheduled_execution_time
+        else "unknown",
+    )
+
+    return RunRequest(
+        run_key=f"reference_sync_{context.scheduled_execution_time.isoformat()}"
+        if context.scheduled_execution_time
+        else "reference_sync_manual",
+        run_config={
+            "ops": {
+                "reference_sync_op": {
+                    "config": {
                         "plan_only": False,
                     }
                 }

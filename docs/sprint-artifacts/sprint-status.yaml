@@ -169,8 +169,8 @@ development_status:
   6.2-1-generic-backfill-framework-core: done  # Configuration-driven generic backfill framework - Completed 2025-12-12
   6.2-2-reference-table-schema-enhancement: done  # Add _source, _needs_review tracking fields - Reviewed & Fixed 2025-12-12
   6.2-3-fk-configuration-schema-extension: done  # FK configuration validation & documentation - Reviewed & Done 2025-12-12
-  6.2-4-pre-load-reference-sync-service: backlog  # Sync from Legacy MySQL and config files
-  6.2-5-hybrid-reference-service-integration: backlog  # Unified pre-load + backfill service
+  6.2-4-pre-load-reference-sync-service: done  # Sync from Legacy MySQL and config files - Code Review Completed 2025-12-12
+  6.2-5-hybrid-reference-service-integration: done  # Unified pre-load + backfill service - Implementation completed 2025-12-12
   6.2-6-reference-data-observability: backlog  # Dashboard, alerts, CSV export for review
   epic-6.2-retrospective: optional
 

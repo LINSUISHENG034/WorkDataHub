@@ -26,6 +26,7 @@ dependencies = [
     "psutil>=7.0.0",
     "requests>=2.32.0",
     "sqlglot>=28.1.0",
+    "PyMySQL>=1.1.0",
 ]
  
 [tool.setuptools.packages.find]

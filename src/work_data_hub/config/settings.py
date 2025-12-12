@@ -268,6 +268,34 @@ class Settings(BaseSettings):
         description="Use shared pipeline framework for annuity performance processing",
     )
 
+    # Story 6.2.4: Reference Sync Configuration
+    reference_sync_enabled: bool = Field(
+        default=True,
+        description="Enable/disable reference sync schedule",
+    )
+
+    # Legacy MySQL Configuration - for reference data sync
+    legacy_mysql_host: str = Field(
+        default="localhost",
+        description="Legacy MySQL database host",
+    )
+    legacy_mysql_port: int = Field(
+        default=3306,
+        description="Legacy MySQL database port",
+    )
+    legacy_mysql_user: str = Field(
+        default="readonly_user",
+        description="Legacy MySQL database user",
+    )
+    legacy_mysql_password: str = Field(
+        default="",
+        description="Legacy MySQL database password",
+    )
+    legacy_mysql_database: str = Field(
+        default="annuity_hub",
+        description="Legacy MySQL database name",
+    )
+
     # Database configuration - nested settings with WDH_DATABASE__ prefix
     database_host: str = Field(default="localhost", description="Database host")
     database_port: int = Field(default=5432, description="Database port")

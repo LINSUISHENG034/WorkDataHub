@@ -19,17 +19,22 @@ from work_data_hub.config.settings import get_settings
 from work_data_hub.domain.annuity_performance.service import (
     process_with_enrichment,
 )
+from work_data_hub.domain.reference_backfill import (
+    GenericBackfillService,
+    BackfillResult,
+    ReferenceSyncService,
+    load_foreign_keys_config,
+)
 from work_data_hub.domain.reference_backfill.service import (
     derive_plan_candidates,
     derive_portfolio_candidates,
 )
-from work_data_hub.domain.reference_backfill import (
-    GenericBackfillService,
-    BackfillResult,
-    load_foreign_keys_config,
+from work_data_hub.domain.reference_backfill.sync_config_loader import (
+    load_reference_sync_config,
 )
 from work_data_hub.domain.sample_trustee_performance.service import process
 from work_data_hub.io.connectors.file_connector import DataSourceConnector
+from work_data_hub.io.connectors.config_file_connector import ConfigFileConnector
 from work_data_hub.io.loader.warehouse_loader import (
     DataWarehouseLoaderError,
     fill_null_only,
@@ -1614,4 +1619,239 @@ def load_to_db_op(
 
     except Exception as e:
         context.log.error(f"Sample database load failed: {e}")
+        raise
+
+
+# Story 6.2.5: Hybrid Reference Service Integration
+
+
+class HybridReferenceConfig(Config):
+    """Configuration for hybrid reference service operation."""
+
+    domain: str
+    auto_derived_threshold: float = 0.10
+    run_preload: bool = False
+
+    @field_validator("domain")
+    @classmethod
+    def validate_domain(cls, v: str) -> str:
+        """Validate domain is non-empty."""
+        if not v or not v.strip():
+            raise ValueError("Domain must be a non-empty string")
+        return v.strip()
+
+    @field_validator("auto_derived_threshold")
+    @classmethod
+    def validate_threshold(cls, v: float) -> float:
+        """Validate threshold is between 0 and 1."""
+        if not 0 <= v <= 1:
+            raise ValueError("auto_derived_threshold must be between 0 and 1")
+        return v
+
+
+@op
+def hybrid_reference_op(
+    context: OpExecutionContext,
+    config: HybridReferenceConfig,
+    df: Any,  # pandas DataFrame
+) -> Dict[str, Any]:
+    """
+    Ensure FK references exist using hybrid strategy (Story 6.2.5).
+
+    Coordinates pre-load check and selective backfill to ensure all foreign key
+    references exist before fact data insertion. Implements the integration layer
+    of the hybrid reference data strategy (AD-011).
+
+    Strategy:
+    1. Check coverage of existing reference data (pre-loaded authoritative data)
+    2. Identify missing FK values
+    3. Backfill only missing values (auto-derived data)
+    4. Return comprehensive metrics
+
+    Args:
+        context: Dagster execution context
+        config: Configuration with domain and threshold
+        df: Fact data DataFrame
+
+    Returns:
+        Dictionary with hybrid reference operation results including:
+        - domain: Domain name
+        - pre_load_available: Whether sync service is available
+        - coverage_metrics: List of coverage metrics per table
+        - backfill_result: Backfill operation results (if any)
+        - total_auto_derived: Count of auto-derived records
+        - total_authoritative: Count of authoritative records
+        - auto_derived_ratio: Ratio of auto-derived to total records
+        - degraded_mode: Whether operating in degraded mode
+        - degradation_reason: Reason for degradation (if any)
+
+    Raises:
+        Exception: If hybrid reference operation fails
+    """
+    try:
+        from work_data_hub.domain.reference_backfill import (
+            HybridReferenceService,
+            GenericBackfillService,
+            load_foreign_keys_config,
+        )
+
+        context.log.info(
+            f"Starting hybrid reference service for domain '{config.domain}' "
+            f"with threshold {config.auto_derived_threshold:.1%}"
+        )
+
+        # Load FK configurations for this domain
+        settings = get_settings()
+        config_path = Path(settings.data_sources_config)
+        fk_configs = load_foreign_keys_config(config_path, config.domain)
+
+        if not fk_configs:
+            context.log.warning(
+                f"No FK configurations found for domain '{config.domain}', skipping"
+            )
+            return {
+                "domain": config.domain,
+                "pre_load_available": False,
+                "coverage_metrics": [],
+                "backfill_result": None,
+                "total_auto_derived": 0,
+                "total_authoritative": 0,
+                "auto_derived_ratio": 0.0,
+                "degraded_mode": False,
+                "degradation_reason": None,
+            }
+
+        # Get database connection using SQLAlchemy (required by HybridReferenceService)
+        from sqlalchemy import create_engine
+
+        settings = get_settings()
+
+        # Get database connection string
+        dsn = None
+        if hasattr(settings, "get_database_connection_string"):
+            try:
+                dsn = settings.get_database_connection_string()
+            except Exception:
+                dsn = None
+        if not isinstance(dsn, str) and hasattr(settings, "database"):
+            try:
+                dsn = settings.database.get_connection_string()
+            except Exception:
+                pass
+        if not isinstance(dsn, str) or not dsn:
+            raise DataWarehouseLoaderError(
+                "Database connection failed: invalid DSN resolved from settings"
+            )
+
+        engine = None
+        conn = None
+        sync_service = None
+        sync_configs = None
+        sync_adapters = None
+
+        # Optional in-process pre-load before coverage/backfill
+        if config.run_preload:
+            try:
+                sync_config = load_reference_sync_config(str(config_path))
+                if sync_config and sync_config.enabled and sync_config.tables:
+                    sync_service = ReferenceSyncService(domain=config.domain)
+                    sync_configs = sync_config.tables
+                    # Wire only config-file adapter here; other adapters can be added as needed
+                    sync_adapters = {
+                        "config_file": ConfigFileConnector(),
+                    }
+                    context.log.info(
+                        "Pre-load enabled with %s table configs", len(sync_configs)
+                    )
+                else:
+                    context.log.info(
+                        "Pre-load requested but reference_sync config missing/disabled; skipping"
+                    )
+            except Exception as preload_error:
+                context.log.warning(
+                    "Pre-load setup failed; continuing without pre-load: %s",
+                    preload_error,
+                )
+
+        try:
+            # Create SQLAlchemy engine and connection
+            engine = create_engine(dsn)
+            conn = engine.connect()
+
+            # Initialize services
+            backfill_service = GenericBackfillService(domain=config.domain)
+
+            hybrid_service = HybridReferenceService(
+                backfill_service=backfill_service,
+                sync_service=sync_service,
+                auto_derived_threshold=config.auto_derived_threshold,
+                sync_configs=sync_configs,
+                sync_adapters=sync_adapters,
+            )
+
+            # Ensure references
+            result = hybrid_service.ensure_references(
+                domain=config.domain,
+                df=df,
+                fk_configs=fk_configs,
+                conn=conn,
+            )
+
+            # Log metrics
+            coverage_rates = [m.coverage_rate for m in result.coverage_metrics]
+            context.log.info(
+                f"Hybrid reference result: "
+                f"coverage={coverage_rates}, "
+                f"auto_derived_ratio={result.auto_derived_ratio:.1%}"
+            )
+
+            # Warn if threshold exceeded
+            if result.auto_derived_ratio > config.auto_derived_threshold:
+                context.log.warning(
+                    f"Auto-derived ratio {result.auto_derived_ratio:.1%} exceeds "
+                    f"threshold {config.auto_derived_threshold:.1%}. "
+                    f"Consider running reference_sync job."
+                )
+
+            # Convert result to dictionary for Dagster serialization
+            return {
+                "domain": result.domain,
+                "pre_load_available": result.pre_load_available,
+                "coverage_metrics": [
+                    {
+                        "table": m.table,
+                        "total_fk_values": m.total_fk_values,
+                        "covered_values": m.covered_values,
+                        "missing_values": m.missing_values,
+                        "coverage_rate": m.coverage_rate,
+                    }
+                    for m in result.coverage_metrics
+                ],
+                "backfill_result": (
+                    {
+                        "processing_order": result.backfill_result.processing_order,
+                        "tables_processed": result.backfill_result.tables_processed,
+                        "total_inserted": result.backfill_result.total_inserted,
+                        "total_skipped": result.backfill_result.total_skipped,
+                        "processing_time_seconds": result.backfill_result.processing_time_seconds,
+                        "rows_per_second": result.backfill_result.rows_per_second,
+                    }
+                    if result.backfill_result
+                    else None
+                ),
+                "total_auto_derived": result.total_auto_derived,
+                "total_authoritative": result.total_authoritative,
+                "auto_derived_ratio": result.auto_derived_ratio,
+                "degraded_mode": result.degraded_mode,
+                "degradation_reason": result.degradation_reason,
+            }
+
+        finally:
+            if conn is not None:
+                conn.close()
+            if engine is not None:
+                engine.dispose()
+
+    except Exception as e:
+        context.log.error(f"Hybrid reference operation failed: {e}")
         raise

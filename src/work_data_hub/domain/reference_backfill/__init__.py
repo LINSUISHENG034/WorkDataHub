@@ -20,6 +20,8 @@ from .service import (
     validate_portfolio_candidates,
 )
 from .generic_service import GenericBackfillService, BackfillResult
+from .sync_service import ReferenceSyncService, SyncResult
+from .hybrid_service import HybridReferenceService, HybridResult, CoverageMetrics
 from .config_loader import load_foreign_keys_config, get_domain_from_context
 
 __all__ = [
@@ -34,6 +36,11 @@ __all__ = [
     "validate_portfolio_candidates",
     "GenericBackfillService",
     "BackfillResult",
+    "ReferenceSyncService",
+    "SyncResult",
+    "HybridReferenceService",
+    "HybridResult",
+    "CoverageMetrics",
     "load_foreign_keys_config",
     "get_domain_from_context",
 ]
