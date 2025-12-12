@@ -851,6 +851,6 @@ context.add_output_metadata({
 ## 11. References
 
 - [Problem Analysis](./problem-analysis.md)
-- [Existing Backfill Service](../../../src/work_data_hub/domain/reference_backfill/service.py)
+- [Existing Backfill Service](../../../src/work_data_hub/domain/reference_backfill/generic_service.py)
 - [Data Sources Config](../../../config/data_sources.yml)
 - [Pipeline Jobs](../../../src/work_data_hub/orchestration/jobs.py)

@@ -33,7 +33,7 @@ In complex business scenarios, it's common for child tables to contain new key v
 
 The project has an existing `reference_backfill` domain that handles FK dependencies:
 
-**Location:** `src/work_data_hub/domain/reference_backfill/service.py`
+**Location:** `src/work_data_hub/domain/reference_backfill/generic_service.py`
 
 **Current Coverage:**
 | Reference Table | Derive Function | Status |
@@ -139,7 +139,7 @@ As the system grows:
 
 ## 6. References
 
-- **Existing Backfill Service:** `src/work_data_hub/domain/reference_backfill/service.py`
+- **Existing Backfill Service:** `src/work_data_hub/domain/reference_backfill/generic_service.py`
 - **Pipeline Jobs:** `src/work_data_hub/orchestration/jobs.py:100-118`
 - **Backfill Ops:** `src/work_data_hub/orchestration/ops.py:783-1062`
 - **MySQL FK Definitions:** `scripts/migrations/mysql_to_postgres_sync/README.md:101-119`

@@ -166,7 +166,7 @@ development_status:
   # Dependencies: Epic 5 (Infrastructure Layer), Epic 6.1 (Enrichment Index)
   # Verification: scripts/validation/verify_backfill_integrated.py (6/6 tests passed)
   epic-6.2: in-progress
-  6.2-1-generic-backfill-framework-core: ready-for-dev  # Configuration-driven generic backfill framework - Story created 2025-12-12
+  6.2-1-generic-backfill-framework-core: done  # Configuration-driven generic backfill framework - Completed 2025-12-12
   6.2-2-reference-table-schema-enhancement: backlog  # Add _source, _needs_review tracking fields
   6.2-3-fk-configuration-schema-extension: backlog  # FK relationships in data_sources.yml
   6.2-4-pre-load-reference-sync-service: backlog  # Sync from Legacy MySQL and config files

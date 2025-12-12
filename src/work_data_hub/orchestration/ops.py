@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, cast
 import yaml
 from dagster import Config, OpExecutionContext, op
 from pydantic import field_validator, model_validator
+from sqlalchemy.engine import Connection
 
 from work_data_hub.config.settings import get_settings
 from work_data_hub.domain.annuity_performance.service import (
@@ -21,6 +22,11 @@ from work_data_hub.domain.annuity_performance.service import (
 from work_data_hub.domain.reference_backfill.service import (
     derive_plan_candidates,
     derive_portfolio_candidates,
+)
+from work_data_hub.domain.reference_backfill import (
+    GenericBackfillService,
+    BackfillResult,
+    load_foreign_keys_config,
 )
 from work_data_hub.domain.sample_trustee_performance.service import process
 from work_data_hub.io.connectors.file_connector import DataSourceConnector
@@ -560,10 +566,12 @@ class LoadConfig(Config):
 class BackfillRefsConfig(Config):
     """Configuration for reference backfill operation."""
 
+    # Legacy configuration for backward compatibility
     targets: List[str] = []  # Empty list means no backfill
     mode: str = "insert_missing"  # or "fill_null_only"
     plan_only: bool = True
     chunk_size: int = 1000
+    domain: str = "annuity_performance"  # Domain to backfill references for
 
     @field_validator("targets")
     @classmethod
@@ -571,7 +579,7 @@ class BackfillRefsConfig(Config):
         """Validate backfill targets are supported."""
         if not v:  # Allow empty list to disable backfill
             return v
-        valid = ["plans", "portfolios", "all"]
+        valid = ["plans", "portfolios", "all", "generic"]
         for target in v:
             if target not in valid:
                 raise ValueError(f"Invalid target: {target}. Valid: {valid}")
@@ -585,6 +593,14 @@ class BackfillRefsConfig(Config):
         if v not in valid_modes:
             raise ValueError(f"Mode '{v}' not supported. Valid: {valid_modes}")
         return v
+
+
+class GenericBackfillConfig(Config):
+    """Configuration for generic backfill operation."""
+
+    domain: str = "annuity_performance"
+    add_tracking_fields: bool = True
+    plan_only: bool = True
 
 
 @op
@@ -1047,6 +1063,115 @@ def backfill_refs_op(
 
 
 @op
+def generic_backfill_refs_op(
+    context: OpExecutionContext,
+    config: GenericBackfillConfig,
+    processed_rows: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    Execute generic reference backfill using configuration-driven approach.
+
+    This op replaces the legacy backfill_refs_op with the new
+    GenericBackfillService that reads foreign_keys configuration from
+    data_sources.yml.
+
+    Args:
+        context: Dagster execution context
+        config: Generic backfill configuration
+        processed_rows: Processed fact data to derive references from
+
+    Returns:
+        Dictionary with backfill execution metadata
+    """
+    # Convert processed rows to DataFrame for the service
+    import pandas as pd
+    df = pd.DataFrame(processed_rows)
+
+    if df.empty:
+        context.log.info("No processed rows provided for backfill")
+        return {"processing_order": [], "tables_processed": [], "total_inserted": 0, "plan_only": config.plan_only}
+
+    conn = None
+    try:
+        # Load foreign key configurations
+        settings = get_settings()
+        config_path = Path(settings.data_sources_config)
+        fk_configs = load_foreign_keys_config(config_path, config.domain)
+
+        if not fk_configs:
+            context.log.info(f"No foreign_keys configuration found for domain '{config.domain}'")
+            return {"processing_order": [], "tables_processed": [], "total_inserted": 0, "plan_only": config.plan_only}
+
+        # Create database connection if not in plan_only mode
+        if not config.plan_only:
+            # Use SQLAlchemy connection for GenericBackfillService
+            from sqlalchemy import create_engine
+
+            dsn = settings.get_database_connection_string()
+            if not dsn:
+                raise DataWarehouseLoaderError(
+                    "Database connection failed: invalid DSN resolved from settings"
+                )
+
+            context.log.info(f"Connecting to database for generic backfill (domain: {config.domain})")
+
+            # Create SQLAlchemy engine
+            engine = create_engine(dsn)
+            conn = engine.connect()
+
+        # Create and run the generic backfill service
+        service = GenericBackfillService(config.domain)
+        result = service.run(
+            df=df,
+            configs=fk_configs,
+            conn=conn,
+            add_tracking_fields=config.add_tracking_fields,
+            plan_only=config.plan_only,
+        )
+
+        # Convert BackfillResult to dictionary for JSON serialization
+        result_dict = {
+            "processing_order": result.processing_order,
+            "tables_processed": result.tables_processed,
+            "total_inserted": result.total_inserted,
+            "total_skipped": result.total_skipped,
+            "processing_time_seconds": result.processing_time_seconds,
+            "rows_per_second": result.rows_per_second,
+            "plan_only": config.plan_only,
+            "domain": config.domain,
+            "tracking_fields_enabled": config.add_tracking_fields
+        }
+
+        # Enhanced logging
+        mode_text = "EXECUTED" if not config.plan_only else "PLAN-ONLY"
+        context.log.info(
+            f"Generic backfill completed ({mode_text}) - domain: {config.domain}, "
+            f"tables: {len(result.tables_processed)}, inserted: {result.total_inserted}, "
+            f"skipped: {result.total_skipped}, time: {result.processing_time_seconds:.2f}s"
+        )
+
+        # Log per-table results
+        for table_info in result.tables_processed:
+            context.log.info(
+                f"Table '{table_info['table']}': {table_info['inserted']} inserted, "
+                f"{table_info.get('skipped', 0)} skipped"
+            )
+
+        # Performance logging
+        if result.rows_per_second:
+            context.log.info(f"Backfill performance: {result.rows_per_second:.0f} rows/sec")
+
+        return result_dict
+
+    except Exception as e:
+        context.log.error(f"Generic backfill operation failed: {e}")
+        raise
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+@op
 def gate_after_backfill(
     context: OpExecutionContext,
     processed_rows: List[Dict[str, Any]],
@@ -1064,7 +1189,10 @@ def gate_after_backfill(
         if isinstance(backfill_summary, dict)
         else []
     )
-    context.log.info(f"Backfill completed; gating fact load. operations={len(ops)}")
+    tables = backfill_summary.get("tables_processed", [])
+    context.log.info(
+        f"Backfill completed; gating fact load. operations={len(ops)}, tables={len(tables)}"
+    )
     return processed_rows
 
 

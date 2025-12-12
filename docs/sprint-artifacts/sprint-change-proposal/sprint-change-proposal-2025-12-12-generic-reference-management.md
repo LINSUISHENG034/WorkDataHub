@@ -74,7 +74,7 @@ When fact data (e.g., `规模明细` table) contains foreign key values that don
 
 | Component | Location | Change Type |
 |-----------|----------|-------------|
-| Generic Backfill Service | `domain/reference_backfill/service.py` | Major refactor |
+| Generic Backfill Service | `domain/reference_backfill/generic_service.py` | Major refactor |
 | FK Configuration Model | `domain/reference_backfill/models.py` | New file |
 | Pipeline Ops | `orchestration/ops.py` | Extend existing |
 | Database Migrations | `io/schema/migrations/` | New migration |
@@ -419,7 +419,7 @@ GROUP BY _source;
 - Problem Analysis: `docs/specific/backfill-method/problem-analysis.md`
 - Mixed Strategy Solution: `docs/specific/backfill-method/mixed-strategy-solution.md`
 - Verification Plan: `docs/specific/backfill-method/verification-plan-v2.md`
-- Existing Backfill Service: `src/work_data_hub/domain/reference_backfill/service.py`
+- Existing Backfill Service: `src/work_data_hub/domain/reference_backfill/generic_service.py`
 
 ### 6.2 Related PRD Requirements
 

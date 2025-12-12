@@ -14,6 +14,8 @@
 # - fallback: Behavior when version detection is ambiguous (error, use_latest_modified)
 
 # Schema version for backward compatibility
+# Version 1.0: Initial schema with file discovery patterns
+# Version 1.0+: Added optional foreign_keys section for reference backfill (backward compatible)
 schema_version: "1.0"
 
 domains:
@@ -55,6 +57,83 @@ domains:
     output:
       table: "规模明细"
       schema_name: "business"
+
+    # Foreign key backfill configuration for reference data management
+    # Schema Version: 1.0 (backward compatible addition)
+    # This section is optional - if missing, no backfill operations will be performed
+    foreign_keys:
+      # 年金计划 (Annuity Plan) reference table backfill
+      - name: "fk_plan"
+        source_column: "计划代码"
+        target_table: "年金计划"
+        target_key: "年金计划号"
+        mode: "insert_missing"
+        backfill_columns:
+          - source: "计划代码"
+            target: "年金计划号"
+          - source: "计划名称"
+            target: "计划名称"
+            optional: true
+          - source: "计划类型"
+            target: "计划类型"
+            optional: true
+          - source: "客户名称"
+            target: "客户名称"
+            optional: true
+          - source: "主拓代码"
+            target: "主拓代码"
+            optional: true
+          - source: "主拓机构"
+            target: "主拓机构"
+            optional: true
+          - source: "资格"
+            target: "资格"
+            optional: true
+
+      # 组合计划 (Portfolio Plan) reference table backfill
+      - name: "fk_portfolio"
+        source_column: "组合代码"
+        target_table: "组合计划"
+        target_key: "组合代码"
+        mode: "insert_missing"
+        depends_on: ["fk_plan"]  # Portfolio depends on Plan
+        backfill_columns:
+          - source: "组合代码"
+            target: "组合代码"
+          - source: "计划代码"
+            target: "年金计划号"  # Foreign key to 年金计划
+          - source: "组合名称"
+            target: "组合名称"
+            optional: true
+          - source: "组合类型"
+            target: "组合类型"
+            optional: true
+
+      # 产品线 (Product Line) reference table backfill
+      - name: "fk_product_line"
+        source_column: "产品线代码"
+        target_table: "产品线"
+        target_key: "产品线代码"
+        mode: "insert_missing"
+        backfill_columns:
+          - source: "产品线代码"
+            target: "产品线代码"
+          - source: "产品线名称"
+            target: "产品线名称"
+            optional: true
+
+      # 组织架构 (Organization) reference table backfill
+      - name: "fk_organization"
+        source_column: "组织代码"
+        target_table: "组织架构"
+        target_key: "组织代码"
+        mode: "insert_missing"
+        backfill_columns:
+          - source: "组织代码"
+            target: "组织代码"
+          - source: "组织名称"
+            target: "组织名称"
+            optional: true
 
   # Annuity Income Domain (Epic 5.5 - Pipeline Architecture Validation)
   # Story 5.5.2: Second domain to validate Infrastructure Layer architecture

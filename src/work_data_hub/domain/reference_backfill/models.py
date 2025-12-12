@@ -2,13 +2,14 @@
 Data models for reference backfill operations.
 
 This module defines Pydantic models representing reference table candidates
-that can be derived from processed fact data.
+that can be derived from processed fact data, and configuration models for
+the generic backfill framework.
 """
 
 from datetime import date
-from typing import Optional
+from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 class AnnuityPlanCandidate(BaseModel):
@@ -47,3 +48,106 @@ class PortfolioCandidate(BaseModel):
     组合名称: Optional[str] = Field(None, max_length=255, description="Portfolio name")
     组合类型: Optional[str] = Field(None, max_length=255, description="Portfolio type")
     运作开始日: Optional[date] = Field(None, description="Operation start date")
+
+
+# Generic Backfill Framework Configuration Models
+
+class BackfillColumnMapping(BaseModel):
+    """
+    Configuration for mapping columns from fact data to reference table columns.
+
+    Represents the relationship between source columns in the fact data
+    and target columns in the reference table.
+    """
+
+    model_config = ConfigDict(extra='forbid')
+
+    source: str = Field(..., description="Fact data column name to extract from")
+    target: str = Field(..., description="Reference table column name to fill")
+    optional: bool = Field(default=False, description="Whether missing source data should be skipped")
+
+    @field_validator('source', 'target')
+    @classmethod
+    def validate_column_names(cls, v):
+        """Validate column names are non-empty strings."""
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("Column names must be non-empty strings")
+        return v.strip()
+
+
+class ForeignKeyConfig(BaseModel):
+    """
+    Configuration for a foreign key relationship and its backfill operation.
+
+    Defines how to derive reference table candidates from fact data,
+    including column mappings, dependencies, and processing mode.
+    """
+
+    model_config = ConfigDict(extra='forbid')
+
+    name: str = Field(..., description="Unique identifier for this foreign key configuration")
+    source_column: str = Field(..., description="Column in fact data containing the foreign key values")
+    target_table: str = Field(..., description="Reference table name to backfill")
+    target_key: str = Field(..., description="Primary key column in target reference table")
+    backfill_columns: List[BackfillColumnMapping] = Field(
+        ..., description="Column mappings from fact data to reference table"
+    )
+    mode: Literal["insert_missing", "fill_null_only"] = Field(
+        default="insert_missing",
+        description="Processing mode: insert_missing adds new records, fill_null_only updates nulls"
+    )
+    depends_on: List[str] = Field(
+        default_factory=list,
+        description="List of foreign key names that must be processed before this one"
+    )
+
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v):
+        """Validate FK name is a non-empty string."""
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("Foreign key name must be a non-empty string")
+        return v.strip()
+
+    @field_validator('source_column', 'target_table', 'target_key')
+    @classmethod
+    def validate_identifiers(cls, v):
+        """Validate table/column identifiers are non-empty strings."""
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("Source column, target table, and target key must be non-empty strings")
+        return v.strip()
+
+    @field_validator('backfill_columns')
+    @classmethod
+    def validate_backfill_columns(cls, v):
+        """Validate at least one backfill column is provided."""
+        if not v or len(v) == 0:
+            raise ValueError("At least one backfill column mapping must be provided")
+        return v
+
+
+class DomainForeignKeysConfig(BaseModel):
+    """
+    Configuration for all foreign keys within a domain.
+
+    Container for all foreign key configurations that need to be processed
+    for a specific domain's backfill operations.
+    """
+
+    model_config = ConfigDict(extra='forbid')
+
+    foreign_keys: List[ForeignKeyConfig] = Field(
+        default_factory=list,
+        description="List of foreign key configurations for this domain"
+    )
+
+    @field_validator('foreign_keys')
+    @classmethod
+    def validate_foreign_keys(cls, v):
+        """Validate foreign key names are unique within the domain."""
+        if v:
+            names = [fk.name for fk in v]
+            if len(names) != len(set(names)):
+                duplicates = [name for name in names if names.count(name) > 1]
+                raise ValueError(f"Duplicate foreign key names found: {duplicates}")
+        return v

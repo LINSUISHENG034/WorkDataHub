@@ -21,7 +21,7 @@ The goals are:
 
 | Layer | Responsibilities | Allowed Dependencies | Representative modules |
 | --- | --- | --- | --- |
-| `domain/` | Pure business logic, TransformStep protocols, Pipeline executor, validation utilities. No knowledge of files, databases, or Dagster. | stdlib, `pandas`, `pydantic`, Story 1.5 pipeline modules inside `domain/`. | `src/work_data_hub/domain/pipelines/core.py`, `src/work_data_hub/domain/pipelines/types.py`, `src/work_data_hub/domain/reference_backfill/service.py`. |
+| `domain/` | Pure business logic, TransformStep protocols, Pipeline executor, validation utilities. No knowledge of files, databases, or Dagster. | stdlib, `pandas`, `pydantic`, Story 1.5 pipeline modules inside `domain/`. | `src/work_data_hub/domain/pipelines/core.py`, `src/work_data_hub/domain/pipelines/types.py`, `src/work_data_hub/domain/reference_backfill/generic_service.py`. |
 | `io/` | Filesystem, Excel readers, warehouse loaders, connectors, adapters that speak to Bronze data. May import `domain/` to reuse types, but never the other way around. | Everything the domain layer can use **plus** infrastructure SDKs (psycopg2, openpyxl, yaml, etc.). | `src/work_data_hub/io/readers/excel_reader.py`, `src/work_data_hub/io/loader/warehouse_loader.py`, `src/work_data_hub/io/connectors/file_connector.py`. |
 | `orchestration/` | Dagster jobs/ops/schedules/sensors plus CLI entry points that stitch the system together. Performs dependency injection so domain logic stays pure. | May import domain + I/O modules, Dagster, config/logging helpers. | `src/work_data_hub/orchestration/jobs.py`, `ops.py`, `schedules.py`, `sensors.py`. |
 
