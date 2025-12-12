@@ -125,7 +125,7 @@ development_status:
   5.6-1-dry-run-failed-records-export: done  # OPT-001: Export validation failures to CSV
   5.6-2-normalize-company-name-bracket-fix: done  # OPT-002: HIGH PRIORITY - Fix bracket handling bug
   5.6-3-domain-data-loading-mode-configuration: done  # OPT-003: Redesigned - REFRESH mode for detail tables
-  5.6-4-domain-development-guide: done  # OPT-004: Create domain development documentation (updated with loading modes)
+  5.6-4-domain-development-guide: done  # OPT-004: Guide now lives at docs/guides/domain-migration/development-guide.md
   epic-5.6-retrospective: optional
 
   # Epic 6: Company Enrichment Service - COMPLETED
@@ -168,7 +168,7 @@ development_status:
   epic-6.2: in-progress
   6.2-1-generic-backfill-framework-core: done  # Configuration-driven generic backfill framework - Completed 2025-12-12
   6.2-2-reference-table-schema-enhancement: done  # Add _source, _needs_review tracking fields - Reviewed & Fixed 2025-12-12
-  6.2-3-fk-configuration-schema-extension: backlog  # FK relationships in data_sources.yml
+  6.2-3-fk-configuration-schema-extension: done  # FK configuration validation & documentation - Reviewed & Done 2025-12-12
   6.2-4-pre-load-reference-sync-service: backlog  # Sync from Legacy MySQL and config files
   6.2-5-hybrid-reference-service-integration: backlog  # Unified pre-load + backfill service
   6.2-6-reference-data-observability: backlog  # Dashboard, alerts, CSV export for review

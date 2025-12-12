@@ -9,7 +9,7 @@ the generic backfill framework.
 from datetime import date
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 
 
 class AnnuityPlanCandidate(BaseModel):
@@ -151,3 +151,46 @@ class DomainForeignKeysConfig(BaseModel):
                 duplicates = [name for name in names if names.count(name) > 1]
                 raise ValueError(f"Duplicate foreign key names found: {duplicates}")
         return v
+
+    @model_validator(mode="after")
+    def validate_dependencies(self):
+        """
+        Validate depends_on references and detect circular dependencies.
+
+        Rules:
+        - depends_on 只能引用同一域内已声明的 FK
+        - 不允许自引用
+        - 检测环依赖并报错
+        """
+        names = {fk.name for fk in self.foreign_keys}
+        # 同域存在性校验
+        for fk in self.foreign_keys:
+            missing = [dep for dep in fk.depends_on if dep not in names]
+            if missing:
+                raise ValueError(
+                    f"depends_on must reference same-domain FK: missing {missing}"
+                )
+            if fk.name in fk.depends_on:
+                raise ValueError("circular dependency detected: self reference")
+
+        # 环依赖检测
+        graph = {fk.name: fk.depends_on for fk in self.foreign_keys}
+        visiting = set()
+        visited = set()
+
+        def dfs(node, path):
+            if node in visiting:
+                cycle_path = "->".join(path + [node])
+                raise ValueError(f"circular dependency detected: {cycle_path}")
+            if node in visited:
+                return
+            visiting.add(node)
+            for dep in graph.get(node, []):
+                dfs(dep, path + [node])
+            visiting.remove(node)
+            visited.add(node)
+
+        for start in graph:
+            dfs(start, [])
+
+        return self

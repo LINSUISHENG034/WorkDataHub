@@ -49,6 +49,7 @@ PYTHONPATH=src uv run python scripts/migrations/migrate_legacy_to_enrichment_ind
 | Document | Purpose | When to Use |
 |----------|---------|-------------|
 | [Development Guide](./development-guide.md) | Implementation patterns and code templates | Phase 3 - Writing domain code |
+| [Foreign Key Backfill (section)](./development-guide.md#foreign-key-backfill-configuration-configdatasourcesyml) | FK 配置示例、依赖约束、最佳实践 | When adding/updating `foreign_keys` 配置 |
 | [Code Mapping](./code-mapping.md) | Document → Code translation | Phase 3 - Converting docs to code |
 | [Mapping Validation Best Practices](./mapping-validation-best-practices.md) | Mapping integrity and validation strategies | **Critical** - Before and after implementation |
 

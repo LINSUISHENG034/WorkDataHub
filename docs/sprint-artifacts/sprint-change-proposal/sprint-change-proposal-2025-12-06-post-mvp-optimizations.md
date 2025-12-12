@@ -62,7 +62,7 @@ During the Epic 5.5 MVP validation phase (specifically Stories 5.5.3 and 5.5.4),
 | OPT-001 | `domain/annuity_income/service.py` | +10 |
 | OPT-002 | `infrastructure/cleansing/rules/string_rules.py` | +2 |
 | OPT-003 | `domain/*/service.py` (module constant) | +4 |
-| OPT-004 | `docs/guides/domain-development-guide.md` (new) | +200 |
+| OPT-004 | `docs/guides/domain-migration/development-guide.md` (new) | +200 |
 
 > **Note:** After KISS/YAGNI review, OPT-001/002/003 were significantly simplified. See Section 4 for details.
 
@@ -289,7 +289,7 @@ UNIQUE (月度, 业务类型);
 
 #### Change: Create new documentation file
 
-**File:** `docs/guides/domain-development-guide.md` (NEW)
+**File:** `docs/guides/domain-migration/development-guide.md` (NEW)
 
 **Content Outline:**
 

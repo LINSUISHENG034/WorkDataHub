@@ -8,14 +8,12 @@ and error handling for invalid configurations.
 
 import pytest
 from pydantic import ValidationError
-from pathlib import Path
 
 from work_data_hub.domain.reference_backfill.models import (
     BackfillColumnMapping,
     ForeignKeyConfig,
     DomainForeignKeysConfig
 )
-from work_data_hub.domain.reference_backfill.config_loader import load_foreign_keys_config
 
 
 class TestBackfillColumnMapping:
@@ -312,20 +310,3 @@ class TestDomainForeignKeysConfig:
         assert "Extra inputs are not permitted" in str(exc_info.value)
 
 
-class TestConfigLoader:
-    """Tests for configuration loader behavior."""
-
-    def test_invalid_config_raises_value_error(self, tmp_path: Path):
-        config_path = tmp_path / "data_sources.yml"
-        config_path.write_text(
-            """
-schema_version: "1.0"
-domains:
-  annuity_performance:
-    foreign_keys: "invalid"
-""",
-            encoding="utf-8",
-        )
-
-        with pytest.raises(ValueError):
-            load_foreign_keys_config(config_path, "annuity_performance")

@@ -323,7 +323,7 @@ When creating a **brownfield PRD** for new features:
 
 ### For Creating New Domains
 
-- **[Domain Development Guide](./guides/domain-development-guide.md)** - Comprehensive guide for implementing new data domains, based on Epic 5.5 learnings
+- **[Domain Migration Guide](./guides/domain-migration/development-guide.md)** - Comprehensive guide for domain migration/development (Epic 5.5+ learnings, extended index under `guides/domain-migration/`)
 
 ---
 

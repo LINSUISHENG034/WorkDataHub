@@ -1,7 +1,7 @@
 # Domain Development Guide
 
 **Version:** 1.1
-**Last Updated:** 2025-12-09
+**Last Updated:** 2025-12-12
 **Based On:** Epic 5.5 Pipeline Architecture Validation
 
 ---
@@ -177,6 +177,67 @@ src/work_data_hub/domain/{domain_name}/
 ---
 
 ## Key Configuration Patterns
+
+### Foreign Key Backfill Configuration (config/data_sources.yml)
+
+Use this when the domain需要配置驱动的引用表回填（Epic 6.2）。`foreign_keys` 节是可选的，缺失时 loader 返回空列表（no-op）。
+
+**Steps**
+1. 打开 `config/data_sources.yml`
+2. 在目标域下添加 `foreign_keys`（依赖只能指向同一域内已声明的 FK，禁止跨域；不允许环/自引用）：
+
+```yaml
+schema_version: "1.0"  # backward compatible
+domains:
+  annuity_performance:
+    foreign_keys:
+      - name: "fk_plan"
+        source_column: "计划代码"
+        target_table: "年金计划"
+        target_key: "年金计划号"
+        mode: "insert_missing"
+        backfill_columns:
+          - source: "计划代码"
+            target: "年金计划号"
+          - source: "计划名称"
+            target: "计划名称"
+            optional: true
+      - name: "fk_portfolio"
+        source_column: "组合代码"
+        target_table: "组合计划"
+        target_key: "组合代码"
+        depends_on: ["fk_plan"]  # same-domain only
+        backfill_columns:
+          - source: "组合代码"
+            target: "组合代码"
+          - source: "计划代码"
+            target: "年金计划号"
+
+  annuity_income:
+    # 示例：可按需启用/扩展 FK 配置
+    foreign_keys: []
+```
+
+**Best Practices**
+- **Unique per domain:** FK 名称在同一域内必须唯一。
+- **Same-domain dependencies only:** `depends_on` 仅能引用同域 FK，跨域引用应拆分为独立域配置。
+- **No cycles:** 环/自引用会在加载阶段被拒绝（错误信息包含 `circular dependency`）。
+- **Optional columns:** 仅对非必需字段使用 `optional: true`，避免吞掉关键字段。
+- **Backward compatibility:** `schema_version: "1.0"` + 缺失 `foreign_keys` 节均应无副作用（返回空列表）。
+
+**Schema Version Evolution Strategy**
+
+| Version | Features | Migration Path |
+|---------|----------|----------------|
+| 1.0 (current) | `foreign_keys` section, `depends_on`, `optional` columns | N/A (initial) |
+| 1.1 (planned) | Cross-domain references, conditional backfill | Add `cross_domain_refs` field; 1.0 configs remain valid |
+| 2.0 (future) | Breaking changes (if any) | Migration script + deprecation warnings in 1.x |
+
+**Version Compatibility Rules:**
+1. **Minor versions (1.x):** Always backward compatible; new fields are optional with sensible defaults
+2. **Major versions (2.x):** May introduce breaking changes; migration scripts provided
+3. **Missing `foreign_keys`:** Always treated as empty list (no-op) regardless of version
+4. **Unknown fields:** Rejected by Pydantic `extra='forbid'` to catch typos early
 
 ### Data Loading Mode Configuration
 

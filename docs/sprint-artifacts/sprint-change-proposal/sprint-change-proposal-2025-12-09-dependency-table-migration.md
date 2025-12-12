@@ -12,7 +12,7 @@
 
 ### Problem Statement
 
-The current `cleansing-rules-template.md` template (7 sections) and `domain-development-guide.md` workflow (6 phases) lack systematic guidance for dependency table migration. This gap may cause:
+The current `cleansing-rules-template.md` template (7 sections) and `domain-migration/development-guide.md` workflow (6 phases) lack systematic guidance for dependency table migration. This gap may cause:
 
 1. Missing dependency tables during domain migration
 2. Inconsistent data between legacy and new systems
@@ -50,7 +50,7 @@ The current `cleansing-rules-template.md` template (7 sections) and `domain-deve
 | Artifact | Change Type | Priority | Description |
 |----------|-------------|----------|-------------|
 | `docs/templates/cleansing-rules-template.md` | Restructure + Add sections | **P0** | Reorder sections, add dependency-related sections at front |
-| `docs/guides/domain-development-guide.md` | Add new phase | **P0** | Add Phase 1: Dependency Analysis & Migration |
+| `docs/guides/domain-migration/development-guide.md` | Add new phase | **P0** | Add Phase 1: Dependency Analysis & Migration |
 | `docs/cleansing-rules/annuity-income.md` | Update example | P1 | Add dependency table sections as reference |
 | `docs/cleansing-rules/index.md` | Add tracking column | P2 | Add migration status tracking |
 
@@ -181,7 +181,7 @@ The current `cleansing-rules-template.md` template (7 sections) and `domain-deve
 
 ---
 
-### 4.2 Workflow Update: `domain-development-guide.md`
+### 4.2 Workflow Update: `domain-migration/development-guide.md`
 
 **Current Phases:**
 ```
@@ -274,7 +274,7 @@ This change can be implemented directly by the development team without backlog 
 | Task | Priority | Estimated Effort |
 |------|----------|------------------|
 | Update `cleansing-rules-template.md` | P0 | 30 min |
-| Update `domain-development-guide.md` | P0 | 30 min |
+| Update `domain-migration/development-guide.md` | P0 | 30 min |
 | Update `annuity-income.md` (example) | P1 | 20 min |
 | Update `cleansing-rules/index.md` | P2 | 10 min |
 
@@ -307,7 +307,7 @@ This change can be implemented directly by the development team without backlog 
 
 1. [Original Requirements Document](../../specific/optimized-requirements/dependency-table-migration-for-cleansing-rules.md)
 2. [Current Cleansing Rules Template](../../templates/cleansing-rules-template.md)
-3. [Current Domain Development Guide](../../guides/domain-development-guide.md)
+3. [Current Domain Development Guide](../../guides/domain-migration/development-guide.md)
 4. [Migration Script](../../../scripts/migrations/migrate_legacy_to_enrichment_index.py)
 5. [Cleansing Rules Index](../../cleansing-rules/index.md)
 

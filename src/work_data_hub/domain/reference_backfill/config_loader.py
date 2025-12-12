@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import yaml
+from yaml import YAMLError
 from pydantic import ValidationError
 
 from .models import DomainForeignKeysConfig, ForeignKeyConfig
@@ -61,6 +62,9 @@ def load_foreign_keys_config(config_path: Path, domain: str) -> List[ForeignKeyC
     except ValidationError as e:
         logger.error(f"Invalid foreign_keys configuration for domain '{domain}': {e}")
         raise ValueError(f"Invalid foreign_keys configuration: {e}") from e
+    except YAMLError as e:
+        logger.error(f"Failed to load foreign_keys configuration (YAML error): {e}")
+        raise ValueError(f"Failed to load foreign_keys configuration: {e}") from e
     except Exception as e:
         logger.error(f"Failed to load foreign_keys configuration: {e}")
         raise ValueError(f"Failed to load foreign_keys configuration: {e}") from e

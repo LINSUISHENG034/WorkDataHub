@@ -73,7 +73,7 @@ def _import(self, db):
 | `annuity_performance/service.py` | `DEFAULT_UPSERT_KEYS` incorrect | Replace with refresh mode config |
 | `annuity_income/service.py` | `DEFAULT_UPSERT_KEYS` incorrect | Replace with refresh mode config |
 | `20251206_000001_add_upsert_constraints.py` | UNIQUE constraints invalid for detail tables | Rollback migration |
-| `docs/guides/domain-development-guide.md` | Documents only UPSERT pattern | Add refresh mode documentation |
+| `docs/guides/domain-migration/development-guide.md` | Documents only UPSERT pattern | Add refresh mode documentation |
 
 ### Code Impact
 
@@ -85,7 +85,7 @@ def _import(self, db):
 | `domain/annuity_performance/service.py` | Replace upsert with refresh config | ~15 |
 | `domain/annuity_income/service.py` | Replace upsert with refresh config | ~15 |
 | `io/schema/migrations/versions/20251206_000001_*.py` | Delete or modify | -74 |
-| `docs/guides/domain-development-guide.md` | Add refresh mode section | +80 |
+| `docs/guides/domain-migration/development-guide.md` | Add refresh mode section | +80 |
 
 ---
 
@@ -267,7 +267,7 @@ else:
 
 ### Change 5: Update Domain Development Guide
 
-**File:** `docs/guides/domain-development-guide.md`
+**File:** `docs/guides/domain-migration/development-guide.md`
 
 **Add new section after "UPSERT_KEYS Configuration":**
 
