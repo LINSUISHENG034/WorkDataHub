@@ -2,6 +2,21 @@
 # WorkDataHub .gitignore
 # ============================================================================
 
+# exclude_file
+# 1. 忽略 fixtures 下的所有内容，但允许进入 fixtures 文件夹
+tests/fixtures/*
+!tests/fixtures/golden_dataset/
+
+# 2. 忽略 golden_dataset 下的所有内容，但允许进入
+tests/fixtures/golden_dataset/*
+!tests/fixtures/golden_dataset/curated/
+
+# 3. 忽略 curated 下的所有内容，但允许进入
+tests/fixtures/golden_dataset/curated/*
+
+# 4. 最后，保留这个特定的文件
+!tests/fixtures/golden_dataset/curated/dataset_requirements.md
+
 # ============================================================================
 # Operating System Files
 # ============================================================================

@@ -11,7 +11,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from graphlib import TopologicalSorter, CycleError
 import pandas as pd
@@ -44,15 +44,17 @@ class GenericBackfillService:
     monitoring.
     """
 
-    def __init__(self, domain: str):
+    def __init__(self, domain: str, enable_audit_logging: bool = True):
         """
         Initialize the backfill service.
 
         Args:
             domain: Domain name for logging and tracking
+            enable_audit_logging: Whether to enable audit logging for data changes
         """
         self.domain = domain
         self.logger = logging.getLogger(f"{__name__}.{domain}")
+        self.enable_audit_logging = enable_audit_logging
 
     def run(
         self,
@@ -313,6 +315,22 @@ class GenericBackfillService:
         # Construct column list for conflict detection (primary key)
         conflict_columns = [config.target_key]
 
+        # Pre-fetch existing keys for accurate audit logging
+        records = candidates_df.to_dict('records')
+        pk_values = [record[config.target_key] for record in records]
+        existing_keys: Set[Any] = set()
+        if pk_values:
+            pk_placeholders = ", ".join([f":pk_{i}" for i in range(len(pk_values))])
+            existing_query = text(f"""
+                SELECT {config.target_key} FROM {config.target_table}
+                WHERE {config.target_key} IN ({pk_placeholders})
+            """)
+            existing_params = {f"pk_{i}": v for i, v in enumerate(pk_values)}
+            existing_keys = {
+                row[0] for row in conn.execute(existing_query, existing_params).fetchall()
+            }
+        new_keys = {str(v) for v in pk_values} - {str(v) for v in existing_keys}
+
         # Different syntax for different databases
         if conn.dialect.name == 'postgresql':
             if config.mode == "fill_null_only":
@@ -423,14 +441,39 @@ class GenericBackfillService:
                 # Return combined count (inserted records only; updates are idempotent fills)
                 return inserted
 
-        # Convert DataFrame to list of dictionaries for batch insert
-        records = candidates_df.to_dict('records')
-
         # Execute batch insert
         result = conn.execute(text(query), records)
         conn.commit()
 
         inserted_count = result.rowcount if hasattr(result, 'rowcount') else len(records)
+
+        # Log audit events for inserted records
+        if self.enable_audit_logging and add_tracking_fields and inserted_count > 0:
+            # Import here to avoid circular import
+            from .observability import ReferenceDataAuditLogger
+
+            audit_logger = ReferenceDataAuditLogger()
+            # Log inserts for new keys
+            for record in records:
+                pk = str(record[config.target_key])
+                if pk in new_keys:
+                    audit_logger.log_insert(
+                        table=config.target_table,
+                        record_key=pk,
+                        source=record.get('_source', 'auto_derived'),
+                        domain=record.get('_derived_from_domain'),
+                        actor=f"backfill_service.{self.domain}"
+                    )
+                elif config.mode == "fill_null_only":
+                    # Existing records updated with new values (fill nulls)
+                    audit_logger.log_update(
+                        table=config.target_table,
+                        record_key=pk,
+                        old_source="unknown",
+                        new_source=record.get('_source', 'auto_derived'),
+                        domain=record.get('_derived_from_domain'),
+                        actor=f"backfill_service.{self.domain}"
+                    )
 
         self.logger.debug(
             f"Inserted {inserted_count} records into '{config.target_table}' "
