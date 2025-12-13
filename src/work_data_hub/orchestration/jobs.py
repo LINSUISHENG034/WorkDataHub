@@ -28,11 +28,12 @@ from work_data_hub.io.loader.company_mapping_loader import (
 from work_data_hub.io.loader.warehouse_loader import WarehouseLoader
 
 from .ops import (
-    backfill_refs_op,
-    derive_plan_refs_op,
-    derive_portfolio_refs_op,
+    backfill_refs_op,  # Legacy - kept for backward compatibility
+    derive_plan_refs_op,  # Legacy - kept for backward compatibility
+    derive_portfolio_refs_op,  # Legacy - kept for backward compatibility
     discover_files_op,
     gate_after_backfill,
+    generic_backfill_refs_op,  # Epic 6.2 - configuration-driven backfill
     load_op,
     load_to_db_op,
     process_annuity_performance_op,
@@ -111,12 +112,12 @@ def annuity_performance_job() -> Any:
     excel_rows = read_excel_op(discovered_paths)
     processed_data = process_annuity_performance_op(excel_rows, discovered_paths)
 
-    # Derive reference candidates from processed data
-    plan_candidates = derive_plan_refs_op(processed_data)
-    portfolio_candidates = derive_portfolio_refs_op(processed_data)
+    # Epic 6.2: Generic reference backfill using configuration-driven approach
+    # Replaces legacy derive_plan_refs_op + derive_portfolio_refs_op + backfill_refs_op
+    # Now handles all 4 FKs (年金计划, 组合计划, 产品线, 组织架构) via data_sources.yml config
+    backfill_result = generic_backfill_refs_op(processed_data)
 
-    # Backfill references and gate before loading facts (FK‑safe ordering)
-    backfill_result = backfill_refs_op(plan_candidates, portfolio_candidates)
+    # Gate before loading facts (FK-safe ordering)
     gated_rows = gate_after_backfill(processed_data, backfill_result)
     load_op(gated_rows)
 
