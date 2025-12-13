@@ -28,10 +28,10 @@ domains:
     base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集"
 
     # File patterns to match (glob syntax)
-    # Pattern validated: matches exactly 1 file in V1 directory
-    # Example: 24年11月年金终稿数据.xlsx
+    # Updated 2025-12-13: Changed to match real data file naming convention
+    # Example: 【for年金机构经营分析】25年10月年金规模收入数据 1111.xlsx
     file_patterns:
-      - "*年金终稿*.xlsx"
+      - "*规模收入数据*.xlsx"
 
     # Patterns to exclude (temp files, emails, etc.)
     exclude_patterns:
@@ -63,10 +63,12 @@ domains:
     # This section is optional - if missing, no backfill operations will be performed
     foreign_keys:
       # 年金计划 (Annuity Plan) reference table backfill
+      # Fixed 2025-12-13: Added target_schema: mapping (actual location in Legacy DB)
       - name: "fk_plan"
         source_column: "计划代码"
         target_table: "年金计划"
         target_key: "年金计划号"
+        target_schema: "mapping"
         mode: "insert_missing"
         backfill_columns:
           - source: "计划代码"
@@ -91,10 +93,12 @@ domains:
             optional: true
 
       # 组合计划 (Portfolio Plan) reference table backfill
+      # Fixed 2025-12-13: Added target_schema: mapping
       - name: "fk_portfolio"
         source_column: "组合代码"
         target_table: "组合计划"
         target_key: "组合代码"
+        target_schema: "mapping"
         mode: "insert_missing"
         depends_on: ["fk_plan"]  # Portfolio depends on Plan
         backfill_columns:
@@ -110,29 +114,37 @@ domains:
             optional: true
 
       # 产品线 (Product Line) reference table backfill
+      # Note: 产品线代码 is derived by Pipeline Step 6 (业务类型 → 产品线代码)
+      # via BUSINESS_TYPE_CODE_MAPPING in infrastructure/mappings/shared.py
+      # FK Backfill runs AFTER pipeline, so 产品线代码 column will exist
       - name: "fk_product_line"
         source_column: "产品线代码"
         target_table: "产品线"
         target_key: "产品线代码"
+        target_schema: "mapping"
         mode: "insert_missing"
         backfill_columns:
           - source: "产品线代码"
             target: "产品线代码"
-          - source: "产品线名称"
-            target: "产品线名称"
+          - source: "业务类型"
+            target: "产品线"
             optional: true
 
       # 组织架构 (Organization) reference table backfill
+      # Fixed 2025-12-13: source_column and target_key corrected to 机构代码
+      # Edge case: "(空白)" values should be skipped (handled by skip_blank_values flag)
       - name: "fk_organization"
-        source_column: "组织代码"
+        source_column: "机构代码"
         target_table: "组织架构"
-        target_key: "组织代码"
+        target_key: "机构代码"
+        target_schema: "mapping"
         mode: "insert_missing"
+        skip_blank_values: true  # Skip "(空白)" and empty values
         backfill_columns:
-          - source: "组织代码"
-            target: "组织代码"
-          - source: "组织名称"
-            target: "组织名称"
+          - source: "机构代码"
+            target: "机构代码"
+          - source: "机构"
+            target: "机构"
             optional: true
 
   # Annuity Income Domain (Epic 5.5 - Pipeline Architecture Validation)
@@ -143,9 +155,9 @@ domains:
     base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集"
 
     # File patterns to match (glob syntax)
-    # Same source file as annuity_performance, different sheet
+    # Updated 2025-12-13: Same pattern as annuity_performance (same file, different sheet)
     file_patterns:
-      - "*年金终稿*.xlsx"
+      - "*规模收入数据*.xlsx"
 
     # Patterns to exclude (temp files, emails, etc.)
     exclude_patterns:

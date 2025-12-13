@@ -172,8 +172,7 @@ reference/claude-code-full-guide/
 reference/patoken/
 
 # Test fixtures
-fixtures/
-tests/fixtures/
+
 
 # Migration and legacy
 db_migration/
