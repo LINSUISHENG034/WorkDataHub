@@ -13,8 +13,7 @@ from sqlalchemy import create_engine
 from work_data_hub.config.settings import get_settings
 from work_data_hub.domain.reference_backfill.sync_service import ReferenceSyncService
 from work_data_hub.domain.reference_backfill.sync_config_loader import load_reference_sync_config
-from work_data_hub.io.connectors.legacy_mysql_connector import LegacyMySQLConnector
-from work_data_hub.io.connectors.config_file_connector import ConfigFileConnector
+from work_data_hub.io.connectors.adapter_factory import AdapterFactory
 
 logger = structlog.get_logger(__name__)
 
@@ -71,11 +70,8 @@ def reference_sync_op(context: OpExecutionContext, config: ReferenceSyncOpConfig
         logger.info("reference_sync_op.disabled", message="Reference sync is disabled")
         return {"status": "skipped", "reason": "disabled"}
 
-    # Initialize adapters
-    adapters = {
-        "legacy_mysql": LegacyMySQLConnector(),
-        "config_file": ConfigFileConnector(),
-    }
+    # Initialize adapters (postgres/mysql/config_file) using factory
+    adapters = AdapterFactory.create_adapters_for_configs(sync_config.tables)
 
     # Initialize sync service
     sync_service = ReferenceSyncService(domain="reference_sync")

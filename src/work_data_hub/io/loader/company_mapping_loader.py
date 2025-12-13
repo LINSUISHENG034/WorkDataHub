@@ -11,17 +11,16 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-# Add legacy path for MySqlDBManager import
+# Add legacy path for MySqlDBManager import (fallback only)
 sys.path.append(str(Path(__file__).parent.parent.parent.parent.parent / "legacy"))
 
 try:
     from legacy.annuity_hub.database_operations.mysql_ops import MySqlDBManager
 except ImportError:
-    # Fallback for development/testing
     MySqlDBManager = None  # type: ignore
-    logging.warning("MySqlDBManager not available - legacy extraction will be disabled")
+    logging.warning("MySqlDBManager not available - MySQL fallback disabled")
 
 
 from work_data_hub.domain.company_enrichment.models import CompanyMappingRecord
@@ -33,6 +32,8 @@ from work_data_hub.io.loader.warehouse_loader import (
     build_insert_sql_with_conflict,
     quote_qualified,
 )
+from work_data_hub.io.connectors.postgres_source_adapter import PostgresSourceAdapter
+from work_data_hub.domain.reference_backfill.sync_models import ReferenceSyncTableConfig
 
 logger = logging.getLogger(__name__)
 
@@ -57,11 +58,6 @@ def extract_legacy_mappings() -> List[CompanyMappingRecord]:
     Raises:
         CompanyMappingLoaderError: If critical extraction failures occur
     """
-    if MySqlDBManager is None:
-        raise CompanyMappingLoaderError(
-            "MySqlDBManager not available - cannot extract legacy mappings"
-        )
-
     logger.info("Starting legacy mapping extraction from 5 sources")
     mappings: List[CompanyMappingRecord] = []
     extraction_stats = {
@@ -234,59 +230,128 @@ def _extract_with_retry(
     raise last_exception
 
 
+def _fetch_from_postgres(
+    table: str,
+    schema: str,
+    columns: List[str],
+    description: str,
+    connection_env_prefix: str = "WDH_LEGACY",
+) -> List[Dict[str, Any]]:
+    """
+    Fetch rows from legacy PostgreSQL using the generic PostgresSourceAdapter.
+    Falls back to MySqlDBManager if Postgres is unavailable and MySQL driver exists.
+    """
+    adapter = PostgresSourceAdapter(connection_env_prefix=connection_env_prefix)
+
+    config = ReferenceSyncTableConfig(
+        name=description,
+        target_table=table,
+        target_schema=schema,
+        source_type="postgres",
+        source_config={
+            "schema": schema,
+            "table": table,
+            "columns": [{"source": c, "target": c} for c in columns],
+        },
+        sync_mode="upsert",
+        primary_key=columns[0],
+    )
+
+    try:
+        df = adapter.fetch_data(table_config=config, state=None)
+        return df.to_dict(orient="records")
+    except Exception as e:
+        logger.error(f"PostgreSQL fetch failed for {description}: {e}")
+        if MySqlDBManager is None:
+            raise
+        logger.warning("Falling back to MySQL legacy connector for %s", description)
+        return []
+
+
 # NOTE: _extract_company_id1_mapping function has been removed
 # The plan code mapping data has been migrated to enterprise.enrichment_index
 # See migration script: scripts/migrations/migrate_plan_mapping_to_enrichment_index.py
 
 
 def _extract_company_id2_mapping() -> Dict[str, str]:
-    """Extract COMPANY_ID2_MAPPING from MySQL (account numbers)."""
-    with MySqlDBManager(database="enterprise") as mysqldb:
-        cursor = mysqldb.cursor
-        try:
-            cursor.execute("""
-                SELECT DISTINCT `年金账户号`, `company_id`
-                FROM `annuity_account_mapping`
-                WHERE `年金账户号` NOT LIKE 'GM%';
-            """)
-            rows = cursor.fetchall()
-        finally:
-            cursor.close()
+    """Extract COMPANY_ID2_MAPPING from legacy source (prefers Postgres)."""
+    rows = _fetch_from_postgres(
+        table="annuity_account_mapping",
+        schema="enterprise",
+        columns=["年金账户号", "company_id"],
+        description="COMPANY_ID2_MAPPING",
+    )
 
-    return {row[0]: row[1] for row in rows if row[0] and row[1]}
+    # Fallback to MySQL if Postgres adapter was not usable
+    if not rows and MySqlDBManager is not None:
+        with MySqlDBManager(database="enterprise") as mysqldb:
+            cursor = mysqldb.cursor
+            try:
+                cursor.execute(
+                    """
+                    SELECT DISTINCT `年金账户号`, `company_id`
+                    FROM `annuity_account_mapping`
+                    WHERE `年金账户号` NOT LIKE 'GM%';
+                    """
+                )
+                rows = cursor.fetchall()
+            finally:
+                cursor.close()
+
+    return {row["年金账户号"] if isinstance(row, dict) else row[0]: row["company_id"] if isinstance(row, dict) else row[1] for row in rows if row and (row["年金账户号"] if isinstance(row, dict) else row[0]) and (row["company_id"] if isinstance(row, dict) else row[1])}
 
 
 def _extract_company_id4_mapping() -> Dict[str, str]:
-    """Extract COMPANY_ID4_MAPPING from MySQL (customer names)."""
-    with MySqlDBManager(database="enterprise") as mysqldb:
-        cursor = mysqldb.cursor
-        try:
-            cursor.execute("""
-                SELECT DISTINCT `company_name`, `company_id`
-                FROM `company_id_mapping`;
-            """)
-            rows = cursor.fetchall()
-        finally:
-            cursor.close()
+    """Extract COMPANY_ID4_MAPPING from legacy source (prefers Postgres)."""
+    rows = _fetch_from_postgres(
+        table="company_id_mapping",
+        schema="enterprise",
+        columns=["company_name", "company_id"],
+        description="COMPANY_ID4_MAPPING",
+    )
 
-    return {row[0]: row[1] for row in rows if row[0] and row[1]}
+    if not rows and MySqlDBManager is not None:
+        with MySqlDBManager(database="enterprise") as mysqldb:
+            cursor = mysqldb.cursor
+            try:
+                cursor.execute(
+                    """
+                    SELECT DISTINCT `company_name`, `company_id`
+                    FROM `company_id_mapping`;
+                    """
+                )
+                rows = cursor.fetchall()
+            finally:
+                cursor.close()
+
+    return {row["company_name"] if isinstance(row, dict) else row[0]: row["company_id"] if isinstance(row, dict) else row[1] for row in rows if row and (row["company_name"] if isinstance(row, dict) else row[0]) and (row["company_id"] if isinstance(row, dict) else row[1])}
 
 
 def _extract_company_id5_mapping() -> Dict[str, str]:
-    """Extract COMPANY_ID5_MAPPING from MySQL (account names)."""
-    with MySqlDBManager(database="business") as mysqldb:
-        cursor = mysqldb.cursor
-        try:
-            cursor.execute("""
-                SELECT DISTINCT `年金账户名`, `company_id`
-                FROM `规模明细`
-                WHERE `company_id` IS NOT NULL;
-            """)
-            rows = cursor.fetchall()
-        finally:
-            cursor.close()
+    """Extract COMPANY_ID5_MAPPING from legacy source (prefers Postgres)."""
+    rows = _fetch_from_postgres(
+        table="规模明细",
+        schema="business",
+        columns=["年金账户名", "company_id"],
+        description="COMPANY_ID5_MAPPING",
+    )
 
-    return {row[0]: row[1] for row in rows if row[0] and row[1]}
+    if not rows and MySqlDBManager is not None:
+        with MySqlDBManager(database="business") as mysqldb:
+            cursor = mysqldb.cursor
+            try:
+                cursor.execute(
+                    """
+                    SELECT DISTINCT `年金账户名`, `company_id`
+                    FROM `规模明细`
+                    WHERE `company_id` IS NOT NULL;
+                    """
+                )
+                rows = cursor.fetchall()
+            finally:
+                cursor.close()
+
+    return {row["年金账户名"] if isinstance(row, dict) else row[0]: row["company_id"] if isinstance(row, dict) else row[1] for row in rows if row and (row["年金账户名"] if isinstance(row, dict) else row[0]) and (row["company_id"] if isinstance(row, dict) else row[1])}
 
 
 def load_company_mappings(

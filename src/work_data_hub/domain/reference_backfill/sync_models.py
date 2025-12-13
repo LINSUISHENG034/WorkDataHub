@@ -78,6 +78,37 @@ class LegacyMySQLSourceConfig(BaseModel):
         description="Optional incremental sync configuration"
     )
 
+
+class PostgresSourceConfig(BaseModel):
+    """
+    Configuration for PostgreSQL data source.
+
+    Defines schema, table name, column mappings, and optional incremental sync settings.
+    Supports connecting to PostgreSQL databases where legacy data has been migrated.
+    """
+
+    model_config = ConfigDict(extra='forbid')
+
+    source_schema: str = Field(
+        default="public",
+        description="Source schema name in PostgreSQL (e.g., 'enterprise', 'business')",
+        alias="schema",
+    )
+    table: str = Field(..., description="Source table name in PostgreSQL")
+    columns: List[ColumnMapping] = Field(
+        ...,
+        description="Column mappings from source to target"
+    )
+    incremental: Optional[IncrementalConfig] = Field(
+        None,
+        description="Optional incremental sync configuration"
+    )
+    connection_env_prefix: str = Field(
+        default="WDH_LEGACY",
+        description="Environment variable prefix for connection settings (fallback to WDH_LEGACY_PG for compatibility)",
+        alias="connection_env_prefix",
+    )
+
     @field_validator('table')
     @classmethod
     def validate_table(cls, v: str) -> str:
@@ -131,9 +162,9 @@ class ReferenceSyncTableConfig(BaseModel):
         default="business",
         description="Target schema name"
     )
-    source_type: Literal["legacy_mysql", "config_file"] = Field(
+    source_type: Literal["legacy_mysql", "mysql", "postgres", "config_file"] = Field(
         ...,
-        description="Type of data source"
+        description="Type of data source: legacy_mysql/mysql, postgres, or config_file"
     )
     source_config: Dict[str, Any] = Field(
         ...,

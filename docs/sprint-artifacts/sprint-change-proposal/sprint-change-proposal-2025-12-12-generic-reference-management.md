@@ -1,7 +1,7 @@
 # Sprint Change Proposal: Generic Reference Data Management
 
 **Date:** 2025-12-12
-**Status:** Pending Approval
+**Status:** Approved (2025-12-12)
 **Triggered By:** Story 6.1 Development - `annuity_performance` Domain
 **Change Scope:** Moderate
 **Proposed Epic:** Epic 6.2 - Generic Reference Data Management
@@ -108,7 +108,7 @@ Phase 4: Hybrid Strategy Integration
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  Layer 1: Authoritative Data (权威数据)                         │
-│  Source: Legacy MySQL, MDM, Config files                        │
+│  Source: Legacy PostgreSQL, MDM, Config files                   │
 │  Characteristics: Complete fields, verified, audit trail        │
 │  Marker: source = 'authoritative'                               │
 └─────────────────────────────────────────────────────────────────┘
@@ -260,15 +260,18 @@ domains:
 **So that** most FK values are covered before fact processing.
 
 **Acceptance Criteria:**
-- Sync from Legacy MySQL for 年金计划, 组合计划, 组织架构
+- Sync from Legacy PostgreSQL for 年金计划, 组合计划, 组织架构
 - Load from config file for 产品线
 - Mark all pre-loaded data as `source='authoritative'`
 - Scheduled execution (daily at 1:00 AM)
 
 **Technical Notes:**
 - Implement `ReferenceSyncService` class
-- Support multiple source types: `legacy_mysql`, `config_file`
+- Support multiple source types: `postgres`, `legacy_mysql`, `config_file`
 - Dagster job: `reference_sync_job`
+
+> **Note (2025-12-13):** Original design assumed Legacy MySQL, but infrastructure has migrated to PostgreSQL.
+> See Story 6.2-P1 (Generic Data Source Adapter Architecture) for the adapter implementation that supports both databases.
 
 ---
 

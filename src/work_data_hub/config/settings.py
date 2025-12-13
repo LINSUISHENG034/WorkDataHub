@@ -274,7 +274,7 @@ class Settings(BaseSettings):
         description="Enable/disable reference sync schedule",
     )
 
-    # Legacy MySQL Configuration - for reference data sync
+    # Legacy MySQL Configuration - for reference data sync (retained for backward compatibility)
     legacy_mysql_host: str = Field(
         default="localhost",
         description="Legacy MySQL database host",
@@ -294,6 +294,30 @@ class Settings(BaseSettings):
     legacy_mysql_database: str = Field(
         default="annuity_hub",
         description="Legacy MySQL database name",
+    )
+
+    # Legacy PostgreSQL Configuration - for reference data sync (Story 6.2-P1)
+    # The legacy data has been migrated from MySQL to PostgreSQL
+    # Connection uses WDH_LEGACY_PG_* environment variables
+    legacy_pg_host: str = Field(
+        default="localhost",
+        description="Legacy PostgreSQL database host",
+    )
+    legacy_pg_port: int = Field(
+        default=5432,
+        description="Legacy PostgreSQL database port",
+    )
+    legacy_pg_user: str = Field(
+        default="postgres",
+        description="Legacy PostgreSQL database user",
+    )
+    legacy_pg_password: str = Field(
+        default="",
+        description="Legacy PostgreSQL database password",
+    )
+    legacy_pg_database: str = Field(
+        default="legacy",
+        description="Legacy PostgreSQL database name",
     )
 
     # Database configuration - nested settings with WDH_DATABASE__ prefix

@@ -180,6 +180,11 @@ domains:
 
 # Story 6.2.4: Reference Sync Configuration
 # Pre-load reference data from authoritative sources
+# Updated 2025-12-13: Changed from legacy_mysql to postgres (Story 6.2-P1)
+# The legacy data has been migrated to PostgreSQL database 'legacy' with schemas:
+# - enterprise (was MySQL database 'enterprise')
+# - business (was MySQL database 'business')
+# - mapping (was MySQL database 'mapping')
 reference_sync:
   enabled: true
   schedule: "0 1 * * *"  # Daily at 01:00 AM (Asia/Shanghai)
@@ -187,12 +192,14 @@ reference_sync:
   batch_size: 5000
 
   tables:
-    # 年金计划 - from Legacy MySQL
+    # 年金计划 - from Legacy PostgreSQL (migrated from MySQL)
     - name: "年金计划"
       target_table: "年金计划"
       target_schema: "business"
-      source_type: "legacy_mysql"
+      source_type: "postgres"
       source_config:
+        connection_env_prefix: "WDH_LEGACY"
+        schema: "enterprise"
         table: "annuity_plan"
         columns:
           - source: "plan_code"
@@ -206,12 +213,14 @@ reference_sync:
       sync_mode: "upsert"
       primary_key: "年金计划号"
 
-    # 组合计划 - from Legacy MySQL
+    # 组合计划 - from Legacy PostgreSQL (migrated from MySQL)
     - name: "组合计划"
       target_table: "组合计划"
       target_schema: "business"
-      source_type: "legacy_mysql"
+      source_type: "postgres"
       source_config:
+        connection_env_prefix: "WDH_LEGACY"
+        schema: "enterprise"
         table: "portfolio_plan"
         columns:
           - source: "portfolio_code"
@@ -225,12 +234,14 @@ reference_sync:
       sync_mode: "upsert"
       primary_key: "组合代码"
 
-    # 组织架构 - from Legacy MySQL with incremental sync
+    # 组织架构 - from Legacy PostgreSQL with incremental sync
     - name: "组织架构"
       target_table: "组织架构"
       target_schema: "business"
-      source_type: "legacy_mysql"
+      source_type: "postgres"
       source_config:
+        connection_env_prefix: "WDH_LEGACY"
+        schema: "enterprise"
         table: "organization"
         columns:
           - source: "org_code"
