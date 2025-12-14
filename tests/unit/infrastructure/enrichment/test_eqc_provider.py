@@ -103,14 +103,18 @@ class TestEqcProviderLookup:
     def test_lookup_success(self, provider: EqcProvider) -> None:
         """Successful lookup returns CompanyInfo."""
         provider.client = MagicMock()
-        provider.client.search_company.return_value = [
-            SimpleNamespace(
-                company_id="614810477",
-                official_name="中国平安保险集团股份有限公司",
-                unite_code="91440300100001XXXX",
-                match_score=0.9,
-            )
-        ]
+        # Mock search_company_with_raw to return (results, raw_json) tuple
+        provider.client.search_company_with_raw.return_value = (
+            [
+                SimpleNamespace(
+                    company_id="614810477",
+                    official_name="中国平安保险集团股份有限公司",
+                    unite_code="91440300100001XXXX",
+                    match_score=0.9,
+                )
+            ],
+            {"list": [{"companyId": "614810477"}]},  # raw_json
+        )
 
         result = provider.lookup("中国平安")
 
@@ -124,7 +128,7 @@ class TestEqcProviderLookup:
     def test_lookup_not_found_returns_none(self, provider: EqcProvider) -> None:
         """EQC not found returns None."""
         provider.client = MagicMock()
-        provider.client.search_company.side_effect = EQCNotFoundError("not found")
+        provider.client.search_company_with_raw.side_effect = EQCNotFoundError("not found")
 
         result = provider.lookup("不存在的公司")
 
@@ -133,7 +137,8 @@ class TestEqcProviderLookup:
     def test_lookup_empty_results_returns_none(self, provider: EqcProvider) -> None:
         """Empty results list returns None."""
         provider.client = MagicMock()
-        provider.client.search_company.return_value = []
+        # Return empty results with raw_json
+        provider.client.search_company_with_raw.return_value = ([], {})
 
         result = provider.lookup("不存在的公司")
 
@@ -142,7 +147,7 @@ class TestEqcProviderLookup:
     def test_lookup_unauthorized_disables_provider(self, provider: EqcProvider) -> None:
         """HTTP 401 disables provider for session."""
         provider.client = MagicMock()
-        provider.client.search_company.side_effect = EQCAuthenticationError("unauth")
+        provider.client.search_company_with_raw.side_effect = EQCAuthenticationError("unauth")
 
         result = provider.lookup("任意公司")
 
@@ -166,14 +171,17 @@ class TestEqcProviderLookup:
     def test_lookup_decrements_budget(self, provider: EqcProvider) -> None:
         """Each lookup decrements budget."""
         provider.client = MagicMock()
-        provider.client.search_company.return_value = [
-            SimpleNamespace(
-                company_id="123",
-                official_name="Test",
-                match_score=0.8,
-                unite_code=None,
-            )
-        ]
+        provider.client.search_company_with_raw.return_value = (
+            [
+                SimpleNamespace(
+                    company_id="123",
+                    official_name="Test",
+                    match_score=0.8,
+                    unite_code=None,
+                )
+            ],
+            {"list": []},
+        )
 
         initial_budget = provider.remaining_budget
         provider.lookup("公司A")
@@ -215,7 +223,7 @@ class TestEqcProviderRetry:
     def test_lookup_retries_on_timeout(self, provider: EqcProvider) -> None:
         """Timeouts via EQC client return None without raising."""
         provider.client = MagicMock()
-        provider.client.search_company.side_effect = EQCClientError("timeout")
+        provider.client.search_company_with_raw.side_effect = EQCClientError("timeout")
 
         result = provider.lookup("公司A")
 
@@ -224,7 +232,7 @@ class TestEqcProviderRetry:
     def test_lookup_no_retry_on_4xx(self, provider: EqcProvider) -> None:
         """Client errors return None without retrying."""
         provider.client = MagicMock()
-        provider.client.search_company.side_effect = EQCClientError("bad request")
+        provider.client.search_company_with_raw.side_effect = EQCClientError("bad request")
 
         result = provider.lookup("公司A")
 
@@ -233,7 +241,7 @@ class TestEqcProviderRetry:
     def test_lookup_retries_exhausted(self, provider: EqcProvider) -> None:
         """Budget decremented even when EQC client fails."""
         provider.client = MagicMock()
-        provider.client.search_company.side_effect = EQCClientError("timeout")
+        provider.client.search_company_with_raw.side_effect = EQCClientError("timeout")
 
         initial_budget = provider.remaining_budget
         result = provider.lookup("公司A")
@@ -262,14 +270,17 @@ class TestEqcProviderCache:
             )
 
         provider.client = MagicMock()
-        provider.client.search_company.return_value = [
-            SimpleNamespace(
-                company_id="614810477",
-                official_name="中国平安",
-                unite_code=None,
-                match_score=0.9,
-            )
-        ]
+        provider.client.search_company_with_raw.return_value = (
+            [
+                SimpleNamespace(
+                    company_id="614810477",
+                    official_name="中国平安",
+                    unite_code=None,
+                    match_score=0.9,
+                )
+            ],
+            {"list": [{"companyId": "614810477"}]},
+        )
 
         # Mock normalize_for_temp_id at the module where it's imported in _cache_result
         with patch("work_data_hub.infrastructure.enrichment.normalizer.normalize_for_temp_id") as mock_norm:
@@ -302,14 +313,17 @@ class TestEqcProviderCache:
             )
 
         provider.client = MagicMock()
-        provider.client.search_company.return_value = [
-            SimpleNamespace(
-                company_id="614810477",
-                official_name="中国平安",
-                unite_code=None,
-                match_score=0.9,
-            )
-        ]
+        provider.client.search_company_with_raw.return_value = (
+            [
+                SimpleNamespace(
+                    company_id="614810477",
+                    official_name="中国平安",
+                    unite_code=None,
+                    match_score=0.9,
+                )
+            ],
+            {"list": [{"companyId": "614810477"}]},
+        )
 
         # Mock normalize_company_name at the module where it's imported in _cache_result
         with patch("work_data_hub.infrastructure.cleansing.normalize_company_name") as mock_norm:

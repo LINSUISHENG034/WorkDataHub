@@ -7,12 +7,10 @@ rate limiting, retries, and configuration management.
 """
 
 import logging
-import os
 import random
 import time
 from collections import deque
 from typing import Deque, List, Optional
-from urllib.parse import quote
 
 import requests
 
@@ -405,6 +403,109 @@ class EQCClient:
             )
 
             return companies
+
+        except requests.JSONDecodeError as e:
+            logger.error(
+                "Failed to parse EQC search response",
+                extra={"query": cleaned_name, "error": str(e)},
+            )
+            raise EQCClientError(f"Invalid JSON response from EQC search API: {e}")
+
+        except KeyError as e:
+            logger.error(
+                "Unexpected EQC search response structure",
+                extra={"query": cleaned_name, "missing_key": str(e)},
+            )
+            raise EQCClientError(
+                f"Unexpected response structure from EQC search API: {e}"
+            )
+
+    def search_company_with_raw(self, name: str) -> tuple[List[CompanySearchResult], dict]:
+        """
+        Search for companies by name and return both parsed results and raw JSON.
+
+        This method is identical to search_company() but also returns the raw
+        API response for persistence purposes (Story 6.2-P5).
+
+        Args:
+            name: Company name to search for (supports Chinese characters)
+
+        Returns:
+            Tuple of (parsed_results, raw_json_response)
+            - parsed_results: List of CompanySearchResult objects
+            - raw_json_response: Complete API response as dict (response body only)
+
+        Raises:
+            EQCAuthenticationError: If authentication fails
+            EQCClientError: For other API errors or network issues
+            ValueError: If name is empty or invalid
+
+        Security:
+            Only returns response body JSON - no headers, no token, no URL params.
+
+        Examples:
+            >>> client = EQCClient()
+            >>> results, raw_json = client.search_company_with_raw("中国平安")
+            >>> print(f"Found {len(results)} companies")
+            >>> print(f"Raw response keys: {raw_json.keys()}")
+        """
+        if not name or not name.strip():
+            raise ValueError("Company name cannot be empty")
+
+        # Clean the search name (do NOT pre-encode - requests handles encoding)
+        cleaned_name = name.strip()
+
+        # Construct search URL - using legacy endpoint format
+        url = f"{self.base_url}/kg-api-hfd/api/search/"
+        params = {"key": cleaned_name}
+
+        logger.info(
+            "Searching companies via EQC (with raw response)",
+            extra={
+                "query": cleaned_name,
+                "query_length": len(cleaned_name),
+                "endpoint": "search",
+            },
+        )
+
+        try:
+            # Make the API request
+            response = self._make_request("GET", url, params=params)
+            data = response.json()
+
+            # Parse response based on EQC API structure
+            results_list = data.get("list", [])
+
+            # Map EQC response fields to our domain models
+            companies = []
+            for item in results_list:
+                try:
+                    company = CompanySearchResult(
+                        company_id=str(item.get("companyId", "")),
+                        official_name=item.get("companyFullName", ""),
+                        unite_code=item.get("unite_code"),
+                        match_score=0.9,
+                    )
+                    companies.append(company)
+
+                except Exception as e:
+                    logger.warning(
+                        "Failed to parse search result item",
+                        extra={"item": item, "error": str(e)},
+                    )
+                    continue
+
+            logger.info(
+                "Company search with raw response completed",
+                extra={
+                    "query": cleaned_name,
+                    "results_count": len(companies),
+                    "raw_results": len(results_list),
+                },
+            )
+
+            # Return both parsed results and raw JSON (response body only)
+            return companies, data
 
         except requests.JSONDecodeError as e:
             logger.error(

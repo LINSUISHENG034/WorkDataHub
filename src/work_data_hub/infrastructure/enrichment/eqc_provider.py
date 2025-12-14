@@ -260,18 +260,18 @@ class EqcProvider:
             return None
 
         # Make API call with retry
-        result = self._call_api_with_retry(company_name)
+        result, raw_json = self._call_api_with_retry(company_name)
 
         # Decrement budget regardless of result
         self.remaining_budget -= 1
 
         # Cache successful result
         if result and self.mapping_repository:
-            self._cache_result(company_name, result)
+            self._cache_result(company_name, result, raw_json)
 
         return result
 
-    def _call_api_with_retry(self, company_name: str) -> Optional[CompanyInfo]:
+    def _call_api_with_retry(self, company_name: str) -> tuple[Optional[CompanyInfo], Optional[dict]]:
         """
         Call EQC API with retry logic for network timeouts.
 
@@ -279,7 +279,7 @@ class EqcProvider:
             company_name: Company name to look up.
 
         Returns:
-            CompanyInfo if found, None otherwise.
+            Tuple of (CompanyInfo, raw_json) if found, (None, None) otherwise.
         """
         try:
             return self._call_api(company_name)
@@ -289,25 +289,25 @@ class EqcProvider:
                 msg="EQC authentication failed - disabling provider",
             )
             self._disabled = True
-            return None
+            return None, None
         except EQCNotFoundError:
             logger.debug("eqc_provider.not_found")
-            return None
+            return None, None
         except EQCClientError as e:
             logger.warning(
                 "eqc_provider.request_error",
                 error_type=type(e).__name__,
             )
-            return None
+            return None, None
         except requests.Timeout:
             logger.warning(
                 "eqc_provider.timeout",
                 attempt=MAX_RETRIES,
                 max_retries=MAX_RETRIES,
             )
-            return None
+            return None, None
 
-    def _call_api(self, company_name: str) -> Optional[CompanyInfo]:
+    def _call_api(self, company_name: str) -> tuple[Optional[CompanyInfo], Optional[dict]]:
         """
         Make single API call to EQC search endpoint.
 
@@ -315,22 +315,26 @@ class EqcProvider:
             company_name: Company name to look up.
 
         Returns:
-            CompanyInfo if found, None otherwise.
+            Tuple of (CompanyInfo, raw_json) if found, (None, None) otherwise.
+            raw_json contains the complete API response for persistence.
         """
         if not self.client:
-            return None
+            return None, None
 
-        results = self.client.search_company(company_name)
+        # Use search_company_with_raw to get both parsed results and raw JSON
+        # (Story 6.2-P5: Need raw response for persistence)
+        results, raw_json = self.client.search_company_with_raw(company_name)
         if not results:
-            return None
+            return None, None
 
         top = results[0]
 
         if not top.company_id or not top.official_name:
             logger.debug("eqc_provider.incomplete_result")
-            return None
+            return None, None
 
-        return CompanyInfo(
+        # Create CompanyInfo
+        company_info = CompanyInfo(
             company_id=str(top.company_id),
             official_name=top.official_name,
             unified_credit_code=getattr(top, "unite_code", None),
@@ -338,13 +342,25 @@ class EqcProvider:
             match_type="eqc",
         )
 
-    def _cache_result(self, company_name: str, result: CompanyInfo) -> None:
+        return company_info, raw_json
+
+    def _cache_result(
+        self,
+        company_name: str,
+        result: CompanyInfo,
+        raw_json: Optional[dict] = None,
+    ) -> None:
         """
         Cache successful lookup result to database (non-blocking).
+
+        Writes to both:
+        1. enterprise.enrichment_index (Epic 6.1 cache)
+        2. enterprise.base_info (Story 6.2-P5 persistence)
 
         Args:
             company_name: Original company name query.
             result: CompanyInfo from successful lookup.
+            raw_json: Raw API response for persistence (Story 6.2-P5).
         """
         try:
             from work_data_hub.infrastructure.enrichment.normalizer import normalize_for_temp_id
@@ -371,6 +387,30 @@ class EqcProvider:
                 "eqc_provider.cached_result",
                 msg="Cached EQC lookup result to enrichment_index",
             )
+
+            # Story 6.2-P5: Write to enterprise.base_info with raw API response
+            # This is best-effort persistence - failure must not fail the lookup
+            if raw_json and self.mapping_repository:
+                try:
+                    self.mapping_repository.upsert_base_info(
+                        company_id=result.company_id,
+                        search_key_word=company_name,
+                        company_full_name=result.official_name,
+                        unite_code=result.unified_credit_code,
+                        raw_data=raw_json,
+                    )
+                    logger.debug(
+                        "eqc_provider.persisted_to_base_info",
+                        msg="Persisted EQC result to base_info table",
+                    )
+                except Exception as e:
+                    # Non-blocking: log and continue
+                    logger.warning(
+                        "eqc_provider.base_info_persistence_failed",
+                        msg="Failed to persist to base_info - continuing without persistence",
+                        error_type=type(e).__name__,
+                    )
+
         except Exception:
             # Non-blocking: log and continue
             logger.warning(

@@ -77,15 +77,19 @@ def eqc_provider_with_client() -> EqcProvider:
         )
 
     # Replace EQC client with simple stub
+    # Note: search_company_with_raw returns (results, raw_json) tuple
     provider.client = SimpleNamespace(
-        search_company=lambda name: [
-            SimpleNamespace(
-                company_id="C123",
-                official_name=f"{name}_official",
-                match_score=0.9,
-                unite_code=None,
-            )
-        ]
+        search_company_with_raw=lambda name: (
+            [
+                SimpleNamespace(
+                    company_id="C123",
+                    official_name=f"{name}_official",
+                    match_score=0.9,
+                    unite_code=None,
+                )
+            ],
+            {"list": [{"companyId": "C123"}]},  # raw_json
+        )
     )
     return provider
 

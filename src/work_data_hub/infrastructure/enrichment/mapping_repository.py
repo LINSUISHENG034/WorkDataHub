@@ -15,6 +15,7 @@ Repository Pattern:
 - Log counts only; never log alias/company_id values
 """
 
+import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -964,3 +965,82 @@ class CompanyMappingRepository:
         )
 
         return updated
+
+    # =========================================================================
+    # Story 6.2-P5: EQC Data Persistence Operations
+    # =========================================================================
+
+    def upsert_base_info(
+        self,
+        company_id: str,
+        search_key_word: str,
+        company_full_name: str,
+        unite_code: Optional[str],
+        raw_data: Dict[str, Any],
+    ) -> bool:
+        """
+        Upsert company data to enterprise.base_info table with raw API response.
+
+        This method writes EQC search results to the base_info table for
+        historical analysis and audit trails (Story 6.2-P5).
+
+        Conflict Resolution:
+        - If company_id exists: Update raw_data and updated_at only
+        - Rationale: Preserve existing structured fields, update raw data
+
+        Args:
+            company_id: EQC company ID (primary key).
+            search_key_word: Original search query that found this company.
+            company_full_name: Official company name from EQC.
+            unite_code: Unified social credit code (统一社会信用代码).
+            raw_data: Complete EQC API response JSON (response body only).
+
+        Returns:
+            True if new record was inserted, False if existing record was updated.
+
+        Security:
+            Only persists response body JSON - no headers, no token, no URL params.
+
+        Example:
+            >>> raw_response = {"list": [...], "total": 1}
+            >>> inserted = repo.upsert_base_info(
+            ...     company_id="1000065057",
+            ...     search_key_word="中国平安",
+            ...     company_full_name="中国平安保险（集团）股份有限公司",
+            ...     unite_code="91440300618698064P",
+            ...     raw_data=raw_response,
+            ... )
+            >>> print(f"New record: {inserted}")
+        """
+        query = text("""
+            INSERT INTO enterprise.base_info
+                (company_id, search_key_word, "companyFullName", unite_code, raw_data, updated_at)
+            VALUES
+                (:company_id, :search_key_word, :company_full_name, :unite_code, :raw_data, NOW())
+            ON CONFLICT (company_id) DO UPDATE SET
+                raw_data = EXCLUDED.raw_data,
+                updated_at = NOW()
+            RETURNING (xmax = 0) AS inserted
+        """)
+
+        result = self.connection.execute(
+            query,
+            {
+                "company_id": company_id,
+                "search_key_word": search_key_word,
+                "company_full_name": company_full_name,
+                "unite_code": unite_code,
+                "raw_data": json.dumps(raw_data, ensure_ascii=False) if raw_data else None,
+            },
+        )
+
+        row = result.fetchone()
+        inserted = row.inserted if row else False
+
+        logger.info(
+            "mapping_repository.upsert_base_info.completed",
+            company_id=company_id,
+            inserted=inserted,
+        )
+
+        return inserted
