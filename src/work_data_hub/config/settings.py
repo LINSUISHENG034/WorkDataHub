@@ -274,6 +274,20 @@ class Settings(BaseSettings):
         description="Enable/disable reference sync schedule",
     )
 
+    # Story 6.2-P5: EQC Data Freshness Configuration
+    eqc_data_freshness_threshold_days: int = Field(
+        default=90,
+        description="Data older than this is considered stale (days)",
+    )
+    eqc_data_refresh_batch_size: int = Field(
+        default=100,
+        description="Batch size for refresh operations",
+    )
+    eqc_data_refresh_rate_limit: float = Field(
+        default=1.0,
+        description="Requests per second during refresh",
+    )
+
     # Legacy MySQL Configuration - for reference data sync (retained for backward compatibility)
     legacy_mysql_host: str = Field(
         default="localhost",
@@ -344,14 +358,25 @@ class Settings(BaseSettings):
         1) WDH_DATABASE__URI (canonical, from .env)
         2) WDH_DATABASE_URI (alternate, from .env)
         3) Construct from individual WDH_DATABASE_* components (from .env)
+
+        Automatically corrects 'postgres://' scheme to 'postgresql://' for
+        SQLAlchemy compatibility.
         """
         env_uri = os.getenv("WDH_DATABASE__URI") or os.getenv("WDH_DATABASE_URI")
+        
+        final_uri = None
         if env_uri:
-            return env_uri
-
-        if self.database_uri:
-            return self.database_uri
-        return self.database.get_connection_string()
+            final_uri = env_uri
+        elif self.database_uri:
+            final_uri = self.database_uri
+        else:
+            final_uri = self.database.get_connection_string()
+            
+        # Fix for SQLAlchemy compatibility (postgres:// is deprecated/unsupported in newer versions)
+        if final_uri and final_uri.startswith("postgres://"):
+            final_uri = final_uri.replace("postgres://", "postgresql://", 1)
+            
+        return final_uri
 
     @model_validator(mode="before")
     @classmethod
