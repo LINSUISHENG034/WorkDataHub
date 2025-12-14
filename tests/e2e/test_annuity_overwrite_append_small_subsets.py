@@ -16,10 +16,8 @@ pytestmark = pytest.mark.e2e_suite
 from unittest.mock import Mock, patch
 from dagster import build_op_context
 
-from src.work_data_hub.orchestration.jobs import (
-    annuity_performance_job,
-    build_run_config,
-)
+from src.work_data_hub.cli.etl import build_run_config
+from src.work_data_hub.orchestration.jobs import annuity_performance_job
 from src.work_data_hub.orchestration.ops import (
     DiscoverFilesConfig,
     LoadConfig,

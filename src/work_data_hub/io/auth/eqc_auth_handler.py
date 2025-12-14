@@ -24,7 +24,7 @@ from work_data_hub.io.auth.models import AuthTimeoutError, AuthTokenResult, Brow
 LOGIN_URL = "https://eqc.pingan.com/"
 TARGET_API_PATH = "/kg-api-hfd/api/search/"
 DEFAULT_TIMEOUT_SECONDS = 300  # 5 minutes
-DEFAULT_ENV_FILE = ".env"
+DEFAULT_ENV_FILE = ".wdh_env"
 EQC_TOKEN_KEY = "WDH_EQC_TOKEN"
 
 logger = logging.getLogger(__name__)

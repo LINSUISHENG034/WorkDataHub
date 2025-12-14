@@ -510,6 +510,13 @@ def run_get_token_auto_qr(
     env_file: str = DEFAULT_ENV_FILE,
 ) -> Optional[str]:
     """Sync wrapper for auto_eqc_auth."""
+    def _mask_token(value: str) -> str:
+        if not value:
+            return "<empty>"
+        if len(value) <= 12:
+            return "<redacted>"
+        return f"{value[:8]}...{value[-4:]}"
+
     try:
         token = asyncio.run(get_auth_token_auto_qr(timeout_seconds))
         
@@ -523,7 +530,7 @@ def run_get_token_auto_qr(
                 print(f"✅ Token 已自动保存到 {env_file}")
             else:
                 print(f"⚠️ Token 保存失败，请手动更新 {env_file}")
-                print(f"   {EQC_TOKEN_KEY}={token}")
+                print(f"   {EQC_TOKEN_KEY}={_mask_token(token)}  # redacted")
         
         return token
     except Exception as exc:

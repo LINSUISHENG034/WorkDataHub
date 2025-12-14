@@ -23,7 +23,7 @@ This document captures the CURRENT STATE of the WorkDataHub codebase, including 
 
 ### Critical Files for Understanding the System
 
-- **CLI entry point**: `uv run python -m src.work_data_hub.orchestration.jobs` triggers Dagster-style jobs with custom flags such as `--plan-only`, `--execute`, and domain selectors.
+- **CLI entry point**: `PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli` is the unified entry point (Story 6.2-P6); `etl` handles domain execution with flags such as `--plan-only` (default) / `--execute`.
 - **Orchestration glue**: `src/work_data_hub/orchestration/ops.py` and `jobs.py` (~40k lines combined) wire discovery → read → process → load flows and are the most interconnected modules.
 - **Domain logic**: `src/work_data_hub/domain/` hosts pipelines for `annuity_performance`, `company_enrichment`, `reference_backfill`, and `sample_trustee_performance` plus the shared pipeline builder in `domain/pipelines/`.
 - **Configuration surface**: `src/work_data_hub/config/settings.py`, `schema.py`, `mapping_loader.py`, and `config/data_sources.yml` govern environment-aware behavior, file discovery, and mapping seeds.
@@ -171,7 +171,7 @@ work-data-hub/
 
 ### APIs & Integration Points
 
-- **CLI**: `python -m src.work_data_hub.orchestration.jobs` exposes flags for domain selection, max files, plan-only vs execute, and pipeline overrides.
+- **CLI**: `python -m work_data_hub.cli etl` exposes flags for domain selection (`--domains` / `--all-domains`), max files, plan-only vs execute, and pipeline overrides.
 - **Dagster Definitions**: `orchestration/repository.py` exposes `Definitions` for potential Dagster UI/daemon usage, though currently executed in-process.
 - **EQC Integration**: `scripts/demos/test_slider_fix.py` and `src/work_data_hub/scripts/eqc_integration_example.py` demonstrate programmatic token retrieval that feeds the enrichment queue.
 - **DDL Generation**: `scripts/create_table/generate_from_json` produces SQL from JSON contracts, with CI ensuring no drift for annuity tables.
@@ -351,8 +351,8 @@ work-data-hub/
    ```
 3. **Pipeline execution**
    ```bash
-   uv run python -m src.work_data_hub.orchestration.jobs --domain sample_trustee_performance --plan-only
-   uv run python -m src.work_data_hub.orchestration.jobs --domain sample_trustee_performance --execute
+   PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli etl --domains sample_trustee_performance --plan-only
+   PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli etl --domains sample_trustee_performance --execute
    ```
 4. **Legacy parity validation**
    ```bash

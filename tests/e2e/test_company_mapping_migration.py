@@ -504,9 +504,11 @@ class TestEndToEndMigration:
         Test integration with the Dagster orchestration system.
 
         Validates that the company_mapping domain is properly integrated
-        into the jobs.py CLI interface.
+        into the CLI interface.
+
+        Note: _execute_company_mapping_job was moved from jobs.py to cli/etl.py in Story 6.2-P6
         """
-        from src.work_data_hub.orchestration.jobs import _execute_company_mapping_job
+        from src.work_data_hub.cli.etl import _execute_company_mapping_job
         import argparse
 
         print(f"\n🔄 Testing orchestration integration")

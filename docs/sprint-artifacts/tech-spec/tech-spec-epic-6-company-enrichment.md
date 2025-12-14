@@ -643,7 +643,7 @@ class EqcProvider:
     def __init__(self, validate_on_init: bool = True):
         if validate_on_init:
             if not validate_eqc_token(self.token):
-                raise EqcTokenInvalidError("Token 无效，请运行: uv run python -m work_data_hub.io.auth --capture --save")
+                raise EqcTokenInvalidError("Token 无效，请运行: PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli auth refresh")
 ```
 
 **Acceptance Criteria:**
@@ -673,9 +673,9 @@ def enrich_company_master():
     """异步回填公司主数据"""
     ...
 
-# CLI 调用
-# uv run python -m src.work_data_hub.orchestration.jobs \
-#     --execute --job enrich_company_master --debug
+# CLI 调用（统一入口：Story 6.2-P6）
+# PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli etl \
+#     --domains company_lookup_queue --execute --batch-size 50 --debug
 ```
 
 **处理流程：**
@@ -824,29 +824,26 @@ WDH_EQC_RATE_LIMIT=60             # 每分钟请求限制
 WDH_ENRICH_SYNC_BUDGET=5          # 同步 EQC 调用预算
 ```
 
-**Token 获取命令：**
+**Token 获取命令（统一入口：Story 6.2-P6）：**
 ```bash
-# 交互式获取 Token（手动登录）
-uv run python -m work_data_hub.io.auth --capture
-
-# 交互式获取并自动保存到 .env
-uv run python -m work_data_hub.io.auth --capture --save
+# 全自动二维码认证（推荐），获取并保存到 .env
+PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli auth refresh
 ```
 
 **CLI 命令：**
 ```bash
 # 映射导入
-uv run python -m src.work_data_hub.orchestration.jobs \
-    --job import_company_mappings --execute
+PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli etl \
+    --domains company_mapping --execute
 
 # 异步回填
-uv run python -m src.work_data_hub.orchestration.jobs \
-    --job enrich_company_master --execute --debug
+PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli etl \
+    --domains company_lookup_queue --execute --batch-size 50 --debug
 
 # 主流程（带 enrichment）
-uv run python -m src.work_data_hub.orchestration.jobs \
-    --domain annuity_performance --execute \
-    --month 202412 --sync-lookup-budget 5
+PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli etl \
+    --domains annuity_performance --execute \
+    --period 202412 --enrichment-enabled --enrichment-sync-budget 5
 ```
 
 ---

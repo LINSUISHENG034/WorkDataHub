@@ -22,7 +22,7 @@ EQC API Token是访问企业查询中心API的认证凭证。WorkDataHub通过�
 **运行命令：**
 
 ```bash
-uv run python src/work_data_hub/io/auth/auto_eqc_auth.py
+PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli auth refresh
 ```
 
 **执行流程：**
@@ -101,7 +101,7 @@ result = provider.lookup("中国平安保险")
 
 ### 2. Token有效期
 - Token在**30分钟无活动后自动过期**
-- 如果Token过期，只需重新运行 `auto_eqc_auth.py` 即可快速刷新。
+- 如果Token过期，只需重新运行 `python -m work_data_hub.cli auth refresh` 即可快速刷新。
 
 ### 3. 环境要求
 - 全自动脚本依赖 `tkinter`（Python通常内置）。
@@ -118,16 +118,16 @@ A:
 ### Q: Token提示无效怎么办？
 A:
 1. 确认Token没有过期（30分钟无活动）。
-2. 使用 `auto_eqc_auth.py` 重新获取。
+2. 使用 `python -m work_data_hub.cli auth refresh` 重新获取。
 
 ## 相关文件位置
 
-- **全自动认证（首选）**：`src/work_data_hub/io/auth/auto_eqc_auth.py`
+- **全自动认证（首选）**：`python -m work_data_hub.cli auth refresh`（底层实现：`src/work_data_hub/io/auth/auto_eqc_auth.py`）
 - 交互式认证（核心逻辑）：`src/work_data_hub/io/auth/eqc_auth_handler.py`
 - EQC客户端：`src/work_data_hub/io/connectors/eqc_client.py`
 - 配置文件：`src/work_data_hub/config/settings.py`
 
 ## 更新历史
 
-- 2025-12-09: 推荐使用 `auto_eqc_auth.py` 进行全自动二维码认证，支持无头模式和统一弹窗。
+- 2025-12-09: 推荐使用 `python -m work_data_hub.cli auth refresh` 进行全自动二维码认证，支持无头模式和统一弹窗。
 - 2025-12-08: 初始版本，支持Token自动保存功能。

@@ -6,25 +6,25 @@ Task 2.3 & 5.1: CLI entry point for data refresh operations with checkpoint supp
 
 Usage:
     # Check freshness status
-    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli.eqc_refresh --status
+    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli eqc-refresh --status
 
     # Refresh stale data (interactive confirmation)
-    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli.eqc_refresh --refresh-stale
+    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli eqc-refresh --refresh-stale
 
     # Refresh specific companies
-    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli.eqc_refresh --company-ids 1000065057,1000087994
+    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli eqc-refresh --company-ids 1000065057,1000087994
 
     # Refresh all data (legacy alias; prefer --initial-full-refresh)
-    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli.eqc_refresh --refresh-all
+    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli eqc-refresh --refresh-all
 
     # Initial full refresh with checkpoint support (Phase 5)
-    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli.eqc_refresh --initial-full-refresh --yes --checkpoint-dir ./checkpoints
+    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli eqc-refresh --initial-full-refresh --yes --checkpoint-dir ./checkpoints
 
     # Resume from checkpoint (aliases: --resume / --resume-from-checkpoint)
-    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli.eqc_refresh --resume-from-checkpoint --yes --checkpoint-dir ./checkpoints
+    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli eqc-refresh --resume-from-checkpoint --yes --checkpoint-dir ./checkpoints
 
     # Dry run (show what would be refreshed)
-    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli.eqc_refresh --refresh-stale --dry-run
+    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli eqc-refresh --refresh-stale --dry-run
 """
 
 from __future__ import annotations
@@ -33,12 +33,11 @@ import argparse
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 from uuid import uuid4
 
 from sqlalchemy import create_engine, text
 
-from work_data_hub.config.settings import get_settings
 from work_data_hub.infrastructure.enrichment.data_refresh_service import (
     EqcDataRefreshService,
 )
@@ -427,11 +426,22 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> int:
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    """
+    Main CLI entry point.
+
+    Args:
+        argv: Command line arguments (defaults to sys.argv[1:])
+
+    Returns:
+        Exit code (0 for success, non-zero for error).
+    """
     parser = build_parser()
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     try:
+        from work_data_hub.config.settings import get_settings
+
         settings = get_settings()
     except Exception as e:
         print(f"❌ Failed to load settings: {e}", file=sys.stderr)
@@ -590,4 +600,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

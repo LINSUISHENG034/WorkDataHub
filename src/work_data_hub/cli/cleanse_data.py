@@ -6,13 +6,13 @@ Task 4.5: CLI entry point for data cleansing operations
 
 Usage:
     # Cleanse specific table
-    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli.cleanse_data --table business_info --domain eqc_business_info
+    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli cleanse --table business_info --domain eqc_business_info
 
     # Cleanse with dry run
-    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli.cleanse_data --table business_info --domain eqc_business_info --dry-run
+    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli cleanse --table business_info --domain eqc_business_info --dry-run
 
     # Cleanse specific company IDs
-    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli.cleanse_data --table business_info --domain eqc_business_info --company-ids 123,456
+    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli cleanse --table business_info --domain eqc_business_info --company-ids 123,456
 """
 
 import argparse
@@ -22,7 +22,6 @@ from typing import List, Optional, Sequence
 
 from sqlalchemy import create_engine, text
 
-from work_data_hub.config.settings import get_settings
 from work_data_hub.infrastructure.cleansing.rule_engine import CleansingRuleEngine
 from work_data_hub.utils.logging import get_logger
 
@@ -67,7 +66,7 @@ def cleanse_business_info_table(
 
     update_query = text("""
         UPDATE enterprise.business_info
-        SET _cleansing_status = :cleansing_status::jsonb,
+        SET _cleansing_status = CAST(:cleansing_status AS jsonb),
             registered_date = :registered_date,
             "registerCaptial" = :registerCaptial,
             registered_status = :registered_status,
@@ -180,9 +179,12 @@ def cleanse_business_info_table(
     }
 
 
-def main() -> int:
+def main(argv: Optional[Sequence[str]] = None) -> int:
     """
     Main CLI entry point.
+
+    Args:
+        argv: Command line arguments (defaults to sys.argv[1:])
 
     Returns:
         Exit code (0 for success, non-zero for error).
@@ -224,10 +226,12 @@ def main() -> int:
         help="Preview mode - show what would be cleansed without making changes",
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     # Load settings
     try:
+        from work_data_hub.config.settings import get_settings
+
         settings = get_settings()
     except Exception as e:
         print(f"❌ Failed to load settings: {e}", file=sys.stderr)

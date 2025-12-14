@@ -1,15 +1,16 @@
 """
 Tests for build_run_config mapping of backfill CLI flags.
+
+Note: build_run_config was moved from jobs.py to cli/etl.py in Story 6.2-P6
 """
 
 from types import SimpleNamespace
 
-from src.work_data_hub.orchestration.jobs import build_run_config
+from work_data_hub.cli.etl import build_run_config
 
 
 def test_build_run_config_backfill_flags():
     args = SimpleNamespace(
-        domain="annuity_performance",
         mode="delete_insert",
         plan_only=True,
         execute=False,
@@ -20,13 +21,12 @@ def test_build_run_config_backfill_flags():
         backfill_mode="insert_missing",
     )
 
-    run_config = build_run_config(args)
+    run_config = build_run_config(args, domain="annuity_performance")
 
     assert "ops" in run_config
-    # backfill op config
-    cfg = run_config["ops"]["backfill_refs_op"]["config"]
-    assert cfg["targets"] == ["all"]
-    assert cfg["mode"] == "insert_missing"
+    # backfill op config (Epic 6.2: uses generic_backfill_refs_op)
+    cfg = run_config["ops"]["generic_backfill_refs_op"]["config"]
+    assert cfg["domain"] == "annuity_performance"
     assert cfg["plan_only"] is True
 
     # load op config exists and is consistent
@@ -37,7 +37,6 @@ def test_build_run_config_backfill_flags():
 def test_build_run_config_skip_facts_flag():
     """Test that --skip-facts flag is passed to load_op config."""
     args = SimpleNamespace(
-        domain="annuity_performance",
         mode="delete_insert",
         plan_only=True,
         execute=False,
@@ -49,7 +48,7 @@ def test_build_run_config_skip_facts_flag():
         backfill_mode="insert_missing",
     )
 
-    run_config = build_run_config(args)
+    run_config = build_run_config(args, domain="annuity_performance")
 
     # Verify skip flag passed to load_op
     load_cfg = run_config["ops"]["load_op"]["config"]
@@ -59,7 +58,6 @@ def test_build_run_config_skip_facts_flag():
 def test_build_run_config_skip_facts_flag_defaults_false():
     """Test that skip flag defaults to False when not provided."""
     args = SimpleNamespace(
-        domain="annuity_performance",
         mode="delete_insert",
         plan_only=True,
         execute=False,
@@ -71,7 +69,7 @@ def test_build_run_config_skip_facts_flag_defaults_false():
         # Note: no skip_facts attribute
     )
 
-    run_config = build_run_config(args)
+    run_config = build_run_config(args, domain="annuity_performance")
 
     # Verify skip flag defaults to False
     load_cfg = run_config["ops"]["load_op"]["config"]
