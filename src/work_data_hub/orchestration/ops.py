@@ -1265,6 +1265,7 @@ def generic_backfill_refs_op(
         if not config.plan_only:
             # Use SQLAlchemy connection for GenericBackfillService
             from sqlalchemy import create_engine
+            import psycopg2
 
             dsn = settings.get_database_connection_string()
             if not dsn:
@@ -1274,8 +1275,8 @@ def generic_backfill_refs_op(
 
             context.log.info(f"Connecting to database for generic backfill (domain: {config.domain})")
 
-            # Create SQLAlchemy engine
-            engine = create_engine(dsn)
+            # Create SQLAlchemy engine with explicit psycopg2 module
+            engine = create_engine(dsn, module=psycopg2)
             conn = engine.connect()
 
         # Create and run the generic backfill service

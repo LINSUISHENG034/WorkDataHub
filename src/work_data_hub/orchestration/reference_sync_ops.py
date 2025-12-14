@@ -96,7 +96,8 @@ def reference_sync_op(context: OpExecutionContext, config: ReferenceSyncOpConfig
 
     # Get database connection
     db_url = settings.get_database_connection_string()
-    engine = create_engine(db_url)
+    import psycopg2
+    engine = create_engine(db_url, module=psycopg2)
 
     try:
         with engine.connect() as conn:
