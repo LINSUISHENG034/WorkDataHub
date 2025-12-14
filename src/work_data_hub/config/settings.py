@@ -150,8 +150,8 @@ class Settings(BaseSettings):
     )
 
     data_sources_config: str = Field(
-        default="./src/work_data_hub/config/data_sources.yml",
-        description="Path to legacy data sources configuration file",
+        default="./config/data_sources.yml",
+        description="Path to data sources configuration file",
     )
 
     # Epic 3 Story 3.0: New data source configuration

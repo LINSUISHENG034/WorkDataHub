@@ -246,6 +246,20 @@ class GenericBackfillService:
 
             # Map additional columns
             for col_mapping in config.backfill_columns:
+                if col_mapping.source not in group.columns:
+                    if col_mapping.optional:
+                        candidate[col_mapping.target] = None
+                        continue
+
+                    self.logger.warning(
+                        f"Required source column '{col_mapping.source}' not found "
+                        f"when deriving '{col_mapping.target}' for "
+                        f"{config.source_column}='{source_value}'. "
+                        f"Available columns: {list(group.columns)}"
+                    )
+                    candidate[col_mapping.target] = None
+                    continue
+
                 # Find first non-null value in the group
                 values = group[col_mapping.source]
                 values = values[self._non_blank_mask(values)]

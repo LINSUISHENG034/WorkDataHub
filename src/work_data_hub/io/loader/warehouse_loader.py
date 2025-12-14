@@ -596,6 +596,34 @@ def quote_qualified(schema: Optional[str], table: str) -> str:
         return quote_ident(table)
 
 
+def quote_table(table: str) -> str:
+    """
+    Quote a table identifier, supporting optional schema qualification.
+
+    Accepts either:
+    - "table"
+    - "schema.table"
+
+    Returns:
+    - '"table"'
+    - '"schema"."table"'
+    """
+    if not table or not isinstance(table, str):
+        raise ValueError("Table name must be non-empty string")
+
+    # If already contains quotes, treat as a raw identifier and quote as-is.
+    # (Callers can pass pre-quoted table names for advanced usage.)
+    if '"' in table:
+        return quote_ident(table)
+
+    if "." in table:
+        schema, table_name = table.split(".", 1)
+        if schema.strip() and table_name.strip():
+            return quote_qualified(schema.strip(), table_name.strip())
+
+    return quote_ident(table)
+
+
 def _ensure_list_of_dicts(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Validate and normalize row data."""
     if not isinstance(rows, list):
@@ -664,7 +692,7 @@ def build_insert_sql(
         return None, []
 
     # Quote table and column identifiers
-    quoted_table = quote_ident(table)
+    quoted_table = quote_table(table)
     quoted_cols = [quote_ident(col) for col in cols]
 
     # Build SQL template
@@ -726,7 +754,7 @@ def build_insert_sql_with_conflict(
         return None, []
 
     # Quote table and column identifiers
-    quoted_table = quote_ident(table)
+    quoted_table = quote_table(table)
     quoted_cols = [quote_ident(col) for col in cols]
 
     # Build SQL template
@@ -806,7 +834,7 @@ def build_delete_sql(
     unique_tuples = sorted(list(set(pk_tuples)))
 
     # Build SQL
-    quoted_table = quote_ident(table)
+    quoted_table = quote_table(table)
     quoted_cols = [quote_ident(col) for col in pk_cols]
     col_list = "(" + ",".join(quoted_cols) + ")"
 
@@ -1263,7 +1291,7 @@ def load(
         estimated_deleted = len(unique_tuples)
 
         if unique_tuples:
-            quoted_table = quote_ident(table)
+            quoted_table = quote_table(table)
             quoted_pk_cols = ",".join(quote_ident(c) for c in pk)
             cols_tuple = f"({quoted_pk_cols})"
 
@@ -1342,7 +1370,7 @@ def load(
                         for i in range(0, len(params), cols_per_row)
                     ]
 
-                    quoted_table = quote_ident(table)
+                    quoted_table = quote_table(table)
                     quoted_cols = [quote_ident(col) for col in cols]
                     col_list = ",".join(quoted_cols)
 

@@ -36,6 +36,7 @@ from .ops import (
     generic_backfill_refs_op,  # Epic 6.2 - configuration-driven backfill
     load_op,
     load_to_db_op,
+    process_annuity_income_op,
     process_annuity_performance_op,
     process_company_lookup_queue_op,
     process_sample_trustee_performance_op,
@@ -120,6 +121,30 @@ def annuity_performance_job() -> Any:
     # Gate before loading facts (FK-safe ordering)
     gated_rows = gate_after_backfill(processed_data, backfill_result)
     load_op(gated_rows)
+
+
+@job
+def annuity_income_job() -> Any:
+    """
+    End-to-end annuity income processing job.
+
+    This job orchestrates the complete ETL pipeline for Chinese "收入明细" data:
+    1. Discover files matching domain patterns
+    2. Read Excel data from discovered files (sheet="收入明细")
+    3. Process data through annuity income domain service
+    4. Load fact data to database or generate execution plan
+
+    Note: This domain does not require reference backfill (simpler than annuity_performance).
+    """
+    # Wire ops together - Dagster handles dependency graph
+    discovered_paths = discover_files_op()
+
+    # Read Excel data and process through annuity income service
+    excel_rows = read_excel_op(discovered_paths)
+    processed_data = process_annuity_income_op(excel_rows, discovered_paths)
+
+    # Load directly (no backfill needed for this domain)
+    load_op(processed_data)
 
 
 class AnnuityPipelineConfig(Config):
@@ -297,12 +322,29 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
     # Load table/pk from data_sources.yml if needed
     settings = get_settings()
 
+    data_sources: Dict[str, Any] = {}
     try:
         with open(settings.data_sources_config, "r", encoding="utf-8") as f:
-            data_sources = yaml.safe_load(f)
+            data_sources = yaml.safe_load(f) or {}
+        if not isinstance(data_sources, dict):
+            data_sources = {}
 
-        domain_config = data_sources.get("domains", {}).get(args.domain, {})
-        table = domain_config.get("table", args.domain)  # Fallback to domain name
+        domain_config = (data_sources.get("domains") or {}).get(args.domain, {}) or {}
+        if not isinstance(domain_config, dict):
+            domain_config = {}
+
+        # Epic 3 schema prefers output.table + output.schema_name
+        output_cfg = domain_config.get("output") if isinstance(domain_config, dict) else None
+        if isinstance(output_cfg, dict) and output_cfg.get("table"):
+            table_name = str(output_cfg["table"])
+            schema_name = output_cfg.get("schema_name")
+            if schema_name:
+                table = f"{schema_name}.{table_name}"
+            else:
+                table = table_name
+        else:
+            table = domain_config.get("table", args.domain)  # Legacy fallback
+
         pk = domain_config.get("pk", [])  # Empty list if not defined
 
         # Runtime override via --pk (only affects delete_insert mode)
@@ -315,9 +357,14 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
         table = args.domain
         pk = []
 
+    # Build discover_files_op config with optional period
+    discover_config = {"domain": args.domain}
+    if hasattr(args, "period") and args.period:
+        discover_config["period"] = args.period
+
     run_config = {
         "ops": {
-            "discover_files_op": {"config": {"domain": args.domain}},
+            "discover_files_op": {"config": discover_config},
             "load_op": {
                 "config": {
                     "table": table,
@@ -333,39 +380,45 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
     # Add max_files parameter and conditionally configure ops
     max_files = getattr(args, "max_files", 1)
 
+    # Determine sheet configuration.
+    # If --sheet not provided, try to get sheet_name from data_sources.yml.
+    sheet_value = getattr(args, "sheet", None)
+    if sheet_value is None:
+        # Check if domain is Epic 3 schema and has sheet_name configured
+        domain_config = (data_sources.get("domains") or {}).get(args.domain, {}) or {}
+        if isinstance(domain_config, dict) and "sheet_name" in domain_config:
+            sheet_value = domain_config["sheet_name"]
+        else:
+            # Fallback to 0 for legacy domains
+            sheet_value = "0"
+
     if max_files > 1:
         # Use new combined op for multi-file processing
         run_config["ops"]["read_and_process_sample_trustee_files_op"] = {
-            "config": {"sheet": args.sheet, "max_files": max_files}
+            "config": {"sheet": sheet_value, "max_files": max_files}
         }
     else:
         # Use existing separate ops for single-file processing (backward compatibility)
         # Coerce sheet: if it's a digit-like string, pass as int; else pass as name
         sheet_cfg: Any
         try:
-            sheet_cfg = int(args.sheet)
+            sheet_cfg = int(sheet_value)
         except Exception:
-            sheet_cfg = args.sheet
+            sheet_cfg = sheet_value
         run_config["ops"]["read_excel_op"] = {"config": {"sheet": sheet_cfg}}
         # process_trustee_performance_op has no config
 
-    # Add backfill configuration (always include, but empty targets when disabled)
-    backfill_refs = getattr(args, "backfill_refs", None)
-    backfill_mode = getattr(args, "backfill_mode", "insert_missing")
-
-    if backfill_refs:
-        targets = [backfill_refs] if backfill_refs != "all" else ["all"]
-    else:
-        targets = []  # Empty targets = no backfill
-
-    run_config["ops"]["backfill_refs_op"] = {
-        "config": {
-            "targets": targets,
-            "mode": backfill_mode,
-            "plan_only": effective_plan_only,
-            "chunk_size": 1000,
+    # Epic 6.2: Generic backfill configuration (configuration-driven approach)
+    # Replaces legacy backfill_refs_op with generic_backfill_refs_op
+    # Only add for domains that require backfill (annuity_performance, sample_trustee_performance)
+    if args.domain in ["annuity_performance", "sample_trustee_performance"]:
+        run_config["ops"]["generic_backfill_refs_op"] = {
+            "config": {
+                "domain": args.domain,
+                "plan_only": effective_plan_only,
+                "add_tracking_fields": True,
+            }
         }
-    }
 
     # Add enrichment configuration for annuity_performance domain
     if args.domain == "annuity_performance":
@@ -730,11 +783,19 @@ def main() -> int:
         ),
     )
     # Sheet can be an index or a name (string)
+    # Default None to detect if user provided explicit value
     parser.add_argument(
         "--sheet",
         type=str,
-        default="0",
-        help="Excel sheet to process (index like '0' or name like '规模明细')",
+        default=None,
+        help="Excel sheet to process (index like '0' or name like '规模明细'). If not provided, uses sheet_name from data_sources.yml for Epic 3 domains.",
+    )
+
+    # Period parameter for Epic 3 schema domains with template variables
+    parser.add_argument(
+        "--period",
+        type=str,
+        help="Period in YYYYMM format for Epic 3 domains (e.g., '202510')",
     )
 
     parser.add_argument(
@@ -861,6 +922,13 @@ def main() -> int:
             print(
                 f"Warning: max_files > 1 not yet supported for {args.domain}, using 1"
             )
+    elif domain_key == "annuity_income":
+        # Story 6.2-P3: Annuity income domain support
+        selected_job = annuity_income_job
+        if max_files > 1:
+            print(
+                f"Warning: max_files > 1 not yet supported for {args.domain}, using 1"
+            )
     elif domain_key == "sample_trustee_performance":
         selected_job = (
             sample_trustee_performance_multi_file_job
@@ -879,7 +947,7 @@ def main() -> int:
     else:
         raise ValueError(
             f"Unsupported domain: {args.domain}. "
-            f"Supported: sample_trustee_performance, annuity_performance, "
+            f"Supported: sample_trustee_performance, annuity_performance, annuity_income, "
             f"company_mapping, company_lookup_queue, reference_sync"
         )
 

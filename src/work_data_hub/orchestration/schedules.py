@@ -42,12 +42,24 @@ def _build_schedule_run_config() -> Dict[str, Any]:
 
     try:
         with open(settings.data_sources_config, "r", encoding="utf-8") as f:
-            data_sources = yaml.safe_load(f)
+            data_sources = yaml.safe_load(f) or {}
+        if not isinstance(data_sources, dict):
+            data_sources = {}
 
-        domain_config = data_sources.get("domains", {}).get(
+        domain_config = (data_sources.get("domains") or {}).get(
             "sample_trustee_performance", {}
-        )
-        table = domain_config.get("table", "sample_trustee_performance")
+        ) or {}
+        if not isinstance(domain_config, dict):
+            domain_config = {}
+
+        output_cfg = domain_config.get("output")
+        if isinstance(output_cfg, dict) and output_cfg.get("table"):
+            schema_name = output_cfg.get("schema_name")
+            table_name = str(output_cfg["table"])
+            table = f"{schema_name}.{table_name}" if schema_name else table_name
+        else:
+            table = domain_config.get("table", "sample_trustee_performance")
+
         pk = domain_config.get("pk", ["report_date", "plan_code", "company_code"])
 
     except Exception as e:

@@ -30,6 +30,7 @@ from work_data_hub.orchestration.ops import (
     derive_portfolio_refs_op,
     discover_files_op,
     load_op,
+    process_annuity_income_op,
     process_annuity_performance_op,
     process_sample_trustee_performance_op,
     read_and_process_sample_trustee_files_op,
@@ -40,93 +41,160 @@ from work_data_hub.orchestration.ops import (
 class TestDiscoverFilesOp:
     """Test discover_files_op functionality."""
 
-    def test_discover_files_op_success(self, tmp_path):
-        """Test successful file discovery with metadata logging."""
-        # Create test configuration
-        config_data = {
-            "domains": {
-                "sample_trustee_performance": {
-                    "pattern": r"(?P<year>20\d{2})[-_](?P<month>0?[1-9]|1[0-2]).*受托业绩.*\.xlsx$",
-                    "select": "latest_by_year_month",
-                    "sheet": 0,
+    def test_discover_files_op_epic3_schema_routes_to_file_discovery_service(self, tmp_path):
+        """Test Epic 3 schema discovery routes to FileDiscoveryService (AC2).
+
+        Validates that domains with Epic 3 schema (base_path, file_patterns) use
+        FileDiscoveryService.discover_file() instead of legacy DataSourceConnector.
+        """
+        from pathlib import Path
+        from unittest.mock import MagicMock
+
+        # Mock the DiscoveryMatch result
+        mock_match = MagicMock()
+        mock_match.file_path = Path("/mock/path/test_file.xlsx")
+        mock_match.version = "V2"
+        mock_match.sheet_name = "规模明细"
+
+        # Mock FileDiscoveryService - patch where it's used, not where it's defined
+        with patch("work_data_hub.orchestration.ops.FileDiscoveryService") as mock_fds_class:
+            mock_fds = MagicMock()
+            mock_fds.discover_file.return_value = mock_match
+            mock_fds_class.return_value = mock_fds
+
+            # Mock get_settings and yaml loading
+            with patch("work_data_hub.orchestration.ops.get_settings") as mock_settings:
+                mock_settings.return_value.data_sources_config = str(tmp_path / "config.yml")
+
+                # Create mock Epic 3 schema config
+                config_data = {
+                    "domains": {
+                        "annuity_performance": {
+                            "base_path": "tests/fixtures/{YYYYMM}",
+                            "file_patterns": ["*.xlsx"],
+                            "version_strategy": "latest_version_dir",
+                            "sheet_name": "规模明细",
+                        }
+                    }
                 }
-            }
-        }
+                config_file = tmp_path / "config.yml"
+                with open(config_file, "w", encoding="utf-8") as f:
+                    yaml.dump(config_data, f)
 
-        config_file = tmp_path / "test_config.yml"
-        with open(config_file, "w", encoding="utf-8") as f:
-            yaml.dump(config_data, f)
-
-        # Create test Excel file
-        test_file = tmp_path / "2024_11_受托业绩报告.xlsx"
-        df = pd.DataFrame({"col1": ["data"]})
-        df.to_excel(test_file, index=False, engine="openpyxl")
-
-        # Mock settings
-        with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
-            mock_settings.return_value.data_sources_config = str(config_file)
-
-            # Mock DataSourceConnector
-            mock_discovered = Mock()
-            mock_discovered.path = str(test_file)
-            mock_discovered.year = 2024
-            mock_discovered.month = 11
-
-            with patch(
-                "src.work_data_hub.orchestration.ops.DataSourceConnector"
-            ) as mock_connector_class:
-                mock_connector = Mock()
-                mock_connector.discover.return_value = [mock_discovered]
-                mock_connector_class.return_value = mock_connector
-
-                # Execute op
                 context = build_op_context()
-                config = DiscoverFilesConfig(domain="sample_trustee_performance")
+                config = DiscoverFilesConfig(domain="annuity_performance", period="202510")
+
                 result = discover_files_op(context, config)
 
-                # Verify result is JSON-serializable
-                assert isinstance(result, list)
-                assert len(result) == 1
-                assert result[0] == str(test_file)
+                # Verify FileDiscoveryService was used (not DataSourceConnector)
+                mock_fds_class.assert_called_once()
+                mock_fds.discover_file.assert_called_once_with(
+                    domain="annuity_performance",
+                    month="202510"
+                )
 
-                # Verify result can be JSON serialized
-                json.dumps(result)
+                # Verify result is list of string paths
+                assert result == [str(mock_match.file_path)]
+                assert isinstance(result[0], str)
+
+    def test_discover_files_op_legacy_schema_routes_to_data_source_connector(self, tmp_path):
+        """Test legacy schema discovery routes to DataSourceConnector (AC1).
+
+        Validates that domains with legacy schema (pattern, select) continue to use
+        DataSourceConnector.discover() for backward compatibility.
+        """
+        from unittest.mock import MagicMock
+
+        # Mock DiscoveredFile result
+        mock_file = MagicMock()
+        mock_file.path = "/mock/path/legacy_file.xlsx"
+
+        # Mock DataSourceConnector - patch where it's used
+        with patch("work_data_hub.orchestration.ops.DataSourceConnector") as mock_dsc_class:
+            mock_dsc = MagicMock()
+            mock_dsc.discover.return_value = [mock_file]
+            mock_dsc_class.return_value = mock_dsc
+
+            # Mock get_settings and yaml loading
+            with patch("work_data_hub.orchestration.ops.get_settings") as mock_settings:
+                mock_settings.return_value.data_sources_config = str(tmp_path / "config.yml")
+
+                # Create mock legacy schema config
+                config_data = {
+                    "domains": {
+                        "sample_trustee_performance": {
+                            "pattern": ".*trustee.*\\.xlsx",
+                            "select": "latest_by_mtime",
+                            "table": "sample_trustee_performance",
+                        }
+                    }
+                }
+                config_file = tmp_path / "config.yml"
+                with open(config_file, "w", encoding="utf-8") as f:
+                    yaml.dump(config_data, f)
+
+                context = build_op_context()
+                config = DiscoverFilesConfig(domain="sample_trustee_performance")
+
+                result = discover_files_op(context, config)
+
+                # Verify DataSourceConnector was used
+                mock_dsc_class.assert_called_once()
+                mock_dsc.discover.assert_called_once_with("sample_trustee_performance")
+
+                # Verify result is list of string paths
+                assert result == [mock_file.path]
 
     def test_discover_files_op_invalid_domain(self):
         """Test that invalid domain raises ValidationError."""
         with pytest.raises(ValueError, match="Domain 'invalid' not supported"):
             DiscoverFilesConfig(domain="invalid")
 
-    def test_discover_files_op_empty_result(self, tmp_path):
-        """Test discovery with no matching files."""
-        config_data = {
-            "domains": {
-                "sample_trustee_performance": {
-                    "pattern": r"(?P<year>20\d{2}).*受托业绩.*\.xlsx$",
-                    "select": "latest_by_year_month",
+    def test_discover_files_op_missing_period(self):
+        """Test that missing period parameter raises error for Epic 3 domains."""
+        # annuity_performance requires period parameter (has {YYYYMM} in base_path)
+        context = build_op_context()
+        config = DiscoverFilesConfig(domain="annuity_performance")  # No period provided
+
+        with pytest.raises(ValueError, match="requires --period parameter"):
+            discover_files_op(context, config)
+
+    def test_discover_files_op_invalid_period_format(self, tmp_path):
+        """Test that invalid period format raises error (AC3 validation)."""
+        # Mock get_settings and yaml loading for Epic 3 schema domain
+        with patch("work_data_hub.orchestration.ops.get_settings") as mock_settings:
+            mock_settings.return_value.data_sources_config = str(tmp_path / "config.yml")
+
+            # Create mock Epic 3 schema config
+            config_data = {
+                "domains": {
+                    "annuity_performance": {
+                        "base_path": "tests/fixtures/{YYYYMM}",
+                        "file_patterns": ["*.xlsx"],
+                        "version_strategy": "latest_version_dir",
+                        "sheet_name": "规模明细",
+                    }
                 }
             }
-        }
+            config_file = tmp_path / "config.yml"
+            with open(config_file, "w", encoding="utf-8") as f:
+                yaml.dump(config_data, f)
 
-        config_file = tmp_path / "test_config.yml"
-        with open(config_file, "w", encoding="utf-8") as f:
-            yaml.dump(config_data, f)
-
-        with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
-            mock_settings.return_value.data_sources_config = str(config_file)
-
-            with patch(
-                "src.work_data_hub.orchestration.ops.DataSourceConnector"
-            ) as mock_connector_class:
-                mock_connector = Mock()
-                mock_connector.discover.return_value = []  # No files found
-                mock_connector_class.return_value = mock_connector
+            # Mock FileDiscoveryService to raise ValueError for invalid period
+            with patch("work_data_hub.orchestration.ops.FileDiscoveryService") as mock_fds_class:
+                mock_fds = Mock()
+                mock_fds.discover_file.side_effect = ValueError(
+                    "Template variable {YYYYMM} must be 6 digits (YYYYMM)"
+                )
+                mock_fds_class.return_value = mock_fds
 
                 context = build_op_context()
-                config = DiscoverFilesConfig(domain="sample_trustee_performance")
-                result = discover_files_op(context, config)
 
-                assert result == []
+                # Test with invalid period format (too short)
+                config = DiscoverFilesConfig(domain="annuity_performance", period="2025")
+
+                with pytest.raises(ValueError, match="6 digits"):
+                    discover_files_op(context, config)
 
 
 class TestReadExcelOp:
@@ -152,7 +220,7 @@ class TestReadExcelOp:
             {"年": "2024", "月": "11", "计划代码": "PLAN002"},
         ]
 
-        with patch("src.work_data_hub.orchestration.ops.read_excel_rows") as mock_read:
+        with patch("work_data_hub.orchestration.ops.read_excel_rows") as mock_read:
             mock_read.return_value = expected_rows
 
             context = build_op_context()
@@ -181,7 +249,7 @@ class TestReadExcelOp:
         test_file = tmp_path / "empty.xlsx"
         pd.DataFrame().to_excel(test_file, index=False, engine="openpyxl")
 
-        with patch("src.work_data_hub.orchestration.ops.read_excel_rows") as mock_read:
+        with patch("work_data_hub.orchestration.ops.read_excel_rows") as mock_read:
             mock_read.return_value = []
 
             context = build_op_context()
@@ -217,7 +285,7 @@ class TestProcessTrusteePerformanceOp:
             "return_rate": "0.055",
         }
 
-        with patch("src.work_data_hub.orchestration.ops.process") as mock_process:
+        with patch("work_data_hub.orchestration.ops.process") as mock_process:
             mock_process.return_value = [mock_model]
 
             context = build_op_context()
@@ -238,7 +306,7 @@ class TestProcessTrusteePerformanceOp:
 
     def test_process_sample_trustee_performance_op_empty_data(self):
         """Test processing empty data."""
-        with patch("src.work_data_hub.orchestration.ops.process") as mock_process:
+        with patch("work_data_hub.orchestration.ops.process") as mock_process:
             mock_process.return_value = []
 
             context = build_op_context()
@@ -252,7 +320,7 @@ class TestProcessTrusteePerformanceOp:
         """Test processing with empty file paths."""
         excel_rows = [{"年": "2024", "月": "11", "计划代码": "PLAN001"}]
 
-        with patch("src.work_data_hub.orchestration.ops.process") as mock_process:
+        with patch("work_data_hub.orchestration.ops.process") as mock_process:
             mock_process.return_value = []
 
             context = build_op_context()
@@ -290,7 +358,7 @@ class TestLoadOp:
             ],
         }
 
-        with patch("src.work_data_hub.orchestration.ops.load") as mock_load:
+        with patch("work_data_hub.orchestration.ops.load") as mock_load:
             mock_load.return_value = mock_result
 
             context = build_op_context()
@@ -331,7 +399,7 @@ class TestLoadOp:
             "batches": 1,
         }
 
-        with patch("src.work_data_hub.orchestration.ops.load") as mock_load:
+        with patch("work_data_hub.orchestration.ops.load") as mock_load:
             mock_load.return_value = mock_result
 
             context = build_op_context()
@@ -353,7 +421,7 @@ class TestLoadOp:
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
-        with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
+        with patch("work_data_hub.orchestration.ops.get_settings") as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             domains = _load_valid_domains()
@@ -367,7 +435,7 @@ class TestLoadOp:
         """Test _load_valid_domains handles missing config file gracefully."""
         missing_file = tmp_path / "nonexistent.yml"
 
-        with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
+        with patch("work_data_hub.orchestration.ops.get_settings") as mock_settings:
             mock_settings.return_value.data_sources_config = str(missing_file)
 
             domains = _load_valid_domains()
@@ -382,7 +450,7 @@ class TestLoadOp:
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
-        with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
+        with patch("work_data_hub.orchestration.ops.get_settings") as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             domains = _load_valid_domains()
@@ -396,7 +464,7 @@ class TestLoadOp:
         with open(config_file, "w", encoding="utf-8") as f:
             f.write("invalid: yaml: content: [")
 
-        with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
+        with patch("work_data_hub.orchestration.ops.get_settings") as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             domains = _load_valid_domains()
@@ -418,15 +486,15 @@ class TestLoadOp:
         }
 
         with patch(
-            "src.work_data_hub.orchestration.ops.psycopg2", create=True
+            "work_data_hub.orchestration.ops.psycopg2", create=True
         ) as mock_psycopg2:
             mock_psycopg2.connect.return_value = mock_conn
 
-            with patch("src.work_data_hub.orchestration.ops.load") as mock_load:
+            with patch("work_data_hub.orchestration.ops.load") as mock_load:
                 mock_load.return_value = mock_result
 
                 with patch(
-                    "src.work_data_hub.orchestration.ops.get_settings"
+                    "work_data_hub.orchestration.ops.get_settings"
                 ) as mock_settings:
                     mock_db = Mock()
                     mock_db.get_connection_string.return_value = "postgresql://test"
@@ -478,7 +546,7 @@ class TestLoadOp:
             mock_psycopg2.connect.side_effect = Exception("Connection refused")
 
             with patch(
-                "src.work_data_hub.orchestration.ops.get_settings"
+                "work_data_hub.orchestration.ops.get_settings"
             ) as mock_settings:
                 mock_db = Mock()
                 mock_db.get_connection_string.return_value = "postgresql://test"
@@ -549,8 +617,8 @@ class TestReadAndProcessTrusteeFilesOp:
 
         # Mock read_excel_rows and process functions
         with (
-            patch("src.work_data_hub.orchestration.ops.read_excel_rows") as mock_read,
-            patch("src.work_data_hub.orchestration.ops.process") as mock_process,
+            patch("work_data_hub.orchestration.ops.read_excel_rows") as mock_read,
+            patch("work_data_hub.orchestration.ops.process") as mock_process,
         ):
             # Configure mock returns for each file
             mock_read.side_effect = [
@@ -600,8 +668,8 @@ class TestReadAndProcessTrusteeFilesOp:
         config = ReadProcessConfig(sheet=0, max_files=2)  # Limit to 2 files
 
         with (
-            patch("src.work_data_hub.orchestration.ops.read_excel_rows") as mock_read,
-            patch("src.work_data_hub.orchestration.ops.process") as mock_process,
+            patch("work_data_hub.orchestration.ops.read_excel_rows") as mock_read,
+            patch("work_data_hub.orchestration.ops.process") as mock_process,
         ):
             mock_read.side_effect = [[{"col": "data1"}], [{"col": "data2"}]]
 
@@ -632,8 +700,8 @@ class TestReadAndProcessTrusteeFilesOp:
         config = ReadProcessConfig(sheet=1, max_files=1)
 
         with (
-            patch("src.work_data_hub.orchestration.ops.read_excel_rows") as mock_read,
-            patch("src.work_data_hub.orchestration.ops.process") as mock_process,
+            patch("work_data_hub.orchestration.ops.read_excel_rows") as mock_read,
+            patch("work_data_hub.orchestration.ops.process") as mock_process,
         ):
             mock_read.return_value = [{"col": "data"}]
 
@@ -655,7 +723,7 @@ class TestReadAndProcessTrusteeFilesOp:
         file_paths = ["/path/file1.xlsx"]
         config = ReadProcessConfig(sheet=0, max_files=1)
 
-        with patch("src.work_data_hub.orchestration.ops.read_excel_rows") as mock_read:
+        with patch("work_data_hub.orchestration.ops.read_excel_rows") as mock_read:
             mock_read.side_effect = Exception("File read error")
 
             context = build_op_context()
@@ -681,16 +749,16 @@ class TestLoadOpConnectionLifecycle:
         }
 
         with patch(
-            "src.work_data_hub.orchestration.ops.psycopg2", create=True
+            "work_data_hub.orchestration.ops.psycopg2", create=True
         ) as mock_psycopg2:
             # CRITICAL: load_op should create bare connection, not use context manager
             mock_psycopg2.connect.return_value = mock_conn
 
-            with patch("src.work_data_hub.orchestration.ops.load") as mock_load:
+            with patch("work_data_hub.orchestration.ops.load") as mock_load:
                 mock_load.return_value = mock_result
 
                 with patch(
-                    "src.work_data_hub.orchestration.ops.get_settings"
+                    "work_data_hub.orchestration.ops.get_settings"
                 ) as mock_settings:
                     mock_settings.return_value.get_database_connection_string.return_value = "postgresql://test"
 
@@ -728,15 +796,15 @@ class TestLoadOpConnectionLifecycle:
         }
 
         with patch(
-            "src.work_data_hub.orchestration.ops.psycopg2", create=True
+            "work_data_hub.orchestration.ops.psycopg2", create=True
         ) as mock_psycopg2:
             mock_psycopg2.connect.return_value = mock_conn
 
-            with patch("src.work_data_hub.orchestration.ops.load") as mock_load:
+            with patch("work_data_hub.orchestration.ops.load") as mock_load:
                 mock_load.return_value = mock_result
 
                 with patch(
-                    "src.work_data_hub.orchestration.ops.get_settings"
+                    "work_data_hub.orchestration.ops.get_settings"
                 ) as mock_settings:
                     mock_settings.return_value.get_database_connection_string.return_value = "postgresql://test"
 
@@ -758,16 +826,16 @@ class TestLoadOpConnectionLifecycle:
         mock_conn = Mock()
 
         with patch(
-            "src.work_data_hub.orchestration.ops.psycopg2", create=True
+            "work_data_hub.orchestration.ops.psycopg2", create=True
         ) as mock_psycopg2:
             mock_psycopg2.connect.return_value = mock_conn
 
-            with patch("src.work_data_hub.orchestration.ops.load") as mock_load:
+            with patch("work_data_hub.orchestration.ops.load") as mock_load:
                 # Simulate load operation failure
                 mock_load.side_effect = Exception("Load operation failed")
 
                 with patch(
-                    "src.work_data_hub.orchestration.ops.get_settings"
+                    "work_data_hub.orchestration.ops.get_settings"
                 ) as mock_settings:
                     mock_settings.return_value.get_database_connection_string.return_value = "postgresql://test"
 
@@ -785,13 +853,13 @@ class TestLoadOpConnectionLifecycle:
         processed_rows = [{"col": "value"}]
 
         with patch(
-            "src.work_data_hub.orchestration.ops.psycopg2", create=True
+            "work_data_hub.orchestration.ops.psycopg2", create=True
         ) as mock_psycopg2:
             # Simulate connection failure
             mock_psycopg2.connect.side_effect = Exception("Connection refused")
 
             with patch(
-                "src.work_data_hub.orchestration.ops.get_settings"
+                "work_data_hub.orchestration.ops.get_settings"
             ) as mock_settings:
                 mock_settings.return_value.get_database_connection_string.return_value = "postgresql://test"
 
@@ -818,15 +886,15 @@ class TestLoadOpConnectionLifecycle:
         }
 
         with patch(
-            "src.work_data_hub.orchestration.ops.psycopg2", create=True
+            "work_data_hub.orchestration.ops.psycopg2", create=True
         ) as mock_psycopg2:
             mock_psycopg2.connect.return_value = mock_conn
 
-            with patch("src.work_data_hub.orchestration.ops.load") as mock_load:
+            with patch("work_data_hub.orchestration.ops.load") as mock_load:
                 mock_load.return_value = mock_result
 
                 with patch(
-                    "src.work_data_hub.orchestration.ops.get_settings"
+                    "work_data_hub.orchestration.ops.get_settings"
                 ) as mock_settings:
                     mock_settings.return_value.get_database_connection_string.return_value = "postgresql://test"
 
@@ -871,9 +939,9 @@ class TestLoadOpConnectionLifecycle:
         }
 
         with patch(
-            "src.work_data_hub.orchestration.ops.psycopg2", create=True
+            "work_data_hub.orchestration.ops.psycopg2", create=True
         ) as mock_psycopg2:
-            with patch("src.work_data_hub.orchestration.ops.load") as mock_load:
+            with patch("work_data_hub.orchestration.ops.load") as mock_load:
                 mock_load.return_value = mock_result
 
                 context = build_op_context()
@@ -910,15 +978,15 @@ class TestLoadOpConnectionLifecycle:
         }
 
         with patch(
-            "src.work_data_hub.orchestration.ops.psycopg2", create=True
+            "work_data_hub.orchestration.ops.psycopg2", create=True
         ) as mock_psycopg2:
             mock_psycopg2.connect.return_value = mock_conn
 
-            with patch("src.work_data_hub.orchestration.ops.load") as mock_load:
+            with patch("work_data_hub.orchestration.ops.load") as mock_load:
                 mock_load.return_value = mock_result
 
                 with patch(
-                    "src.work_data_hub.orchestration.ops.get_settings"
+                    "work_data_hub.orchestration.ops.get_settings"
                 ) as mock_settings:
                     # Test specific DSN format
                     mock_settings.return_value.get_database_connection_string.return_value = "postgresql://user:pass@localhost:5432/testdb"
@@ -953,15 +1021,15 @@ class TestLoadOpConnectionLifecycle:
         }
 
         with patch(
-            "src.work_data_hub.orchestration.ops.psycopg2", create=True
+            "work_data_hub.orchestration.ops.psycopg2", create=True
         ) as mock_psycopg2:
             mock_psycopg2.connect.return_value = mock_conn
 
-            with patch("src.work_data_hub.orchestration.ops.load") as mock_load:
+            with patch("work_data_hub.orchestration.ops.load") as mock_load:
                 mock_load.return_value = mock_result
 
                 with patch(
-                    "src.work_data_hub.orchestration.ops.get_settings"
+                    "work_data_hub.orchestration.ops.get_settings"
                 ) as mock_settings:
                     mock_db = Mock()
                     mock_db.get_connection_string.return_value = "postgresql://test"
@@ -994,13 +1062,13 @@ class TestLoadOpConnectionLifecycle:
         processed_rows = [{"col": "value", "id": 1}]  # Add missing id field
 
         with patch(
-            "src.work_data_hub.orchestration.ops.psycopg2", create=True
+            "work_data_hub.orchestration.ops.psycopg2", create=True
         ) as mock_psycopg2:
             # Simulate connection failure
             mock_psycopg2.connect.side_effect = Exception("Connection error")
 
             with patch(
-                "src.work_data_hub.orchestration.ops.get_settings"
+                "work_data_hub.orchestration.ops.get_settings"
             ) as mock_settings:
                 mock_db = Mock()
                 mock_db.get_connection_string.return_value = "postgresql://test"
@@ -1030,7 +1098,7 @@ class TestProcessAnnuityPerformanceOp:
 
         # Mock the process_with_enrichment function to avoid import issues
         with patch(
-            "src.work_data_hub.orchestration.ops.process_with_enrichment"
+            "work_data_hub.orchestration.ops.process_with_enrichment"
         ) as mock_process:
             # Setup mock result
             mock_result = Mock()
@@ -1039,7 +1107,7 @@ class TestProcessAnnuityPerformanceOp:
             mock_process.return_value = mock_result
 
             # Mock psycopg2 to verify it's not called in plan-only mode
-            with patch("src.work_data_hub.orchestration.ops.psycopg2") as mock_psycopg2:
+            with patch("work_data_hub.orchestration.ops.psycopg2") as mock_psycopg2:
                 result = process_annuity_performance_op(
                     context, config, excel_rows, file_paths
                 )
@@ -1072,7 +1140,7 @@ class TestProcessAnnuityPerformanceOp:
 
         # Mock the process_with_enrichment function
         with patch(
-            "src.work_data_hub.orchestration.ops.process_with_enrichment"
+            "work_data_hub.orchestration.ops.process_with_enrichment"
         ) as mock_process:
             # Setup mock result with some processed records
             mock_result = Mock()
@@ -1100,3 +1168,118 @@ class TestProcessAnnuityPerformanceOp:
 
             # Should return serialized records
             assert result == [{"plan_code": "TEST001", "client": "Test Client"}]
+
+
+class TestProcessAnnuityIncomeOp:
+    """Test process_annuity_income_op functionality (Story 6.2-P3 AC5)."""
+
+    def test_process_annuity_income_op_plan_only_success(self):
+        """Test plan-only mode processes data without database connections."""
+        context = build_op_context()
+        config = ProcessingConfig(
+            enrichment_enabled=False,
+            plan_only=True,
+            enrichment_sync_budget=0,
+            export_unknown_names=True,
+        )
+        excel_rows = [{"计划号": "PLAN001", "机构": "北京", "固费": "100.00"}]
+        file_paths = ["test_income_file.xlsx"]
+
+        # Mock the process_annuity_income_with_enrichment function
+        with patch(
+            "work_data_hub.orchestration.ops.process_annuity_income_with_enrichment"
+        ) as mock_process:
+            # Setup mock result with processed records
+            mock_result = Mock()
+            mock_record = Mock()
+            mock_record.model_dump.return_value = {
+                "plan_code": "PLAN001",
+                "branch": "北京",
+                "fixed_fee": "100.00",
+            }
+            mock_result.records = [mock_record]
+            mock_process.return_value = mock_result
+
+            result = process_annuity_income_op(
+                context, config, excel_rows, file_paths
+            )
+
+            # Verify process was called with correct parameters
+            mock_process.assert_called_once_with(
+                excel_rows,
+                data_source="test_income_file.xlsx"
+            )
+
+            # Verify result is JSON-serializable
+            json.dumps(result)
+
+            # Should return serialized records
+            assert result == [{"plan_code": "PLAN001", "branch": "北京", "fixed_fee": "100.00"}]
+
+    def test_process_annuity_income_op_empty_data(self):
+        """Test processing empty data returns empty list."""
+        context = build_op_context()
+        config = ProcessingConfig(plan_only=True)
+        excel_rows = []
+        file_paths = ["test_file.xlsx"]
+
+        with patch(
+            "work_data_hub.orchestration.ops.process_annuity_income_with_enrichment"
+        ) as mock_process:
+            mock_result = Mock()
+            mock_result.records = []
+            mock_process.return_value = mock_result
+
+            result = process_annuity_income_op(context, config, excel_rows, file_paths)
+
+            assert result == []
+
+    def test_process_annuity_income_op_empty_file_paths(self):
+        """Test processing with empty file paths uses 'unknown' as data_source."""
+        context = build_op_context()
+        config = ProcessingConfig(plan_only=True)
+        excel_rows = [{"计划号": "PLAN001"}]
+        file_paths = []
+
+        with patch(
+            "work_data_hub.orchestration.ops.process_annuity_income_with_enrichment"
+        ) as mock_process:
+            mock_result = Mock()
+            mock_result.records = []
+            mock_process.return_value = mock_result
+
+            result = process_annuity_income_op(context, config, excel_rows, file_paths)
+
+            # Should use "unknown" as data_source when no file paths provided
+            mock_process.assert_called_once_with(excel_rows, data_source="unknown")
+            assert result == []
+
+    def test_process_annuity_income_op_multiple_records(self):
+        """Test processing multiple records returns all serialized."""
+        context = build_op_context()
+        config = ProcessingConfig(plan_only=True)
+        excel_rows = [
+            {"计划号": "PLAN001", "固费": "100.00"},
+            {"计划号": "PLAN002", "固费": "200.00"},
+        ]
+        file_paths = ["test_file.xlsx"]
+
+        with patch(
+            "work_data_hub.orchestration.ops.process_annuity_income_with_enrichment"
+        ) as mock_process:
+            mock_result = Mock()
+            mock_record1 = Mock()
+            mock_record1.model_dump.return_value = {"plan_code": "PLAN001", "fixed_fee": "100.00"}
+            mock_record2 = Mock()
+            mock_record2.model_dump.return_value = {"plan_code": "PLAN002", "fixed_fee": "200.00"}
+            mock_result.records = [mock_record1, mock_record2]
+            mock_process.return_value = mock_result
+
+            result = process_annuity_income_op(context, config, excel_rows, file_paths)
+
+            assert len(result) == 2
+            assert result[0]["plan_code"] == "PLAN001"
+            assert result[1]["plan_code"] == "PLAN002"
+
+            # Verify result is JSON-serializable
+            json.dumps(result)

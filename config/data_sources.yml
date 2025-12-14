@@ -19,6 +19,31 @@
 schema_version: "1.0"
 
 domains:
+  # Sample Trustee Performance Domain (demo/test)
+  # Used by Dagster schedules/sensors and sample jobs.
+  # Path structure: tests/fixtures/real_data/202411/收集数据/业务收集/V1/**/*
+  sample_trustee_performance:
+    # NOTE: No {YYYYMM} here to keep sensors/schedules period-free.
+    base_path: "tests/fixtures/real_data/202411/收集数据/业务收集"
+
+    # Trustee files live under nested folders (e.g., "每月业务收集-11月"), so use recursive glob.
+    file_patterns:
+      - "**/*受托业绩*.xlsx"
+
+    exclude_patterns:
+      - "~$*"
+      - "*.eml"
+
+    # This sheet is primarily for sample job usage; override via CLI if needed.
+    sheet_name: 0
+
+    version_strategy: "highest_number"
+    fallback: "error"
+
+    output:
+      table: "sample_trustee_performance"
+      schema_name: "sample"
+
   # Annuity Performance Domain
   # ✅ VALIDATED with real 202411 data (Epic 3 Tech Spec Action Item #2)
   # Path structure: tests/fixtures/real_data/202411/收集数据/数据采集/V1/*.xlsx

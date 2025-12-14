@@ -77,10 +77,10 @@ class DataSourcesValidationError(Exception):
 
 
 def validate_data_sources_config(
-    config_path: str = "src/work_data_hub/config/data_sources.yml",
+    config_path: str = "config/data_sources.yml",
 ) -> bool:
     """
-    Validate data_sources.yml against schema.
+    Validate data_sources.yml against Epic 3 schema (DataSourceConfigV2).
 
     Args:
         config_path: Path to the data_sources.yml file to validate
@@ -105,8 +105,8 @@ def validate_data_sources_config(
         raise DataSourcesValidationError(f"Failed to load configuration file: {e}")
 
     try:
-        # PATTERN: Use Pydantic validation like settings.py
-        config = DataSourcesConfig(**data)
+        # Epic 3: Use DataSourceConfigV2 for new base_path + version_strategy schema
+        config = DataSourceConfigV2(**data)
         logger.info(
             "Successfully validated data_sources configuration with "
             f"{len(config.domains)} domains"
@@ -117,17 +117,17 @@ def validate_data_sources_config(
 
 
 def get_domain_config(
-    domain_name: str, config_path: str = "src/work_data_hub/config/data_sources.yml"
-) -> DomainConfig:
+    domain_name: str, config_path: str = "config/data_sources.yml"
+) -> "DomainConfigV2":
     """
-    Get validated configuration for a specific domain.
+    Get validated Epic 3 configuration for a specific domain.
 
     Args:
         domain_name: Name of the domain to get config for
         config_path: Path to the data_sources.yml file
 
     Returns:
-        Validated DomainConfig instance
+        Validated DomainConfigV2 instance
 
     Raises:
         DataSourcesValidationError: If validation fails or domain not found
@@ -144,7 +144,7 @@ def get_domain_config(
             f"Domain '{domain_name}' not found in configuration"
         )
 
-    return DomainConfig(**data["domains"][domain_name])
+    return DomainConfigV2(**data["domains"][domain_name])
 
 
 # ============================================================================

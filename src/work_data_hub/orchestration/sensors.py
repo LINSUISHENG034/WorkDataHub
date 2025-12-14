@@ -14,8 +14,9 @@ import yaml
 from dagster import RunRequest, SensorEvaluationContext, SkipReason, sensor
 
 from work_data_hub.config.settings import get_settings
-from work_data_hub.io.connectors.file_connector import DataSourceConnector
+from work_data_hub.io.connectors.file_connector import FileDiscoveryService
 from work_data_hub.io.loader.warehouse_loader import build_insert_sql
+from work_data_hub.utils.types import DiscoveredFile, extract_file_metadata
 
 from .jobs import process_company_lookup_queue_job, sample_trustee_performance_multi_file_job
 
@@ -39,12 +40,24 @@ def _build_sensor_run_config() -> Dict[str, Any]:
 
     try:
         with open(settings.data_sources_config, "r", encoding="utf-8") as f:
-            data_sources = yaml.safe_load(f)
+            data_sources = yaml.safe_load(f) or {}
+        if not isinstance(data_sources, dict):
+            data_sources = {}
 
-        domain_config = data_sources.get("domains", {}).get(
+        domain_config = (data_sources.get("domains") or {}).get(
             "sample_trustee_performance", {}
-        )
-        table = domain_config.get("table", "sample_trustee_performance")
+        ) or {}
+        if not isinstance(domain_config, dict):
+            domain_config = {}
+
+        output_cfg = domain_config.get("output")
+        if isinstance(output_cfg, dict) and output_cfg.get("table"):
+            schema_name = output_cfg.get("schema_name")
+            table_name = str(output_cfg["table"])
+            table = f"{schema_name}.{table_name}" if schema_name else table_name
+        else:
+            table = domain_config.get("table", "sample_trustee_performance")
+
         pk = domain_config.get("pk", ["report_date", "plan_code", "company_code"])
 
     except Exception:
@@ -92,9 +105,20 @@ def trustee_new_files_sensor(context: SensorEvaluationContext):
     - Updates cursor after successful file detection
     """
     try:
-        # Initialize connector to discover trustee files
-        connector = DataSourceConnector()
-        files = connector.discover("sample_trustee_performance")
+        # Discover a single best-match file using Epic 3 discovery
+        discovery = FileDiscoveryService()
+        match = discovery.discover_file(domain="sample_trustee_performance")
+        file_meta = extract_file_metadata(str(match.file_path))
+        file_meta.update({"version": match.version, "sheet_name": match.sheet_name})
+        files = [
+            DiscoveredFile(
+                domain="sample_trustee_performance",
+                path=str(match.file_path),
+                year=None,
+                month=None,
+                metadata=file_meta,
+            )
+        ]
 
         if not files:
             return SkipReason(

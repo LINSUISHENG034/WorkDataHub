@@ -88,6 +88,10 @@ class ForeignKeyConfig(BaseModel):
     name: str = Field(..., description="Unique identifier for this foreign key configuration")
     source_column: str = Field(..., description="Column in fact data containing the foreign key values")
     target_table: str = Field(..., description="Reference table name to backfill")
+    target_schema: str = Field(
+        default="public",
+        description="Target schema containing the reference table",
+    )
     target_key: str = Field(..., description="Primary key column in target reference table")
     backfill_columns: List[BackfillColumnMapping] = Field(
         ..., description="Column mappings from fact data to reference table"
@@ -99,6 +103,10 @@ class ForeignKeyConfig(BaseModel):
     depends_on: List[str] = Field(
         default_factory=list,
         description="List of foreign key names that must be processed before this one"
+    )
+    skip_blank_values: bool = Field(
+        default=False,
+        description="Skip blank-like FK values (e.g., empty strings, '(空白)') during candidate derivation",
     )
 
     @field_validator('name')
@@ -115,6 +123,14 @@ class ForeignKeyConfig(BaseModel):
         """Validate table/column identifiers are non-empty strings."""
         if not isinstance(v, str) or not v.strip():
             raise ValueError("Source column, target table, and target key must be non-empty strings")
+        return v.strip()
+
+    @field_validator("target_schema")
+    @classmethod
+    def validate_target_schema(cls, v: str) -> str:
+        """Validate schema identifier is non-empty."""
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("Target schema must be a non-empty string")
         return v.strip()
 
     @field_validator('backfill_columns')

@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional, Pattern
 import pandas as pd
 import yaml
 
-import work_data_hub.config.settings as settings_module
+from work_data_hub.config.settings import get_settings
 from work_data_hub.infrastructure.settings.data_source_schema import (
     DataSourceConfigV2,
     DataSourcesValidationError,
@@ -52,6 +52,18 @@ class DataSourceConnector:
     """
     Configuration-driven file discovery connector.
 
+    .. deprecated:: Epic 6.2-P3
+        This class is deprecated for Epic 3 schema domains (base_path, file_patterns).
+        Use :class:`FileDiscoveryService` instead for Epic 3 schema domains.
+
+        DataSourceConnector remains available for backward compatibility with
+        legacy schema domains (pattern, select) but should not be used for
+        new Epic 3 schema configurations.
+
+        Migration guide:
+        - Epic 3 schema domains → Use FileDiscoveryService.discover_file()
+        - Legacy schema domains → Continue using DataSourceConnector.discover()
+
     This class handles the discovery of data files based on configurable
     regex patterns and selection strategies. It supports Unicode filename
     matching, version directory handling, and various file filtering options.
@@ -78,6 +90,9 @@ class DataSourceConnector:
         # Load and validate configuration
         self.config = self._load_config()
 
+        # Check for Epic 3 schema usage and emit deprecation warning
+        self._check_epic3_schema_usage()
+
         # Prepare canonical/alias mappings for domain names
         self._canonical_domains = {
             name: self._canonicalize_domain(name, cfg)
@@ -90,6 +105,35 @@ class DataSourceConnector:
         # Pre-compile regex patterns with Unicode support
         self.compiled_patterns = self._compile_patterns()
 
+    def _check_epic3_schema_usage(self) -> None:
+        """
+        Check if any domains use Epic 3 schema and emit deprecation warning.
+
+        Epic 3 schema domains should use FileDiscoveryService instead.
+        """
+        import warnings
+
+        epic3_domains = []
+        for domain_name, domain_config in self.config["domains"].items():
+            # Detect Epic 3 schema by presence of base_path and file_patterns
+            if "base_path" in domain_config and "file_patterns" in domain_config:
+                epic3_domains.append(domain_name)
+
+        if epic3_domains:
+            warnings.warn(
+                f"DataSourceConnector is deprecated for Epic 3 schema domains: {epic3_domains}. "
+                f"Use FileDiscoveryService instead. "
+                f"See migration guide in DataSourceConnector docstring.",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+            self.logger.warning(
+                "DataSourceConnector initialized with Epic 3 schema domains: %s. "
+                "Consider migrating to FileDiscoveryService for better version detection "
+                "and template variable support.",
+                epic3_domains,
+            )
+
     def _get_settings(self) -> Any:
         """
         Lazily resolve settings so tests can patch get_settings easily.
@@ -97,18 +141,7 @@ class DataSourceConnector:
         if self.settings is not None:
             return self.settings
 
-        try:
-            getter = settings_module.get_settings  # type: ignore[attr-defined]
-        except AttributeError:
-            getter = None
-
-        if callable(getter):
-            self.settings = getter()
-        elif hasattr(settings_module, "data_base_dir"):
-            # Fallback: settings_module may already be a Settings instance in tests
-            self.settings = settings_module
-        else:
-            raise AttributeError("Configuration settings unavailable")
+        self.settings = get_settings()
 
         return self.settings
 
@@ -146,6 +179,20 @@ class DataSourceConnector:
 
         for domain_name in domains_to_scan:
             domain_config = self.config["domains"][domain_name]
+            # This connector only supports the legacy schema (pattern/select).
+            if "pattern" not in domain_config or "select" not in domain_config:
+                if domain is not None:
+                    raise DataSourceConnectorError(
+                        f"Domain '{domain_name}' uses Epic 3 schema and cannot be "
+                        f"discovered via DataSourceConnector. Use FileDiscoveryService "
+                        f"for base_path + file_patterns discovery."
+                    )
+                self.logger.debug(
+                    "Skipping Epic 3 schema domain '%s' in DataSourceConnector.discover",
+                    domain_name,
+                )
+                continue
+
             pattern = self.compiled_patterns[domain_name]
 
             self.logger.debug(
@@ -202,14 +249,20 @@ class DataSourceConnector:
         if "domains" not in config:
             raise DataSourceConnectorError("Configuration missing 'domains' section")
 
-        # Validate each domain configuration
+        # Validate each domain configuration (legacy schema only).
+        #
+        # Epic 3 schema domains live in the same config file but are not supported
+        # by this legacy connector. Those domains should use FileDiscoveryService.
         for domain_name, domain_config in config["domains"].items():
-            required_keys = ["pattern", "select"]
-            for key in required_keys:
-                if key not in domain_config:
-                    raise DataSourceConnectorError(
-                        f"Domain '{domain_name}' missing required key: {key}"
-                    )
+            is_legacy_schema = "pattern" in domain_config and "select" in domain_config
+            is_epic3_schema = "base_path" in domain_config and "file_patterns" in domain_config
+
+            if not (is_legacy_schema or is_epic3_schema):
+                raise DataSourceConnectorError(
+                    f"Domain '{domain_name}' has unrecognized configuration schema. "
+                    f"Expected legacy keys (pattern, select) or Epic 3 keys "
+                    f"(base_path, file_patterns)."
+                )
 
         self.logger.info(f"Loaded configuration for {len(config['domains'])} domains")
         return config
@@ -227,6 +280,10 @@ class DataSourceConnector:
         compiled = {}
 
         for domain_name, domain_config in self.config["domains"].items():
+            # Only legacy schema domains have regex patterns.
+            if "pattern" not in domain_config:
+                continue
+
             pattern_str = domain_config["pattern"]
 
             try:
@@ -569,6 +626,16 @@ class DataSourceConnector:
 
 
 @dataclass
+class DiscoveryMatch:
+    """Result of discovery-only operation (no Excel loading)."""
+
+    file_path: Path
+    version: str
+    sheet_name: str
+    resolved_base_path: Path
+
+
+@dataclass
 class DataDiscoveryResult:
     """Result of file discovery operation with rich metadata."""
 
@@ -600,11 +667,104 @@ class FileDiscoveryService:
         file_matcher: Optional[FilePatternMatcher] = None,
         excel_reader: Optional[ExcelReader] = None,
     ):
-        self.settings = settings or settings_module.get_settings()
+        self.settings = settings or get_settings()
         self.version_scanner = version_scanner or VersionScanner()
         self.file_matcher = file_matcher or FilePatternMatcher()
         self.excel_reader = excel_reader or ExcelReader()
         self.logger = get_logger(__name__)
+
+    def discover_file(
+        self,
+        domain: str,
+        version_override: Optional[str] = None,
+        **template_vars: Any,
+    ) -> DiscoveryMatch:
+        """
+        Discover file for a domain without loading Excel data.
+
+        This is a discovery-only API that performs:
+        - Template variable resolution
+        - Version detection
+        - File pattern matching
+
+        But does NOT load Excel data, making it suitable for orchestration
+        layer discovery operations.
+
+        Args:
+            domain: Domain identifier (e.g., 'annuity_performance')
+            version_override: Optional manual version (e.g., "V1")
+            **template_vars: Template variables for path resolution (e.g.,
+            month="202501")
+
+        Returns:
+            DiscoveryMatch with file path, version, sheet name, and resolved base path
+
+        Raises:
+            DiscoveryError: With structured context if any stage fails
+        """
+        self.logger.info(
+            "discovery.started", domain=domain, template_vars=template_vars
+        )
+
+        try:
+            domain_config = self._load_domain_config(domain)
+            base_path = self._resolve_template_vars(
+                domain_config.base_path, template_vars
+            )
+
+            # Stage 1: Version detection
+            version_result = self._detect_version_with_fallback(
+                base_path, domain_config, version_override
+            )
+            self.logger.info(
+                "discovery.version_detected",
+                version=version_result.version,
+                path=str(version_result.path),
+                strategy=version_result.strategy_used,
+            )
+
+            # Stage 2: File matching
+            match_result = self.file_matcher.match_files(
+                search_path=version_result.path,
+                include_patterns=list(domain_config.file_patterns),
+                exclude_patterns=list(domain_config.exclude_patterns or []),
+            )
+            self.logger.info(
+                "discovery.file_matched",
+                file_path=str(match_result.matched_file),
+                match_count=match_result.match_count,
+            )
+
+            result = DiscoveryMatch(
+                file_path=match_result.matched_file,
+                version=version_result.version,
+                sheet_name=domain_config.sheet_name,
+                resolved_base_path=base_path,
+            )
+
+            self.logger.info(
+                "discovery.completed",
+                domain=domain,
+                file_path=str(result.file_path),
+                version=result.version,
+                sheet_name=result.sheet_name,
+            )
+
+            return result
+
+        except DiscoveryError as exc:
+            self.logger.error("discovery.failed", **exc.to_dict())
+            raise
+        except Exception as exc:  # pragma: no cover - defensive
+            stage = self._identify_failed_stage(exc)
+            wrapped = DiscoveryError(
+                domain=domain,
+                failed_stage=stage,
+                original_error=exc,
+                message=str(exc),
+            )
+            self.logger.error("discovery.failed", **wrapped.to_dict())
+            raise wrapped
 
     def discover_and_load(
         self,
