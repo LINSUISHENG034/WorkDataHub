@@ -73,6 +73,7 @@ markers = [
     "unit: marks tests as fast unit tests with no external dependencies",
     "integration: marks tests as integration tests with database or filesystem",
     "postgres: marks tests as requiring a PostgreSQL database (deselect with '-m \"not postgres\"')",
+    "eqc_integration: marks tests that call the EQC API (opt-in)",
     "monthly_data: marks tests requiring reference/monthly data (opt-in)",
     "legacy_data: marks tests as requiring legacy sample data (opt-in)",
     "e2e: legacy marker for parity/end-to-end scenarios (see e2e_suite)",

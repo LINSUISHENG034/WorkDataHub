@@ -322,8 +322,8 @@ class EQCClient:
         """
         Search for companies by name using EQC API.
 
-        Uses the EQC searchAll endpoint to find companies matching the provided name.
-        Handles Chinese character encoding and response parsing automatically.
+        Uses the EQC `/search/` endpoint (key-based search) to find companies matching
+        the provided name. Handles Chinese character encoding and response parsing automatically.
 
         Args:
             name: Company name to search for (supports Chinese characters)
@@ -348,8 +348,7 @@ class EQCClient:
         # Clean the search name (do NOT pre-encode - requests handles encoding)
         cleaned_name = name.strip()
 
-        # Construct search URL - using legacy endpoint format
-        # Note: searchAll endpoint requires different permissions, use /search/ instead
+        # Construct search URL
         url = f"{self.base_url}/kg-api-hfd/api/search/"
         params = {"key": cleaned_name}  # requests will handle URL encoding
 

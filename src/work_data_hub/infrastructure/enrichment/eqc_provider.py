@@ -390,7 +390,7 @@ class EqcProvider:
 
             # Story 6.2-P5: Write to enterprise.base_info with raw API response
             # This is best-effort persistence - failure must not fail the lookup
-            if raw_json and self.mapping_repository:
+            if raw_json is not None and self.mapping_repository:
                 try:
                     self.mapping_repository.upsert_base_info(
                         company_id=result.company_id,

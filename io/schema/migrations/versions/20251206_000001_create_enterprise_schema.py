@@ -3,13 +3,18 @@
 Story 6.1: Enterprise Schema Creation
 Creates the persistence layer for company enrichment:
 - enterprise schema (isolated from business tables)
-- company_master: Company master data
+- company_master: Company master data [DEPRECATED 2025-12-14 - Use base_info instead]
 - company_mapping: Unified mapping cache (Legacy 5-tier + EQC)
 - enrichment_requests: Async backfill queue
 
+DEPRECATION NOTICE (Story 6.2-P5):
+The company_master table is deprecated as of 2025-12-14. All new development
+should use enterprise.base_info (legacy table) for company master data.
+See: docs/deprecations/company_master_table_deprecation.md
+
 Table Schema per Tech Spec:
 - company_master: company_id PK, official_name, unified_credit_code UNIQUE,
-  aliases TEXT[], source, timestamps
+  aliases TEXT[], source, timestamps [DEPRECATED - kept for backward compatibility]
 - company_mapping: alias_name + match_type UNIQUE, priority CHECK 1-5
 - enrichment_requests: async queue with status tracking, partial unique index
 
@@ -77,6 +82,8 @@ def upgrade() -> None:
     conn.execute(sa.text(f"CREATE SCHEMA IF NOT EXISTS {SCHEMA_NAME}"))
 
     # === Step 2: Create company_master table (AC2) ===
+    # DEPRECATED (Story 6.2-P5): This table is deprecated. Use enterprise.base_info instead.
+    # Kept for backward compatibility only. See: docs/deprecations/company_master_table_deprecation.md
     if not _table_exists(conn, "company_master", SCHEMA_NAME):
         op.create_table(
             "company_master",

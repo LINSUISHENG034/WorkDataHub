@@ -651,3 +651,174 @@ class TestEnqueueForEnrichment:
         assert elapsed_ms < 50, f"Enqueue took {elapsed_ms:.2f}ms, expected <50ms"
         # Single batch insert
         mock_connection.execute.assert_called_once()
+
+
+class TestCompanyMappingRepositoryUpsertBaseInfo:
+    """Test upsert_base_info method (Story 6.2-P5)."""
+
+    def test_upsert_base_info_inserts_new_record(self, repository, mock_connection):
+        """Test upsert_base_info inserts new record successfully."""
+        # Mock fetchone to return inserted=True (xmax=0)
+        mock_row = MagicMock()
+        mock_row.inserted = True
+        mock_result = MagicMock()
+        mock_result.fetchone.return_value = mock_row
+        mock_connection.execute.return_value = mock_result
+
+        raw_data = {"list": [{"companyId": "123", "companyFullName": "Test"}], "total": 1}
+
+        inserted = repository.upsert_base_info(
+            company_id="1000065057",
+            search_key_word="中国平安",
+            company_full_name="中国平安保险（集团）股份有限公司",
+            unite_code="91440300618698064P",
+            raw_data=raw_data,
+        )
+
+        assert inserted is True
+        mock_connection.execute.assert_called_once()
+
+        # Verify SQL parameters
+        call_args = mock_connection.execute.call_args
+        params = call_args[0][1]
+        assert params["company_id"] == "1000065057"
+        assert params["search_key_word"] == "中国平安"
+        assert params["company_full_name"] == "中国平安保险（集团）股份有限公司"
+        assert params["unite_code"] == "91440300618698064P"
+        # raw_data should be JSON string
+        import json
+        assert json.loads(params["raw_data"]) == raw_data
+
+    def test_upsert_base_info_updates_existing_record(self, repository, mock_connection):
+        """Test upsert_base_info updates existing record."""
+        # Mock fetchone to return inserted=False (xmax!=0)
+        mock_row = MagicMock()
+        mock_row.inserted = False
+        mock_result = MagicMock()
+        mock_result.fetchone.return_value = mock_row
+        mock_connection.execute.return_value = mock_result
+
+        raw_data = {"list": [{"companyId": "123"}], "total": 1}
+
+        inserted = repository.upsert_base_info(
+            company_id="1000065057",
+            search_key_word="平安",
+            company_full_name="中国平安保险（集团）股份有限公司",
+            unite_code="91440300618698064P",
+            raw_data=raw_data,
+        )
+
+        assert inserted is False
+        mock_connection.execute.assert_called_once()
+
+    def test_upsert_base_info_handles_null_unite_code(self, repository, mock_connection):
+        """Test upsert_base_info handles NULL unite_code."""
+        mock_row = MagicMock()
+        mock_row.inserted = True
+        mock_result = MagicMock()
+        mock_result.fetchone.return_value = mock_row
+        mock_connection.execute.return_value = mock_result
+
+        raw_data = {"list": [], "total": 0}
+
+        inserted = repository.upsert_base_info(
+            company_id="123",
+            search_key_word="Test",
+            company_full_name="Test Company",
+            unite_code=None,  # NULL value
+            raw_data=raw_data,
+        )
+
+        assert inserted is True
+        call_args = mock_connection.execute.call_args
+        params = call_args[0][1]
+        assert params["unite_code"] is None
+
+    def test_upsert_base_info_serializes_raw_data_correctly(self, repository, mock_connection):
+        """Test upsert_base_info serializes raw_data as JSON string."""
+        mock_row = MagicMock()
+        mock_row.inserted = True
+        mock_result = MagicMock()
+        mock_result.fetchone.return_value = mock_row
+        mock_connection.execute.return_value = mock_result
+
+        # Complex raw data with nested structures
+        raw_data = {
+            "list": [
+                {
+                    "companyId": "123",
+                    "companyFullName": "测试公司",
+                    "nested": {"key": "value"},
+                }
+            ],
+            "total": 1,
+            "metadata": {"timestamp": "2025-12-14"},
+        }
+
+        repository.upsert_base_info(
+            company_id="123",
+            search_key_word="测试",
+            company_full_name="测试公司",
+            unite_code="ABC123",
+            raw_data=raw_data,
+        )
+
+        call_args = mock_connection.execute.call_args
+        params = call_args[0][1]
+
+        # Verify JSON serialization
+        import json
+        serialized = params["raw_data"]
+        assert isinstance(serialized, str)
+        deserialized = json.loads(serialized)
+        assert deserialized == raw_data
+        # Verify Chinese characters are preserved (ensure_ascii=False)
+        assert "测试公司" in serialized
+
+    def test_upsert_base_info_handles_empty_raw_data(self, repository, mock_connection):
+        """Test upsert_base_info handles empty raw_data dict."""
+        mock_row = MagicMock()
+        mock_row.inserted = True
+        mock_result = MagicMock()
+        mock_result.fetchone.return_value = mock_row
+        mock_connection.execute.return_value = mock_result
+
+        repository.upsert_base_info(
+            company_id="123",
+            search_key_word="Test",
+            company_full_name="Test Company",
+            unite_code="ABC",
+            raw_data={},  # Empty dict
+        )
+
+        call_args = mock_connection.execute.call_args
+        params = call_args[0][1]
+        import json
+        assert json.loads(params["raw_data"]) == {}
+
+    def test_upsert_base_info_uses_on_conflict_do_update(self, repository, mock_connection):
+        """Test upsert_base_info uses ON CONFLICT DO UPDATE semantics."""
+        mock_row = MagicMock()
+        mock_row.inserted = False
+        mock_result = MagicMock()
+        mock_result.fetchone.return_value = mock_row
+        mock_connection.execute.return_value = mock_result
+
+        raw_data = {"list": [], "total": 0}
+
+        repository.upsert_base_info(
+            company_id="123",
+            search_key_word="Test",
+            company_full_name="Test Company",
+            unite_code="ABC",
+            raw_data=raw_data,
+        )
+
+        # Verify SQL contains ON CONFLICT clause
+        call_args = mock_connection.execute.call_args
+        sql_text = str(call_args[0][0])
+        assert "ON CONFLICT" in sql_text
+        assert "DO UPDATE" in sql_text
+        # Verify only raw_data and updated_at are updated
+        assert "raw_data = EXCLUDED.raw_data" in sql_text
+        assert "updated_at = NOW()" in sql_text

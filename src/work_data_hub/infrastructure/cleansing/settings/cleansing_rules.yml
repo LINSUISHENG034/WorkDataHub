@@ -58,3 +58,61 @@ domains:
     收入金额:
       - remove_currency_symbols
       - clean_comma_separated_number
+
+  # EQC Business Info Domain (Story 6.2-P5)
+  # Cleansing rules for enterprise.business_info fields from EQC API
+  eqc_business_info:
+    # NOTE:
+    # - Field keys should match the record dict keys used by the refresh/cleansing CLIs.
+    # - Keep legacy-style keys as well for compatibility with earlier prototypes.
+
+    # === enterprise.business_info (current DB/CLI field names) ===
+    registered_date:
+      - trim_whitespace
+      - parse_chinese_date_value
+    registerCaptial:
+      - remove_currency_symbols
+      - clean_comma_separated_number
+      - convert_chinese_amount_units
+    registered_status:
+      - trim_whitespace
+    legal_person_name:
+      - trim_whitespace
+    address:
+      - trim_whitespace
+    company_name:
+      - trim_whitespace
+      - normalize_company_name
+    credit_code:
+      - trim_whitespace
+    company_type:
+      - trim_whitespace
+    industry_name:
+      - trim_whitespace
+    business_scope:
+      - trim_whitespace
+
+    # === Legacy / API-shaped keys (kept for backward compatibility) ===
+    companyId:
+      - trim_whitespace
+    companyFullName:
+      - trim_whitespace
+    unite_code:
+      - trim_whitespace
+    reg_cap:
+      - remove_currency_symbols
+      - clean_comma_separated_number
+      - convert_chinese_amount_units
+    est_date:
+      - trim_whitespace
+      - parse_chinese_date_value
+    le_rep:
+      - trim_whitespace
+    company_nature:
+      - trim_whitespace
+    province:
+      - trim_whitespace
+    rank_score:
+      - clean_comma_separated_number
+    default_score:
+      - clean_comma_separated_number

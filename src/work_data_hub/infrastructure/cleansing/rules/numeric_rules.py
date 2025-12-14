@@ -6,6 +6,7 @@
 """
 
 import unicodedata
+import re
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Callable, Dict, List, Optional, Union
 
@@ -98,6 +99,60 @@ def clean_comma_separated_number(value: Any) -> Any:
         return None
 
     return cleaned
+
+
+@rule(
+    name="convert_chinese_amount_units",
+    category=RuleCategory.NUMERIC,
+    description="将带有“万/亿”单位的金额字符串转换为数值（以元为基准）",
+)
+def convert_chinese_amount_units(value: Any) -> Any:
+    """
+    Convert amounts like "1,000万元" / "2亿元" to numeric yuan values.
+
+    Notes:
+        - If no supported unit suffix is present, returns the original value.
+        - Designed to be composed after string cleaning rules.
+    """
+    if value is None:
+        return None
+
+    if isinstance(value, (int, float, Decimal)):
+        return value
+
+    if not isinstance(value, str):
+        return value
+
+    normalized = unicodedata.normalize("NFKC", value).strip()
+    if not normalized:
+        return None
+
+    multiplier = None
+    unit_suffixes = (
+        ("万元", 10_000.0),
+        ("万", 10_000.0),
+        ("亿元", 100_000_000.0),
+        ("亿", 100_000_000.0),
+    )
+    for suffix, mult in unit_suffixes:
+        if normalized.endswith(suffix):
+            multiplier = mult
+            normalized = normalized[: -len(suffix)].strip()
+            break
+
+    if multiplier is None:
+        return value
+
+    candidate = normalized.replace(",", "").replace(" ", "").replace("\u3000", "")
+    if candidate in NULL_PLACEHOLDERS or candidate.lower() in NULL_PLACEHOLDERS:
+        return None
+
+    # Keep digits, sign, decimal point only.
+    candidate = re.sub(r"[^0-9.+-]", "", candidate)
+    if not candidate or candidate in {"+", "-", ".", "+.", "-."}:
+        return None
+
+    return float(candidate) * multiplier
 
 
 @rule(

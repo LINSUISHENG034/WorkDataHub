@@ -10,6 +10,7 @@ This service provides:
 - Progress tracking and error handling
 """
 
+import json
 import time
 from dataclasses import dataclass
 from typing import List, Optional
@@ -248,15 +249,17 @@ class EqcDataRefreshService:
             ORDER BY updated_at ASC NULLS FIRST
         """
 
+        # Use parameterized query for LIMIT to prevent SQL injection
         if limit is not None:
-            query_text += f" LIMIT {limit}"
+            query_text += " LIMIT :limit"
 
         query = text(query_text)
 
-        result = self.connection.execute(
-            query,
-            {"threshold_days": threshold_days},
-        )
+        params = {"threshold_days": threshold_days}
+        if limit is not None:
+            params["limit"] = limit
+
+        result = self.connection.execute(query, params)
         rows = result.fetchall()
 
         companies = []
@@ -278,6 +281,126 @@ class EqcDataRefreshService:
         )
 
         return companies
+
+    def get_all_companies(
+        self,
+        limit: Optional[int] = None,
+    ) -> List[StaleCompanyInfo]:
+        """
+        Get all companies from enterprise.base_info in stable order.
+
+        Args:
+            limit: Maximum number of companies to return. If None, returns all.
+
+        Returns:
+            List of StaleCompanyInfo (updated_at/days_since_update populated if available).
+        """
+        query_text = """
+            SELECT
+                company_id,
+                "companyFullName" AS company_full_name,
+                updated_at,
+                CASE
+                    WHEN updated_at IS NULL THEN NULL
+                    ELSE EXTRACT(DAY FROM NOW() - updated_at)::INTEGER
+                END AS days_since_update
+            FROM enterprise.base_info
+            ORDER BY company_id
+        """
+
+        if limit is not None:
+            query_text += " LIMIT :limit"
+
+        params = {}
+        if limit is not None:
+            params["limit"] = limit
+
+        rows = self.connection.execute(text(query_text), params).fetchall()
+        return [
+            StaleCompanyInfo(
+                company_id=row.company_id,
+                company_full_name=row.company_full_name or "",
+                updated_at=str(row.updated_at) if row.updated_at else None,
+                days_since_update=row.days_since_update,
+            )
+            for row in rows
+        ]
+
+    def _cleanse_business_info_best_effort(self, company_id: str) -> None:
+        """
+        Best-effort cleansing integration for enterprise.business_info (Story 6.2-P5 AC16).
+
+        This function must never fail the refresh operation.
+        """
+        try:
+            from work_data_hub.infrastructure.cleansing.rule_engine import CleansingRuleEngine
+
+            row = self.connection.execute(
+                text("""
+                    SELECT
+                        company_id,
+                        registered_date,
+                        "registerCaptial",
+                        registered_status,
+                        legal_person_name,
+                        address,
+                        company_name,
+                        credit_code,
+                        company_type,
+                        industry_name,
+                        business_scope
+                    FROM enterprise.business_info
+                    WHERE company_id = :company_id
+                """),
+                {"company_id": company_id},
+            ).fetchone()
+
+            if not row:
+                return
+
+            record = dict(row._mapping)
+            engine = CleansingRuleEngine()
+            result = engine.cleanse_record("eqc_business_info", record)
+
+            self.connection.execute(
+                text("""
+                    UPDATE enterprise.business_info
+                    SET _cleansing_status = :cleansing_status::jsonb,
+                        registered_date = :registered_date,
+                        "registerCaptial" = :registerCaptial,
+                        registered_status = :registered_status,
+                        legal_person_name = :legal_person_name,
+                        address = :address,
+                        company_name = :company_name,
+                        credit_code = :credit_code,
+                        company_type = :company_type,
+                        industry_name = :industry_name,
+                        business_scope = :business_scope
+                    WHERE company_id = :company_id
+                """),
+                {
+                    "company_id": record["company_id"],
+                    "cleansing_status": json.dumps(
+                        result.cleansing_status, ensure_ascii=False
+                    ),
+                    "registered_date": record.get("registered_date"),
+                    "registerCaptial": record.get("registerCaptial"),
+                    "registered_status": record.get("registered_status"),
+                    "legal_person_name": record.get("legal_person_name"),
+                    "address": record.get("address"),
+                    "company_name": record.get("company_name"),
+                    "credit_code": record.get("credit_code"),
+                    "company_type": record.get("company_type"),
+                    "industry_name": record.get("industry_name"),
+                    "business_scope": record.get("business_scope"),
+                },
+            )
+        except Exception as exc:
+            logger.warning(
+                "data_refresh_service.business_info_cleansing_failed",
+                company_id=company_id,
+                error_type=type(exc).__name__,
+            )
 
     def refresh_by_company_ids(
         self,
@@ -389,6 +512,9 @@ class EqcDataRefreshService:
                     raw_data=raw_json,
                 )
 
+                # AC16: Integrate cleansing into refresh flow (best-effort)
+                self._cleanse_business_info_best_effort(company_id)
+
                 successful += 1
 
                 logger.debug(
@@ -451,7 +577,7 @@ class EqcDataRefreshService:
         Args:
             threshold_days: Custom threshold in days. If None, uses settings default.
             batch_size: Batch size for processing. If None, uses settings default.
-                Companies are processed in batches of this size with commits between batches.
+                Companies are processed in batches of this size.
             rate_limit: Requests per second. If None, uses settings default.
             max_companies: Maximum companies to refresh. If None, refreshes all stale.
 

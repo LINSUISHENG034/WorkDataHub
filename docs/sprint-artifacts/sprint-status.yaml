@@ -206,7 +206,29 @@ development_status:
   # Includes: Data Freshness Management, Data Cleansing Framework, Initial Full Refresh Milestone
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-14-eqc-data-persistence.md
   # PM Review: docs/sprint-artifacts/reviews/pm-review-eqc-data-persistence-2025-12-14.md
-  6.2-p5-eqc-data-persistence-legacy-integration: in-progress  # EQC API response persistence to base_info + data refresh capability
+  6.2-p5-eqc-data-persistence-legacy-integration: done  # EQC API response persistence to base_info + data refresh capability
+  # Story 6.2-P6: CLI Architecture Unification & Multi-Domain Batch Processing
+  # Added 2025-12-14 via Correct-Course workflow
+  # Unify CLI tools under src/work_data_hub/cli/, implement multi-domain batch processing
+  # First Principles: Single etl command with --domains parameter (no separate batch command)
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-14-cli-architecture.md
+  # Story file: docs/sprint-artifacts/stories/6.2-p6-cli-architecture-unification.md
+  6.2-p6-cli-architecture-unification: review  # CLI unification + multi-domain batch processing ✅
+  # Story 6.2-P7: Enterprise Schema Consolidation
+  # Added 2025-12-14 via Correct-Course workflow
+  # Refactor migration to align base_info with archive_base_info, remove company_master
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-14-eqc-api-full-coverage.md
+  6.2-p7-enterprise-schema-consolidation: ready-for-dev  # Schema refactor: base_info/business_info/biz_label alignment
+  # Story 6.2-P8: EQC Full Data Acquisition
+  # Added 2025-12-14 via Correct-Course workflow
+  # Implement findDepart and findLabels API calls, store raw responses
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-14-eqc-api-full-coverage.md
+  6.2-p8-eqc-full-data-acquisition: backlog  # EQCClient: get_business_info() + get_label_info()
+  # Story 6.2-P9: Raw Data Cleansing & Transformation
+  # Added 2025-12-14 via Correct-Course workflow
+  # Transform raw_business_info/raw_biz_label to normalized business_info/biz_label tables
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-14-eqc-api-full-coverage.md
+  6.2-p9-raw-data-cleansing-transformation: backlog  # Cleansing: raw JSONB → normalized tables
 
   # Epic 7: Testing & Validation Infrastructure
   epic-7: backlog

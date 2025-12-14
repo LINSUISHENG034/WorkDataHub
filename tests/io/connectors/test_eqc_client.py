@@ -184,14 +184,12 @@ class TestEQCClientSearchMethod:
         client = EQCClient(token="test_token")
         results = client.search_company("测试")
 
-        # Verify request was made correctly
+        # Verify request was made correctly (actual implementation uses /search/ endpoint with 'key' param)
         mock_make_request.assert_called_once_with(
             "GET",
-            "https://eqc.pingan.com/kg-api-hfd/api/search/searchAll",
+            "https://eqc.pingan.com/kg-api-hfd/api/search/",
             params={
-                "keyword": "%E6%B5%8B%E8%AF%95",  # URL encoded "测试"
-                "currentPage": 1,
-                "pageSize": 10,
+                "key": "测试",
             },
         )
 
@@ -641,3 +639,151 @@ class TestEQCClientIntegration:
             assert isinstance(detail, CompanyDetail)
             assert detail.company_id == results[0].company_id
             assert detail.official_name  # Should have a name
+
+
+class TestEQCClientSearchWithRaw:
+    """Test search_company_with_raw method (Story 6.2-P5)."""
+
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    def test_search_with_raw_returns_tuple(self, mock_enforce_rate_limit):
+        """Test search_company_with_raw returns both parsed results and raw JSON."""
+        client = EQCClient(token="test_token")
+
+        mock_response_data = {
+            "list": [
+                {
+                    "companyId": "1000065057",
+                    "companyFullName": "中国平安保险（集团）股份有限公司",
+                    "unite_code": "91440300618698064P",
+                }
+            ],
+            "total": 1,
+            "page": 1,
+        }
+
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = mock_response_data
+            mock_request.return_value = mock_response
+
+            results, raw_json = client.search_company_with_raw("中国平安")
+
+            # Verify parsed results
+            assert isinstance(results, list)
+            assert len(results) == 1
+            assert results[0].company_id == "1000065057"
+            assert results[0].official_name == "中国平安保险（集团）股份有限公司"
+
+            # Verify raw JSON
+            assert isinstance(raw_json, dict)
+            assert raw_json == mock_response_data
+            assert "list" in raw_json
+            assert "total" in raw_json
+
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    def test_search_with_raw_empty_results(self, mock_enforce_rate_limit):
+        """Test search_company_with_raw with empty results."""
+        client = EQCClient(token="test_token")
+
+        mock_response_data = {"list": [], "total": 0}
+
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = mock_response_data
+            mock_request.return_value = mock_response
+
+            results, raw_json = client.search_company_with_raw("不存在的公司")
+
+            assert isinstance(results, list)
+            assert len(results) == 0
+            assert isinstance(raw_json, dict)
+            assert raw_json["total"] == 0
+
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    def test_search_with_raw_only_returns_response_body(self, mock_enforce_rate_limit):
+        """Test that raw JSON only contains response body, not headers or token."""
+        client = EQCClient(token="secret_token_123")
+
+        mock_response_data = {
+            "list": [{"companyId": "123", "companyFullName": "Test Company"}],
+            "total": 1,
+        }
+
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = mock_response_data
+            mock_response.headers = {"Authorization": "Bearer secret_token_123"}
+            mock_request.return_value = mock_response
+
+            results, raw_json = client.search_company_with_raw("Test")
+
+            # Verify raw JSON does NOT contain headers or token
+            assert "Authorization" not in raw_json
+            assert "token" not in raw_json
+            assert "secret_token_123" not in str(raw_json)
+
+            # Verify raw JSON only contains response body
+            assert "list" in raw_json
+            assert "total" in raw_json
+
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    def test_search_with_raw_handles_errors(self, mock_enforce_rate_limit):
+        """Test search_company_with_raw handles errors correctly."""
+        client = EQCClient(token="test_token")
+
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 401
+            mock_request.return_value = mock_response
+
+            with pytest.raises(EQCAuthenticationError):
+                client.search_company_with_raw("Test")
+
+    def test_search_with_raw_validates_input(self):
+        """Test search_company_with_raw validates empty input."""
+        client = EQCClient(token="test_token")
+
+        with pytest.raises(ValueError) as exc_info:
+            client.search_company_with_raw("")
+        assert "Company name cannot be empty" in str(exc_info.value)
+
+        with pytest.raises(ValueError):
+            client.search_company_with_raw("   ")
+
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    def test_search_with_raw_multiple_results(self, mock_enforce_rate_limit):
+        """Test search_company_with_raw with multiple results."""
+        client = EQCClient(token="test_token")
+
+        mock_response_data = {
+            "list": [
+                {
+                    "companyId": "1000065057",
+                    "companyFullName": "中国平安保险（集团）股份有限公司",
+                    "unite_code": "91440300618698064P",
+                },
+                {
+                    "companyId": "1000087994",
+                    "companyFullName": "平安银行股份有限公司",
+                    "unite_code": "91440300279377011F",
+                },
+            ],
+            "total": 2,
+        }
+
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = mock_response_data
+            mock_request.return_value = mock_response
+
+            results, raw_json = client.search_company_with_raw("平安")
+
+            assert len(results) == 2
+            assert results[0].company_id == "1000065057"
+            assert results[1].company_id == "1000087994"
+            assert raw_json["total"] == 2
+            assert len(raw_json["list"]) == 2

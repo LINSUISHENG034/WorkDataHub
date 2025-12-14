@@ -1016,7 +1016,7 @@ class CompanyMappingRepository:
             INSERT INTO enterprise.base_info
                 (company_id, search_key_word, "companyFullName", unite_code, raw_data, updated_at)
             VALUES
-                (:company_id, :search_key_word, :company_full_name, :unite_code, :raw_data, NOW())
+                (:company_id, :search_key_word, :company_full_name, :unite_code, CAST(:raw_data AS JSONB), NOW())
             ON CONFLICT (company_id) DO UPDATE SET
                 raw_data = EXCLUDED.raw_data,
                 updated_at = NOW()
@@ -1030,7 +1030,7 @@ class CompanyMappingRepository:
                 "search_key_word": search_key_word,
                 "company_full_name": company_full_name,
                 "unite_code": unite_code,
-                "raw_data": json.dumps(raw_data, ensure_ascii=False) if raw_data else None,
+                "raw_data": json.dumps(raw_data, ensure_ascii=False) if raw_data is not None else None,
             },
         )
 

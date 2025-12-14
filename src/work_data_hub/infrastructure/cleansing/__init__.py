@@ -54,11 +54,13 @@ from work_data_hub.infrastructure.cleansing.rules.numeric_rules import (
     annuity_decimal_cleaner,
     comprehensive_decimal_cleaning,
     decimal_quantization,
+    convert_chinese_amount_units,
     handle_percentage_conversion,
     remove_currency_symbols,
     standardize_null_values,
     trustee_decimal_cleaner,
 )
+from work_data_hub.infrastructure.cleansing.rules.date_rules import parse_chinese_date_value
 from work_data_hub.infrastructure.cleansing.rules.string_rules import (
     normalize_company_name,
     trim_whitespace,
@@ -86,8 +88,10 @@ __all__: list[str] = [
     "handle_percentage_conversion",
     "standardize_null_values",
     "decimal_quantization",
+    "convert_chinese_amount_units",
     "trim_whitespace",
     "normalize_company_name",
+    "parse_chinese_date_value",
     # 预配置清洗器
     "annuity_decimal_cleaner",
     "trustee_decimal_cleaner",
