@@ -184,6 +184,22 @@ development_status:
   6.2-p1-generic-data-source-adapter: done  # Epic 6.2 Patch - Generic adapter architecture for multi-database support - Implementation complete 2025-12-13
   6.2-6-reference-data-observability: done  # Dashboard, alerts, CSV export for review - Implementation complete 2025-12-13
   epic-6.2-retrospective: completed  # 2025-12-13 - Action items: 产品线 derivation, schema config update, real data validation checklist
+  # Story 6.2-P2: Real Data Validation Configuration
+  # Added 2025-12-13 via Correct-Course workflow
+  # Configuration updates for real data validation (file_patterns, config paths, schema validation)
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-13-real-data-validation.md
+  6.2-p2-real-data-validation-config: done  # Configuration updates completed 2025-12-13
+  # Story 6.2-P3: Orchestration Layer Architecture Unification
+  # Added 2025-12-13 via Correct-Course workflow
+  # Unify orchestration layer to use Epic 3 FileDiscoveryService, add --period CLI parameter
+  # Discovered: Legacy DataSourceConnector and Epic 3 FileDiscoveryService coexist with incompatible schemas
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-13-real-data-validation.md (Section 6-8)
+  6.2-p3-orchestration-architecture-unification: ready-for-dev
+  # Story 6.2-P4: Incremental Sync State Persistence
+  # Added 2025-12-14 via quick-dev workflow
+  # Fixes: Story 6.2-4 incremental sync logic exists but state persistence was missing
+  # Reference: docs/sprint-artifacts/quick-dev/reference-sync-incremental-state-persistence.md
+  6.2-p4-incremental-sync-state-persistence: done  # State persistence for reference_sync_op - Implementation complete 2025-12-14
 
   # Epic 7: Testing & Validation Infrastructure
   epic-7: backlog

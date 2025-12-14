@@ -226,12 +226,12 @@ class TestDagsterJobExecution:
     @patch('work_data_hub.orchestration.reference_sync_ops.get_settings')
     @patch('work_data_hub.orchestration.reference_sync_ops.load_reference_sync_config')
     @patch('work_data_hub.orchestration.reference_sync_ops.create_engine')
-    @patch('work_data_hub.orchestration.reference_sync_ops.LegacyMySQLConnector')
-    @patch('work_data_hub.orchestration.reference_sync_ops.ConfigFileConnector')
+    @patch('work_data_hub.orchestration.reference_sync_ops.AdapterFactory')
+    @patch('work_data_hub.orchestration.reference_sync_ops.SyncStateRepository')
     def test_reference_sync_op_execution(
         self,
-        mock_config_connector,
-        mock_mysql_connector,
+        mock_state_repo_class,
+        mock_adapter_factory,
         mock_create_engine,
         mock_load_config,
         mock_get_settings,
@@ -245,7 +245,14 @@ class TestDagsterJobExecution:
         mock_config = Mock()
         mock_config.enabled = True
         mock_config.tables = []
+        mock_config.batch_size = 5000
         mock_load_config.return_value = mock_config
+
+        mock_adapter_factory.create_adapters_for_configs.return_value = {}
+
+        mock_state_repo = MagicMock()
+        mock_state_repo.get_all_states.return_value = {}
+        mock_state_repo_class.return_value = mock_state_repo
 
         mock_engine = MagicMock()
         mock_conn = MagicMock()
@@ -264,6 +271,7 @@ class TestDagsterJobExecution:
         assert result["status"] == "success"
         assert "total_synced" in result
         assert "failed_count" in result
+        assert "states_persisted" in result
 
     @patch('work_data_hub.orchestration.reference_sync_ops.get_settings')
     @patch('work_data_hub.orchestration.reference_sync_ops.load_reference_sync_config')
