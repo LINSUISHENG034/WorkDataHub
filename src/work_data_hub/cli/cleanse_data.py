@@ -4,178 +4,275 @@ CLI for data cleansing operations.
 Story 6.2-P5: EQC Data Persistence & Legacy Table Integration
 Task 4.5: CLI entry point for data cleansing operations
 
+Story 6.2-P9: Raw Data Cleansing & Transformation
+Task 4.1: Extended with biz_label table support and --limit parameter
+
 Usage:
-    # Cleanse specific table
-    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli cleanse --table business_info --domain eqc_business_info
+    # Cleanse business_info table
+    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli.cleanse_data \
+        --table business_info --batch-size 100
 
-    # Cleanse with dry run
-    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli cleanse --table business_info --domain eqc_business_info --dry-run
+    # Cleanse biz_label table
+    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli.cleanse_data \
+        --table biz_label --batch-size 100
 
-    # Cleanse specific company IDs
-    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli cleanse --table business_info --domain eqc_business_info --company-ids 123,456
+    # Cleanse all tables
+    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli.cleanse_data \
+        --table all --batch-size 100 --limit 50
+
+    # Dry run to preview
+    PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.cli.cleanse_data \
+        --table all --batch-size 10 --limit 50 --dry-run
 """
+
+from __future__ import annotations
 
 import argparse
 import json
 import sys
-from typing import List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Connection
 
-from work_data_hub.infrastructure.cleansing.rule_engine import CleansingRuleEngine
+from work_data_hub.infrastructure.cleansing.business_info_cleanser import BusinessInfoCleanser
+from work_data_hub.infrastructure.cleansing.biz_label_parser import BizLabelParser
+from work_data_hub.infrastructure.enrichment.business_info_repository import BusinessInfoRepository
+from work_data_hub.infrastructure.enrichment.biz_label_repository import BizLabelRepository
 from work_data_hub.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-def cleanse_business_info_table(
-    connection,
-    domain: str,
-    company_ids: Optional[Sequence[str]] = None,
-    dry_run: bool = False,
-    batch_size: int = 100,
-) -> dict:
+def fetch_raw_records(
+    connection: Connection,
+    batch_size: int,
+    offset: int,
+    table: str = "business_info",
+    incremental: bool = True,
+) -> List[Dict[str, Any]]:
     """
-    Cleanse records in enterprise.business_info table.
+    Fetch raw records from base_info for cleansing.
 
     Args:
-        connection: SQLAlchemy connection.
-        domain: Domain name for cleansing rules (e.g., "eqc_business_info").
-        company_ids: Optional list of company IDs to cleanse. If None, cleanses all.
-        dry_run: If True, don't commit changes.
-        batch_size: Number of records to process per batch.
+        connection: SQLAlchemy connection
+        batch_size: Number of records per batch
+        offset: Offset for pagination
+        table: Target table (business_info or biz_label)
+        incremental: If True, only fetch records not yet cleansed
 
     Returns:
-        Dict with cleansing statistics.
+        List of raw record dicts
     """
-    engine = CleansingRuleEngine()
-
-    select_columns = """
-        company_id,
-        registered_date,
-        "registerCaptial",
-        registered_status,
-        legal_person_name,
-        address,
-        company_name,
-        credit_code,
-        company_type,
-        industry_name,
-        business_scope
-    """
-
-    update_query = text("""
-        UPDATE enterprise.business_info
-        SET _cleansing_status = CAST(:cleansing_status AS jsonb),
-            registered_date = :registered_date,
-            "registerCaptial" = :registerCaptial,
-            registered_status = :registered_status,
-            legal_person_name = :legal_person_name,
-            address = :address,
-            company_name = :company_name,
-            credit_code = :credit_code,
-            company_type = :company_type,
-            industry_name = :industry_name,
-            business_scope = :business_scope
-        WHERE company_id = :company_id
-    """)
-
-    total_records = 0
-    total_fields_cleansed = 0
-    total_fields_failed = 0
-
-    def _apply_batch(rows) -> None:
-        nonlocal total_records, total_fields_cleansed, total_fields_failed
-
-        records = [dict(row._mapping) for row in rows]
-        results = engine.cleanse_batch(domain, records)
-
-        total_records += len(records)
-        total_fields_cleansed += sum(r.fields_cleansed for r in results)
-        total_fields_failed += sum(r.fields_failed for r in results)
-
-        if dry_run:
-            return
-
-        for record, result in zip(records, results, strict=False):
-            connection.execute(
-                update_query,
-                {
-                    "company_id": record["company_id"],
-                    "cleansing_status": json.dumps(
-                        result.cleansing_status, ensure_ascii=False
-                    ),
-                    "registered_date": record.get("registered_date"),
-                    "registerCaptial": record.get("registerCaptial"),
-                    "registered_status": record.get("registered_status"),
-                    "legal_person_name": record.get("legal_person_name"),
-                    "address": record.get("address"),
-                    "company_name": record.get("company_name"),
-                    "credit_code": record.get("credit_code"),
-                    "company_type": record.get("company_type"),
-                    "industry_name": record.get("industry_name"),
-                    "business_scope": record.get("business_scope"),
-                },
-            )
-
-        connection.commit()
-
-    # If company_ids specified, process in manageable chunks
-    if company_ids:
-        ids = [str(cid).strip() for cid in company_ids if str(cid).strip()]
-        for start in range(0, len(ids), batch_size):
-            chunk = ids[start : start + batch_size]
-            placeholders = ",".join([f":id{i}" for i in range(len(chunk))])
-            query = text(f"""
-                SELECT {select_columns}
-                FROM enterprise.business_info
-                WHERE company_id IN ({placeholders})
-                ORDER BY company_id
+    if table == "business_info":
+        if incremental:
+            query = text("""
+                SELECT b.company_id, b.raw_business_info
+                FROM enterprise.base_info b
+                LEFT JOIN enterprise.business_info bi ON b.company_id = bi.company_id
+                WHERE b.raw_business_info IS NOT NULL
+                  AND bi.company_id IS NULL
+                ORDER BY b.company_id
+                LIMIT :batch_size OFFSET :offset
             """)
-            params = {f"id{i}": cid for i, cid in enumerate(chunk)}
-            rows = connection.execute(query, params).fetchall()
-            if rows:
-                _apply_batch(rows)
-        return {
-            "total_records": total_records,
-            "records_cleansed": total_records,
-            "fields_cleansed": total_fields_cleansed,
-            "fields_failed": total_fields_failed,
-        }
-
-    # Otherwise: scan the whole table with keyset pagination
-    last_company_id: Optional[str] = None
-    while True:
-        if last_company_id is None:
-            query = text(f"""
-                SELECT {select_columns}
-                FROM enterprise.business_info
-                ORDER BY company_id
-                LIMIT :limit
-            """)
-            params = {"limit": batch_size}
         else:
-            query = text(f"""
-                SELECT {select_columns}
-                FROM enterprise.business_info
-                WHERE company_id > :last_company_id
+            query = text("""
+                SELECT company_id, raw_business_info
+                FROM enterprise.base_info
+                WHERE raw_business_info IS NOT NULL
                 ORDER BY company_id
-                LIMIT :limit
+                LIMIT :batch_size OFFSET :offset
             """)
-            params = {"last_company_id": last_company_id, "limit": batch_size}
+    else:  # biz_label
+        if incremental:
+            query = text("""
+                SELECT b.company_id, b.raw_biz_label
+                FROM enterprise.base_info b
+                WHERE b.raw_biz_label IS NOT NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM enterprise.biz_label bl
+                      WHERE bl.company_id = b.company_id
+                  )
+                ORDER BY b.company_id
+                LIMIT :batch_size OFFSET :offset
+            """)
+        else:
+            query = text("""
+                SELECT company_id, raw_biz_label
+                FROM enterprise.base_info
+                WHERE raw_biz_label IS NOT NULL
+                ORDER BY company_id
+                LIMIT :batch_size OFFSET :offset
+            """)
 
-        rows = connection.execute(query, params).fetchall()
-        if not rows:
+    rows = connection.execute(query, {"batch_size": batch_size, "offset": offset}).fetchall()
+    return [dict(row._mapping) for row in rows]
+
+
+def cleanse_business_info_from_raw(
+    connection: Connection,
+    batch_size: int = 100,
+    limit: Optional[int] = None,
+    dry_run: bool = False,
+    incremental: bool = True,
+) -> Dict[str, int]:
+    """
+    Cleanse business_info records from raw JSONB in base_info.
+
+    Story 6.2-P9: Transform raw_business_info to normalized business_info records.
+
+    Args:
+        connection: SQLAlchemy connection
+        batch_size: Number of records per batch
+        limit: Maximum total records to process (None = all)
+        dry_run: If True, don't persist changes
+        incremental: If True, only process un-cleansed records
+
+    Returns:
+        Stats dict with counts
+    """
+    cleanser = BusinessInfoCleanser()
+    repository = BusinessInfoRepository(connection)
+
+    total_processed = 0
+    total_success = 0
+    total_failed = 0
+    offset = 0
+
+    while True:
+        if limit and total_processed >= limit:
             break
 
-        _apply_batch(rows)
-        last_company_id = str(rows[-1]._mapping["company_id"])
+        effective_batch = min(batch_size, limit - total_processed) if limit else batch_size
+        records = fetch_raw_records(connection, effective_batch, offset, "business_info", incremental)
+
+        if not records:
+            break
+
+        for record in records:
+            company_id = record["company_id"]
+            raw_business_info = record.get("raw_business_info")
+
+            if not raw_business_info:
+                total_failed += 1
+                continue
+
+            try:
+                business_record = cleanser.transform(raw_business_info, company_id)
+
+                if not dry_run:
+                    repository.upsert(business_record)
+                    connection.commit()
+
+                total_success += 1
+            except Exception as e:
+                logger.warning(
+                    "cleanse_data.business_info_failed",
+                    company_id=company_id,
+                    error=str(e),
+                )
+                total_failed += 1
+
+            total_processed += 1
+
+            if limit and total_processed >= limit:
+                break
+
+        # Progress reporting
+        print(f"  Processed {total_processed} records, {total_success} success, {total_failed} failed")
+
+        offset += effective_batch
 
     return {
-        "total_records": total_records,
-        "records_cleansed": total_records,
-        "fields_cleansed": total_fields_cleansed,
-        "fields_failed": total_fields_failed,
+        "total_records": total_processed,
+        "records_success": total_success,
+        "records_failed": total_failed,
+    }
+
+
+def cleanse_biz_label_from_raw(
+    connection: Connection,
+    batch_size: int = 100,
+    limit: Optional[int] = None,
+    dry_run: bool = False,
+    incremental: bool = True,
+) -> Dict[str, int]:
+    """
+    Cleanse biz_label records from raw JSONB in base_info.
+
+    Story 6.2-P9: Parse and persist biz_label records.
+
+    Args:
+        connection: SQLAlchemy connection
+        batch_size: Number of records per batch
+        limit: Maximum total records to process (None = all)
+        dry_run: If True, don't persist changes
+        incremental: If True, only process un-cleansed records
+
+    Returns:
+        Stats dict with counts
+    """
+    parser = BizLabelParser()
+    repository = BizLabelRepository(connection)
+
+    total_processed = 0
+    total_success = 0
+    total_failed = 0
+    total_labels = 0
+    offset = 0
+
+    while True:
+        if limit and total_processed >= limit:
+            break
+
+        effective_batch = min(batch_size, limit - total_processed) if limit else batch_size
+        records = fetch_raw_records(connection, effective_batch, offset, "biz_label", incremental)
+
+        if not records:
+            break
+
+        for record in records:
+            company_id = record["company_id"]
+            raw_biz_label = record.get("raw_biz_label")
+
+            if not raw_biz_label:
+                total_failed += 1
+                continue
+
+            try:
+                label_records = parser.parse(raw_biz_label, company_id)
+
+                if not dry_run:
+                    inserted = repository.upsert_batch(company_id, label_records)
+                    connection.commit()
+                    total_labels += inserted
+                else:
+                    total_labels += len(label_records)
+
+                total_success += 1
+            except Exception as e:
+                logger.warning(
+                    "cleanse_data.biz_label_failed",
+                    company_id=company_id,
+                    error=str(e),
+                )
+                total_failed += 1
+
+            total_processed += 1
+
+            if limit and total_processed >= limit:
+                break
+
+        # Progress reporting
+        print(f"  Processed {total_processed} records, {total_success} success, {total_labels} labels")
+
+        offset += effective_batch
+
+    return {
+        "total_records": total_processed,
+        "records_success": total_success,
+        "records_failed": total_failed,
+        "total_labels": total_labels,
     }
 
 
@@ -190,7 +287,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         Exit code (0 for success, non-zero for error).
     """
     parser = argparse.ArgumentParser(
-        description="Data cleansing operations",
+        description="Data cleansing operations for EQC raw data transformation",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
@@ -199,21 +296,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument(
         "--table",
         required=True,
-        choices=["business_info"],
-        help="Table to cleanse",
-    )
-    parser.add_argument(
-        "--domain",
-        required=True,
-        help="Domain name for cleansing rules (e.g., eqc_business_info)",
+        choices=["business_info", "biz_label", "all"],
+        help="Table to cleanse (business_info, biz_label, or all)",
     )
 
     # Optional arguments
-    parser.add_argument(
-        "--company-ids",
-        type=str,
-        help="Comma-separated list of company IDs to cleanse",
-    )
     parser.add_argument(
         "--batch-size",
         type=int,
@@ -221,9 +308,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         help="Batch size for processing (default: 100)",
     )
     parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Maximum number of records to process (default: all)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Preview mode - show what would be cleansed without making changes",
+    )
+    parser.add_argument(
+        "--full-refresh",
+        action="store_true",
+        help="Re-cleanse all records (default: incremental - only un-cleansed records)",
     )
 
     args = parser.parse_args(argv)
@@ -244,48 +342,61 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"❌ Failed to create database engine: {e}", file=sys.stderr)
         return 1
 
-    # Parse company IDs if provided
-    company_ids = None
-    if args.company_ids:
-        company_ids = [cid.strip() for cid in args.company_ids.split(",")]
+    incremental = not args.full_refresh
 
     # Use context manager for connection
     try:
         with engine.connect() as connection:
-            if args.dry_run:
-                print(f"\n[DRY RUN] Would cleanse {args.table} table with domain {args.domain}")
-                if company_ids:
-                    print(f"Company IDs: {', '.join(company_ids)}")
-                else:
-                    print(f"Batch size: {args.batch_size}")
-                return 0
+            mode_str = "[DRY RUN] " if args.dry_run else ""
+            incr_str = "incremental" if incremental else "full refresh"
 
-            print(f"\n🔄 Cleansing {args.table} table with domain {args.domain}...")
+            print(f"\n{mode_str}🔄 Cleansing {args.table} table ({incr_str})...")
+            print(f"   Batch size: {args.batch_size}, Limit: {args.limit or 'all'}")
 
-            # Cleanse table
-            if args.table == "business_info":
-                stats = cleanse_business_info_table(
+            all_stats: Dict[str, Dict[str, int]] = {}
+
+            # Cleanse business_info
+            if args.table in ("business_info", "all"):
+                print("\n📊 Processing business_info...")
+                stats = cleanse_business_info_from_raw(
                     connection,
-                    args.domain,
-                    company_ids=company_ids,
-                    dry_run=args.dry_run,
                     batch_size=args.batch_size,
+                    limit=args.limit,
+                    dry_run=args.dry_run,
+                    incremental=incremental,
                 )
-            else:
-                print(f"❌ Unsupported table: {args.table}", file=sys.stderr)
-                return 1
+                all_stats["business_info"] = stats
+
+            # Cleanse biz_label
+            if args.table in ("biz_label", "all"):
+                print("\n🏷️ Processing biz_label...")
+                stats = cleanse_biz_label_from_raw(
+                    connection,
+                    batch_size=args.batch_size,
+                    limit=args.limit,
+                    dry_run=args.dry_run,
+                    incremental=incremental,
+                )
+                all_stats["biz_label"] = stats
 
             # Print results
             print("\n" + "=" * 60)
-            print("Cleansing Results")
-            print("=" * 60)
-            print(f"Total Records: {stats['total_records']}")
-            print(f"Records Cleansed: {stats['records_cleansed']}")
-            print(f"✅ Fields Cleansed: {stats['fields_cleansed']}")
-            print(f"❌ Fields Failed: {stats['fields_failed']}")
+            print("Cleansing Results Summary")
             print("=" * 60)
 
-            return 0 if stats['fields_failed'] == 0 else 1
+            total_failed = 0
+            for table_name, stats in all_stats.items():
+                print(f"\n{table_name}:")
+                print(f"  Total Records: {stats['total_records']}")
+                print(f"  ✅ Success: {stats['records_success']}")
+                print(f"  ❌ Failed: {stats['records_failed']}")
+                if "total_labels" in stats:
+                    print(f"  🏷️ Labels Inserted: {stats['total_labels']}")
+                total_failed += stats["records_failed"]
+
+            print("\n" + "=" * 60)
+
+            return 0 if total_failed == 0 else 1
 
     except KeyboardInterrupt:
         print("\n\n❌ Operation cancelled by user")

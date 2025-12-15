@@ -532,3 +532,116 @@ class LookupRequest(BaseModel):
 
         # Empty string validation will be handled by min_length constraint
         return cleaned if cleaned else None
+
+
+# ===== EQC Data Cleansing Models (Story 6.2-P9) =====
+# These models represent the normalized DB table structures,
+# distinct from the API response models above (BusinessInfoResult, LabelInfo).
+
+
+class BusinessInfoRecord(BaseModel):
+    """
+    DB record model for enterprise.business_info table.
+
+    Maps to the normalized business_info table structure from Story 6.2-P7.
+    This is distinct from BusinessInfoResult which represents raw API responses.
+
+    Fields are normalized types (DATE, NUMERIC) after cleansing from raw strings.
+    """
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        validate_default=True,
+        from_attributes=True,
+        extra="forbid",
+    )
+
+    company_id: str = Field(..., min_length=1, max_length=255, description="Company ID (FK to base_info)")
+
+    # Normalized fields (cleansed from raw strings)
+    registered_date: Optional[datetime] = Field(None, description="Registration date (DATE type)")
+    registered_capital: Optional[float] = Field(None, description="Registered capital in yuan (NUMERIC)")
+    start_date: Optional[datetime] = Field(None, description="Business period start date (DATE)")
+    end_date: Optional[datetime] = Field(None, description="Business period end date (DATE)")
+    colleagues_num: Optional[int] = Field(None, description="Employee count (INTEGER)")
+    actual_capital: Optional[float] = Field(None, description="Paid-in capital in yuan (NUMERIC)")
+
+    # Retained string fields
+    registered_status: Optional[str] = Field(None, max_length=100, description="Registration status")
+    legal_person_name: Optional[str] = Field(None, max_length=255, description="Legal representative name")
+    address: Optional[str] = Field(None, description="Company address")
+    codename: Optional[str] = Field(None, max_length=100, description="Company code name")
+    company_name: Optional[str] = Field(None, max_length=255, description="Company name")
+    company_en_name: Optional[str] = Field(None, description="English company name")
+    currency: Optional[str] = Field(None, max_length=50, description="Currency")
+    credit_code: Optional[str] = Field(None, max_length=50, description="Unified social credit code")
+    register_code: Optional[str] = Field(None, max_length=50, description="Registration code")
+    organization_code: Optional[str] = Field(None, max_length=50, description="Organization code")
+    company_type: Optional[str] = Field(None, max_length=100, description="Company type")
+    industry_name: Optional[str] = Field(None, max_length=255, description="Industry classification")
+    registration_organ_name: Optional[str] = Field(None, max_length=255, description="Registration authority")
+    start_end: Optional[str] = Field(None, max_length=100, description="Business period display string")
+    business_scope: Optional[str] = Field(None, description="Business scope")
+    telephone: Optional[str] = Field(None, max_length=100, description="Telephone")
+    email_address: Optional[str] = Field(None, max_length=255, description="Email address")
+    website: Optional[str] = Field(None, max_length=500, description="Website")
+    company_former_name: Optional[str] = Field(None, description="Former company names")
+    control_id: Optional[str] = Field(None, max_length=100, description="Controller ID")
+    control_name: Optional[str] = Field(None, max_length=255, description="Controller name")
+    bene_id: Optional[str] = Field(None, max_length=100, description="Beneficiary ID")
+    bene_name: Optional[str] = Field(None, max_length=255, description="Beneficiary name")
+    province: Optional[str] = Field(None, max_length=100, description="Province")
+    department: Optional[str] = Field(None, max_length=255, description="Department")
+
+    # snake_case converted from camelCase
+    legal_person_id: Optional[str] = Field(None, max_length=100, description="Legal person ID")
+    logo_url: Optional[str] = Field(None, description="Logo URL")
+    type_code: Optional[str] = Field(None, max_length=50, description="Company type code")
+    update_time: Optional[datetime] = Field(None, description="EQC data update time")
+    registered_capital_currency: Optional[str] = Field(None, max_length=50, description="Registered capital currency")
+    full_register_type_desc: Optional[str] = Field(None, max_length=255, description="Full register type description")
+    industry_code: Optional[str] = Field(None, max_length=50, description="Industry code")
+
+    # Cleansing metadata
+    cleansing_status: Optional[dict] = Field(
+        None, description="Per-field cleansing status tracking"
+    )
+
+    @field_validator("company_id", mode="before")
+    @classmethod
+    def normalize_company_id(cls, v: Any) -> str:
+        """Normalize company ID to string format."""
+        if v is None:
+            return v
+        return str(v).strip()
+
+
+class BizLabelRecord(BaseModel):
+    """
+    DB record model for enterprise.biz_label table.
+
+    Maps to the normalized biz_label table structure from Story 6.2-P7.
+    This is distinct from LabelInfo which represents raw API response entries.
+    """
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        validate_default=True,
+        from_attributes=True,
+        extra="forbid",
+    )
+
+    company_id: str = Field(..., min_length=1, max_length=255, description="Company ID (FK to base_info)")
+    type: Optional[str] = Field(None, max_length=100, description="Label category type")
+    lv1_name: Optional[str] = Field(None, max_length=255, description="Level 1 label name")
+    lv2_name: Optional[str] = Field(None, max_length=255, description="Level 2 label name")
+    lv3_name: Optional[str] = Field(None, max_length=255, description="Level 3 label name")
+    lv4_name: Optional[str] = Field(None, max_length=255, description="Level 4 label name")
+
+    @field_validator("company_id", mode="before")
+    @classmethod
+    def normalize_company_id(cls, v: Any) -> str:
+        """Normalize company ID to string format."""
+        if v is None:
+            return v
+        return str(v).strip()
