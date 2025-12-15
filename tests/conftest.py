@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import os
+import platform
+import sys
+from types import SimpleNamespace
 
 from typing import Generator
 
@@ -14,10 +17,27 @@ import psycopg2
 from psycopg2 import sql
 
 from work_data_hub.config import get_settings
-from work_data_hub.io.schema import migration_runner
 
 # Ensure Settings() can initialize in test environments without bespoke .env files.
 os.environ.setdefault("DATABASE_URL", "sqlite:///workdatahub_dev.db")
+
+# Some environments have a broken/hanging `wmic` implementation, which can cause
+# `platform.uname()` (and downstream imports like SQLAlchemy/Pandera) to hang at
+# import time. Patch platform helpers for tests to avoid blocking collection.
+if sys.platform.startswith("win"):
+    platform.win32_ver = lambda *args, **kwargs: ("", "", "", "")  # type: ignore[assignment]
+    _fake_uname = SimpleNamespace(
+        system="Windows",
+        node="",
+        release="",
+        version="",
+        machine=os.environ.get("PROCESSOR_ARCHITECTURE", ""),
+        processor=os.environ.get("PROCESSOR_ARCHITECTURE", ""),
+    )
+    platform.uname = lambda: _fake_uname  # type: ignore[assignment]
+    platform.system = lambda: "Windows"  # type: ignore[assignment]
+    platform.machine = lambda: _fake_uname.machine  # type: ignore[assignment]
+    platform.processor = lambda: _fake_uname.processor  # type: ignore[assignment]
 
 LEGACY_OPTION = "run_legacy_tests"
 E2E_OPTION = "run_e2e_tests"
@@ -143,6 +163,8 @@ def _drop_database(admin_dsn: str, db_name: str) -> None:
 @pytest.fixture
 def postgres_db_with_migrations() -> Generator[str, None, None]:
     """Use a temporary PostgreSQL database, apply migrations, and yield DSN."""
+    from work_data_hub.io.schema import migration_runner
+
     base_dsn = _resolve_postgres_dsn()
     temp_dsn, temp_db, admin_dsn = _create_ephemeral_database(base_dsn)
 

@@ -13,11 +13,14 @@ from collections import deque
 from typing import Deque, List, Optional
 
 import requests
+from pydantic import ValidationError
 
 from work_data_hub.config.settings import get_settings
 from work_data_hub.domain.company_enrichment.models import (
+    BusinessInfoResult,
     CompanyDetail,
     CompanySearchResult,
+    LabelInfo,
 )
 
 logger = logging.getLogger(__name__)
@@ -228,6 +231,39 @@ class EQCClient:
                         },
                     )
                     return response
+
+                elif response.status_code == 403:
+                    # Some EQC environments reject additional browser-mimic headers.
+                    # Retry once with a minimal header set (token-only) if caller didn't
+                    # explicitly pass headers.
+                    if attempt == 0 and "headers" not in kwargs:
+                        logger.warning(
+                            "EQC request forbidden; retrying with minimal headers",
+                            extra={
+                                "url": sanitized_url,
+                                "status_code": response.status_code,
+                            },
+                        )
+                        response = self.session.request(
+                            method,
+                            url,
+                            timeout=self.timeout,
+                            headers={"token": self.token},
+                            **kwargs,
+                        )
+                        if response.status_code == 200:
+                            return response
+                        if response.status_code == 401:
+                            raise EQCAuthenticationError("Invalid or expired EQC token")
+                        if response.status_code == 404:
+                            raise EQCNotFoundError("Resource not found")
+                        if response.status_code == 429:
+                            raise EQCRateLimitError("Rate limit exceeded")
+                        raise EQCClientError(
+                            f"Unexpected status code after minimal-header retry: {response.status_code}"
+                        )
+
+                    raise EQCClientError("Forbidden (403) from EQC API")
 
                 elif response.status_code == 401:
                     logger.error(
@@ -550,12 +586,7 @@ class EQCClient:
         if not company_id or not str(company_id).strip():
             raise ValueError("Company ID cannot be empty")
 
-        # Clean the company ID
         cleaned_id = str(company_id).strip()
-
-        # Construct detail URL - using findDepart endpoint from legacy analysis
-        url = f"{self.base_url}/kg-api-hfd/api/search/findDepart"
-        params = {"targetId": cleaned_id}
 
         logger.info(
             "Retrieving company details via EQC",
@@ -566,79 +597,46 @@ class EQCClient:
         )
 
         try:
-            # Make the API request
-            response = self._make_request("GET", url, params=params)
-            data = response.json()
-
-            # Parse response based on EQC API structure
-            # From legacy code: response contains 'businessInfodto' object
-            business_info = data.get("businessInfodto", {})
-
-            if not business_info:
-                logger.warning(
-                    "Empty business info in EQC response",
-                    extra={
-                        "company_id": cleaned_id,
-                        "response_keys": list(data.keys()),
-                    },
-                )
-                raise EQCNotFoundError(
-                    f"No business information found for company ID: {cleaned_id}"
-                )
+            # Use shared helper to avoid code duplication
+            business_info, _ = self._fetch_find_depart(cleaned_id)
 
             # Extract company detail fields
-            # Map EQC response fields to our domain model
-            try:
-                detail = CompanyDetail(
-                    company_id=cleaned_id,
-                    official_name=business_info.get(
-                        "companyFullName", business_info.get("company_name", "")
-                    ),
-                    unite_code=business_info.get("unite_code"),
-                    aliases=self._extract_aliases(business_info),
-                    business_status=business_info.get(
-                        "business_status", business_info.get("status")
-                    ),
-                )
+            detail = CompanyDetail(
+                company_id=cleaned_id,
+                official_name=business_info.get(
+                    "companyFullName", business_info.get("company_name", "")
+                ),
+                unite_code=business_info.get("unite_code"),
+                aliases=self._extract_aliases(business_info),
+                business_status=business_info.get(
+                    "business_status", business_info.get("status")
+                ),
+            )
 
-                logger.info(
-                    "Company details retrieved successfully",
-                    extra={
-                        "company_id": cleaned_id,
-                        "official_name": detail.official_name,
-                        "has_unite_code": bool(detail.unite_code),
-                        "aliases_count": len(detail.aliases),
-                    },
-                )
+            logger.info(
+                "Company details retrieved successfully",
+                extra={
+                    "company_id": cleaned_id,
+                    "official_name": detail.official_name,
+                    "has_unite_code": bool(detail.unite_code),
+                    "aliases_count": len(detail.aliases),
+                },
+            )
 
-                return detail
+            return detail
 
-            except Exception as e:
-                logger.error(
-                    "Failed to parse company detail response",
-                    extra={
-                        "company_id": cleaned_id,
-                        "error": str(e),
-                        "business_info_keys": list(business_info.keys()),
-                    },
-                )
-                raise EQCClientError(f"Failed to parse company detail response: {e}")
-
-        except requests.JSONDecodeError as e:
+        except Exception as e:
             logger.error(
-                "Failed to parse EQC detail response",
-                extra={"company_id": cleaned_id, "error": str(e)},
+                "Failed to parse company detail response",
+                extra={
+                    "company_id": cleaned_id,
+                    "error": str(e),
+                },
             )
-            raise EQCClientError(f"Invalid JSON response from EQC detail API: {e}")
-
-        except KeyError as e:
-            logger.error(
-                "Unexpected EQC detail response structure",
-                extra={"company_id": cleaned_id, "missing_key": str(e)},
-            )
-            raise EQCClientError(
-                f"Unexpected response structure from EQC detail API: {e}"
-            )
+            # Re-raise as EQCClientError if it's not already an EQC error
+            if isinstance(e, (EQCNotFoundError, EQCAuthenticationError, EQCClientError)):
+                raise
+            raise EQCClientError(f"Failed to parse company detail response: {e}")
 
     def _extract_aliases(self, business_info: dict) -> List[str]:
         """
@@ -683,3 +681,452 @@ class EQCClient:
                     aliases.append(cleaned_alias)
 
         return aliases
+
+    def _fetch_find_depart(self, company_id: str) -> tuple[dict, dict]:
+        """
+        Call findDepart API and return (businessInfodto, raw_response).
+
+        Shared by get_company_detail() and get_business_info_with_raw().
+        Handles rate limiting, error handling, and logging internally.
+
+        Args:
+            company_id: EQC company ID (as string)
+
+        Returns:
+            Tuple of (businessInfodto dict, complete raw response dict)
+
+        Raises:
+            EQCNotFoundError: If company not found (404 or empty businessInfodto)
+            EQCAuthenticationError: If token invalid (401)
+            EQCClientError: For other errors
+        """
+        if not company_id or not str(company_id).strip():
+            raise ValueError("Company ID cannot be empty")
+
+        cleaned_id = str(company_id).strip()
+        url = f"{self.base_url}/kg-api-hfd/api/search/findDepart"
+        params = {"targetId": cleaned_id}
+
+        logger.info(
+            "Fetching business info via EQC findDepart",
+            extra={
+                "company_id": cleaned_id,
+                "endpoint": "findDepart",
+            },
+        )
+
+        try:
+            response = self._make_request("GET", url, params=params)
+            data = response.json()
+
+            business_info = data.get("businessInfodto", {})
+            if not business_info:
+                logger.warning(
+                    "Empty business info in EQC response",
+                    extra={
+                        "company_id": cleaned_id,
+                        "response_keys": list(data.keys()),
+                    },
+                )
+                raise EQCNotFoundError(
+                    f"No business information found for company: {cleaned_id}"
+                )
+
+            return business_info, data
+
+        except requests.JSONDecodeError as e:
+            logger.error(
+                "Failed to parse EQC findDepart response",
+                extra={"company_id": cleaned_id, "error": str(e)},
+            )
+            raise EQCClientError(f"Invalid JSON response from EQC findDepart API: {e}")
+
+    @staticmethod
+    def _first_non_empty_str(payload: dict, keys: list[str]) -> Optional[str]:
+        for key in keys:
+            value = payload.get(key)
+            if value is None:
+                continue
+            cleaned = str(value).strip()
+            if cleaned:
+                return cleaned
+        return None
+
+    def _parse_business_info(
+        self,
+        business_info: dict,
+        *,
+        fallback_company_id: str,
+    ) -> BusinessInfoResult:
+        """
+        Parse business_infodto dict into BusinessInfoResult model.
+
+        Maps EQC API fields to our domain model with proper validation.
+
+        Args:
+            business_info: businessInfodto dictionary from EQC API response
+
+        Returns:
+            BusinessInfoResult with mapped fields
+        """
+        company_id = (
+            self._first_non_empty_str(business_info, ["company_id", "companyId", "id"])
+            or fallback_company_id
+        )
+
+        company_name = self._first_non_empty_str(
+            business_info,
+            ["companyFullName", "company_name", "companyName", "name", "coname"],
+        )
+
+        registered_date = self._first_non_empty_str(
+            business_info, ["registered_date", "registeredDate", "est_date", "estDate"]
+        )
+
+        registered_capital_raw = self._first_non_empty_str(
+            business_info, ["registerCaptial", "reg_cap", "registered_capital"]
+        )
+
+        registered_status = self._first_non_empty_str(
+            business_info, ["registered_status", "registeredStatus", "registered_status"]
+        )
+
+        legal_person_name = self._first_non_empty_str(
+            business_info, ["legal_person_name", "legalPersonName", "le_rep"]
+        )
+
+        address = self._first_non_empty_str(business_info, ["address"])
+
+        credit_code = self._first_non_empty_str(
+            business_info, ["unite_code", "uniteCode", "credit_code", "creditCode"]
+        )
+
+        company_type = self._first_non_empty_str(
+            business_info, ["company_type", "companyType", "type"]
+        )
+
+        industry_name = self._first_non_empty_str(
+            business_info, ["industry_name", "industryName"]
+        )
+
+        business_scope = self._first_non_empty_str(
+            business_info, ["business_scope", "businessScope"]
+        )
+
+        codename = self._first_non_empty_str(business_info, ["codename"])
+        company_en_name = self._first_non_empty_str(business_info, ["company_en_name"])
+        currency = self._first_non_empty_str(business_info, ["currency"])
+        register_code = self._first_non_empty_str(business_info, ["register_code"])
+        organization_code = self._first_non_empty_str(
+            business_info, ["organization_code", "organizationCode"]
+        )
+        registration_organ_name = self._first_non_empty_str(
+            business_info, ["registration_organ_name"]
+        )
+        start_date = self._first_non_empty_str(business_info, ["start_date", "startDate"])
+        end_date = self._first_non_empty_str(business_info, ["end_date", "endDate"])
+        start_end = self._first_non_empty_str(business_info, ["start_end"])
+        telephone = self._first_non_empty_str(business_info, ["telephone"])
+        email_address = self._first_non_empty_str(business_info, ["email_address"])
+        website = self._first_non_empty_str(business_info, ["website"])
+        colleagues_num = self._first_non_empty_str(
+            business_info, ["colleagues_num", "collegues_num"]
+        )
+        company_former_name = self._first_non_empty_str(business_info, ["company_former_name"])
+        control_id = self._first_non_empty_str(business_info, ["control_id"])
+        control_name = self._first_non_empty_str(business_info, ["control_name"])
+        bene_id = self._first_non_empty_str(business_info, ["bene_id"])
+        bene_name = self._first_non_empty_str(business_info, ["bene_name"])
+        legal_person_id = self._first_non_empty_str(business_info, ["legalPersonId", "legal_person_id"])
+        province = self._first_non_empty_str(business_info, ["province"])
+        logo_url = self._first_non_empty_str(business_info, ["logoUrl", "logo_url"])
+        type_code = self._first_non_empty_str(business_info, ["typeCode", "type_code"])
+        department = self._first_non_empty_str(business_info, ["department"])
+        update_time = self._first_non_empty_str(business_info, ["updateTime", "update_time"])
+        actual_capital_raw = self._first_non_empty_str(business_info, ["actualCapi", "actual_capital"])
+        registered_capital_currency = self._first_non_empty_str(
+            business_info, ["registeredCapitalCurrency", "registered_capital_currency"]
+        )
+        full_register_type_desc = self._first_non_empty_str(
+            business_info, ["fullRegisterTypeDesc", "full_register_type_desc"]
+        )
+        industry_code = self._first_non_empty_str(business_info, ["industryCode", "industry_code"])
+
+        return BusinessInfoResult(
+            company_id=company_id,
+            company_name=company_name,
+            registered_date=registered_date,
+            registered_capital_raw=registered_capital_raw,
+            registered_status=registered_status,
+            legal_person_name=legal_person_name,
+            address=address,
+            credit_code=credit_code,
+            company_type=company_type,
+            industry_name=industry_name,
+            business_scope=business_scope,
+            codename=codename,
+            company_en_name=company_en_name,
+            currency=currency,
+            register_code=register_code,
+            organization_code=organization_code,
+            registration_organ_name=registration_organ_name,
+            start_date=start_date,
+            end_date=end_date,
+            start_end=start_end,
+            telephone=telephone,
+            email_address=email_address,
+            website=website,
+            colleagues_num=colleagues_num,
+            company_former_name=company_former_name,
+            control_id=control_id,
+            control_name=control_name,
+            bene_id=bene_id,
+            bene_name=bene_name,
+            legal_person_id=legal_person_id,
+            province=province,
+            logo_url=logo_url,
+            type_code=type_code,
+            department=department,
+            update_time=update_time,
+            actual_capital_raw=actual_capital_raw,
+            registered_capital_currency=registered_capital_currency,
+            full_register_type_desc=full_register_type_desc,
+            industry_code=industry_code,
+        )
+
+    def get_business_info(self, company_id: str) -> BusinessInfoResult:
+        """
+        Get business information by EQC company ID.
+
+        Uses the EQC findDepart endpoint to retrieve comprehensive business
+        registration information.
+
+        Args:
+            company_id: EQC company ID (as string)
+
+        Returns:
+            BusinessInfoResult with comprehensive business information
+
+        Raises:
+            EQCAuthenticationError: If authentication fails
+            EQCNotFoundError: If company ID is not found
+            EQCClientError: For other API errors or network issues
+            ValueError: If company_id is empty or invalid
+        """
+        cleaned_id = str(company_id).strip()
+        business_info, _ = self._fetch_find_depart(cleaned_id)
+        try:
+            return self._parse_business_info(
+                business_info,
+                fallback_company_id=cleaned_id,
+            )
+        except ValidationError as e:
+            raise EQCClientError(
+                f"Unexpected response structure from EQC findDepart API: {e}"
+            )
+
+    def get_business_info_with_raw(self, company_id: str) -> tuple[BusinessInfoResult, dict]:
+        """
+        Get business information and return both parsed result and raw JSON.
+
+        This method is identical to get_business_info() but also returns the raw
+        API response for persistence purposes.
+
+        Args:
+            company_id: EQC company ID (as string)
+
+        Returns:
+            Tuple of (parsed_result, raw_json_response)
+            - parsed_result: BusinessInfoResult object
+            - raw_json_response: Complete API response as dict (response body only)
+
+        Raises:
+            EQCAuthenticationError: If authentication fails
+            EQCClientError: For other API errors or network issues
+            ValueError: If company_id is empty or invalid
+
+        Security:
+            Only returns response body JSON - no headers, no token, no URL params.
+        """
+        cleaned_id = str(company_id).strip()
+        business_info, raw = self._fetch_find_depart(cleaned_id)
+        try:
+            parsed = self._parse_business_info(
+                business_info,
+                fallback_company_id=cleaned_id,
+            )
+        except ValidationError as e:
+            raise EQCClientError(
+                f"Unexpected response structure from EQC findDepart API: {e}"
+            )
+        return parsed, raw
+
+    def _parse_labels_with_fallback(self, labels_response: dict, target_company_id: str) -> List[LabelInfo]:
+        """
+        Parse labels response with null companyId fallback logic.
+
+        When companyId is None, search siblings for a non-null value.
+        From legacy crawler pattern.
+
+        Args:
+            labels_response: Response from findLabels API
+            target_company_id: Company ID to use as final fallback
+
+        Returns:
+            List of LabelInfo objects
+        """
+        results = []
+        for category in labels_response.get("labels", []):
+            label_type = category.get("type", "")
+            for lab in category.get("labels", []):
+                company_id = lab.get("companyId")
+                # Fallback: if companyId is None, try siblings
+                if company_id is None:
+                    for sibling in category.get("labels", []):
+                        if sibling.get("companyId"):
+                            company_id = sibling["companyId"]
+                            break
+                # Final fallback: use the target_company_id from search
+                if company_id is None:
+                    company_id = target_company_id
+
+                lv1 = lab.get("lv1Name")
+                lv2 = lab.get("lv2Name")
+                lv3 = lab.get("lv3Name")
+                lv4 = lab.get("lv4Name")
+
+                # Legacy quirk: some responses encode region labels as:
+                # lv1Name="地区分类", lv2Name=<province>, lv3Name=<city>.
+                # Normalize to make the hierarchy usable without special handling downstream.
+                if lv1 == "地区分类" and lv2:
+                    lv1, lv2, lv3, lv4 = lv2, lv3, lv4, None
+
+                results.append(LabelInfo(
+                    company_id=company_id,
+                    type=label_type,
+                    lv1_name=lv1,
+                    lv2_name=lv2,
+                    lv3_name=lv3,
+                    lv4_name=lv4,
+                ))
+        return results
+
+    def get_label_info(self, company_id: str) -> List[LabelInfo]:
+        """
+        Get label information by EQC company ID.
+
+        Uses the EQC findLabels endpoint to retrieve classification labels
+        for a company.
+
+        Args:
+            company_id: EQC company ID (as string)
+
+        Returns:
+            List of LabelInfo objects representing company labels
+
+        Raises:
+            EQCAuthenticationError: If authentication fails
+            EQCClientError: For other API errors or network issues
+            ValueError: If company_id is empty or invalid
+        """
+        if not company_id or not str(company_id).strip():
+            raise ValueError("Company ID cannot be empty")
+
+        cleaned_id = str(company_id).strip()
+        url = f"{self.base_url}/kg-api-hfd/api/search/findLabels"
+        params = {"targetId": cleaned_id}
+
+        logger.info(
+            "Retrieving label info via EQC",
+            extra={
+                "company_id": cleaned_id,
+                "endpoint": "findLabels",
+            },
+        )
+
+        try:
+            response = self._make_request("GET", url, params=params)
+            data = response.json()
+
+            # Parse labels with fallback logic for null companyId
+            labels = self._parse_labels_with_fallback(data, cleaned_id)
+
+            logger.info(
+                "Label info retrieved successfully",
+                extra={
+                    "company_id": cleaned_id,
+                    "labels_count": len(labels),
+                },
+            )
+
+            return labels
+
+        except requests.JSONDecodeError as e:
+            logger.error(
+                "Failed to parse EQC findLabels response",
+                extra={"company_id": cleaned_id, "error": str(e)},
+            )
+            raise EQCClientError(f"Invalid JSON response from EQC findLabels API: {e}")
+
+    def get_label_info_with_raw(self, company_id: str) -> tuple[List[LabelInfo], dict]:
+        """
+        Get label information and return both parsed result and raw JSON.
+
+        This method is identical to get_label_info() but also returns the raw
+        API response for persistence purposes.
+
+        Args:
+            company_id: EQC company ID (as string)
+
+        Returns:
+            Tuple of (parsed_result, raw_json_response)
+            - parsed_result: List of LabelInfo objects
+            - raw_json_response: Complete API response as dict (response body only)
+
+        Raises:
+            EQCAuthenticationError: If authentication fails
+            EQCClientError: For other API errors or network issues
+            ValueError: If company_id is empty or invalid
+
+        Security:
+            Only returns response body JSON - no headers, no token, no URL params.
+        """
+        if not company_id or not str(company_id).strip():
+            raise ValueError("Company ID cannot be empty")
+
+        cleaned_id = str(company_id).strip()
+        url = f"{self.base_url}/kg-api-hfd/api/search/findLabels"
+        params = {"targetId": cleaned_id}
+
+        logger.info(
+            "Retrieving label info via EQC (with raw response)",
+            extra={
+                "company_id": cleaned_id,
+                "endpoint": "findLabels",
+            },
+        )
+
+        try:
+            response = self._make_request("GET", url, params=params)
+            data = response.json()
+
+            # Parse labels with fallback logic
+            labels = self._parse_labels_with_fallback(data, cleaned_id)
+
+            logger.info(
+                "Label info with raw response retrieved successfully",
+                extra={
+                    "company_id": cleaned_id,
+                    "labels_count": len(labels),
+                },
+            )
+
+            # Return both parsed results and raw JSON
+            return labels, data
+
+        except requests.JSONDecodeError as e:
+            logger.error(
+                "Failed to parse EQC findLabels response",
+                extra={"company_id": cleaned_id, "error": str(e)},
+            )
+            raise EQCClientError(f"Invalid JSON response from EQC findLabels API: {e}")

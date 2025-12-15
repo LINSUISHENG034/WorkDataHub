@@ -16,8 +16,10 @@ import pytest
 import requests
 
 from work_data_hub.domain.company_enrichment.models import (
+    BusinessInfoResult,
     CompanyDetail,
     CompanySearchResult,
+    LabelInfo,
 )
 from work_data_hub.io.connectors.eqc_client import (
     EQCAuthenticationError,
@@ -787,3 +789,427 @@ class TestEQCClientSearchWithRaw:
             assert results[1].company_id == "1000087994"
             assert raw_json["total"] == 2
             assert len(raw_json["list"]) == 2
+
+
+class TestEQCClientBusinessInfo:
+    """Test get_business_info and get_business_info_with_raw methods (Story 6.2-P8)."""
+
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    def test_get_business_info_success(self, mock_enforce_rate_limit):
+        """Test successful business info retrieval."""
+        client = EQCClient(token="test_token")
+
+        mock_response_data = {
+            "businessInfodto": {
+                "company_id": "1000065057",
+                "company_name": "中国平安保险（集团）股份有限公司",
+                "registered_date": "1988-03-21",
+                "registerCaptial": "80000.00万元",
+                "registered_status": "存续",
+                "legal_person_name": "马明哲",
+                "address": "深圳市福田区",
+                "credit_code": "91440300123456789X",
+                "company_type": "股份有限公司",
+                "industry_name": "保险业",
+                "business_scope": "保险业务",
+            }
+        }
+
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = mock_response_data
+            mock_request.return_value = mock_response
+
+            result = client.get_business_info("1000065057")
+
+            # Verify request was made correctly
+            mock_request.assert_called_once_with(
+                "GET",
+                "https://eqc.pingan.com/kg-api-hfd/api/search/findDepart",
+                timeout=client.timeout,
+                params={"targetId": "1000065057"},
+            )
+
+            # Verify parsed result
+            assert isinstance(result, BusinessInfoResult)
+            assert result.company_id == "1000065057"
+            assert result.company_name == "中国平安保险（集团）股份有限公司"
+            assert result.registered_date == "1988-03-21"
+            assert result.registered_capital_raw == "80000.00万元"
+            assert result.registered_status == "存续"
+            assert result.legal_person_name == "马明哲"
+            assert result.address == "深圳市福田区"
+            assert result.credit_code == "91440300123456789X"
+            assert result.company_type == "股份有限公司"
+            assert result.industry_name == "保险业"
+            assert result.business_scope == "保险业务"
+
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    def test_get_business_info_not_found(self, mock_enforce_rate_limit):
+        """Test business info retrieval with 404 error."""
+        client = EQCClient(token="test_token")
+
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 404
+            mock_request.return_value = mock_response
+
+            with pytest.raises(EQCNotFoundError) as exc_info:
+                client.get_business_info("nonexistent")
+            assert "Resource not found" in str(exc_info.value)
+
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    def test_get_business_info_authentication_error(self, mock_enforce_rate_limit):
+        """Test business info retrieval with 401 error."""
+        client = EQCClient(token="invalid_token")
+
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 401
+            mock_request.return_value = mock_response
+
+            with pytest.raises(EQCAuthenticationError) as exc_info:
+                client.get_business_info("1000065057")
+            assert "Invalid or expired EQC token" in str(exc_info.value)
+
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    def test_get_business_info_with_raw(self, mock_enforce_rate_limit):
+        """Test get_business_info_with_raw returns both parsed result and raw JSON."""
+        client = EQCClient(token="test_token")
+
+        mock_response_data = {
+            "businessInfodto": {
+                "company_id": "1000065057",
+                "company_name": "中国平安保险（集团）股份有限公司",
+                "registerCaptial": "80000.00万元",
+            },
+            "other_field": "other_value",
+        }
+
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = mock_response_data
+            mock_request.return_value = mock_response
+
+            result, raw_json = client.get_business_info_with_raw("1000065057")
+
+            # Verify parsed result
+            assert isinstance(result, BusinessInfoResult)
+            assert result.company_id == "1000065057"
+            assert result.registered_capital_raw == "80000.00万元"
+
+            # Verify raw JSON contains complete response
+            assert isinstance(raw_json, dict)
+            assert raw_json == mock_response_data
+            assert "businessInfodto" in raw_json
+            assert "other_field" in raw_json
+
+    def test_get_business_info_empty_id_raises_error(self):
+        """Test business info retrieval with empty company ID raises ValueError."""
+        client = EQCClient(token="test_token")
+
+        with pytest.raises(ValueError) as exc_info:
+            client.get_business_info("")
+        assert "Company ID cannot be empty" in str(exc_info.value)
+
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    def test_get_business_info_empty_business_info(self, mock_enforce_rate_limit):
+        """Test business info retrieval with empty businessInfodto."""
+        client = EQCClient(token="test_token")
+
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"businessInfodto": {}}
+            mock_request.return_value = mock_response
+
+            with pytest.raises(EQCNotFoundError) as exc_info:
+                client.get_business_info("1000065057")
+            assert "No business information found" in str(exc_info.value)
+
+
+class TestEQCClientLabelInfo:
+    """Test get_label_info and get_label_info_with_raw methods (Story 6.2-P8)."""
+
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    def test_get_label_info_success(self, mock_enforce_rate_limit):
+        """Test successful label info retrieval."""
+        client = EQCClient(token="test_token")
+
+        mock_response_data = {
+            "labels": [
+                {
+                    "type": "行业分类",
+                    "labels": [
+                        {
+                            "companyId": "1000065057",
+                            "lv1Name": "金融业",
+                            "lv2Name": "保险业",
+                            "lv3Name": "人身保险",
+                            "lv4Name": None,
+                        },
+                        {
+                            "companyId": "1000065057",
+                            "lv1Name": "地区分类",
+                            "lv2Name": "广东省",
+                            "lv3Name": "深圳市",
+                            "lv4Name": None,
+                        },
+                    ],
+                },
+                {
+                    "type": "企业规模",
+                    "labels": [
+                        {
+                            "companyId": "1000065057",
+                            "lv1Name": "大型企业",
+                            "lv2Name": None,
+                            "lv3Name": None,
+                            "lv4Name": None,
+                        }
+                    ],
+                },
+            ]
+        }
+
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = mock_response_data
+            mock_request.return_value = mock_response
+
+            result = client.get_label_info("1000065057")
+
+            # Verify request was made correctly
+            mock_request.assert_called_once_with(
+                "GET",
+                "https://eqc.pingan.com/kg-api-hfd/api/search/findLabels",
+                timeout=client.timeout,
+                params={"targetId": "1000065057"},
+            )
+
+            # Verify parsed result
+            assert isinstance(result, list)
+            assert len(result) == 3
+
+            # Check first label (行业分类 - 金融业)
+            label1 = result[0]
+            assert isinstance(label1, LabelInfo)
+            assert label1.company_id == "1000065057"
+            assert label1.type == "行业分类"
+            assert label1.lv1_name == "金融业"
+            assert label1.lv2_name == "保险业"
+            assert label1.lv3_name == "人身保险"
+            assert label1.lv4_name is None
+
+            # Check second label (行业分类 - 地区分类)
+            label2 = result[1]
+            assert label2.type == "行业分类"
+            assert label2.lv1_name == "广东省"
+            assert label2.lv2_name == "深圳市"
+
+            # Check third label (企业规模)
+            label3 = result[2]
+            assert label3.type == "企业规模"
+            assert label3.lv1_name == "大型企业"
+
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    def test_get_label_info_null_company_id_fallback(self, mock_enforce_rate_limit):
+        """Test label info retrieval with null companyId fallback logic."""
+        client = EQCClient(token="test_token")
+
+        mock_response_data = {
+            "labels": [
+                {
+                    "type": "行业分类",
+                    "labels": [
+                        {
+                            "companyId": None,  # Null - should use sibling fallback
+                            "lv1Name": "Unknown1",
+                        },
+                        {
+                            "companyId": "1000065057",  # Valid - fallback target
+                            "lv1Name": "金融业",
+                        },
+                        {
+                            "companyId": None,  # Null - should use sibling fallback
+                            "lv1Name": "Unknown2",
+                        },
+                    ],
+                },
+            ]
+        }
+
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = mock_response_data
+            mock_request.return_value = mock_response
+
+            result = client.get_label_info("1000065057")
+
+            # All labels should have the fallback company_id
+            assert len(result) == 3
+            for label in result:
+                assert label.company_id == "1000065057"
+
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    def test_get_label_info_empty_labels(self, mock_enforce_rate_limit):
+        """Test label info retrieval with empty labels array."""
+        client = EQCClient(token="test_token")
+
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"labels": []}
+            mock_request.return_value = mock_response
+
+            result = client.get_label_info("1000065057")
+
+            assert isinstance(result, list)
+            assert len(result) == 0
+
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    def test_get_label_info_with_raw(self, mock_enforce_rate_limit):
+        """Test get_label_info_with_raw returns both parsed result and raw JSON."""
+        client = EQCClient(token="test_token")
+
+        mock_response_data = {
+            "labels": [
+                {
+                    "type": "行业分类",
+                    "labels": [
+                        {
+                            "companyId": "1000065057",
+                            "lv1Name": "金融业",
+                            "lv2Name": "保险业",
+                        }
+                    ],
+                }
+            ],
+            "metadata": {"count": 1},
+        }
+
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = mock_response_data
+            mock_request.return_value = mock_response
+
+            result, raw_json = client.get_label_info_with_raw("1000065057")
+
+            # Verify parsed result
+            assert isinstance(result, list)
+            assert len(result) == 1
+            assert result[0].type == "行业分类"
+            assert result[0].lv1_name == "金融业"
+
+            # Verify raw JSON contains complete response
+            assert isinstance(raw_json, dict)
+            assert raw_json == mock_response_data
+            assert "labels" in raw_json
+            assert "metadata" in raw_json
+
+    def test_get_label_info_empty_id_raises_error(self):
+        """Test label info retrieval with empty company ID raises ValueError."""
+        client = EQCClient(token="test_token")
+
+        with pytest.raises(ValueError) as exc_info:
+            client.get_label_info("")
+        assert "Company ID cannot be empty" in str(exc_info.value)
+
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    def test_get_label_info_authentication_error(self, mock_enforce_rate_limit):
+        """Test label info retrieval with 401 error."""
+        client = EQCClient(token="invalid_token")
+
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 401
+            mock_request.return_value = mock_response
+
+            with pytest.raises(EQCAuthenticationError) as exc_info:
+                client.get_label_info("1000065057")
+            assert "Invalid or expired EQC token" in str(exc_info.value)
+
+
+class TestEQCClientSharedHelper:
+    """Test the _fetch_find_depart shared helper method."""
+
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    def test_fetch_find_depart_shared_helper(self, mock_enforce_rate_limit):
+        """Test _fetch_find_depart returns business_info and raw response."""
+        client = EQCClient(token="test_token")
+
+        mock_response_data = {
+            "businessInfodto": {
+                "company_id": "1000065057",
+                "company_name": "Test Company",
+                "registerCaptial": "10000.00万元",
+            },
+            "other_data": "value",
+        }
+
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = mock_response_data
+            mock_request.return_value = mock_response
+
+            business_info, raw = client._fetch_find_depart("1000065057")
+
+            # Verify business_info is extracted
+            assert business_info == {
+                "company_id": "1000065057",
+                "company_name": "Test Company",
+                "registerCaptial": "10000.00万元",
+            }
+
+            # Verify raw contains complete response
+            assert raw == mock_response_data
+
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    def test_fetch_find_depart_empty_business_info(self, mock_enforce_rate_limit):
+        """Test _fetch_find_depart raises error for empty businessInfodto."""
+        client = EQCClient(token="test_token")
+
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"businessInfodto": {}}
+            mock_request.return_value = mock_response
+
+            with pytest.raises(EQCNotFoundError) as exc_info:
+                client._fetch_find_depart("1000065057")
+            assert "No business information found" in str(exc_info.value)
+
+    @patch("work_data_hub.io.connectors.eqc_client.EQCClient._enforce_rate_limit")
+    def test_get_company_detail_uses_shared_helper(self, mock_enforce_rate_limit):
+        """Test get_company_detail uses the shared _fetch_find_depart helper."""
+        client = EQCClient(token="test_token")
+
+        with patch.object(client, "_fetch_find_depart") as mock_fetch:
+            mock_fetch.return_value = (
+                {
+                    "companyFullName": "中国平安保险",
+                    "unite_code": "91440300123456789X",
+                    "business_status": "存续",
+                    "alias_name": "平安保险",
+                },
+                {"raw": "response"},
+            )
+
+            result = client.get_company_detail("1000065057")
+
+            # Verify shared helper was called
+            mock_fetch.assert_called_once_with("1000065057")
+
+            # Verify result parsing
+            assert isinstance(result, CompanyDetail)
+            assert result.company_id == "1000065057"
+            assert result.official_name == "中国平安保险"
+            assert result.unite_code == "91440300123456789X"
+            assert result.business_status == "存续"
+            assert "平安保险" in result.aliases

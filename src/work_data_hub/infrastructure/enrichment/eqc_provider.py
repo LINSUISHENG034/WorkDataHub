@@ -32,6 +32,7 @@ from work_data_hub.io.connectors.eqc_client import (
     EQCClientError,
     EQCNotFoundError,
 )
+from work_data_hub.infrastructure.enrichment.normalizer import normalize_for_temp_id
 from work_data_hub.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -121,8 +122,13 @@ def validate_eqc_token(token: str, base_url: str) -> bool:
             headers={"token": token},
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
-        # 401 means token is invalid; other errors don't indicate token invalidity
-        return response.status_code != 401
+        if response.status_code == 200:
+            return True
+        # 401/403 are strong signals that the token/session is not usable.
+        if response.status_code in {401, 403}:
+            return False
+        # Other errors (e.g., transient 5xx) don't prove token invalidity.
+        return True
     except requests.RequestException:
         # Network errors don't indicate token invalidity
         return True
@@ -309,21 +315,23 @@ class EqcProvider:
 
     def _call_api(self, company_name: str) -> tuple[Optional[CompanyInfo], Optional[dict]]:
         """
-        Make single API call to EQC search endpoint.
+        Make API calls to EQC search, findDepart, and findLabels endpoints.
+
+        Story 6.2-P8: Orchestrate all 3 API calls to acquire complete enterprise data.
 
         Args:
             company_name: Company name to look up.
 
         Returns:
-            Tuple of (CompanyInfo, raw_json) if found, (None, None) otherwise.
-            raw_json contains the complete API response for persistence.
+            Tuple of (CompanyInfo, raw_search_json) if found, (None, None) otherwise.
+            Additional raw responses (business_info, labels) are passed via _cache_result.
         """
         if not self.client:
             return None, None
 
+        # Step 1: Search for company
         # Use search_company_with_raw to get both parsed results and raw JSON
-        # (Story 6.2-P5: Need raw response for persistence)
-        results, raw_json = self.client.search_company_with_raw(company_name)
+        results, raw_search_json = self.client.search_company_with_raw(company_name)
         if not results:
             return None, None
 
@@ -333,16 +341,53 @@ class EqcProvider:
             logger.debug("eqc_provider.incomplete_result")
             return None, None
 
+        # Step 2: Get additional data (findDepart and findLabels)
+        # Store these as instance variables for _cache_result to use
+        self._raw_business_info = None
+        self._raw_biz_label = None
+
+        company_id = str(top.company_id)
+
+        # Error isolation: Try to get business info, but continue if it fails
+        try:
+            _, self._raw_business_info = self.client.get_business_info_with_raw(company_id)
+            logger.debug(
+                "eqc_provider.business_info_acquired",
+                company_id=company_id,
+            )
+        except Exception as e:
+            logger.warning(
+                "eqc_provider.business_info_failed",
+                msg="Failed to get business info - continuing without it",
+                company_id=company_id,
+                error_type=type(e).__name__,
+            )
+
+        # Error isolation: Try to get label info, but continue if it fails
+        try:
+            _, self._raw_biz_label = self.client.get_label_info_with_raw(company_id)
+            logger.debug(
+                "eqc_provider.label_info_acquired",
+                company_id=company_id,
+            )
+        except Exception as e:
+            logger.warning(
+                "eqc_provider.label_info_failed",
+                msg="Failed to get label info - continuing without it",
+                company_id=company_id,
+                error_type=type(e).__name__,
+            )
+
         # Create CompanyInfo
         company_info = CompanyInfo(
-            company_id=str(top.company_id),
+            company_id=company_id,
             official_name=top.official_name,
             unified_credit_code=getattr(top, "unite_code", None),
             confidence=getattr(top, "match_score", 0.9) or 0.9,
             match_type="eqc",
         )
 
-        return company_info, raw_json
+        return company_info, raw_search_json
 
     def _cache_result(
         self,
@@ -363,7 +408,6 @@ class EqcProvider:
             raw_json: Raw API response for persistence (Story 6.2-P5).
         """
         try:
-            from work_data_hub.infrastructure.enrichment.normalizer import normalize_for_temp_id
             from work_data_hub.infrastructure.enrichment.types import (
                 EnrichmentIndexRecord, LookupType, SourceType
             )
@@ -388,20 +432,23 @@ class EqcProvider:
                 msg="Cached EQC lookup result to enrichment_index",
             )
 
-            # Story 6.2-P5: Write to enterprise.base_info with raw API response
+            # Story 6.2-P5/P8: Write to enterprise.base_info with all raw API responses
             # This is best-effort persistence - failure must not fail the lookup
             if raw_json is not None and self.mapping_repository:
                 try:
+                    # Story 6.2-P8: Pass all raw data to repository
                     self.mapping_repository.upsert_base_info(
                         company_id=result.company_id,
                         search_key_word=company_name,
                         company_full_name=result.official_name,
                         unite_code=result.unified_credit_code,
                         raw_data=raw_json,
+                        raw_business_info=getattr(self, "_raw_business_info", None),
+                        raw_biz_label=getattr(self, "_raw_biz_label", None),
                     )
                     logger.debug(
                         "eqc_provider.persisted_to_base_info",
-                        msg="Persisted EQC result to base_info table",
+                        msg="Persisted EQC result to base_info table with full data",
                     )
                 except Exception as e:
                     # Non-blocking: log and continue

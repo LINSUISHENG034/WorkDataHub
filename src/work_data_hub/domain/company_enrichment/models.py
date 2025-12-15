@@ -296,6 +296,123 @@ class CompanyDetail(BaseModel):
         return []
 
 
+# ===== EQC API Extended Models for Full Data Acquisition =====
+# These models support findDepart and findLabels API endpoints
+
+
+class BusinessInfoResult(BaseModel):
+    """
+    Result from EQC findDepart API (businessInfodto structure).
+
+    Maps to the businessInfodto response from findDepart endpoint,
+    providing comprehensive business registration information.
+    Raw string values are stored; data cleansing is handled in Story 6.2-P9.
+    """
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        validate_default=True,
+        extra="forbid",
+    )
+
+    company_id: str = Field(..., min_length=1, description="EQC company ID")
+    company_name: Optional[str] = Field(None, max_length=500, description="Company name")
+
+    # Raw values here are strings; normalization/typing happens in Story 6.2-P9.
+    registered_date: Optional[str] = Field(None, description="Registration date (raw string)")
+    registered_capital_raw: Optional[str] = Field(
+        None, description="Registered capital (raw string, e.g., '80000.00万元')"
+    )
+    registered_status: Optional[str] = Field(
+        None, max_length=100, description="Registration status"
+    )
+    legal_person_name: Optional[str] = Field(
+        None, max_length=255, description="Legal representative name"
+    )
+    address: Optional[str] = Field(None, description="Company address")
+    codename: Optional[str] = Field(None, max_length=100, description="Company code name")
+    company_en_name: Optional[str] = Field(None, description="English company name")
+    currency: Optional[str] = Field(None, max_length=50, description="Currency")
+    credit_code: Optional[str] = Field(None, max_length=50, description="Unified social credit code")
+    register_code: Optional[str] = Field(None, max_length=50, description="Registration code")
+    organization_code: Optional[str] = Field(
+        None, max_length=50, description="Organization code"
+    )
+    company_type: Optional[str] = Field(None, max_length=100, description="Company type")
+    industry_name: Optional[str] = Field(None, max_length=255, description="Industry classification")
+    registration_organ_name: Optional[str] = Field(
+        None, max_length=255, description="Registration authority name"
+    )
+    start_date: Optional[str] = Field(None, description="Business period start date (raw string)")
+    end_date: Optional[str] = Field(None, description="Business period end date (raw string)")
+    start_end: Optional[str] = Field(None, max_length=100, description="Business period display string")
+    business_scope: Optional[str] = Field(None, description="Business scope")
+    telephone: Optional[str] = Field(None, max_length=100, description="Telephone")
+    email_address: Optional[str] = Field(None, max_length=255, description="Email address")
+    website: Optional[str] = Field(None, max_length=500, description="Website")
+    colleagues_num: Optional[str] = Field(None, description="Employees count (raw string)")
+    company_former_name: Optional[str] = Field(None, description="Former company names")
+    control_id: Optional[str] = Field(None, max_length=100, description="Controller ID")
+    control_name: Optional[str] = Field(None, max_length=255, description="Controller name")
+    bene_id: Optional[str] = Field(None, max_length=100, description="Beneficiary ID")
+    bene_name: Optional[str] = Field(None, max_length=255, description="Beneficiary name")
+    legal_person_id: Optional[str] = Field(None, max_length=100, description="Legal person ID")
+    province: Optional[str] = Field(None, max_length=100, description="Province")
+    logo_url: Optional[str] = Field(None, description="Logo URL")
+    type_code: Optional[str] = Field(None, max_length=50, description="Company type code")
+    department: Optional[str] = Field(None, max_length=255, description="Department")
+    update_time: Optional[str] = Field(None, description="EQC update time (raw string)")
+    actual_capital_raw: Optional[str] = Field(
+        None, description="Paid-in capital (raw string)"
+    )
+    registered_capital_currency: Optional[str] = Field(
+        None, max_length=50, description="Registered capital currency"
+    )
+    full_register_type_desc: Optional[str] = Field(
+        None, max_length=255, description="Full register type description"
+    )
+    industry_code: Optional[str] = Field(None, max_length=50, description="Industry code")
+
+    @field_validator("company_id", mode="before")
+    @classmethod
+    def normalize_company_id(cls, v: Any) -> str:
+        """Normalize company ID to string format."""
+        if v is None:
+            return v
+        return str(v).strip()
+
+
+class LabelInfo(BaseModel):
+    """
+    Result from EQC findLabels API.
+
+    Maps to individual label entries from the labels response structure.
+    Handles null companyId fallback logic per Legacy crawler pattern.
+    """
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        validate_default=True,
+        populate_by_name=True,
+        extra="forbid",
+    )
+
+    company_id: str = Field(..., description="Company ID (may need sibling fallback)")
+    type: str = Field(..., description="Label category (e.g., '行业分类')")
+    lv1_name: Optional[str] = Field(None, alias="lv1Name", description="Level 1 label name")
+    lv2_name: Optional[str] = Field(None, alias="lv2Name", description="Level 2 label name")
+    lv3_name: Optional[str] = Field(None, alias="lv3Name", description="Level 3 label name")
+    lv4_name: Optional[str] = Field(None, alias="lv4Name", description="Level 4 label name")
+
+    @field_validator("company_id", mode="before")
+    @classmethod
+    def normalize_company_id(cls, v: Any) -> str:
+        """Normalize company ID to string format."""
+        if v is None:
+            return v
+        return str(v).strip()
+
+
 # ===== Company Enrichment Service Models =====
 # These models define the data contracts for the CompanyEnrichmentService
 # with caching, queue processing, and unified resolution capabilities

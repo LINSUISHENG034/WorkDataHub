@@ -16,29 +16,10 @@ Architecture Reference:
 - AD-010: Infrastructure Layer & Pipeline Composition
 """
 
-from .company_id_resolver import CompanyIdResolver
-from .eqc_provider import (
-    CompanyInfo,
-    EnterpriseInfoProvider,
-    EqcProvider,
-    EqcTokenInvalidError,
-    validate_eqc_token,
-)
-from .mapping_repository import (
-    CompanyMappingRepository,
-    InsertBatchResult,
-    MatchResult,
-)
-from .normalizer import generate_temp_company_id, normalize_for_temp_id
-from .domain_learning_service import DomainLearningService
-from .types import (
-    DomainLearningConfig,
-    DomainLearningResult,
-    ResolutionResult,
-    ResolutionSource,
-    ResolutionStatistics,
-    ResolutionStrategy,
-)
+from __future__ import annotations
+
+import importlib
+from typing import Any
 
 __all__ = [
     "CompanyIdResolver",
@@ -62,3 +43,40 @@ __all__ = [
     "DomainLearningConfig",
     "DomainLearningResult",
 ]
+
+_LAZY_IMPORTS: dict[str, tuple[str, str]] = {
+    "CompanyIdResolver": (".company_id_resolver", "CompanyIdResolver"),
+    "CompanyMappingRepository": (".mapping_repository", "CompanyMappingRepository"),
+    "MatchResult": (".mapping_repository", "MatchResult"),
+    "InsertBatchResult": (".mapping_repository", "InsertBatchResult"),
+    "ResolutionStrategy": (".types", "ResolutionStrategy"),
+    "ResolutionStatistics": (".types", "ResolutionStatistics"),
+    "ResolutionResult": (".types", "ResolutionResult"),
+    "ResolutionSource": (".types", "ResolutionSource"),
+    "normalize_for_temp_id": (".normalizer", "normalize_for_temp_id"),
+    "generate_temp_company_id": (".normalizer", "generate_temp_company_id"),
+    # Story 6.6: EQC Provider
+    "EqcProvider": (".eqc_provider", "EqcProvider"),
+    "EqcTokenInvalidError": (".eqc_provider", "EqcTokenInvalidError"),
+    "CompanyInfo": (".eqc_provider", "CompanyInfo"),
+    "EnterpriseInfoProvider": (".eqc_provider", "EnterpriseInfoProvider"),
+    "validate_eqc_token": (".eqc_provider", "validate_eqc_token"),
+    # Story 6.1.3: Domain Learning
+    "DomainLearningService": (".domain_learning_service", "DomainLearningService"),
+    "DomainLearningConfig": (".types", "DomainLearningConfig"),
+    "DomainLearningResult": (".types", "DomainLearningResult"),
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name not in _LAZY_IMPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, attr_name = _LAZY_IMPORTS[name]
+    module = importlib.import_module(module_name, __name__)
+    value = getattr(module, attr_name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted(set(list(globals().keys()) + list(_LAZY_IMPORTS.keys())))

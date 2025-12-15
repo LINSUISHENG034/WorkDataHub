@@ -69,6 +69,12 @@ msg = "Domain layer cannot import from work_data_hub.orchestration (Story 1.6 Cl
 quote-style = "double"
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = [
+    ".git",
+    ".venv",
+    "node_modules",
+]
 markers = [
     "unit: marks tests as fast unit tests with no external dependencies",
     "integration: marks tests as integration tests with database or filesystem",

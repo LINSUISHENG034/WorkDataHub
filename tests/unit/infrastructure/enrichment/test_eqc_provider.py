@@ -448,3 +448,211 @@ class TestValidateEqcToken:
             result = validate_eqc_token("token", "https://eqc.test.com")
 
             assert result is True  # Network error doesn't indicate invalid token
+
+
+class TestEqcProviderFullDataAcquisition:
+    """Tests for EQC Provider full data acquisition (Story 6.2-P8)."""
+
+    @pytest.fixture
+    def provider(self) -> EqcProvider:
+        """Create a provider with mocked settings."""
+        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.get_settings") as mock_settings:
+            mock_settings.return_value.eqc_token = ""
+            mock_settings.return_value.eqc_base_url = "https://eqc.test.com"
+            mock_settings.return_value.company_sync_lookup_limit = 5
+            mock_settings.return_value.eqc_rate_limit = 10
+
+            return EqcProvider(
+                token="test_token_12345678901234567890",
+                budget=5,
+                base_url="https://eqc.test.com",
+            )
+
+    def test_lookup_calls_all_three_endpoints(self, provider) -> None:
+        """Test that lookup calls search, findDepart, and findLabels endpoints."""
+        mock_repo = MagicMock()
+        provider.mapping_repository = mock_repo
+
+        # Mock the client methods
+        provider.client = MagicMock()
+        provider.client.search_company_with_raw.return_value = (
+            [
+                SimpleNamespace(
+                    company_id="1000065057",
+                    official_name="中国平安保险（集团）股份有限公司",
+                    unite_code="91440300618698064P",
+                    match_score=0.9,
+                )
+            ],
+            {"list": [{"companyId": "1000065057"}]},
+        )
+        provider.client.get_business_info_with_raw.return_value = (
+            SimpleNamespace(
+                company_id="1000065057",
+                company_name="中国平安保险（集团）股份有限公司",
+                registered_capital_raw="80000.00万元",
+            ),
+            {"businessInfodto": {"company_id": "1000065057"}},
+        )
+        provider.client.get_label_info_with_raw.return_value = (
+            [
+                SimpleNamespace(
+                    company_id="1000065057",
+                    type="行业分类",
+                    lv1_name="金融业",
+                )
+            ],
+            {"labels": [{"type": "行业分类", "labels": []}]},
+        )
+
+        # Mock normalizer
+        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.normalize_for_temp_id") as mock_norm:
+            mock_norm.return_value = "中国平安"
+
+            result = provider.lookup("中国平安")
+
+            # Verify all three endpoints were called
+            provider.client.search_company_with_raw.assert_called_once_with("中国平安")
+            provider.client.get_business_info_with_raw.assert_called_once_with("1000065057")
+            provider.client.get_label_info_with_raw.assert_called_once_with("1000065057")
+
+            # Verify result
+            assert result is not None
+            assert result.company_id == "1000065057"
+            assert result.official_name == "中国平安保险（集团）股份有限公司"
+
+            # Verify repository was called with all raw data
+            mock_repo.insert_enrichment_index_batch.assert_called_once()
+            mock_repo.upsert_base_info.assert_called_once()
+            call_args = mock_repo.upsert_base_info.call_args
+            assert call_args[1]["company_id"] == "1000065057"
+            assert call_args[1]["raw_data"] == {"list": [{"companyId": "1000065057"}]}
+            assert call_args[1]["raw_business_info"] == {"businessInfodto": {"company_id": "1000065057"}}
+            assert call_args[1]["raw_biz_label"] == {"labels": [{"type": "行业分类", "labels": []}]}
+
+    def test_lookup_continues_when_business_info_fails(self, provider) -> None:
+        """Test that lookup continues when get_business_info fails (error isolation)."""
+        mock_repo = MagicMock()
+        provider.mapping_repository = mock_repo
+
+        # Mock the client methods - business info raises exception
+        provider.client = MagicMock()
+        provider.client.search_company_with_raw.return_value = (
+            [
+                SimpleNamespace(
+                    company_id="1000065057",
+                    official_name="中国平安保险",
+                    unite_code="91440300618698064P",
+                    match_score=0.9,
+                )
+            ],
+            {"list": [{"companyId": "1000065057"}]},
+        )
+        provider.client.get_business_info_with_raw.side_effect = Exception("API error")
+        provider.client.get_label_info_with_raw.return_value = (
+            [
+                SimpleNamespace(
+                    company_id="1000065057",
+                    type="行业分类",
+                    lv1_name="金融业",
+                )
+            ],
+            {"labels": []},
+        )
+
+        # Mock normalizer
+        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.normalize_for_temp_id") as mock_norm:
+            mock_norm.return_value = "中国平安"
+
+            result = provider.lookup("中国平安")
+
+            # Should still return a result despite business info failure
+            assert result is not None
+            assert result.company_id == "1000065057"
+
+            # Verify repository was called with None for failed business info
+            mock_repo.upsert_base_info.assert_called_once()
+            call_args = mock_repo.upsert_base_info.call_args
+            assert call_args[1]["raw_business_info"] is None
+            assert call_args[1]["raw_biz_label"] == {"labels": []}
+
+    def test_lookup_continues_when_label_info_fails(self, provider) -> None:
+        """Test that lookup continues when get_label_info fails (error isolation)."""
+        mock_repo = MagicMock()
+        provider.mapping_repository = mock_repo
+
+        # Mock the client methods - label info raises exception
+        provider.client = MagicMock()
+        provider.client.search_company_with_raw.return_value = (
+            [
+                SimpleNamespace(
+                    company_id="1000065057",
+                    official_name="中国平安保险",
+                    unite_code="91440300618698064P",
+                    match_score=0.9,
+                )
+            ],
+            {"list": [{"companyId": "1000065057"}]},
+        )
+        provider.client.get_business_info_with_raw.return_value = (
+            SimpleNamespace(
+                company_id="1000065057",
+                company_name="中国平安保险",
+            ),
+            {"businessInfodto": {}},
+        )
+        provider.client.get_label_info_with_raw.side_effect = Exception("API error")
+
+        # Mock normalizer
+        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.normalize_for_temp_id") as mock_norm:
+            mock_norm.return_value = "中国平安"
+
+            result = provider.lookup("中国平安")
+
+            # Should still return a result despite label info failure
+            assert result is not None
+            assert result.company_id == "1000065057"
+
+            # Verify repository was called with None for failed label info
+            mock_repo.upsert_base_info.assert_called_once()
+            call_args = mock_repo.upsert_base_info.call_args
+            assert call_args[1]["raw_business_info"] == {"businessInfodto": {}}
+            assert call_args[1]["raw_biz_label"] is None
+
+    def test_lookup_continues_when_both_additional_apis_fail(self, provider) -> None:
+        """Test that lookup continues when both business_info and label_info fail."""
+        mock_repo = MagicMock()
+        provider.mapping_repository = mock_repo
+
+        # Mock the client methods - both additional APIs fail
+        provider.client = MagicMock()
+        provider.client.search_company_with_raw.return_value = (
+            [
+                SimpleNamespace(
+                    company_id="1000065057",
+                    official_name="中国平安保险",
+                    unite_code="91440300618698064P",
+                    match_score=0.9,
+                )
+            ],
+            {"list": [{"companyId": "1000065057"}]},
+        )
+        provider.client.get_business_info_with_raw.side_effect = Exception("Business API error")
+        provider.client.get_label_info_with_raw.side_effect = Exception("Label API error")
+
+        # Mock normalizer
+        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.normalize_for_temp_id") as mock_norm:
+            mock_norm.return_value = "中国平安"
+
+            result = provider.lookup("中国平安")
+
+            # Should still return a result with just search data
+            assert result is not None
+            assert result.company_id == "1000065057"
+
+            # Verify repository was called with None for both failed APIs
+            mock_repo.upsert_base_info.assert_called_once()
+            call_args = mock_repo.upsert_base_info.call_args
+            assert call_args[1]["raw_data"] == {"list": [{"companyId": "1000065057"}]}
+            assert call_args[1]["raw_business_info"] is None
+            assert call_args[1]["raw_biz_label"] is None
