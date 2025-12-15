@@ -75,6 +75,11 @@ class BusinessInfoCleanser:
 
         # colleagues_num: Employee count
         raw_colleagues = data.get("collegues_num") or raw.get("colleagues_num")
+        
+        # Handle explicit "not disclosed" as null input
+        if raw_colleagues == "企业选择不公示":
+            raw_colleagues = None
+
         colleagues_num = self._parse_int(raw_colleagues)
         status["colleagues_num"] = "cleansed" if colleagues_num is not None else (
             "null_input" if raw_colleagues is None else "parse_failed"
@@ -258,11 +263,28 @@ class BusinessInfoCleanser:
         if value is None:
             return None
         try:
-            # Handle string values like "100人" or "100"
+            # Handle string values like "100人" or "100" or ranges "100-199人"
             if isinstance(value, str):
                 cleaned = value.replace("人", "").replace(",", "").strip()
+
+                # Handle special cases like "少于50人", "超过100人"
+                if cleaned.startswith("少于"):
+                    cleaned = cleaned[2:]
+                elif cleaned.startswith("超过"):
+                    # For "超过100人", we'll use the lower bound as estimate
+                    pass
+                elif "至" in cleaned:
+                    # Handle "100至199人" format
+                    cleaned = cleaned.split("至")[0].strip()
+
+                if "-" in cleaned:
+                    # For ranges like 100-199, take the lower bound
+                    cleaned = cleaned.split("-")[0].strip()
+
                 if not cleaned:
                     return None
+
+                # Convert to int, handling decimal values
                 return int(float(cleaned))  # Handle "100.0" -> 100
             return int(value)
         except (ValueError, TypeError):

@@ -29,7 +29,7 @@ def _normalize_fullwidth_digits(value: str) -> str:
 
 
 def _validate_date_range(
-    parsed: date, min_year: int = 2000, max_year: int = 2030
+    parsed: date, min_year: int = 1900, max_year: int = 2030
 ) -> date:
     """Ensure parsed date falls within allowed range."""
     if not (min_year <= parsed.year <= max_year):
