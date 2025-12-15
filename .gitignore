@@ -195,11 +195,11 @@ docs/sprint*.md
 .claude/
 
 # BMAD (Build, Manage, Analyze, Deploy)
-bmad/
-.bmad/
-.bmad-core/
-.bmad-*/
-.bmad-ephemeral/
+# bmad/
+# .bmad/
+# .bmad-core/
+# .bmad-*/
+# .bmad-ephemeral/
 
 # Other AI tools
 .gemini/
