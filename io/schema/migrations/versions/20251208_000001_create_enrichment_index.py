@@ -103,7 +103,7 @@ def upgrade() -> None:
                 "company_id",
                 sa.String(100),
                 nullable=False,
-                comment="Resolved company_id (aligned with enterprise.company_master)",
+                comment="Resolved company_id (aligned with enterprise.base_info/company_id)",
             ),
             # Metadata
             sa.Column(

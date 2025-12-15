@@ -264,7 +264,7 @@ class EnrichmentIndexRecord:
             this should be normalized using the shared normalizer.
             Format for plan_customer: "{plan_code}|{normalized_customer_name}"
         lookup_type: Type of lookup (plan_code, account_name, etc.)
-        company_id: Resolved company ID (aligned with enterprise.company_master)
+        company_id: Resolved company ID (aligned with enterprise.base_info/company_id)
         confidence: Confidence score (0.00-1.00), default 1.00
         source: Source of the mapping (yaml, eqc_api, etc.)
         source_domain: Optional domain that learned this mapping

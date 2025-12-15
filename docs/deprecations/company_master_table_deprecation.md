@@ -1,13 +1,14 @@
 # Deprecation Notice: `enterprise.company_master` Table
 
-**Status:** DEPRECATED
+**Status:** REMOVED
 **Deprecation Date:** 2025-12-14
-**Story:** 6.2-P5 - EQC Data Persistence & Legacy Table Integration
+**Removal Date:** 2025-12-15
+**Story:** 6.2-P7 - Enterprise Schema Consolidation
 **Replacement:** `enterprise.base_info` (Legacy table)
 
 ## Summary
 
-The `enterprise.company_master` table is **deprecated** and should not be used for new development. All EQC API data persistence now uses the `enterprise.base_info` table, which is the established legacy table structure.
+The `enterprise.company_master` table has been **removed** from the migration files as of Story 6.2-P7. The table definition no longer exists in the codebase. All new development should use the `enterprise.base_info` table, which provides a complete schema aligned with the Legacy system's archive_base_info (37+ columns).
 
 ## Background
 
@@ -20,11 +21,13 @@ During Epic 6 (Company Enrichment Service), we created the `enterprise.company_m
 
 ## Migration Path
 
-### Current State (2025-12-14)
+### Current State (2025-12-15)
 
-- `company_master` table exists but contains minimal data (test records only)
+- `company_master` table has been **removed** from migration files (Story 6.2-P7)
+- The table may still exist in databases that applied the migration before removal
 - No production code actively writes to `company_master`
 - `base_info` table is the active persistence target for EQC data
+- New databases (fresh installs) will not have `company_master` table
 
 ### Recommended Actions
 
@@ -36,44 +39,50 @@ During Epic 6 (Company Enrichment Service), we created the `enterprise.company_m
 **For Existing Code:**
 - Review any references to `company_master` in your code
 - Update to use `base_info` or `enrichment_index` as appropriate
-- No immediate action required - table will remain for backward compatibility
+- **Important**: The table no longer exists in migration files - ensure your code doesn't depend on it
+- For databases with existing `company_master` tables, consider a manual cleanup operation
 
 ### Table Comparison
 
-| Feature | `company_master` (Deprecated) | `base_info` (Active) |
-|---------|------------------------------|----------------------|
-| Purpose | Canonical company records | Legacy company master data |
-| Schema | Minimal (company_id, official_name, unified_credit_code, aliases) | Rich (40+ fields from legacy system) |
+| Feature | `company_master` (Removed) | `base_info` (Active) |
+|---------|----------------------------|----------------------|
+| Purpose | Was canonical company records | Legacy company master data |
+| Schema | Was minimal (6 columns) | Rich (37+ columns from archive_base_info) |
 | Data Source | EQC API (planned) | EQC API + Legacy system |
-| Raw Data | Not supported | JSONB column (Story 6.2-P5) |
-| Status | Deprecated | Active |
+| Raw Data | Not supported | JSONB columns: raw_data, raw_business_info, raw_biz_label |
+| Status | Removed from migrations | Active |
+| Migration Status | Removed in 6.2-P7 | Created/Updated in 6.2-P7 |
 
 ## Technical Details
 
 ### Schema Differences
 
-**`company_master` (Deprecated):**
+**`company_master` (Removed):**
 ```sql
-CREATE TABLE enterprise.company_master (
-    company_id VARCHAR(100) PRIMARY KEY,
-    official_name VARCHAR(255) NOT NULL,
-    unified_credit_code VARCHAR(50) UNIQUE,
-    aliases TEXT[],
-    source VARCHAR(50) DEFAULT 'internal',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+-- This table has been removed from migration files
+-- Previously existed with minimal schema (6 columns)
+-- No longer created in new database installations
 ```
 
-**`base_info` (Active):**
+**`base_info` (Active - Expanded in 6.2-P7):**
 ```sql
 CREATE TABLE enterprise.base_info (
     company_id VARCHAR(255) PRIMARY KEY,
     search_key_word VARCHAR(255),
-    companyFullName VARCHAR(255),
-    unite_code VARCHAR(255),
-    -- ... 40+ additional fields from legacy system
-    raw_data JSONB,  -- Added in Story 6.2-P5
+    -- Legacy archive_base_info alignment (37 columns)
+    name, name_display, symbol, rank_score, country,
+    company_en_name, smdb_code, is_hk, coname, is_list,
+    company_nature, _score, type, "registeredStatus",
+    organization_code, le_rep, reg_cap, is_pa_relatedparty,
+    province, "companyFullName", est_date, company_short_name,
+    id, is_debt, unite_code, registered_status, cocode,
+    default_score, company_former_name, is_rank_list,
+    trade_register_code, "companyId", is_normal, company_full_name,
+    -- Raw API response storage (Story 6.2-P5/6.2-P7)
+    raw_data JSONB,                    -- search response
+    raw_business_info JSONB,           -- findDepart response
+    raw_biz_label JSONB,               -- findLabels response
+    api_fetched_at TIMESTAMP WITH TIME ZONE,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 ```
@@ -91,13 +100,14 @@ The following code components reference `company_master`:
 - `src/work_data_hub/infrastructure/enrichment/types.py` - Comment reference
 
 **Migration Files:**
-- `io/schema/migrations/versions/20251206_000001_create_enterprise_schema.py` - Table creation
+- `io/schema/migrations/versions/20251206_000001_create_enterprise_schema.py` - Table REMOVED (6.2-P7)
 
 ## Timeline
 
 - **2025-11-29**: `company_master` table created (Story 6.1)
 - **2025-12-14**: Table deprecated in favor of `base_info` (Story 6.2-P5)
-- **Future**: Table may be dropped in a future cleanup story (no timeline set)
+- **2025-12-15**: Table removed from migration files (Story 6.2-P7)
+- **Note**: Existing databases may still have the table; new databases will not
 
 ## Questions?
 
