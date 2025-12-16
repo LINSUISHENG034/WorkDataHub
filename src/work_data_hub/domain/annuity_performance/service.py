@@ -9,7 +9,11 @@ import pandas as pd
 import structlog
 
 from work_data_hub.config import get_domain_output_config
+from work_data_hub.config.settings import get_settings
 from work_data_hub.domain.pipelines.types import DomainPipelineResult, PipelineContext
+from work_data_hub.infrastructure.enrichment.mapping_repository import (
+    CompanyMappingRepository,
+)
 from work_data_hub.infrastructure.validation import export_error_csv
 
 from .helpers import (
@@ -177,25 +181,54 @@ def process_with_enrichment(
         )
 
     plan_overrides = load_plan_override_mapping()
-    pipeline = build_bronze_to_silver_pipeline(
-        enrichment_service=enrichment_service,
-        plan_override_mapping=plan_overrides,
-        sync_lookup_budget=sync_lookup_budget,
-    )
-    context = PipelineContext(
-        pipeline_name="bronze_to_silver",
-        execution_id=f"annuity-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
-        timestamp=datetime.now(timezone.utc),
-        config={"domain": "annuity_performance", "data_source": data_source},
-        domain="annuity_performance",
-        run_id=f"annuity-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
-        extra={"data_source": data_source},
-    )
-    start_time = time.perf_counter()
-    input_df = pd.DataFrame(rows)
-    result_df = pipeline.execute(input_df.copy(), context)
-    # Keep all original records - no aggregation for business detail data
-    records, unknown_names = convert_dataframe_to_models(result_df)
+
+    mapping_repository: Optional[CompanyMappingRepository] = None
+    repo_connection = None
+    if enrichment_service is not None:
+        try:
+            from sqlalchemy import create_engine
+
+            settings = get_settings()
+            engine = create_engine(settings.get_database_connection_string())
+            repo_connection = engine.connect()
+            mapping_repository = CompanyMappingRepository(repo_connection)
+        except Exception as e:
+            logger.bind(domain="annuity_performance", step="mapping_repository").warning(
+                "Failed to initialize CompanyMappingRepository; proceeding without DB cache",
+                error=str(e),
+            )
+            mapping_repository = None
+            repo_connection = None
+
+    try:
+        pipeline = build_bronze_to_silver_pipeline(
+            enrichment_service=enrichment_service,
+            plan_override_mapping=plan_overrides,
+            sync_lookup_budget=sync_lookup_budget,
+            mapping_repository=mapping_repository,
+        )
+        context = PipelineContext(
+            pipeline_name="bronze_to_silver",
+            execution_id=f"annuity-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+            timestamp=datetime.now(timezone.utc),
+            config={"domain": "annuity_performance", "data_source": data_source},
+            domain="annuity_performance",
+            run_id=f"annuity-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+            extra={"data_source": data_source},
+        )
+        start_time = time.perf_counter()
+        input_df = pd.DataFrame(rows)
+        result_df = pipeline.execute(input_df.copy(), context)
+        # Keep all original records - no aggregation for business detail data
+        records, unknown_names = convert_dataframe_to_models(result_df)
+    finally:
+        if repo_connection is not None:
+            try:
+                repo_connection.commit()
+            except Exception:
+                repo_connection.rollback()
+            repo_connection.close()
+
     dropped_count = len(rows) - len(records)
     if dropped_count > 0:
         drop_rate = dropped_count / len(rows) if rows else 0

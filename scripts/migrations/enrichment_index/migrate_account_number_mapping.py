@@ -44,14 +44,24 @@ logger = structlog.get_logger(__name__)
 
 
 def create_engine_from_env():
-    """Create SQLAlchemy engine from environment variable."""
+    """Create SQLAlchemy engine from environment variables.
+
+    Canonical env var is `WDH_DATABASE__URI` (from `.wdh_env`). Fallback to the
+    common `DATABASE_URL` for compatibility.
+    """
     import os
-    database_url = os.environ.get("DATABASE_URL")
+
+    database_url = os.environ.get("WDH_DATABASE__URI") or os.environ.get("DATABASE_URL")
     if not database_url:
         raise ValueError(
-            "DATABASE_URL environment variable is required. "
-            "Example: postgresql://user:pass@localhost:5432/dbname"
+            "WDH_DATABASE__URI (preferred) or DATABASE_URL is required. "
+            "Example: postgresql://user:pass@localhost:5432/postgres"
         )
+
+    # Fix for SQLAlchemy compatibility (postgres:// is deprecated)
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+
     return create_engine(database_url)
 
 
@@ -125,13 +135,21 @@ def migrate_account_number_mapping(
     try:
         import os
         import re
-        # 从DATABASE_URL构建legacy数据库连接
-        database_url = os.environ.get("DATABASE_URL")
-        if not database_url:
-            raise ValueError("DATABASE_URL environment variable is required")
 
-        # 使用正则表达式替换数据库名为 legacy
-        legacy_db_url = re.sub(r'/([^/]+)$', '/legacy', database_url)
+        # Prefer explicit legacy DB URI; fall back to best-effort rewrite.
+        legacy_db_url = os.environ.get("LEGACY_DATABASE__URI")
+        if not legacy_db_url:
+            database_url = (
+                os.environ.get("WDH_DATABASE__URI") or os.environ.get("DATABASE_URL")
+            )
+            if not database_url:
+                raise ValueError(
+                    "LEGACY_DATABASE__URI (preferred) or WDH_DATABASE__URI/DATABASE_URL is required"
+                )
+            legacy_db_url = re.sub(r"/([^/]+)$", "/legacy", database_url)
+
+        if legacy_db_url.startswith("postgres://"):
+            legacy_db_url = legacy_db_url.replace("postgres://", "postgresql://", 1)
 
         from sqlalchemy import create_engine
         legacy_engine = create_engine(legacy_db_url)

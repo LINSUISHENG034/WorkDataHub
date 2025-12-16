@@ -82,12 +82,11 @@ domains:
     output:
       table: "规模明细"
       schema_name: "business"
-      # Primary key for delete_insert mode (matches GOLD_COMPOSITE_KEY in schemas.py)
+      # Refresh key for delete_insert mode (Legacy-compatible refresh scope)
       pk:
         - "月度"
-        - "计划代码"
-        - "组合代码"
-        - "company_id"
+        - "业务类型"
+        - "计划类型"
 
     # Foreign key backfill configuration for reference data management
     # Schema Version: 1.0 (backward compatible addition)

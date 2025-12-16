@@ -58,16 +58,42 @@ logger = structlog.get_logger(__name__)
 
 
 def create_engine_from_env():
-    """Create SQLAlchemy engine from environment variable."""
+    """Create SQLAlchemy engine for TARGET database from .wdh_env.
+    
+    Uses WDH_DATABASE__URI (canonical) from .wdh_env file.
+    All database configuration is centralized in .wdh_env.
+    """
     import os
 
-    database_url = os.environ.get("DATABASE_URL")
+    database_url = os.environ.get("WDH_DATABASE__URI")
     if not database_url:
         raise ValueError(
-            "DATABASE_URL environment variable is required. "
-            "Example: postgresql://user:pass@localhost:5432/dbname"
+            "WDH_DATABASE__URI environment variable is required (from .wdh_env). "
+            "Example: postgres://user:pass@localhost:5432/postgres"
         )
+    # Fix for SQLAlchemy compatibility (postgres:// is deprecated)
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
     return create_engine(database_url)
+
+
+def create_legacy_engine_from_env():
+    """Create SQLAlchemy engine for LEGACY database from .wdh_env.
+    
+    Uses LEGACY_DATABASE__URI (canonical) from .wdh_env file.
+    Falls back to target database if not set (single-DB mode).
+    """
+    import os
+
+    legacy_url = os.environ.get("LEGACY_DATABASE__URI")
+    if legacy_url:
+        # Fix for SQLAlchemy compatibility
+        if legacy_url.startswith("postgres://"):
+            legacy_url = legacy_url.replace("postgres://", "postgresql://", 1)
+        return create_engine(legacy_url)
+    
+    # Fall back to target database if legacy URL is not set (single-DB mode)
+    return create_engine_from_env()
 
 
 # =============================================================================
@@ -86,9 +112,9 @@ class LegacyMigrationConfig:
     perform_preflight: bool = True
     report_path: Optional[Path] = None
 
-    # Source tables
-    company_id_mapping_table: str = "legacy.company_id_mapping"
-    eqc_search_result_table: str = "legacy.eqc_search_result"
+    # Source tables (updated for PostgreSQL migration: legacy tables now in 'enterprise' schema)
+    company_id_mapping_table: str = "enterprise.company_id_mapping"
+    eqc_search_result_table: str = "enterprise.eqc_search_result"
 
     # Confidence mapping
     confidence_current: Decimal = field(default_factory=lambda: Decimal("1.00"))
@@ -522,12 +548,9 @@ def migrate_company_id_mapping(
         # Batch insert
         if len(records) >= config.batch_size:
             unique_records, extra_hits = _deduplicate_records(records)
-            conflict_count = 0
             if not config.dry_run:
-                conflict_count = _estimate_conflicts(connection, unique_records)
                 result = repo.insert_enrichment_index_batch(unique_records)
-                report.updated += conflict_count
-                report.inserted += max(0, result.inserted_count - conflict_count)
+                report.inserted += result.inserted_count
                 # Increment hit_count for intra-batch duplicates we collapsed
                 for key, count in extra_hits.items():
                     for _ in range(count):
@@ -549,10 +572,8 @@ def migrate_company_id_mapping(
     if records:
         unique_records, extra_hits = _deduplicate_records(records)
         if not config.dry_run:
-            conflict_count = _estimate_conflicts(connection, unique_records)
             result = repo.insert_enrichment_index_batch(unique_records)
-            report.updated += conflict_count
-            report.inserted += max(0, result.inserted_count - conflict_count)
+            report.inserted += result.inserted_count
             for key, count in extra_hits.items():
                 for _ in range(count):
                     repo.update_hit_count(key[1], key[0])
@@ -625,12 +646,9 @@ def migrate_eqc_search_result(
         # Batch insert
         if len(records) >= config.batch_size:
             unique_records, extra_hits = _deduplicate_records(records)
-            conflict_count = 0
             if not config.dry_run:
-                conflict_count = _estimate_conflicts(connection, unique_records)
                 result = repo.insert_enrichment_index_batch(unique_records)
-                report.updated += conflict_count
-                report.inserted += max(0, result.inserted_count - conflict_count)
+                report.inserted += result.inserted_count
                 for key, count in extra_hits.items():
                     for _ in range(count):
                         repo.update_hit_count(key[1], key[0])
@@ -651,10 +669,8 @@ def migrate_eqc_search_result(
     if records:
         unique_records, extra_hits = _deduplicate_records(records)
         if not config.dry_run:
-            conflict_count = _estimate_conflicts(connection, unique_records)
             result = repo.insert_enrichment_index_batch(unique_records)
-            report.updated += conflict_count
-            report.inserted += max(0, result.inserted_count - conflict_count)
+            report.inserted += result.inserted_count
             for key, count in extra_hits.items():
                 for _ in range(count):
                     repo.update_hit_count(key[1], key[0])
@@ -727,6 +743,9 @@ def run_migration(config: LegacyMigrationConfig) -> FullMigrationReport:
     """
     Run the full legacy data migration.
 
+    Supports dual-database mode: reads from Legacy database (LEGACY_DATABASE_URL)
+    and writes to target database (DATABASE_URL).
+
     Args:
         config: Migration configuration.
 
@@ -735,27 +754,30 @@ def run_migration(config: LegacyMigrationConfig) -> FullMigrationReport:
     """
     full_report = FullMigrationReport(dry_run=config.dry_run)
 
-    engine = create_engine_from_env()
+    # Create separate engines for source and target databases
+    target_engine = create_engine_from_env()
+    legacy_engine = create_legacy_engine_from_env()
 
-    with engine.connect() as connection:
+    with target_engine.connect() as target_conn, legacy_engine.connect() as legacy_conn:
         preflight_summary: Optional[Dict[str, str]] = None
         if config.perform_preflight:
-            preflight_summary = _run_preflight_checks(connection)
+            preflight_summary = _run_preflight_checks(target_conn)
 
         start_time = time.perf_counter()
-        repo = CompanyMappingRepository(connection)
+        repo = CompanyMappingRepository(target_conn)
 
         # Migrate company_id_mapping first (process 'current' before 'former')
-        report1 = migrate_company_id_mapping(connection, repo, config)
+        # Read from legacy_conn, write via repo (to target_conn)
+        report1 = migrate_company_id_mapping(legacy_conn, repo, config)
         full_report.add_report(report1)
 
         # Migrate eqc_search_result
-        report2 = migrate_eqc_search_result(connection, repo, config)
+        report2 = migrate_eqc_search_result(legacy_conn, repo, config)
         full_report.add_report(report2)
 
         # Commit if not dry run
         if not config.dry_run:
-            connection.commit()
+            target_conn.commit()
 
         full_report.runtime_seconds = time.perf_counter() - start_time
         full_report.preflight_summary = preflight_summary
@@ -766,6 +788,7 @@ def run_migration(config: LegacyMigrationConfig) -> FullMigrationReport:
         )
 
     return full_report
+
 
 
 # =============================================================================

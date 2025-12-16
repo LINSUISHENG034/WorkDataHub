@@ -240,6 +240,12 @@ development_status:
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-16-etl-backfill-sql-module.md
   # Code Review: 2025-12-16 - Adversarial review passed, InsertBuilder refactored, pre-existing test issues documented
   6.2-p10-etl-backfill-sql-module: done  # Bug fixes + SQL module architecture - Code Review PASSED 2025-12-16
+  # Story 6.2-P11: 规模明细 Pipeline 字段派生修复
+  # Added 2025-12-16 via Correct-Course workflow
+  # Fixes: 年金账户号 field derivation missing, enrichment_index table restoration
+  # Enhancement: CLI Token pre-check with auto-refresh via auto_eqc_auth.py
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-16.md
+  6.2-p11-guimo-mingxi-field-derivation-fix: done  # Pipeline field derivation + Token auto-refresh - Code Review PASSED 2025-12-16
 
   # Epic 7: Testing & Validation Infrastructure
   epic-7: backlog

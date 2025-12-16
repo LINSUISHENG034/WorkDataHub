@@ -40,14 +40,24 @@ logger = structlog.get_logger(__name__)
 
 
 def create_engine_from_env():
-    """Create SQLAlchemy engine from environment variable."""
+    """Create SQLAlchemy engine from environment variables.
+
+    Canonical env var is `WDH_DATABASE__URI` (from `.wdh_env`). Fallback to the
+    common `DATABASE_URL` for compatibility.
+    """
     import os
-    database_url = os.environ.get("DATABASE_URL")
+
+    database_url = os.environ.get("WDH_DATABASE__URI") or os.environ.get("DATABASE_URL")
     if not database_url:
         raise ValueError(
-            "DATABASE_URL environment variable is required. "
-            "Example: postgresql://user:pass@localhost:5432/dbname"
+            "WDH_DATABASE__URI (preferred) or DATABASE_URL is required. "
+            "Example: postgresql://user:pass@localhost:5432/postgres"
         )
+
+    # Fix for SQLAlchemy compatibility (postgres:// is deprecated)
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+
     return create_engine(database_url)
 
 
@@ -114,10 +124,19 @@ def migrate_plan_mapping(
     # 连接到Legacy PostgreSQL数据库
     try:
         import os
-        # 使用主数据库连接，因为它包含了legacy schema
-        legacy_db_url = os.environ.get("DATABASE_URL")
+        # Prefer explicit legacy DB URI; fall back to target DB (single-DB mode).
+        legacy_db_url = (
+            os.environ.get("LEGACY_DATABASE__URI")
+            or os.environ.get("WDH_DATABASE__URI")
+            or os.environ.get("DATABASE_URL")
+        )
         if not legacy_db_url:
-            raise ValueError("DATABASE_URL environment variable is required")
+            raise ValueError(
+                "LEGACY_DATABASE__URI (preferred) or WDH_DATABASE__URI/DATABASE_URL is required"
+            )
+
+        if legacy_db_url.startswith("postgres://"):
+            legacy_db_url = legacy_db_url.replace("postgres://", "postgresql://", 1)
 
         from sqlalchemy import create_engine
         legacy_engine = create_engine(legacy_db_url)
@@ -227,7 +246,8 @@ def verify_migration(pg_connection: Connection) -> Dict[str, int]:
     for name, query in queries.items():
         if name == "sample_records":
             results[name] = [
-                dict(row) for row in pg_connection.execute(text(query)).fetchall()
+                dict(row._mapping)
+                for row in pg_connection.execute(text(query)).fetchall()
             ]
         else:
             results[name] = pg_connection.execute(text(query)).scalar() or 0

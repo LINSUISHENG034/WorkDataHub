@@ -292,14 +292,17 @@ class CompanyIdResolver:
         existing_column_resolved_indices: List[int] = []
 
         if strategy.company_id_column in result_df.columns:
-            existing_values = result_df.loc[mask_missing, strategy.company_id_column]
-            # Only use non-empty existing values
-            valid_existing = existing_values.notna() & (existing_values != "")
-            valid_mask = mask_missing & valid_existing.reindex(
-                mask_missing.index, fill_value=False
+            existing_values_all = result_df[strategy.company_id_column]
+            existing_values_text = existing_values_all.astype(str).str.strip()
+            # Only trust numeric company IDs from source column.
+            # Reject placeholders like 'N' to avoid treating them as valid IDs.
+            valid_existing_all = (
+                existing_values_all.notna()
+                & existing_values_text.str.fullmatch(r"\d+").fillna(False)
             )
-            result_df.loc[valid_mask, strategy.output_column] = result_df.loc[
-                valid_mask, strategy.company_id_column
+            valid_mask = mask_missing & valid_existing_all
+            result_df.loc[valid_mask, strategy.output_column] = existing_values_text[
+                valid_mask
             ]
 
             existing_hits = result_df[strategy.output_column].notna() & ~resolution_mask
@@ -663,7 +666,13 @@ class CompanyIdResolver:
 
                 record = results.get((lookup_type, key))
                 if isinstance(record, EnrichmentIndexRecord):
-                    resolved.loc[idx] = record.company_id
+                    company_id = str(record.company_id).strip()
+                    # Treat non-numeric cache entries as invalid (e.g., legacy placeholder 'N').
+                    # If invalid, keep searching lower-priority keys for a usable mapping.
+                    if not company_id.isdigit():
+                        path_segments.append(f"{label}:INVALID")
+                        continue
+                    resolved.loc[idx] = company_id
                     used_keys.append((lookup_type, key))
                     hits_by_priority[priority_key] += 1
                     path_segments.append(f"{label}:HIT")
@@ -824,11 +833,26 @@ class CompanyIdResolver:
 
         cache_payloads: List[Dict[str, Any]] = []
 
-        for idx in df[mask_unresolved].index:
+        # Deduplicate by normalized customer name so budget is consumed per-unique name
+        # (not per-row), and apply a successful hit to all matching rows.
+        unresolved_name_series = df.loc[mask_unresolved, strategy.customer_name_column]
+        indices_by_name: Dict[str, List[int]] = {}
+        exemplar_row_by_name: Dict[str, pd.Series] = {}
+        for idx, raw_name in unresolved_name_series.items():
+            if pd.isna(raw_name):
+                continue
+            raw_text = str(raw_name).strip()
+            if not raw_text:
+                continue
+            normalized_name = normalize_for_temp_id(raw_text) or raw_text
+            indices_by_name.setdefault(normalized_name, []).append(idx)
+            exemplar_row_by_name.setdefault(normalized_name, df.loc[idx])
+
+        for normalized_name, indices in indices_by_name.items():
             if budget_remaining <= 0:
                 break
 
-            row = df.loc[idx]
+            row = exemplar_row_by_name[normalized_name]
             customer_name = row.get(strategy.customer_name_column)
             if pd.isna(customer_name):
                 continue
@@ -847,13 +871,15 @@ class CompanyIdResolver:
                 budget_remaining -= 1
 
                 if result and result.company_id:
-                    resolved.loc[idx] = result.company_id
-                    eqc_hits += 1
+                    for idx in indices:
+                        resolved.loc[idx] = result.company_id
+                    eqc_hits += len(indices)
 
                     cache_payloads.append(
                         {
                             # Align EQC cache entries with P4 normalization so lookups hit
-                            "alias_name": normalize_company_name(str(customer_name)) or str(customer_name).strip(),
+                            "alias_name": normalize_company_name(str(customer_name))
+                            or str(customer_name).strip(),
                             "canonical_id": result.company_id,
                             "match_type": "eqc",
                             "priority": 6,
@@ -867,7 +893,7 @@ class CompanyIdResolver:
                     "company_id_resolver.eqc_lookup_failed",
                     error=str(e),
                 )
-                # Continue to next row - don't block pipeline
+                # Continue to next name - don't block pipeline
 
         if cache_payloads and self.mapping_repository:
             # Deduplicate by alias_name/match_type to avoid redundant inserts
@@ -917,30 +943,41 @@ class CompanyIdResolver:
             self.eqc_provider.budget = strategy.sync_lookup_budget
             self.eqc_provider.remaining_budget = strategy.sync_lookup_budget
 
-        for idx in df[mask_unresolved].index:
+        # Deduplicate by normalized customer name so budget is consumed per-unique name
+        # (not per-row), and apply a successful hit to all matching rows.
+        unresolved_name_series = df.loc[mask_unresolved, strategy.customer_name_column]
+        indices_by_name: Dict[str, List[int]] = {}
+        exemplar_raw_by_name: Dict[str, str] = {}
+        for idx, raw_name in unresolved_name_series.items():
+            if pd.isna(raw_name):
+                continue
+            raw_text = str(raw_name).strip()
+            if not raw_text:
+                continue
+            normalized_name = normalize_for_temp_id(raw_text) or raw_text
+            indices_by_name.setdefault(normalized_name, []).append(idx)
+            exemplar_raw_by_name.setdefault(normalized_name, raw_text)
+
+        for normalized_name, indices in indices_by_name.items():
             # Check if provider still has budget
             if not self.eqc_provider.is_available:
                 break
 
-            row = df.loc[idx]
-            customer_name = row.get(strategy.customer_name_column)
-            if pd.isna(customer_name):
-                continue
-
             try:
                 # EqcProvider.lookup() handles budget, caching, and errors internally
-                result = self.eqc_provider.lookup(str(customer_name))
+                result = self.eqc_provider.lookup(exemplar_raw_by_name[normalized_name])
 
                 if result:
-                    resolved.loc[idx] = result.company_id
-                    eqc_hits += 1
+                    for idx in indices:
+                        resolved.loc[idx] = result.company_id
+                    eqc_hits += len(indices)
 
             except Exception as e:
                 logger.warning(
                     "company_id_resolver.eqc_provider_lookup_failed",
                     error_type=type(e).__name__,
                 )
-                # Continue to next row - don't block pipeline
+                # Continue to next name - don't block pipeline
 
         budget_remaining = self.eqc_provider.remaining_budget
 
@@ -991,7 +1028,7 @@ class CompanyIdResolver:
             company_id = str(row[strategy.output_column])
 
             # Skip temporary IDs
-            if company_id.startswith("IN_"):
+            if company_id.startswith("IN"):
                 continue
 
             for column, match_type, priority, needs_normalization in backflow_fields:

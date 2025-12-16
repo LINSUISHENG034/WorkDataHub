@@ -4,9 +4,12 @@ ETL CLI for WorkDataHub.
 Story 6.2-P6: CLI Architecture Unification & Multi-Domain Batch Processing
 Task 1.2: Extract jobs.py main() to cli/etl.py with single & multi-domain support
 
+Story 6.2-P11: Token auto-refresh on CLI startup (T3.1-T3.3)
+
 This module provides the CLI interface for running ETL jobs, supporting:
 - Single domain processing (backward compatible)
 - Multi-domain batch processing (new in Story 6.2-P6)
+- Token validation and auto-refresh at startup (new in Story 6.2-P11)
 - All existing CLI options from jobs.py
 
 Usage:
@@ -18,14 +21,98 @@ Usage:
 
     # All domains (Phase 2)
     python -m work_data_hub.cli etl --all-domains --period 202411 --execute
+    
+    # Disable auto-refresh token (if you want to skip token check)
+    python -m work_data_hub.cli etl --domains annuity_performance --no-auto-refresh-token --execute
 """
 
 import argparse
+import os
 import re
 import sys
 from typing import Any, Dict, List, Optional
 
 import yaml
+
+from work_data_hub.config.settings import get_settings
+
+
+def _validate_and_refresh_token(auto_refresh: bool = True) -> bool:
+    """
+    Validate EQC token at CLI startup and auto-refresh if invalid.
+    
+    Story 6.2-P11 T3.1-T3.2: Pre-check Token validity before ETL execution.
+    If token is invalid and auto_refresh is True, triggers auto-QR login flow.
+    
+    Args:
+        auto_refresh: If True, auto-refresh token when validation fails.
+        
+    Returns:
+        True if token is valid (or was successfully refreshed), False otherwise.
+    """
+    from work_data_hub.infrastructure.enrichment.eqc_provider import validate_eqc_token
+    
+    try:
+        settings = get_settings()
+        token = settings.eqc_token
+        base_url = settings.eqc_base_url
+        
+        if not token:
+            print("⚠️  No EQC token configured (WDH_EQC_TOKEN not set)")
+            if not auto_refresh:
+                print("   Continuing without token (EQC lookup will be disabled)")
+                return True
+            print("   Attempting to refresh token via QR login...")
+            return _trigger_token_refresh()
+        
+        # Validate existing token
+        print("🔐 Validating EQC token...", end=" ", flush=True)
+        if validate_eqc_token(token, base_url):
+            print("✅ Token valid")
+            return True
+        
+        # Token is invalid
+        print("❌ Token invalid/expired")
+        
+        if not auto_refresh:
+            print("⚠️  Auto-refresh disabled (--no-auto-refresh-token)")
+            print("   Run: python -m work_data_hub.cli auth refresh")
+            return True  # Continue without valid token
+            
+        print("   Attempting to refresh token via QR login...")
+        return _trigger_token_refresh()
+        
+    except Exception as e:
+        print(f"⚠️  Token validation error: {e}")
+        return True  # Continue anyway to avoid blocking pipeline
+
+
+def _trigger_token_refresh() -> bool:
+    """Trigger automatic token refresh via QR login."""
+    try:
+        from work_data_hub.io.auth.auto_eqc_auth import run_get_token_auto_qr
+
+        token = run_get_token_auto_qr(save_to_env=True, timeout_seconds=180)
+        if token:
+            print("✅ Token refreshed successfully")
+            # Make the refreshed token effective in the current process as well.
+            # Settings are cached (lru_cache), so we must clear it to re-read `.wdh_env`.
+            os.environ["WDH_EQC_TOKEN"] = token
+            try:
+                from work_data_hub.config.settings import get_settings
+
+                get_settings.cache_clear()
+            except Exception:
+                # Best-effort; even if cache clear fails, the token is persisted to `.wdh_env`.
+                pass
+            return True
+        else:
+            print("❌ Token refresh failed")
+            print("   Please run manually: python -m work_data_hub.cli auth refresh")
+            return False
+    except Exception as e:
+        print(f"❌ Token refresh error: {e}")
+        return False
 
 
 def _parse_pk_override(pk_arg: Any) -> List[str]:
@@ -789,17 +876,29 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
 
     # Enrichment arguments
+    # Default behavior: enabled (so EQC sync lookups can run) unless explicitly disabled.
+    parser.add_argument(
+        "--enrichment",
+        dest="enrichment_enabled",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Enable company enrichment/EQC lookups (default: enabled)",
+    )
+    # Backward-compatible alias (kept for existing scripts/docs)
     parser.add_argument(
         "--enrichment-enabled",
+        dest="enrichment_enabled",
         action="store_true",
-        default=False,
-        help="Enable company enrichment during processing",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--enrichment-sync-budget",
         type=int,
-        default=0,
-        help="Budget for synchronous EQC lookups per processing session (default: 0)",
+        default=500,
+        help=(
+            "Budget for synchronous EQC lookups per processing session "
+            "(default: 500; set 0 to disable)"
+        ),
     )
     parser.add_argument(
         "--export-unknown-names",
@@ -819,6 +918,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         action="store_true",
         help="Raise exceptions immediately (useful for testing)",
     )
+    
+    # Story 6.2-P11 T3.3: Token auto-refresh control
+    parser.add_argument(
+        "--no-auto-refresh-token",
+        action="store_true",
+        default=False,
+        help="Disable automatic EQC token refresh at startup",
+    )
 
     args = parser.parse_args(argv)
 
@@ -828,6 +935,23 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.domains and args.all_domains:
         parser.error("Cannot specify both --domains and --all-domains")
+
+    # Story 6.2-P11 T3.1-T3.2: Token validation at CLI startup
+    # Only validate for domains that may use EQC enrichment (annuity_performance).
+    # `--no-auto-refresh-token` disables auto-refresh, but still performs a pre-check so
+    # users can see token status and intentionally proceed without EQC lookups.
+    auto_refresh_enabled = not getattr(args, "no_auto_refresh_token", False)
+    enrichment_enabled = bool(getattr(args, "enrichment_enabled", False))
+
+    domains_for_check: List[str] = []
+    if args.domains:
+        domains_for_check = [d.strip() for d in args.domains.split(",")]
+    elif args.all_domains:
+        domains_for_check = _load_configured_domains()
+
+    enrichment_domains = {"annuity_performance"}
+    if enrichment_enabled and any(d in enrichment_domains for d in domains_for_check):
+        _validate_and_refresh_token(auto_refresh=auto_refresh_enabled)
 
     # Determine domains to process
     domains_to_process: List[str] = []

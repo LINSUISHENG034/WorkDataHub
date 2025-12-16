@@ -105,7 +105,8 @@
 | 13 | 客户名称 | 年金账户名 | `df['年金账户名'] = df['客户名称']` | Copy before normalization |
 | 14 | 客户名称 | 客户名称 | `df['客户名称'].apply(clean_company_name)` | Normalized in-place |
 | 15 | 计划代码 | company_id | 5-step resolution process | See Section 7 |
-| 16 | 集团企业客户号 | [DROPPED] | `df.drop(columns=['集团企业客户号'])` | Intermediate column only |
+| 16 | 集团企业客户号 | 年金账户号 | `df['年金账户号'] = df['集团企业客户号'].str.lstrip("C")` | Derived before drop (Story 6.2-P11) |
+| 17 | 集团企业客户号 | [DROPPED] | `df.drop(columns=['集团企业客户号'])` | Dropped after derivation |
 
 ---
 
@@ -123,6 +124,7 @@
 | CR-008 | 机构代码 | default | `df['机构代码'].replace("null", "G00").fillna("G00")` | 1 | Default to headquarters code |
 | CR-009 | 客户名称 | transformation | `df['客户名称'].apply(clean_company_name)` | 1 | Name normalization |
 | CR-010 | company_id | 5-step resolution | Complex multi-source resolution | 1 | See Section 7 for details |
+| CR-011 | 年金账户号 | derivation | `df['年金账户号'] = df['集团企业客户号'].str.lstrip("C")` | 1 | Story 6.2-P11: Derive before 集团企业客户号 is dropped |
 
 ---
 
@@ -350,5 +352,5 @@ ls -la tests/fixtures/validation_results/annuity_performance/
 
 ---
 
-**Last Updated:** 2025-12-10
-**Status:** 85% Complete (missing 2 dependency tables)
+**Last Updated:** 2025-12-16
+**Status:** 90% Complete (Story 6.2-P11: Added 年金账户号 derivation rule CR-011)

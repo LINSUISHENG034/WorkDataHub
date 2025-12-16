@@ -258,16 +258,23 @@ def build_bronze_to_silver_pipeline(
                 else pd.Series([None] * len(df)),
             }
         ),
-        # Step 10: Data cleansing via CleansingRegistry
+        # Step 10: Derive 年金账户号 from cleaned 集团企业客户号 (Story 6.2-P11)
+        # CRITICAL: Must copy BEFORE Step 13 (DropStep) deletes 集团企业客户号
+        CalculationStep(
+            {
+                "年金账户号": lambda df: df.get("集团企业客户号", pd.Series([None] * len(df))).copy(),
+            }
+        ),
+        # Step 11: Data cleansing via CleansingRegistry
         CleansingStep(domain="annuity_performance"),
-        # Step 11: Company ID resolution
+        # Step 12: Company ID resolution
         CompanyIdResolutionStep(
             enrichment_service=enrichment_service,
             plan_override_mapping=plan_override_mapping,
             sync_lookup_budget=sync_lookup_budget,
             mapping_repository=mapping_repository,
         ),
-        # Step 12: Drop legacy columns
+        # Step 13: Drop legacy columns
         DropStep(list(LEGACY_COLUMNS_TO_DELETE)),
     ]
 

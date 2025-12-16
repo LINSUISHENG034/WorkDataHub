@@ -151,16 +151,16 @@ class DomainLearningService:
             return result
 
         company_id_col = column_mapping.get("company_id", "company_id")
-        valid_mask = (
-            df[company_id_col].notna()
-            & ~df[company_id_col].astype(str).str.startswith("IN_")
-        )
+        company_id_text = df[company_id_col].astype(str).str.strip()
+        is_temp_id = company_id_text.str.upper().str.startswith("IN")
+        is_numeric_id = company_id_text.str.fullmatch(r"\d+").fillna(False)
+        valid_mask = df[company_id_col].notna() & is_numeric_id & ~is_temp_id
         valid_count = int(valid_mask.sum())
         null_count = int(df[company_id_col].isna().sum())
         temp_id_count = int(
             (
                 df[company_id_col].notna()
-                & df[company_id_col].astype(str).str.startswith("IN_")
+                & is_temp_id
             ).sum()
         )
         result.valid_records = valid_count
@@ -289,20 +289,17 @@ class DomainLearningService:
 
         company_id_col = column_mapping.get("company_id", "company_id")
 
-        # Filter valid records: non-null company_id, not temp ID (IN_*)
-        valid_mask = (
-            df[company_id_col].notna()
-            & ~df[company_id_col].astype(str).str.startswith("IN_")
-        )
+        # Filter valid records: numeric company_id and not temp ID (IN*)
+        company_id_text = df[company_id_col].astype(str).str.strip()
+        is_temp_id = company_id_text.str.upper().str.startswith("IN")
+        is_numeric_id = company_id_text.str.fullmatch(r"\d+").fillna(False)
+        valid_mask = df[company_id_col].notna() & is_numeric_id & ~is_temp_id
         valid_df = df[valid_mask].copy()
         stats["valid_records"] = len(valid_df)
 
         # Track skipped records
         null_count = df[company_id_col].isna().sum()
-        temp_id_count = (
-            df[company_id_col].notna()
-            & df[company_id_col].astype(str).str.startswith("IN_")
-        ).sum()
+        temp_id_count = (df[company_id_col].notna() & is_temp_id).sum()
 
         if null_count > 0:
             stats["skipped_by_reason"]["null_company_id"] = int(null_count)

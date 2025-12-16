@@ -576,6 +576,9 @@ class CompanyMappingRepository:
 
         # Single-statement INSERT ... SELECT with UNNEST to avoid executemany
         # and honor the partial unique index on normalized_name for pending/processing.
+        #
+        # NOTE: Avoid Postgres casts like ":param::text[]" because SQLAlchemy/psycopg2
+        # will treat ":" as a literal in the final SQL. Use typed bindparams instead.
         query = text(
             """
             INSERT INTO enterprise.enrichment_requests
@@ -587,12 +590,16 @@ class CompanyMappingRepository:
                 'pending' AS status,
                 NOW() AS created_at
             FROM unnest(
-                :raw_names::text[],
-                :normalized_names::text[],
-                :temp_ids::text[]
+                :raw_names,
+                :normalized_names,
+                :temp_ids
             ) AS t(raw_name, normalized_name, temp_id)
             ON CONFLICT DO NOTHING
             """
+        ).bindparams(
+            bindparam("raw_names", type_=ARRAY(TEXT)),
+            bindparam("normalized_names", type_=ARRAY(TEXT)),
+            bindparam("temp_ids", type_=ARRAY(TEXT)),
         )
 
         result = self.connection.execute(

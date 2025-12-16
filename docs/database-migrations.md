@@ -59,3 +59,55 @@ def test_pipeline_tables(test_db_with_migrations):
 2. **Adding migrations:** Place new scripts under `io/schema/migrations/versions/` using the timestamp naming convention. Keep Postgres-specific types (`JSONB`, `UUID`) but provide SQLite fallbacks using SQLAlchemy variants.
 3. **Testing:** Use `pytest -m integration tests/io/schema/test_migrations.py` to validate upgrades/downgrades locally.
 4. **Documentation:** Update this guide whenever new tooling, commands, or conventions are introduced.
+
+---
+
+## Legacy Database Migration (2025-12-16)
+
+> **重要变更**: Legacy MySQL 数据库已完全迁移至 PostgreSQL。
+
+### 迁移概况
+
+| 属性 | 旧值 | 新值 |
+|------|------|------|
+| 数据库类型 | MySQL | PostgreSQL |
+| 连接地址 | `192.168.0.200:5432/annuity` | `localhost:5432/legacy` |
+| 连接字符串 | _(已废弃)_ | `postgresql://postgres:Post.169828@localhost:5432/legacy` |
+
+### 配置变更
+
+在 `.wdh_env` 中添加了新的配置项：
+
+```ini
+# Target database (app code)
+WDH_DATABASE__URI=postgres://postgres:Post.169828@localhost:5432/postgres
+
+# Legacy database (migration scripts use this for reading source data)
+LEGACY_DATABASE__URI=postgres://postgres:Post.169828@localhost:5432/legacy
+```
+
+### Schema 映射
+
+Legacy 系统中的表现在位于 `legacy` 数据库的以下 schema：
+
+| Schema | 主要表 |
+|--------|--------|
+| `enterprise` | `company_id_mapping`, `eqc_search_result`, `annuity_account_mapping` |
+| `mapping` | `年金计划` |
+| `business` | `规模明细` |
+| `config` | 配置表 |
+| `customer` | 客户数据 |
+| `finance` | 财务数据 |
+
+### 受影响的脚本
+
+需要使用 `LEGACY_DATABASE__URI` 的脚本：
+
+- `scripts/migrations/enrichment_index/migrate_full_legacy_db.py`
+- `scripts/migrations/enrichment_index/migrate_plan_mapping.py`
+
+### 注意事项
+
+1. **双数据库模式**: 迁移脚本现在支持从 Legacy PostgreSQL 读取，写入到 Target PostgreSQL
+2. **Schema 变更**: 源表从 `legacy.*` 变更为 `enterprise.*`
+3. **环境变量**: 统一使用 `.wdh_env` 管理所有数据库配置，避免硬编码

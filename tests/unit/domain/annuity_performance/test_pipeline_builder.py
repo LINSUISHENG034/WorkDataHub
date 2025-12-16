@@ -261,3 +261,91 @@ class TestPipelineExecution:
 
         # Customer names should be preserved
         assert result_df.loc[0, "客户名称"] == "测试公司A"
+
+
+class TestAnnuityAccountNumberDerivation:
+    """Tests for 年金账户号 derivation from 集团企业客户号 (Story 6.2-P11).
+    
+    Verifies that Step 10 correctly copies the cleaned 集团企业客户号 value
+    to 年金账户号 before the legacy column is dropped.
+    """
+
+    @pytest.fixture
+    def context(self):
+        """Create pipeline context for testing."""
+        return make_context("test_pipeline")
+
+    def test_annuity_account_number_derived_correctly(self, context):
+        """集团企业客户号 'C12345' → 年金账户号 '12345'.
+        
+        Story 6.2-P11 T2.2: Verify the derivation chain:
+        1. Step 9: 集团企业客户号.lstrip('C') → '12345'
+        2. Step 10: 年金账户号 = 集团企业客户号.copy() → '12345'
+        """
+        df = pd.DataFrame({
+            "月度": ["202510"],
+            "计划代码": ["FP0001"],
+            "客户名称": ["测试公司"],
+            "业务类型": ["企年投资"],
+            "机构名称": ["北京"],
+            "集团企业客户号": ["C12345678"],  # Original value with "C" prefix
+        })
+
+        pipeline = build_bronze_to_silver_pipeline(
+            plan_override_mapping={"FP0001": "614810477"},
+        )
+        result_df = pipeline.execute(df, context)
+
+        # 年金账户号 should be derived from cleaned 集团企业客户号
+        assert "年金账户号" in result_df.columns
+        assert result_df.loc[0, "年金账户号"] == "12345678"
+
+        # 集团企业客户号 should be dropped (legacy column)
+        assert "集团企业客户号" not in result_df.columns
+
+    def test_annuity_account_number_handles_missing_column(self, context):
+        """Missing 集团企业客户号 → 年金账户号 is None.
+        
+        Story 6.2-P11 T2.2: Verify graceful handling when source column is missing.
+        """
+        df = pd.DataFrame({
+            "月度": ["202510"],
+            "计划代码": ["FP0001"],
+            "客户名称": ["测试公司"],
+            "业务类型": ["企年投资"],
+            "机构名称": ["北京"],
+            # 集团企业客户号 column intentionally missing
+        })
+
+        pipeline = build_bronze_to_silver_pipeline(
+            plan_override_mapping={"FP0001": "614810477"},
+        )
+        result_df = pipeline.execute(df, context)
+
+        # 年金账户号 column should exist but be None
+        assert "年金账户号" in result_df.columns
+        assert pd.isna(result_df.loc[0, "年金账户号"]) or result_df.loc[0, "年金账户号"] is None
+
+    def test_annuity_account_number_handles_null_values(self, context):
+        """集团企业客户号 with null → 年金账户号 is null.
+        
+        Verify that null/empty values are handled correctly.
+        """
+        df = pd.DataFrame({
+            "月度": ["202510", "202510"],
+            "计划代码": ["FP0001", "FP0002"],
+            "客户名称": ["测试公司A", "测试公司B"],
+            "业务类型": ["企年投资", "职年受托"],
+            "机构名称": ["北京", "上海"],
+            "集团企业客户号": ["C12345678", None],  # Mix of valid and null
+        })
+
+        pipeline = build_bronze_to_silver_pipeline(
+            plan_override_mapping={"FP0001": "614810477"},
+        )
+        result_df = pipeline.execute(df, context)
+
+        # First row should have valid value
+        assert result_df.loc[0, "年金账户号"] == "12345678"
+        # Second row should have null
+        assert pd.isna(result_df.loc[1, "年金账户号"])
