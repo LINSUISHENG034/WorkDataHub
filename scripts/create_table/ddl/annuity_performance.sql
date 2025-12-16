@@ -1,9 +1,9 @@
 -- Auto-generated baseline DDL (initial seed).
--- Entity: annuity_performance | Table: 规模明细
+-- Entity: annuity_performance | Table: business.规模明细
 
-DROP TABLE IF EXISTS "规模明细" CASCADE;
+DROP TABLE IF EXISTS business."规模明细" CASCADE;
 
-CREATE TABLE "规模明细" (
+CREATE TABLE business."规模明细" (
   "annuity_performance_id"    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 
   -- Core business fields (normalized)
@@ -37,16 +37,16 @@ CREATE TABLE "规模明细" (
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS "idx_规模明细_月度" ON "规模明细" ("月度");
-CREATE INDEX IF NOT EXISTS "idx_规模明细_计划代码" ON "规模明细" ("计划代码");
-CREATE INDEX IF NOT EXISTS "idx_规模明细_company_id" ON "规模明细" ("company_id");
-CREATE INDEX IF NOT EXISTS "idx_规模明细_机构代码" ON "规模明细" ("机构代码");
-CREATE INDEX IF NOT EXISTS "idx_规模明细_产品线代码" ON "规模明细" ("产品线代码");
-CREATE INDEX IF NOT EXISTS "idx_规模明细_年金账户号" ON "规模明细" ("年金账户号");
+CREATE INDEX IF NOT EXISTS "idx_规模明细_月度" ON business."规模明细" ("月度");
+CREATE INDEX IF NOT EXISTS "idx_规模明细_计划代码" ON business."规模明细" ("计划代码");
+CREATE INDEX IF NOT EXISTS "idx_规模明细_company_id" ON business."规模明细" ("company_id");
+CREATE INDEX IF NOT EXISTS "idx_规模明细_机构代码" ON business."规模明细" ("机构代码");
+CREATE INDEX IF NOT EXISTS "idx_规模明细_产品线代码" ON business."规模明细" ("产品线代码");
+CREATE INDEX IF NOT EXISTS "idx_规模明细_年金账户号" ON business."规模明细" ("年金账户号");
 
-CREATE INDEX IF NOT EXISTS "idx_规模明细_月度_计划代码" ON "规模明细" ("月度", "计划代码");
-CREATE INDEX IF NOT EXISTS "idx_规模明细_月度_company_id" ON "规模明细" ("月度", "company_id");
-CREATE INDEX IF NOT EXISTS "idx_规模明细_月度_计划代码_company_id" ON "规模明细" ("月度", "计划代码", "company_id");
+CREATE INDEX IF NOT EXISTS "idx_规模明细_月度_计划代码" ON business."规模明细" ("月度", "计划代码");
+CREATE INDEX IF NOT EXISTS "idx_规模明细_月度_company_id" ON business."规模明细" ("月度", "company_id");
+CREATE INDEX IF NOT EXISTS "idx_规模明细_月度_计划代码_company_id" ON business."规模明细" ("月度", "计划代码", "company_id");
 
 -- Trigger function
 CREATE OR REPLACE FUNCTION update_annuity_performance_updated_at()
@@ -59,7 +59,7 @@ $$ LANGUAGE plpgsql;
 
 -- Trigger
 CREATE TRIGGER trigger_update_annuity_performance_updated_at
-    BEFORE UPDATE ON "规模明细"
+    BEFORE UPDATE ON business."规模明细"
     FOR EACH ROW
     EXECUTE FUNCTION update_annuity_performance_updated_at();
 

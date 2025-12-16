@@ -20,6 +20,15 @@ from sqlalchemy.engine import Connection
 
 from .models import ForeignKeyConfig, BackfillColumnMapping
 
+# SQL Module (Story 6.2-P10)
+from work_data_hub.infrastructure.sql import (
+    qualify_table,
+    build_indexed_params,
+    remap_records,
+    PostgreSQLDialect,
+    InsertBuilder,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,6 +42,11 @@ class BackfillResult:
     total_skipped: int
     processing_time_seconds: float
     rows_per_second: Optional[float] = None
+
+
+def _qualified_table_name(config: ForeignKeyConfig) -> str:
+    """Get fully qualified table name with schema."""
+    return qualify_table(config.target_table, schema=config.target_schema)
 
 
 class GenericBackfillService:
@@ -324,7 +338,8 @@ class GenericBackfillService:
         # Build INSERT ... ON CONFLICT DO NOTHING query
         # This ensures idempotency by ignoring existing records
         columns = list(candidates_df.columns)
-        placeholders = [f":{col}" for col in columns]
+        # Use indexed parameter names to avoid issues with Chinese column names (Story 6.2-P10)
+        col_param_map, placeholders = build_indexed_params(columns)
 
         # Construct column list for conflict detection (primary key)
         conflict_columns = [config.target_key]
@@ -333,11 +348,12 @@ class GenericBackfillService:
         records = candidates_df.to_dict('records')
         pk_values = [record[config.target_key] for record in records]
         existing_keys: Set[Any] = set()
+        qualified_table = _qualified_table_name(config)
         if pk_values:
             pk_placeholders = ", ".join([f":pk_{i}" for i in range(len(pk_values))])
             existing_query = text(f"""
-                SELECT {config.target_key} FROM {config.target_table}
-                WHERE {config.target_key} IN ({pk_placeholders})
+                SELECT "{config.target_key}" FROM {qualified_table}
+                WHERE "{config.target_key}" IN ({pk_placeholders})
             """)
             existing_params = {f"pk_{i}": v for i, v in enumerate(pk_values)}
             existing_keys = {
@@ -346,44 +362,49 @@ class GenericBackfillService:
         new_keys = {str(v) for v in pk_values} - {str(v) for v in existing_keys}
 
         # Different syntax for different databases
+        # Use InsertBuilder for PostgreSQL (Story 6.2-P10 SQL Module)
         if conn.dialect.name == 'postgresql':
+            dialect = PostgreSQLDialect()
+            builder = InsertBuilder(dialect)
+            update_columns = [col for col in columns if col != config.target_key]
+
             if config.mode == "fill_null_only":
-                update_set = ", ".join(
-                    [
-                        f"{col} = CASE WHEN {config.target_table}.{col} IS NULL THEN EXCLUDED.{col} ELSE {config.target_table}.{col} END"
-                        for col in columns
-                        if col != config.target_key
-                    ]
+                query = builder.upsert(
+                    schema=config.target_schema,
+                    table=config.target_table,
+                    columns=columns,
+                    placeholders=placeholders,
+                    conflict_columns=conflict_columns,
+                    mode="do_update",
+                    update_columns=update_columns,
+                    null_guard=True,
                 )
-                query = f"""
-                    INSERT INTO {config.target_table} ({', '.join(columns)})
-                    VALUES ({', '.join(placeholders)})
-                    ON CONFLICT ({', '.join(conflict_columns)}) DO UPDATE
-                    SET {update_set}
-                """
             else:
-                query = f"""
-                    INSERT INTO {config.target_table} ({', '.join(columns)})
-                    VALUES ({', '.join(placeholders)})
-                    ON CONFLICT ({', '.join(conflict_columns)}) DO NOTHING
-                """
+                query = builder.upsert(
+                    schema=config.target_schema,
+                    table=config.target_table,
+                    columns=columns,
+                    placeholders=placeholders,
+                    conflict_columns=conflict_columns,
+                    mode="do_nothing",
+                )
         elif conn.dialect.name == 'mysql':
             if config.mode == "fill_null_only":
                 update_set = ", ".join(
                     [
-                        f"{col}=IF({col} IS NULL, VALUES({col}), {col})"
+                        f'`{col}`=IF(`{col}` IS NULL, VALUES(`{col}`), `{col}`)'
                         for col in columns
                         if col != config.target_key
                     ]
                 )
                 query = f"""
-                    INSERT INTO {config.target_table} ({', '.join(columns)})
+                    INSERT INTO {qualified_table} ({', '.join(f'"{c}"' for c in columns)})
                     VALUES ({', '.join(placeholders)})
                     ON DUPLICATE KEY UPDATE {update_set}
                 """
             else:
                 query = f"""
-                    INSERT INTO {config.target_table} ({', '.join(columns)})
+                    INSERT INTO {qualified_table} ({', '.join(f'"{c}"' for c in columns)})
                     VALUES ({', '.join(placeholders)})
                     ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)
                 """
@@ -391,8 +412,8 @@ class GenericBackfillService:
             # Generic approach - check existence first
             # This is slower but works across databases
             existing_query = f"""
-                SELECT {config.target_key} FROM {config.target_table}
-                WHERE {config.target_key} IN :primary_keys
+                SELECT "{config.target_key}" FROM {qualified_table}
+                WHERE "{config.target_key}" IN :primary_keys
             """
             existing_keys = {
                 row[0] for row in conn.execute(
@@ -411,7 +432,7 @@ class GenericBackfillService:
                     return 0
 
                 query = f"""
-                    INSERT INTO {config.target_table} ({', '.join(columns)})
+                    INSERT INTO {qualified_table} ({', '.join(f'"{c}"' for c in columns)})
                     VALUES ({', '.join(placeholders)})
                 """
             else:
@@ -419,7 +440,7 @@ class GenericBackfillService:
                 inserted = 0
                 if not new_records_df.empty:
                     insert_query = f"""
-                        INSERT INTO {config.target_table} ({', '.join(columns)})
+                        INSERT INTO {qualified_table} ({', '.join(f'"{c}"' for c in columns)})
                         VALUES ({', '.join(placeholders)})
                     """
                     records = new_records_df.to_dict('records')
@@ -443,7 +464,7 @@ class GenericBackfillService:
                         params[col] = value
                     if update_fragments:
                         update_query = f"""
-                            UPDATE {config.target_table}
+                            UPDATE {qualified_table}
                             SET {', '.join(update_fragments)}
                             WHERE {config.target_key} = :pk AND (
                                 {" OR ".join([f"{col} IS NULL" for col in params if col != 'pk'])}
@@ -455,8 +476,11 @@ class GenericBackfillService:
                 # Return combined count (inserted records only; updates are idempotent fills)
                 return inserted
 
+        # Remap record keys to indexed parameter names (Story 6.2-P10)
+        remapped_records = remap_records(records, col_param_map)
+        
         # Execute batch insert
-        result = conn.execute(text(query), records)
+        result = conn.execute(text(query), remapped_records)
         conn.commit()
 
         inserted_count = result.rowcount if hasattr(result, 'rowcount') else len(records)

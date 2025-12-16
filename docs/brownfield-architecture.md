@@ -159,6 +159,46 @@ work-data-hub/
 - `tests/legacy/`: Harness for comparing new outputs against `legacy/annuity_hub` datasets.
 - `tests/fixtures/`: Provides sample Excel files, mapping data, and eqc tokens for deterministic tests.
 
+### SQL Generation Module (`src/work_data_hub/infrastructure/sql/`)
+
+**Added:** Story 6.2-P10 (2025-12-16)
+
+Centralized SQL generation module providing consistent handling of:
+
+- **`core/`** - Base SQL builder classes, identifier quoting, parameter binding
+- **`dialects/`** - Database-specific syntax (PostgreSQL, MySQL)
+- **`operations/`** - Common SQL operations (INSERT, SELECT, UPDATE, UPSERT)
+
+**Design Principles:**
+
+1. **Consistent Identifier Handling**: All table/column names properly quoted, especially for Chinese characters
+2. **Schema Qualification**: Automatic `schema."table"` formatting
+3. **Dialect Abstraction**: Single interface for multiple database backends
+4. **Testability**: SQL generation testable without database connection
+
+**Usage Example:**
+
+```python
+from work_data_hub.infrastructure.sql import PostgreSQLDialect, InsertBuilder
+
+dialect = PostgreSQLDialect()
+builder = InsertBuilder(dialect)
+sql = builder.upsert(
+    schema="mapping",
+    table="年金计划",
+    columns=["年金计划号", "计划全称"],
+    conflict_columns=["年金计划号"]
+)
+# Output: INSERT INTO mapping."年金计划" ("年金计划号", "计划全称")
+#         VALUES (:col_0, :col_1) ON CONFLICT ("年金计划号") DO NOTHING
+```
+
+**Files Using This Module:**
+
+- `domain/reference_backfill/generic_service.py` - Primary consumer
+- `infrastructure/enrichment/*_repository.py` - Repository layer (future migration)
+- `io/loader/warehouse_loader.py` - Data loading (future migration)
+
 -----
 
 ## Data Models and APIs

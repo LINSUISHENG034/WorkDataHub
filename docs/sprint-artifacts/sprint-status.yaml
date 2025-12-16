@@ -162,7 +162,7 @@ development_status:
   6.1-4-legacy-data-migration: done  # Migrate existing data to enrichment_index
   epic-6.1-retrospective: completed  # 2025-12-08 - Action items: Production migration, Golden Dataset tests
 
-  # Epic 6.2: Generic Reference Data Management - COMPLETED
+  # Epic 6.2: Generic Reference Data Management - IN PROGRESS
   # Added 2025-12-12 via Correct-Course workflow, Approved 2025-12-12 by PM
   # Hybrid strategy: Pre-load (authoritative) + On-demand backfill (auto-derived)
   # Addresses FK constraint violations for 产品线 and 组织架构 tables
@@ -171,7 +171,9 @@ development_status:
   # Verification: scripts/validation/verify_backfill_integrated.py (6/6 tests passed)
   # Retrospective completed 2025-12-13, identified real data validation gaps
   # Reference: docs/sprint-artifacts/retrospective/epic-6.2-retro-2025-12-13.md
-  epic-6.2: done
+  # STATUS REVERTED 2025-12-16: Story 6.2-P6 validation revealed backfill bugs (I001-I006)
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-16-etl-backfill-sql-module.md
+  epic-6.2: in-progress
   6.2-1-generic-backfill-framework-core: done  # Configuration-driven generic backfill framework - Completed 2025-12-12
   6.2-2-reference-table-schema-enhancement: done  # Add _source, _needs_review tracking fields - Reviewed & Fixed 2025-12-12
   6.2-3-fk-configuration-schema-extension: done  # FK configuration validation & documentation - Reviewed & Done 2025-12-12
@@ -231,6 +233,13 @@ development_status:
   # SM Review: 2025-12-15 - Validation passed, 3 critical + 4 medium + 3 low issues fixed
   # Code Review: 2025-12-15 - Adversarial review passed, 2 HIGH + 4 MEDIUM + 2 LOW issues fixed
   6.2-p9-raw-data-cleansing-transformation: done  # Cleansing: raw JSONB → normalized tables - Code Review PASSED 2025-12-15
+  # Story 6.2-P10: ETL Backfill Bug Fixes & SQL Module Architecture
+  # Added 2025-12-16 via Correct-Course workflow
+  # Fixes: I001-I006 issues discovered during 6.2-P6 CLI validation
+  # Enhancement: Establish infrastructure/sql/ module for centralized SQL generation
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-16-etl-backfill-sql-module.md
+  # Code Review: 2025-12-16 - Adversarial review passed, InsertBuilder refactored, pre-existing test issues documented
+  6.2-p10-etl-backfill-sql-module: done  # Bug fixes + SQL module architecture - Code Review PASSED 2025-12-16
 
   # Epic 7: Testing & Validation Infrastructure
   epic-7: backlog

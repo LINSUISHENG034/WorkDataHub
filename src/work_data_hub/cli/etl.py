@@ -97,7 +97,10 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:
         else:
             table = domain_config.get("table", domain)  # Legacy fallback
 
-        pk = domain_config.get("pk", [])  # Empty list if not defined
+        pk = domain_config.get("pk", [])  # Legacy fallback
+        # Epic 3 schema: pk in output section takes precedence
+        if isinstance(output_cfg, dict) and "pk" in output_cfg:
+            pk = output_cfg["pk"]
 
         # Runtime override via --pk (only affects delete_insert mode)
         pk_override = _parse_pk_override(getattr(args, "pk", None))
@@ -163,7 +166,7 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:
             "config": {
                 "domain": domain,
                 "plan_only": effective_plan_only,
-                "add_tracking_fields": True,
+                "add_tracking_fields": False,  # mapping schema tables don't have tracking fields
             }
         }
 

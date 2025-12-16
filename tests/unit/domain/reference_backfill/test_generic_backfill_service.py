@@ -304,9 +304,12 @@ class TestBackfillTable:
         # Mock connection - use MagicMock to allow dialect attribute
         mock_conn = MagicMock()
         mock_conn.dialect.name = "postgresql"
-        mock_result = Mock()
-        mock_result.rowcount = 2
-        mock_conn.execute.return_value = mock_result
+        # Mock two execute calls: 1. check existing keys 2. insert
+        mock_existing_result = Mock()
+        mock_existing_result.fetchall.return_value = []  # No existing keys
+        mock_insert_result = Mock()
+        mock_insert_result.rowcount = 2
+        mock_conn.execute.side_effect = [mock_existing_result, mock_insert_result]
 
         candidates_df = pd.DataFrame([
             {"primary_key": "key1", "value": "value1", "_source": "auto_derived"},
@@ -316,9 +319,10 @@ class TestBackfillTable:
         inserted = service.backfill_table(candidates_df, config, mock_conn, add_tracking_fields=False)
 
         assert inserted == 2
-        mock_conn.execute.assert_called_once()
-        call_args = mock_conn.execute.call_args
-        assert "ON CONFLICT (primary_key) DO NOTHING" in call_args[0][0].text
+        assert mock_conn.execute.call_count == 2
+        # Second call should be the INSERT
+        call_args = mock_conn.execute.call_args_list[1]
+        assert "ON CONFLICT" in str(call_args[0][0]) and "DO NOTHING" in str(call_args[0][0])
 
     def test_generic_insert_with_existing_records(self):
         """Test generic insert with existing record filtering."""
@@ -339,9 +343,11 @@ class TestBackfillTable:
         mock_conn = MagicMock()
         mock_conn.dialect.name = "sqlite"  # Not postgresql or mysql
         mock_conn.execute.side_effect = [
-            # First call: check existing keys - use tuple since row[0] is accessed
+            # First call: check existing keys (for new_keys tracking)
             Mock(fetchall=lambda: [("key1",)]),
-            # Second call: actual insert
+            # Second call: check existing keys again (for generic filter)
+            Mock(fetchall=lambda: [("key1",)]),
+            # Third call: actual insert
             Mock(rowcount=1)
         ]
 
@@ -353,7 +359,7 @@ class TestBackfillTable:
         inserted = service.backfill_table(candidates_df, config, mock_conn, add_tracking_fields=False)
 
         assert inserted == 1  # Only key2 should be inserted
-        assert mock_conn.execute.call_count == 2
+        assert mock_conn.execute.call_count == 3
 
 
 class TestGenericBackfillServiceIntegration:
@@ -366,7 +372,12 @@ class TestGenericBackfillServiceIntegration:
         # Mock connection - use MagicMock to allow dialect attribute
         mock_conn = MagicMock()
         mock_conn.dialect.name = "postgresql"
-        mock_conn.execute.return_value = Mock(rowcount=1)
+        # Mock execute to return empty existing keys then insert result
+        mock_existing = Mock()
+        mock_existing.fetchall.return_value = []
+        mock_insert = Mock()
+        mock_insert.rowcount = 1
+        mock_conn.execute.side_effect = [mock_existing, mock_insert, mock_existing, mock_insert]
 
         # Create configurations with dependencies
         fk_plan = ForeignKeyConfig(
@@ -452,7 +463,12 @@ class TestGenericBackfillServiceIntegration:
 
         mock_conn = MagicMock()
         mock_conn.dialect.name = "postgresql"
-        mock_conn.execute.return_value = Mock(rowcount=2)
+        # Mock two execute calls: 1. check existing keys 2. insert
+        mock_existing_result = Mock()
+        mock_existing_result.fetchall.return_value = []
+        mock_insert_result = Mock()
+        mock_insert_result.rowcount = 2
+        mock_conn.execute.side_effect = [mock_existing_result, mock_insert_result]
 
         candidates_df = pd.DataFrame(
             [

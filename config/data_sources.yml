@@ -82,6 +82,12 @@ domains:
     output:
       table: "规模明细"
       schema_name: "business"
+      # Primary key for delete_insert mode (matches GOLD_COMPOSITE_KEY in schemas.py)
+      pk:
+        - "月度"
+        - "计划代码"
+        - "组合代码"
+        - "company_id"
 
     # Foreign key backfill configuration for reference data management
     # Schema Version: 1.0 (backward compatible addition)
@@ -99,7 +105,7 @@ domains:
           - source: "计划代码"
             target: "年金计划号"
           - source: "计划名称"
-            target: "计划名称"
+            target: "计划全称"  # Fixed: actual column name
             optional: true
           - source: "计划类型"
             target: "计划类型"
@@ -114,7 +120,7 @@ domains:
             target: "主拓机构"
             optional: true
           - source: "资格"
-            target: "资格"
+            target: "管理资格"  # Fixed: actual column name
             optional: true
 
       # 组合计划 (Portfolio Plan) reference table backfill
@@ -203,6 +209,12 @@ domains:
     output:
       table: "收入明细"
       schema_name: "business"
+      # Primary key for delete_insert mode (matches GOLD_COMPOSITE_KEY in schemas.py)
+      pk:
+        - "月度"
+        - "计划号"
+        - "组合代码"
+        - "company_id"
 
   # Future domains (Epic 9) can be added here:
   # universal_insurance:
