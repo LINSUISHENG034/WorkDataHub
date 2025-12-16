@@ -196,6 +196,7 @@ docs/sprint*.md
 
 # BMAD (Build, Manage, Analyze, Deploy)
 # bmad/
+# _bmad/
 # .bmad/
 # .bmad-core/
 # .bmad-*/
