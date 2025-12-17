@@ -68,6 +68,140 @@ from guimo_iter_report_generator import (
 
 
 # =============================================================================
+# Auto-Discovery (Epic 3: Version-Aware File Discovery)
+# =============================================================================
+
+
+def discover_source_file(month: str, domain: str = "annuity_performance") -> tuple:
+    """
+    Discover source file using New Pipeline's FileDiscoveryService.
+
+    Args:
+        month: Month in YYYYMM format (e.g., '202311')
+        domain: Domain name for file discovery config
+
+    Returns:
+        Tuple of (file_path, sheet_name)
+
+    Raises:
+        SystemExit: If discovery fails
+    """
+    import re
+
+    # Validate month format
+    if not re.match(r'^\d{6}$', month):
+        print(f"❌ Invalid month format: {month}")
+        print("   Expected format: YYYYMM (e.g., 202311)")
+        sys.exit(1)
+
+    try:
+        from work_data_hub.io.connectors.file_connector import FileDiscoveryService
+
+        print(f"🔍 Auto-discovering source file for month {month}...")
+        discovery_service = FileDiscoveryService()
+        result = discovery_service.discover_file(
+            domain=domain,
+            month=month,  # Note: template var is 'month' not 'YYYYMM'
+        )
+
+        print(f"   ✓ Discovered: {result.file_path.name}")
+        print(f"   ✓ Version: {result.version}")
+        print(f"   ✓ Sheet: {result.sheet_name}")
+
+        return str(result.file_path), result.sheet_name
+
+    except Exception as e:
+        print(f"❌ Auto-discovery failed: {e}")
+        print(f"\n💡 Please specify the file path manually:")
+        print(f"   python guimo_iter_cleaner_compare.py <excel_path> --limit 100")
+        sys.exit(1)
+
+
+# =============================================================================
+# Token Validation (Story 6.2-P11: Auto-refresh for validation scripts)
+# =============================================================================
+
+
+def _validate_and_refresh_token(auto_refresh: bool = True) -> bool:
+    """
+    Validate EQC token at script startup and auto-refresh if invalid.
+
+    Replicates the token validation logic from cli/etl.py (Story 6.2-P11).
+
+    Args:
+        auto_refresh: If True, auto-refresh token when validation fails.
+
+    Returns:
+        True if token is valid (or was successfully refreshed), False otherwise.
+    """
+    import os
+
+    from work_data_hub.config.settings import get_settings
+    from work_data_hub.infrastructure.enrichment.eqc_provider import validate_eqc_token
+
+    try:
+        settings = get_settings()
+        token = settings.eqc_token
+        base_url = settings.eqc_base_url
+
+        if not token:
+            print("⚠️  No EQC token configured (WDH_EQC_TOKEN not set)")
+            if not auto_refresh:
+                print("   Continuing without token (EQC lookup will be disabled)")
+                return True
+            print("   Attempting to refresh token via QR login...")
+            return _trigger_token_refresh()
+
+        # Validate existing token
+        print("🔐 Validating EQC token...", end=" ", flush=True)
+        if validate_eqc_token(token, base_url):
+            print("✅ Token valid")
+            return True
+
+        # Token is invalid
+        print("❌ Token invalid/expired")
+
+        if not auto_refresh:
+            print("⚠️  Auto-refresh disabled (--no-auto-refresh-token)")
+            print("   Run: python -m work_data_hub.cli auth refresh")
+            return True  # Continue without valid token
+
+        print("   Attempting to refresh token via QR login...")
+        return _trigger_token_refresh()
+
+    except Exception as e:
+        print(f"⚠️  Token validation error: {e}")
+        return True  # Continue anyway to avoid blocking script
+
+
+def _trigger_token_refresh() -> bool:
+    """Trigger automatic token refresh via QR login."""
+    import os
+
+    try:
+        from work_data_hub.io.auth.auto_eqc_auth import run_get_token_auto_qr
+
+        token = run_get_token_auto_qr(save_to_env=True, timeout_seconds=180)
+        if token:
+            print("✅ Token refreshed successfully")
+            os.environ["WDH_EQC_TOKEN"] = token
+            try:
+                from work_data_hub.config.settings import get_settings
+
+                get_settings.cache_clear()
+            except Exception:
+                pass
+            return True
+        else:
+            print("❌ Token refresh failed")
+            print("   Please run manually: python -m work_data_hub.cli auth refresh")
+            return False
+    except Exception as e:
+        print(f"❌ Token refresh error: {e}")
+        return False
+
+
+# =============================================================================
 # Cleaner Executors
 # =============================================================================
 
@@ -113,6 +247,18 @@ def run_legacy_cleaner(
     cleaner = AnnuityPerformanceCleaner(excel_path, sheet_name=sheet_name)
     df = cleaner.clean()
 
+    # Validate that Legacy cleaner returned data
+    if len(df) == 0:
+        print(f"\n❌ Legacy Cleaner returned 0 rows!")
+        print(f"   This usually indicates an internal cleaner error.")
+        print(f"   Check the log output above for 'Error in class AnnuityPerformanceCleaner'.")
+        print(f"\n💡 Options:")
+        print(f"   1. Check if the Excel file contains the expected columns")
+        print(f"   2. Use --new-only mode to skip Legacy comparison:")
+        print(f"      python guimo_iter_cleaner_compare.py <excel_path> --new-only")
+        print("")
+        raise RuntimeError("Legacy cleaner returned empty DataFrame - internal error")
+
     if row_limit and row_limit > 0:
         df = df.head(row_limit)
 
@@ -124,7 +270,7 @@ def run_new_pipeline(
     sheet_name: str,
     row_limit: Optional[int] = None,
     enable_enrichment: bool = False,
-    sync_lookup_budget: int = 50,
+    sync_lookup_budget: int = 1000,
 ) -> pd.DataFrame:
     """
     Execute New Pipeline cleaner with full company ID resolution.
@@ -134,7 +280,7 @@ def run_new_pipeline(
         sheet_name: Sheet name to process
         row_limit: Optional row limit for iteration
         enable_enrichment: Whether to enable EQC enrichment service (default: False)
-        sync_lookup_budget: Budget for EQC sync lookups (default: 50)
+        sync_lookup_budget: Budget for EQC sync lookups (default: 1000)
 
     Returns:
         Cleaned DataFrame from New Pipeline
@@ -155,43 +301,71 @@ def run_new_pipeline(
     # Load plan override mapping from YAML
     plan_override_mapping = load_plan_override_mapping()
 
-    # Get mapping repository for database cache lookup
-    mapping_repository = None
-    enrichment_service = None
+    # Enable DB cache lookups whenever possible (independent of EQC enrichment).
+    # EQC sync lookups are controlled by enable_enrichment + sync_lookup_budget.
+    settings = get_settings()
+    engine = None
 
-    if enable_enrichment:
-        try:
-            from work_data_hub.infrastructure.database.connection import get_engine
-            from work_data_hub.infrastructure.enrichment.mapping_repository import (
-                CompanyMappingRepository,
-            )
+    try:
+        from sqlalchemy import create_engine
 
-            engine = get_engine()
-            mapping_repository = CompanyMappingRepository(engine)
-            print(f"   ✓ Database mapping repository enabled")
-        except Exception as e:
-            print(f"   ⚠️ Database connection failed: {e}")
+        engine = create_engine(settings.get_database_connection_string())
+    except Exception as e:
+        print(f"   ⚠️ Database engine init failed (DB cache disabled): {e}")
 
-    # Build pipeline with full company ID resolution support
-    pipeline = build_bronze_to_silver_pipeline(
-        enrichment_service=enrichment_service,  # EQC via eqc_provider auto-creation
-        plan_override_mapping=plan_override_mapping,
-        sync_lookup_budget=sync_lookup_budget if enable_enrichment else 0,
-        mapping_repository=mapping_repository,
+    if engine is None:
+        pipeline = build_bronze_to_silver_pipeline(
+            enrichment_service=None,
+            plan_override_mapping=plan_override_mapping,
+            sync_lookup_budget=sync_lookup_budget if enable_enrichment else 0,
+            mapping_repository=None,
+        )
+
+        context = PipelineContext(
+            pipeline_name="cleaner_comparison",
+            execution_id=f"compare-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+            timestamp=datetime.now(timezone.utc),
+            config={},
+            domain="annuity_performance",
+            run_id="compare",
+            extra={},
+        )
+
+        return pipeline.execute(raw_df.copy(), context)
+
+    from work_data_hub.infrastructure.enrichment.mapping_repository import (
+        CompanyMappingRepository,
     )
 
-    # Create context
-    context = PipelineContext(
-        pipeline_name="cleaner_comparison",
-        execution_id=f"compare-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
-        timestamp=datetime.now(timezone.utc),
-        config={},
-        domain="annuity_performance",
-        run_id="compare",
-        extra={},
-    )
+    # Keep the connection open for the whole pipeline execution (CompanyMappingRepository owns a Connection).
+    with engine.connect() as conn:
+        mapping_repository = CompanyMappingRepository(conn)
+        print("   ✓ Database mapping repository enabled (enterprise.enrichment_index)")
 
-    return pipeline.execute(raw_df.copy(), context)
+        pipeline = build_bronze_to_silver_pipeline(
+            enrichment_service=None,
+            plan_override_mapping=plan_override_mapping,
+            sync_lookup_budget=sync_lookup_budget if enable_enrichment else 0,
+            mapping_repository=mapping_repository,
+        )
+
+        context = PipelineContext(
+            pipeline_name="cleaner_comparison",
+            execution_id=f"compare-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+            timestamp=datetime.now(timezone.utc),
+            config={},
+            domain="annuity_performance",
+            run_id="compare",
+            extra={},
+        )
+
+        result_df = pipeline.execute(raw_df.copy(), context)
+
+        # CRITICAL: Commit to persist EQC cache writes to database
+        # Without this, all insert_enrichment_index_batch calls are rolled back!
+        conn.commit()
+
+        return result_df
 
 
 # =============================================================================
@@ -255,6 +429,9 @@ def compare_numeric_fields(
     """
     diffs: List[NumericDiff] = []
 
+    # Excel row offset: +1 for 0-based index, +1 for header row = +2
+    EXCEL_ROW_OFFSET = 2
+
     # Row alignment is foundational for row-by-row comparison.
     if len(legacy_df) != len(new_df):
         diffs.append(
@@ -310,7 +487,7 @@ def compare_numeric_fields(
             if legacy_invalid or new_invalid:
                 invalid_examples.append(
                     {
-                        "row": idx,
+                        "row": idx + EXCEL_ROW_OFFSET,
                         "legacy_raw": "" if _is_blank_value(legacy_raw) else str(legacy_raw),
                         "new_raw": "" if _is_blank_value(new_raw) else str(new_raw),
                     }
@@ -323,7 +500,7 @@ def compare_numeric_fields(
             if legacy_val != new_val:
                 mismatch_examples.append(
                     {
-                        "row": idx,
+                        "row": idx + EXCEL_ROW_OFFSET,
                         "legacy_value": str(legacy_val),
                         "new_value": str(new_val),
                     }
@@ -368,6 +545,9 @@ def compare_derived_fields(
     """
     diffs: List[DerivedDiff] = []
 
+    # Excel row offset: +1 for 0-based index, +1 for header row = +2
+    EXCEL_ROW_OFFSET = 2
+
     for col in DERIVED_FIELDS:
         if col not in legacy_df.columns or col not in new_df.columns:
             continue
@@ -387,7 +567,7 @@ def compare_derived_fields(
         if diff_indices:
             examples = [
                 {
-                    "row": idx,
+                    "row": idx + EXCEL_ROW_OFFSET,
                     "legacy_value": legacy_vals.iloc[idx],
                     "new_value": new_vals.iloc[idx],
                 }
@@ -474,6 +654,9 @@ def compare_upgrade_fields(
     """
     diffs: List[UpgradeDiff] = []
 
+    # Excel row offset: +1 for 0-based index, +1 for header row = +2
+    EXCEL_ROW_OFFSET = 2
+
     # Company ID comparison
     if "company_id" in legacy_df.columns and "company_id" in new_df.columns:
         min_len = min(len(legacy_df), len(new_df))
@@ -489,7 +672,7 @@ def compare_upgrade_fields(
                 diffs.append(
                     UpgradeDiff(
                         field="company_id",
-                        row=idx,
+                        row=idx + EXCEL_ROW_OFFSET,
                         legacy_value=legacy_val,
                         new_value=new_val,
                         classification=classification,
@@ -512,7 +695,7 @@ def compare_upgrade_fields(
                 diffs.append(
                     UpgradeDiff(
                         field="客户名称",
-                        row=idx,
+                        row=idx + EXCEL_ROW_OFFSET,
                         legacy_value=legacy_val[:50],  # Truncate for readability
                         new_value=new_val[:50],
                         classification=classification,
@@ -532,6 +715,7 @@ def run_comparison(
     sheet_name: str = DEFAULT_SHEET_NAME,
     row_limit: int = DEFAULT_ROW_LIMIT,
     enable_enrichment: bool = False,
+    sync_lookup_budget: int = 1000,
     save_debug: bool = False,
     run_id: Optional[str] = None,
 ) -> tuple:
@@ -543,6 +727,7 @@ def run_comparison(
         sheet_name: Sheet name to process
         row_limit: Row limit for iteration (0 = no limit)
         enable_enrichment: Whether to enable EQC enrichment
+        sync_lookup_budget: Budget for EQC sync lookups (default: 1000)
         save_debug: Whether to save debug snapshots
         run_id: Optional run ID (timestamp) for output directory
 
@@ -560,7 +745,9 @@ def run_comparison(
     legacy_df = run_legacy_cleaner(excel_path, sheet_name, row_limit)
 
     print(f"🔄 Running New Pipeline...")
-    new_df = run_new_pipeline(excel_path, sheet_name, row_limit, enable_enrichment)
+    new_df = run_new_pipeline(
+        excel_path, sheet_name, row_limit, enable_enrichment, sync_lookup_budget
+    )
 
     # Save debug snapshots if requested
     if save_debug:
@@ -606,25 +793,29 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Basic comparison with 100 row limit
+  # Auto-discovery mode (recommended) - automatically finds correct file version
+  python guimo_iter_cleaner_compare.py --month 202311 --limit 100
+
+  # Manual mode - specify file path directly
   python guimo_iter_cleaner_compare.py data/202412_annuity.xlsx --limit 100
 
-  # Full dataset comparison
-  python guimo_iter_cleaner_compare.py data/202412_annuity.xlsx --limit 0
+  # Full dataset comparison with auto-discovery
+  python guimo_iter_cleaner_compare.py --month 202311 --limit 0 --enrichment --export
 
   # New Pipeline only (no Legacy dependencies needed)
-  python guimo_iter_cleaner_compare.py data/202412_annuity.xlsx --new-only --debug
-
-  # With debug snapshots
-  python guimo_iter_cleaner_compare.py data/202412_annuity.xlsx --limit 100 --debug
-
-  # Export reports
-  python guimo_iter_cleaner_compare.py data/202412_annuity.xlsx --limit 100 --export
+  python guimo_iter_cleaner_compare.py --month 202311 --new-only --debug
         """,
     )
     parser.add_argument(
         "excel_path",
-        help="Path to Excel file containing source data",
+        nargs="?",
+        default=None,
+        help="Path to Excel file (optional if --month is used)",
+    )
+    parser.add_argument(
+        "--month",
+        type=str,
+        help="Month in YYYYMM format for auto-discovery (e.g., 202311)",
     )
     parser.add_argument(
         "--sheet",
@@ -657,14 +848,45 @@ Examples:
         action="store_true",
         help="Run only New Pipeline (skip Legacy, no comparison)",
     )
+    parser.add_argument(
+        "--no-auto-refresh-token",
+        action="store_true",
+        help="Disable automatic token refresh when --enrichment is enabled",
+    )
+    parser.add_argument(
+        "--sync-budget",
+        type=int,
+        default=1000,
+        help="EQC sync lookup budget (default: 1000, 0 = disabled)",
+    )
 
     args = parser.parse_args()
 
-    # Verify input file exists
-    excel_path = Path(args.excel_path)
-    if not excel_path.exists():
-        print(f"❌ Error: File not found: {excel_path}")
+    # Determine file source: auto-discovery or manual path
+    sheet_name = args.sheet
+    if args.month:
+        # Auto-discovery mode
+        excel_path_str, discovered_sheet = discover_source_file(args.month)
+        excel_path = Path(excel_path_str)
+        # Use discovered sheet unless user explicitly specified one
+        if args.sheet == DEFAULT_SHEET_NAME:
+            sheet_name = discovered_sheet
+    elif args.excel_path:
+        # Manual mode
+        excel_path = Path(args.excel_path)
+        if not excel_path.exists():
+            print(f"❌ Error: File not found: {excel_path}")
+            sys.exit(1)
+    else:
+        print("❌ Error: Either --month or excel_path is required")
+        print("   Usage: python guimo_iter_cleaner_compare.py --month 202311")
+        print("   Or:    python guimo_iter_cleaner_compare.py <file_path>")
         sys.exit(1)
+
+    # Token validation: only when --enrichment is requested
+    if args.enrichment:
+        auto_refresh = not getattr(args, "no_auto_refresh_token", False)
+        _validate_and_refresh_token(auto_refresh=auto_refresh)
 
     # Generate run_id for this execution
     run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -674,9 +896,10 @@ Examples:
         print(f"🔄 Running New Pipeline only (--new-only mode)...")
         new_df = run_new_pipeline(
             excel_path=str(excel_path),
-            sheet_name=args.sheet,
+            sheet_name=sheet_name,
             row_limit=args.limit,
             enable_enrichment=args.enrichment,
+            sync_lookup_budget=args.sync_budget,
         )
         print(f"\n✅ New Pipeline completed:")
         print(f"   Rows: {len(new_df)}")
@@ -695,9 +918,10 @@ Examples:
 
     report, run_id = run_comparison(
         excel_path=str(excel_path),
-        sheet_name=args.sheet,
+        sheet_name=sheet_name,
         row_limit=args.limit,
         enable_enrichment=args.enrichment,
+        sync_lookup_budget=args.sync_budget,
         save_debug=args.debug,
         run_id=run_id,
     )

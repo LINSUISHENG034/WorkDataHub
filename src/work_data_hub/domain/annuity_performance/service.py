@@ -184,21 +184,20 @@ def process_with_enrichment(
 
     mapping_repository: Optional[CompanyMappingRepository] = None
     repo_connection = None
-    if enrichment_service is not None:
-        try:
-            from sqlalchemy import create_engine
+    try:
+        from sqlalchemy import create_engine
 
-            settings = get_settings()
-            engine = create_engine(settings.get_database_connection_string())
-            repo_connection = engine.connect()
-            mapping_repository = CompanyMappingRepository(repo_connection)
-        except Exception as e:
-            logger.bind(domain="annuity_performance", step="mapping_repository").warning(
-                "Failed to initialize CompanyMappingRepository; proceeding without DB cache",
-                error=str(e),
-            )
-            mapping_repository = None
-            repo_connection = None
+        settings = get_settings()
+        engine = create_engine(settings.get_database_connection_string())
+        repo_connection = engine.connect()
+        mapping_repository = CompanyMappingRepository(repo_connection)
+    except Exception as e:
+        logger.bind(domain="annuity_performance", step="mapping_repository").warning(
+            "Failed to initialize CompanyMappingRepository; proceeding without DB cache",
+            error=str(e),
+        )
+        mapping_repository = None
+        repo_connection = None
 
     try:
         pipeline = build_bronze_to_silver_pipeline(

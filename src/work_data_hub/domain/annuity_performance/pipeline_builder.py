@@ -156,7 +156,14 @@ class CompanyIdResolutionStep(TransformStep):
             mapping_repository=mapping_repository,
         )
         self._sync_lookup_budget = sync_lookup_budget
-        self._use_enrichment = enrichment_service is not None
+        # Enable EQC lookup if:
+        # 1. enrichment_service is provided (legacy), OR
+        # 2. sync_lookup_budget > 0 and mapping_repository is available
+        #    (CompanyIdResolver auto-creates eqc_provider in this case)
+        self._use_enrichment = (
+            enrichment_service is not None
+            or (sync_lookup_budget > 0 and mapping_repository is not None)
+        )
 
     @property
     def name(self) -> str:

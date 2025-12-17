@@ -365,6 +365,25 @@ class CompanyIdResolver:
                 budget_remaining=budget_remaining,
             )
 
+        # Step 4.5: Default fallback for empty customer_name (Legacy compatibility)
+        # From legacy data_cleaner.py lines 215-217: when company_id is empty AND
+        # customer_name is empty, use hardcoded default '600866980'
+        mask_missing = result_df[strategy.output_column].isna()
+        customer_name_col = strategy.customer_name_column
+        mask_empty_customer = mask_missing & (
+            result_df[customer_name_col].isna() |
+            (result_df[customer_name_col].astype(str).str.strip() == "")
+        )
+        if mask_empty_customer.any():
+            result_df.loc[mask_empty_customer, strategy.output_column] = "600866980"
+            stats.default_fallback_hits = int(mask_empty_customer.sum())
+            resolution_mask |= mask_empty_customer
+
+            logger.debug(
+                "company_id_resolver.default_fallback_applied",
+                count=stats.default_fallback_hits,
+            )
+
         # Step 5: Generate temp IDs for remaining (vectorized apply)
         mask_still_missing = result_df[strategy.output_column].isna()
         temp_id_indices: List[int] = []
@@ -667,9 +686,10 @@ class CompanyIdResolver:
                 record = results.get((lookup_type, key))
                 if isinstance(record, EnrichmentIndexRecord):
                     company_id = str(record.company_id).strip()
-                    # Treat non-numeric cache entries as invalid (e.g., legacy placeholder 'N').
-                    # If invalid, keep searching lower-priority keys for a usable mapping.
-                    if not company_id.isdigit():
+                    # Validate cache entries: reject obvious placeholders like 'N' or empty values,
+                    # but accept alphanumeric IDs like '602671512X' (special customer IDs).
+                    # Valid format: at least 5 chars starting with digit (e.g., '602671512X')
+                    if not company_id or len(company_id) < 5 or not company_id[0].isdigit():
                         path_segments.append(f"{label}:INVALID")
                         continue
                     resolved.loc[idx] = company_id

@@ -138,6 +138,9 @@ class ResolutionStatistics:
     # Story 6.5: Async queue statistics
     async_queued: int = 0
 
+    # Legacy compatibility: default fallback for empty customer_name
+    default_fallback_hits: int = 0
+
     # Story 6.1.3: Domain learning statistics
     domain_learning_stats: Dict[str, Any] = field(default_factory=dict)
 
@@ -178,6 +181,7 @@ class ResolutionStatistics:
             "unresolved": self.unresolved,
             "backflow": self.backflow_stats,
             "async_queued": self.async_queued,
+            "default_fallback_hits": self.default_fallback_hits,
             "domain_learning": self.domain_learning_stats,
             # Backward compatibility
             "plan_override_hits": self.yaml_hits.get("plan", self.plan_override_hits),

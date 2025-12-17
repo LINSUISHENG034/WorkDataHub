@@ -402,6 +402,21 @@ class EQCClient:
             response = self._make_request("GET", url, params=params)
             data = response.json()
 
+            # Check for TokenExpired error in response body
+            if "error" in data:
+                error_msg = data.get("error", "")
+                if error_msg == "TokenExpired":
+                    logger.error(
+                        "EQC token expired (detected in response body)",
+                        extra={"query": cleaned_name, "error": error_msg},
+                    )
+                    raise EQCAuthenticationError("EQC token expired")
+                else:
+                    logger.warning(
+                        "EQC API returned error in response body",
+                        extra={"query": cleaned_name, "error": error_msg},
+                    )
+
             # Parse response based on EQC API structure
             # From legacy code: response contains 'list' array with results
             results_list = data.get("list", [])
@@ -507,6 +522,22 @@ class EQCClient:
             # Make the API request
             response = self._make_request("GET", url, params=params)
             data = response.json()
+
+            # Check for TokenExpired error in response body
+            # EQC API may return 200 OK with error in body
+            if "error" in data:
+                error_msg = data.get("error", "")
+                if error_msg == "TokenExpired":
+                    logger.error(
+                        "EQC token expired (detected in response body)",
+                        extra={"query": cleaned_name, "error": error_msg},
+                    )
+                    raise EQCAuthenticationError("EQC token expired")
+                else:
+                    logger.warning(
+                        "EQC API returned error in response body",
+                        extra={"query": cleaned_name, "error": error_msg},
+                    )
 
             # Parse response based on EQC API structure
             results_list = data.get("list", [])

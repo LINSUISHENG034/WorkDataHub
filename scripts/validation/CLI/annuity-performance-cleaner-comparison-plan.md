@@ -1,8 +1,8 @@
 # Annuity Performance Cleaner Comparison: Implementation Plan
 
-**Version:** 3.2
-**Date:** 2025-12-17
-**Status:** Reviewed (done)
+**Version:** 3.3
+**Date:** 2025-12-18
+**Status:** Updated
 **Domain:** `annuity_performance` (业务."规模明细")
 
 ---
@@ -872,10 +872,12 @@ if __name__ == "__main__":
 
 | Aspect | Legacy | New Pipeline |
 |--------|--------|--------------|
-| Resolution steps | 5-step cascade with static mappings | `CompanyIdResolver` with dynamic strategies |
+| Resolution steps | 5-step cascade with static mappings | `CompanyIdResolver` with 6-step dynamic strategies |
 | EQC integration | None | Optional (via `enrichment_service`) |
 | Temp ID format | N/A (uses static mappings) | `IN{hash}` format |
-| Caching | None | `CompanyMappingRepository` |
+| Caching | None | `enrichment_index` table |
+| Default fallback | `600866980` for empty customer_name | Same (Step 4.5) |
+| Alphanumeric IDs | Supports (e.g., `602671512X`) | Supports (e.g., `602671512X`) |
 
 ---
 
@@ -1219,6 +1221,7 @@ The following documents have been consolidated into this guide and are archived 
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.3 | 2025-12-18 | Added Step 4.5 (600866980 fallback for empty customer_name); relaxed alphanumeric company_id validation; updated resolution priority docs |
 | 3.2 | 2025-12-17 | Synced key sections with current scripts; strengthened critical checks (row count mismatch, invalid numerics, missing numeric columns) and aligned artifacts layout. |
 | 3.1 | 2024-12-17 | Added Appendix A-E consolidating legacy documents |
 | 3.0 | 2024-12-17 | Complete rewrite: Cleaner comparison approach |
