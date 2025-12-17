@@ -241,7 +241,7 @@ def build_bronze_to_silver_pipeline(
             {
                 "月度": lambda df: df["月度"].apply(parse_chinese_date)
                 if "月度" in df.columns
-                else df["月度"],
+                else pd.Series([None] * len(df)),
             }
         ),
         # Step 8: Portfolio code defaults (QTAN001/QTAN002/QTAN003)

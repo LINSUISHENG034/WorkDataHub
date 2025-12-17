@@ -107,6 +107,9 @@ dmypy.json
 # Testing and Coverage
 # ============================================================================
 
+# Debug Snapshots
+scripts/validation/CLI/_artifacts/
+
 # Pytest
 .pytest_cache/
 test-results/
