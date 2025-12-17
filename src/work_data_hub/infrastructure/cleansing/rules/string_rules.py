@@ -7,7 +7,7 @@ from typing import Any
 
 from work_data_hub.infrastructure.cleansing.registry import RuleCategory, rule
 
-_DECORATIVE_CHARS = '「」『』"《》'
+_DECORATIVE_CHARS = '「」『』"'  # Note: 《》 are valid chars in company names, preserved
 
 # Legacy parity: suffixes / markers to remove from company names
 _COMPANY_NAME_SUFFIXES_TO_REMOVE = (

@@ -39,6 +39,11 @@ class TestNormalizeCompanyName:
         assert "「" not in result
         assert "」" not in result
 
+    def test_preserves_angle_brackets(self) -> None:
+        """Verify 《》 are preserved as valid characters in company names."""
+        result = normalize_company_name("《国家大剧院》有限公司")
+        assert result == "《国家大剧院》有限公司"
+
     def test_converts_halfwidth_brackets_to_fullwidth(self) -> None:
         result = normalize_company_name("中国(北京)科技公司")
         assert "(" not in result
@@ -109,3 +114,13 @@ class TestNormalizeCompanyNameBracketFix:
         # Legacy 'Trim trailing' logic removes the final '))'.
         # Result is truncated. Strict assertion to ensure no unexpected artifacts beyond known behavior.
         assert result == "中国公司（集团（子公司"
+
+    def test_trailing_group_marker_removed(self) -> None:
+        """User requirement: Remove trailing (集团) marker from long company names."""
+        result = normalize_company_name("中国机械科学研究总院集团有限公司(集团)")
+        assert result == "中国机械科学研究总院集团有限公司"
+
+    def test_trailing_obsolete_marker_removed(self) -> None:
+        """User requirement: Remove trailing （作废） marker from company names."""
+        result = normalize_company_name("浙江温州鹿城农村商业银行股份有限公司（作废）")
+        assert result == "浙江温州鹿城农村商业银行股份有限公司"
