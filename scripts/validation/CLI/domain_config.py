@@ -1,13 +1,17 @@
 """
-Configuration constants for Annuity Performance Cleaner Comparison.
+Shared Configuration Constants for Cleaner Comparison.
 
-This module centralizes all configuration values used across the comparison scripts.
+This module contains non-domain-specific constants used across the comparison scripts.
+Domain-specific values have been migrated to configs/ directory.
+
+Note: For backward compatibility, some constants are still exported here.
+Prefer using the domain config classes in configs/ for domain-specific values.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List
+from typing import List
 
 # =============================================================================
 # Path Configuration
@@ -20,41 +24,6 @@ DEBUG_SNAPSHOTS_SUBDIR = "debug_snapshots"
 
 # Legacy path for imports
 LEGACY_PATH = SCRIPT_DIR.parent.parent.parent / "legacy"
-
-# =============================================================================
-# Field Classification
-# =============================================================================
-
-# Numeric fields requiring zero-tolerance comparison
-# NULL and 0 are treated as equivalent
-NUMERIC_FIELDS: List[str] = [
-    "期初资产规模",
-    "期末资产规模",
-    "供款",
-    "流失(含待遇支付)",  # Legacy column name
-    "流失",
-    "待遇支付",
-]
-
-# Column name mapping: Legacy → New Pipeline
-COLUMN_NAME_MAPPING: Dict[str, str] = {
-    "流失(含待遇支付)": "流失_含待遇支付",
-}
-
-# Derived fields: computed from source via mappings/transformations
-DERIVED_FIELDS: List[str] = [
-    "月度",
-    "机构代码",
-    "计划代码",
-    "组合代码",
-    "产品线代码",
-]
-
-# Upgrade fields: intentionally enhanced in New Pipeline
-UPGRADE_FIELDS: List[str] = [
-    "company_id",
-    "客户名称",
-]
 
 # =============================================================================
 # Classification Rules for company_id Differences
@@ -95,5 +64,4 @@ REPORT_DATE_FORMAT = "%Y%m%d_%H%M%S"
 # Default Values
 # =============================================================================
 
-DEFAULT_SHEET_NAME = "规模明细"
 DEFAULT_ROW_LIMIT = 100

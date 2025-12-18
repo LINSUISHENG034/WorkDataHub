@@ -246,6 +246,16 @@ development_status:
   # Enhancement: CLI Token pre-check with auto-refresh via auto_eqc_auth.py
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-16.md
   6.2-p11-guimo-mingxi-field-derivation-fix: done  # Pipeline field derivation + Token auto-refresh - Code Review PASSED 2025-12-16
+  # Story 6.2-P12: Domain Comparison Framework Generalization
+  # Added 2025-12-18 via Correct-Course workflow
+  # Refactors cleaner-comparison module to config-driven domain-agnostic architecture
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-18.md
+  6.2-p12-domain-comparison-framework: done  # Config-driven domain comparison framework
+  # Story 6.2-P13: Unified Domain Schema Management Architecture
+  # Added 2025-12-18 via create-story workflow
+  # Single Source of Truth for domain schema definitions, eliminates 6-location fragmentation
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-18-unified-schema-management.md
+  6.2-p13-unified-domain-schema-management: ready-for-dev  # Domain Registry + Shared Models + Alembic Unification
 
   # Epic 7: Testing & Validation Infrastructure
   epic-7: backlog

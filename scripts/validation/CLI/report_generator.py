@@ -1,7 +1,8 @@
 """
-Report generation utilities for Annuity Performance Cleaner Comparison.
+Report generation utilities for Cleaner Comparison.
 
 Provides functions to generate CSV and Markdown reports from comparison results.
+This is a domain-agnostic version that works with any configured domain.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from guimo_iter_config import (
+from domain_config import (
     ARTIFACTS_DIR,
     DEBUG_SNAPSHOTS_SUBDIR,
     MAX_EXAMPLES_PER_DIFF,
@@ -101,7 +102,7 @@ class ComparisonReport:
 def print_report(report: ComparisonReport) -> None:
     """Print comparison report to console."""
     print("\n" + "=" * 70)
-    print("ANNUITY PERFORMANCE CLEANER COMPARISON REPORT")
+    print("CLEANER COMPARISON REPORT")
     print("=" * 70)
 
     print(f"\n📁 Input: {report.excel_path}")
@@ -219,7 +220,6 @@ def generate_csv_report(
         run_dir.mkdir(parents=True, exist_ok=True)
         output_path = run_dir / f"{REPORT_PREFIX}_{run_id}.csv"
     else:
-        # Ensure directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
     rows: List[Dict[str, Any]] = []
@@ -312,11 +312,10 @@ def generate_markdown_summary(
         run_dir.mkdir(parents=True, exist_ok=True)
         output_path = run_dir / f"{SUMMARY_PREFIX}_{run_id}.md"
     else:
-        # Ensure directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
     lines: List[str] = [
-        "# Annuity Performance Cleaner Comparison Summary",
+        "# Cleaner Comparison Summary",
         "",
         f"**Generated:** {datetime.now(timezone.utc).isoformat()}",
         f"**Input:** `{report.excel_path}`",
@@ -438,13 +437,9 @@ def save_debug_snapshots(
     Returns:
         Path to the run directory containing snapshots
     """
-    from guimo_iter_config import ARTIFACTS_DIR
-
-    # Generate run ID if not provided
     if run_id is None:
         run_id = datetime.now(timezone.utc).strftime(REPORT_DATE_FORMAT)
 
-    # Create run-specific directory + debug snapshots subdir
     run_dir = ARTIFACTS_DIR / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -462,4 +457,3 @@ def save_debug_snapshots(
     print(f"   New:    {new_path.name}")
 
     return run_dir
-
