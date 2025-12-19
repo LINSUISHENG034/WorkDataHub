@@ -1,0 +1,110 @@
+# WorkDataHub Foreign Key Backfill Configuration
+# Story 6.2-P14: Config File Modularization
+# Created: 2025-12-19
+#
+# This file contains foreign key backfill configurations extracted from
+# data_sources.yml to follow Single Responsibility Principle (SRP).
+#
+# Previously: config/data_sources.yml → domains.*.foreign_keys sections
+# Schema Version: 1.0
+#
+# Usage: Loaded by work_data_hub.domain.reference_backfill.config_loader
+#
+# Configuration Structure:
+# - domains: Map of domain_name → foreign_keys config list
+# - Each domain can have multiple FK rules with dependencies
+# - mode: insert_missing (add records not in target)
+# - depends_on: List of FK names to process first
+# - skip_blank_values: Skip "(空白)" and empty values
+
+schema_version: "1.0"
+
+domains:
+  # Annuity Performance Domain (규模명세)
+  # Validated with real 202411 data (Epic 3 Tech Spec)
+  annuity_performance:
+    foreign_keys:
+      # 年金计划 (Annuity Plan) reference table backfill
+      # Fixed 2025-12-13: Added target_schema: mapping (actual location in Legacy DB)
+      - name: "fk_plan"
+        source_column: "计划代码"
+        target_table: "年金计划"
+        target_key: "年金计划号"
+        target_schema: "mapping"
+        mode: "insert_missing"
+        backfill_columns:
+          - source: "计划代码"
+            target: "年金计划号"
+          - source: "计划名称"
+            target: "计划全称"  # Fixed: actual column name
+            optional: true
+          - source: "计划类型"
+            target: "计划类型"
+            optional: true
+          - source: "客户名称"
+            target: "客户名称"
+            optional: true
+          - source: "主拓代码"
+            target: "主拓代码"
+            optional: true
+          - source: "主拓机构"
+            target: "主拓机构"
+            optional: true
+          - source: "资格"
+            target: "管理资格"  # Fixed: actual column name
+            optional: true
+
+      # 组合计划 (Portfolio Plan) reference table backfill
+      # Fixed 2025-12-13: Added target_schema: mapping
+      - name: "fk_portfolio"
+        source_column: "组合代码"
+        target_table: "组合计划"
+        target_key: "组合代码"
+        target_schema: "mapping"
+        mode: "insert_missing"
+        depends_on: ["fk_plan"]  # Portfolio depends on Plan
+        backfill_columns:
+          - source: "组合代码"
+            target: "组合代码"
+          - source: "计划代码"
+            target: "年金计划号"  # Foreign key to 年金计划
+          - source: "组合名称"
+            target: "组合名称"
+            optional: true
+          - source: "组合类型"
+            target: "组合类型"
+            optional: true
+
+      # 产品线 (Product Line) reference table backfill
+      # Note: 产品线代码 is derived by Pipeline Step 6 (业务类型 → 产品线代码)
+      # via BUSINESS_TYPE_CODE_MAPPING in infrastructure/mappings/shared.py
+      # FK Backfill runs AFTER pipeline, so 产品线代码 column will exist
+      - name: "fk_product_line"
+        source_column: "产品线代码"
+        target_table: "产品线"
+        target_key: "产品线代码"
+        target_schema: "mapping"
+        mode: "insert_missing"
+        backfill_columns:
+          - source: "产品线代码"
+            target: "产品线代码"
+          - source: "业务类型"
+            target: "产品线"
+            optional: true
+
+      # 组织架构 (Organization) reference table backfill
+      # Fixed 2025-12-13: source_column and target_key corrected to 机构代码
+      # Edge case: "(空白)" values should be skipped (handled by skip_blank_values flag)
+      - name: "fk_organization"
+        source_column: "机构代码"
+        target_table: "组织架构"
+        target_key: "机构代码"
+        target_schema: "mapping"
+        mode: "insert_missing"
+        skip_blank_values: true  # Skip "(空白)" and empty values
+        backfill_columns:
+          - source: "机构代码"
+            target: "机构代码"
+          - source: "机构"
+            target: "机构"
+            optional: true

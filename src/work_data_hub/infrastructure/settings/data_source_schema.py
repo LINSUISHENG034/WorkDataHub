@@ -16,6 +16,7 @@ Migrated from config/schema.py in Story 5.3.
 """
 
 import logging
+import copy
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Union
@@ -273,11 +274,17 @@ class DataSourceConfigV2(BaseModel):
     This schema validates the complete data_sources.yml structure with:
     - schema_version for backward compatibility tracking
     - domains mapping with Epic 3 DomainConfigV2 structure
+    - Story 6.2-P14 AC-4: Optional defaults section for inheritance
     """
 
     schema_version: str = Field(
         default="1.0",
         description="Config schema version for backward compatibility",
+    )
+
+    defaults: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Story 6.2-P14: Default values applied to all domains",
     )
 
     domains: Dict[str, DomainConfigV2] = Field(
@@ -300,7 +307,8 @@ class DataSourceConfigV2(BaseModel):
         Raises:
             ValueError: If schema version is not supported
         """
-        supported_versions = ["1.0"]
+        # Story 6.2-P14: Added version 1.1 for defaults support
+        supported_versions = ["1.0", "1.1"]
         if v not in supported_versions:
             raise ValueError(
                 f"Unsupported schema version '{v}'. "
@@ -405,4 +413,67 @@ def get_domain_config_v2(
             f"Domain '{domain_name}' not found in configuration"
         )
 
-    return DomainConfigV2(**data["domains"][domain_name])
+    domain_raw: Dict[str, Any] = data["domains"][domain_name] or {}
+    defaults: Dict[str, Any] = data.get("defaults") or {}
+
+    merged = _merge_with_defaults(domain_raw, defaults) if defaults else domain_raw
+    return DomainConfigV2(**merged)
+
+
+def _merge_with_defaults(
+    domain_config: Dict[str, Any],
+    defaults: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Merge domain config with defaults using inheritance rules.
+
+    Story 6.2-P14: Implements defaults/overrides pattern for data_sources.yml
+
+    Merge Rules:
+    - Scalars: domain value wins over default
+    - Lists: replace by default. Use "+" prefix to extend (e.g., "+*pattern*")
+    - Dicts: deep merge (domain values override defaults)
+
+    Args:
+        domain_config: Domain-specific configuration
+        defaults: Default configuration values
+
+    Returns:
+        Merged configuration dictionary
+    """
+    result = copy.deepcopy(defaults)
+
+    for key, value in domain_config.items():
+        if key not in result:
+            # Key only exists in domain, add it
+            result[key] = value
+        elif isinstance(value, dict) and isinstance(result[key], dict):
+            # Deep merge for dicts
+            result[key] = _merge_with_defaults(value, result[key])
+        elif isinstance(value, list):
+            # Check for extend pattern (+ prefix)
+            extend_items = [
+                v[1:] for v in value
+                if isinstance(v, str) and v.startswith("+")
+            ]
+            replace_items = [
+                v for v in value
+                if not (isinstance(v, str) and v.startswith("+"))
+            ]
+
+            if extend_items and not replace_items:
+                # Extend only: add to defaults
+                base_list = result.get(key, [])
+                result[key] = list(base_list) + extend_items if isinstance(base_list, list) else extend_items
+            elif replace_items:
+                # Replace mode: use domain value plus any extends
+                result[key] = replace_items + extend_items
+            else:
+                # Empty list: clear defaults
+                result[key] = []
+        else:
+            # Scalar: domain wins
+            result[key] = value
+
+    return result
+

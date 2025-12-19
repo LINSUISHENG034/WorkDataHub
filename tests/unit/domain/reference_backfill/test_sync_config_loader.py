@@ -21,42 +21,39 @@ def sample_config_data():
     """Create sample configuration data."""
     return {
         "schema_version": "1.0",
-        "domains": {},
-        "reference_sync": {
-            "enabled": True,
-            "schedule": "0 1 * * *",
-            "concurrency": 1,
-            "batch_size": 5000,
-            "tables": [
-                {
-                    "name": "年金计划",
-                    "target_table": "年金计划",
-                    "target_schema": "business",
-                    "source_type": "legacy_mysql",
-                    "source_config": {
-                        "table": "annuity_plan",
-                        "columns": [
-                            {"source": "plan_code", "target": "年金计划号"},
-                            {"source": "plan_name", "target": "计划名称"},
-                        ]
-                    },
-                    "sync_mode": "upsert",
-                    "primary_key": "年金计划号",
+        "enabled": True,
+        "schedule": "0 1 * * *",
+        "concurrency": 1,
+        "batch_size": 5000,
+        "tables": [
+            {
+                "name": "年金计划",
+                "target_table": "年金计划",
+                "target_schema": "business",
+                "source_type": "legacy_mysql",
+                "source_config": {
+                    "table": "annuity_plan",
+                    "columns": [
+                        {"source": "plan_code", "target": "年金计划号"},
+                        {"source": "plan_name", "target": "计划名称"},
+                    ]
                 },
-                {
-                    "name": "产品线",
-                    "target_table": "产品线",
-                    "target_schema": "business",
-                    "source_type": "config_file",
-                    "source_config": {
-                        "file_path": "config/reference_data/product_lines.yml",
-                        "schema_version": "1.0",
-                    },
-                    "sync_mode": "delete_insert",
-                    "primary_key": "产品线代码",
+                "sync_mode": "upsert",
+                "primary_key": "年金计划号",
+            },
+            {
+                "name": "产品线",
+                "target_table": "产品线",
+                "target_schema": "business",
+                "source_type": "config_file",
+                "source_config": {
+                    "file_path": "config/reference_data/product_lines.yml",
+                    "schema_version": "1.0",
                 },
-            ]
-        }
+                "sync_mode": "delete_insert",
+                "primary_key": "产品线代码",
+            },
+        ],
     }
 
 
@@ -65,8 +62,8 @@ class TestReferenceSyncConfigLoader:
 
     def test_init(self):
         """Test loader initialization."""
-        loader = ReferenceSyncConfigLoader("config/data_sources.yml")
-        assert loader.config_path == Path("config/data_sources.yml")
+        loader = ReferenceSyncConfigLoader("config/reference_sync.yml")
+        assert loader.config_path == Path("config/reference_sync.yml")
         assert loader.logger is not None
 
     @patch('work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists')
@@ -83,7 +80,7 @@ class TestReferenceSyncConfigLoader:
         mock_exists.return_value = True
         mock_yaml_load.return_value = sample_config_data
 
-        loader = ReferenceSyncConfigLoader("config/data_sources.yml")
+        loader = ReferenceSyncConfigLoader("config/reference_sync.yml")
         config = loader.load_config()
 
         # Verify config was loaded
@@ -105,7 +102,7 @@ class TestReferenceSyncConfigLoader:
         """Test loading with missing config file."""
         mock_exists.return_value = False
 
-        loader = ReferenceSyncConfigLoader("config/data_sources.yml")
+        loader = ReferenceSyncConfigLoader("config/reference_sync.yml")
 
         with pytest.raises(FileNotFoundError, match="Configuration file not found"):
             loader.load_config()
@@ -113,23 +110,24 @@ class TestReferenceSyncConfigLoader:
     @patch('work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists')
     @patch('builtins.open', new_callable=mock_open)
     @patch('work_data_hub.domain.reference_backfill.sync_config_loader.yaml.safe_load')
-    def test_load_config_no_reference_sync_section(
+    def test_load_config_no_tables_key(
         self,
         mock_yaml_load,
         mock_file_open,
         mock_exists,
     ):
-        """Test loading with missing reference_sync section."""
+        """Test loading with missing tables key."""
         mock_exists.return_value = True
         mock_yaml_load.return_value = {
             "schema_version": "1.0",
-            "domains": {}
+            "enabled": True,
+            "schedule": "0 1 * * *",
         }
 
-        loader = ReferenceSyncConfigLoader("config/data_sources.yml")
+        loader = ReferenceSyncConfigLoader("config/reference_sync.yml")
         config = loader.load_config()
 
-        # Should return None when section is missing
+        # Should return None when tables key is missing
         assert config is None
 
     @patch('work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists')
@@ -145,7 +143,7 @@ class TestReferenceSyncConfigLoader:
         mock_exists.return_value = True
         mock_yaml_load.side_effect = yaml.YAMLError("Invalid YAML")
 
-        loader = ReferenceSyncConfigLoader("config/data_sources.yml")
+        loader = ReferenceSyncConfigLoader("config/reference_sync.yml")
 
         with pytest.raises(ValueError, match="Invalid YAML"):
             loader.load_config()
@@ -162,12 +160,11 @@ class TestReferenceSyncConfigLoader:
         """Test loading with invalid configuration schema."""
         mock_exists.return_value = True
         mock_yaml_load.return_value = {
-            "reference_sync": {
-                "invalid_field": "value"
-            }
+            "schema_version": "1.0",
+            "tables": [{}],  # Missing required fields for ReferenceSyncTableConfig
         }
 
-        loader = ReferenceSyncConfigLoader("config/data_sources.yml")
+        loader = ReferenceSyncConfigLoader("config/reference_sync.yml")
 
         with pytest.raises(ValueError, match="Invalid reference sync configuration"):
             loader.load_config()
@@ -187,10 +184,10 @@ class TestReferenceSyncConfigLoader:
 
         # Modify config to disable sync
         disabled_config = sample_config_data.copy()
-        disabled_config["reference_sync"]["enabled"] = False
+        disabled_config["enabled"] = False
         mock_yaml_load.return_value = disabled_config
 
-        loader = ReferenceSyncConfigLoader("config/data_sources.yml")
+        loader = ReferenceSyncConfigLoader("config/reference_sync.yml")
         config = loader.load_config()
 
         # Config should still load but be disabled
@@ -211,7 +208,7 @@ class TestReferenceSyncConfigLoader:
         mock_exists.return_value = True
         mock_yaml_load.return_value = sample_config_data
 
-        config = load_reference_sync_config("config/data_sources.yml")
+        config = load_reference_sync_config("config/reference_sync.yml")
 
         # Verify config was loaded
         assert isinstance(config, ReferenceSyncConfig)
@@ -230,14 +227,13 @@ class TestReferenceSyncConfigLoader:
         """Test loading with empty tables list."""
         mock_exists.return_value = True
         mock_yaml_load.return_value = {
-            "reference_sync": {
-                "enabled": True,
-                "schedule": "0 1 * * *",
-                "tables": []
-            }
+            "schema_version": "1.0",
+            "enabled": True,
+            "schedule": "0 1 * * *",
+            "tables": [],
         }
 
-        loader = ReferenceSyncConfigLoader("config/data_sources.yml")
+        loader = ReferenceSyncConfigLoader("config/reference_sync.yml")
         config = loader.load_config()
 
         # Should load successfully with empty tables

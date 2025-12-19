@@ -1186,7 +1186,7 @@ class TestEnrichmentIndexDbCache:
         mock_repo.lookup_enrichment_index_batch.assert_called_once()
         mock_repo.update_hit_count.assert_called()
 
-    def test_enrichment_index_logs_decision_path(self, default_strategy, caplog):
+    def test_enrichment_index_logs_decision_path(self, default_strategy):
         """Decision path logging should include priority outcome."""
         mock_repo = MagicMock()
         mock_repo.lookup_enrichment_index_batch.return_value = {
@@ -1209,16 +1209,20 @@ class TestEnrichmentIndexDbCache:
             "客户名称": [" Customer_A  "],
         })
 
-        with caplog.at_level("DEBUG"):
+        # Patch stdlib logger to avoid flaky cross-test logging configuration.
+        from work_data_hub.infrastructure.enrichment import company_id_resolver as resolver_module
+        from unittest.mock import patch
+
+        with patch.object(resolver_module._stdlib_logger, "debug") as mock_debug:
             resolver.resolve_batch(df, default_strategy)
 
-        # structlog outputs JSON; check for decision_path in log message text
-        decision_path_logs = [
-            record.getMessage()
-            for record in caplog.records
-            if "db_cache_decision_path" in record.getMessage()
-        ]
-        assert any("DB-P1:HIT" in log for log in decision_path_logs)
+        assert any(
+            call.args
+            and "company_id_resolver.db_cache_decision_path" in str(call.args[0])
+            and len(call.args) >= 3
+            and "DB-P1:HIT" in str(call.args[2])
+            for call in mock_debug.call_args_list
+        )
 
     def test_enrichment_index_fallbacks_to_legacy_on_no_hits(self, default_strategy):
         """If enrichment_index misses, resolver should fall back to legacy table when available."""
@@ -1282,7 +1286,7 @@ class TestEnrichmentIndexDbCache:
         assert mock_repo.update_hit_count.call_count == 2
         assert result.statistics.db_decision_path_counts.get("DB-P1:HIT") == 2
 
-    def test_enrichment_index_emits_metrics_log(self, default_strategy, caplog):
+    def test_enrichment_index_emits_metrics_log(self, default_strategy):
         """Metrics log should include per-priority hits and decision-path counts."""
         mock_repo = MagicMock()
         mock_repo.lookup_enrichment_index_batch.return_value = {
@@ -1305,15 +1309,17 @@ class TestEnrichmentIndexDbCache:
             "客户名称": [" Customer_A  "],
         })
 
-        with caplog.at_level("INFO"):
+        # Patch stdlib logger to avoid flaky cross-test logging configuration.
+        from work_data_hub.infrastructure.enrichment import company_id_resolver as resolver_module
+        from unittest.mock import patch
+
+        with patch.object(resolver_module._stdlib_logger, "info") as mock_info:
             resolver.resolve_batch(df, default_strategy)
 
-        metric_logs = [
-            record.getMessage()
-            for record in caplog.records
-            if "db_cache_metrics" in record.getMessage()
-        ]
-        assert metric_logs, "Expected db_cache_metrics log entry"
+        assert any(
+            call.args and "company_id_resolver.db_cache_metrics" in str(call.args[0])
+            for call in mock_info.call_args_list
+        ), "Expected db_cache_metrics log entry"
 
 
 class TestP4NormalizationDbCacheLookup:

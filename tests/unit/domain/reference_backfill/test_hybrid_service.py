@@ -465,7 +465,7 @@ class TestHybridReferenceServiceIntegration:
         assert result.degraded_mode is False
 
     def test_ensure_references_threshold_warning(
-        self, backfill_service, sample_fk_configs, sample_fact_data, mock_conn, caplog
+        self, backfill_service, sample_fk_configs, sample_fact_data, mock_conn
     ):
         """Test that warning is logged when auto_derived ratio exceeds threshold."""
         service = HybridReferenceService(
@@ -492,7 +492,7 @@ class TestHybridReferenceServiceIntegration:
         mock_conn.commit = Mock()
         mock_conn.begin = Mock(return_value=Mock(commit=Mock(), rollback=Mock()))
 
-        with caplog.at_level("WARNING"):
+        with patch.object(service.logger, "warning") as mock_warn:
             result = service.ensure_references(
                 domain="test_domain",
                 df=sample_fact_data,
@@ -500,8 +500,12 @@ class TestHybridReferenceServiceIntegration:
                 conn=mock_conn,
             )
 
-        # Check that warning was logged
-        assert any("exceeds threshold" in record.message for record in caplog.records)
+        # Check that warning was logged (robust to global logging config changes)
+        assert any(
+            "exceeds threshold" in str(call.args[0])
+            for call in mock_warn.call_args_list
+            if call.args
+        )
         assert result.auto_derived_ratio > 0.10
 
 

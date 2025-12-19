@@ -1250,12 +1250,12 @@ def generic_backfill_refs_op(
         context.log.info("No processed rows provided for backfill")
         return {"processing_order": [], "tables_processed": [], "total_inserted": 0, "plan_only": config.plan_only}
 
+    settings = get_settings()
+
     conn = None
     try:
-        # Load foreign key configurations
-        settings = get_settings()
-        config_path = Path(settings.data_sources_config)
-        fk_configs = load_foreign_keys_config(config_path, config.domain)
+        # Load foreign key configurations (Story 6.2-P14: uses default path config/foreign_keys.yml)
+        fk_configs = load_foreign_keys_config(domain=config.domain)
 
         if not fk_configs:
             context.log.info(f"No foreign_keys configuration found for domain '{config.domain}'")
@@ -1855,10 +1855,8 @@ def hybrid_reference_op(
             f"with threshold {config.auto_derived_threshold:.1%}"
         )
 
-        # Load FK configurations for this domain
-        settings = get_settings()
-        config_path = Path(settings.data_sources_config)
-        fk_configs = load_foreign_keys_config(config_path, config.domain)
+        # Load FK configurations for this domain (Story 6.2-P14: uses default path)
+        fk_configs = load_foreign_keys_config(domain=config.domain)
 
         if not fk_configs:
             context.log.warning(
@@ -1907,7 +1905,8 @@ def hybrid_reference_op(
         # Optional in-process pre-load before coverage/backfill
         if config.run_preload:
             try:
-                sync_config = load_reference_sync_config(str(config_path))
+                # Story 6.2-P14: Uses default path config/reference_sync.yml
+                sync_config = load_reference_sync_config()
                 if sync_config and sync_config.enabled and sync_config.tables:
                     sync_service = ReferenceSyncService(domain=config.domain)
                     sync_configs = sync_config.tables

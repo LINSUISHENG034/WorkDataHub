@@ -1,0 +1,101 @@
+# WorkDataHub Reference Sync Configuration
+# Story 6.2-P14: Config File Modularization
+# Created: 2025-12-19
+#
+# This file contains reference sync configurations extracted from
+# data_sources.yml to follow Single Responsibility Principle (SRP).
+#
+# Previously: config/data_sources.yml → reference_sync section (lines 229-315)
+# Schema Version: 1.0
+#
+# Usage: Loaded by work_data_hub.domain.reference_backfill.sync_config_loader
+#
+# Story 6.2.4: Reference Sync Configuration
+# Pre-load reference data from authoritative sources
+# Updated 2025-12-13: Changed from legacy_mysql to postgres (Story 6.2-P1)
+# The legacy data has been migrated to PostgreSQL database 'legacy' with schemas:
+# - enterprise (was MySQL database 'enterprise')
+# - business (was MySQL database 'business')
+# - mapping (was MySQL database 'mapping')
+
+schema_version: "1.0"
+
+# Reference Sync Settings
+enabled: true
+schedule: "0 1 * * *"  # Daily at 01:00 AM (Asia/Shanghai)
+concurrency: 1
+batch_size: 5000
+
+tables:
+  # 年金计划 - from Legacy PostgreSQL (migrated from MySQL)
+  - name: "年金计划"
+    target_table: "年金计划"
+    target_schema: "business"
+    source_type: "postgres"
+    source_config:
+      connection_env_prefix: "WDH_LEGACY"
+      schema: "enterprise"
+      table: "annuity_plan"
+      columns:
+        - source: "plan_code"
+          target: "年金计划号"
+        - source: "plan_name"
+          target: "计划名称"
+        - source: "plan_type"
+          target: "计划类型"
+        - source: "customer_name"
+          target: "客户名称"
+    sync_mode: "upsert"
+    primary_key: "年金计划号"
+
+  # 组合计划 - from Legacy PostgreSQL (migrated from MySQL)
+  - name: "组合计划"
+    target_table: "组合计划"
+    target_schema: "business"
+    source_type: "postgres"
+    source_config:
+      connection_env_prefix: "WDH_LEGACY"
+      schema: "enterprise"
+      table: "portfolio_plan"
+      columns:
+        - source: "portfolio_code"
+          target: "组合代码"
+        - source: "plan_code"
+          target: "年金计划号"
+        - source: "portfolio_name"
+          target: "组合名称"
+        - source: "portfolio_type"
+          target: "组合类型"
+    sync_mode: "upsert"
+    primary_key: "组合代码"
+
+  # 组织架构 - from Legacy PostgreSQL with incremental sync
+  - name: "组织架构"
+    target_table: "组织架构"
+    target_schema: "business"
+    source_type: "postgres"
+    source_config:
+      connection_env_prefix: "WDH_LEGACY"
+      schema: "enterprise"
+      table: "organization"
+      columns:
+        - source: "org_code"
+          target: "组织代码"
+        - source: "org_name"
+          target: "组织名称"
+      incremental:
+        where: "updated_at >= :last_synced_at"
+        updated_at_column: "updated_at"
+    sync_mode: "upsert"
+    primary_key: "组织代码"
+
+  # 产品线 - from config file
+  - name: "产品线"
+    target_table: "产品线"
+    target_schema: "business"
+    source_type: "config_file"
+    source_config:
+      file_path: "config/reference_data/product_lines.yml"
+      schema_version: "1.0"
+    sync_mode: "delete_insert"
+    primary_key: "产品线代码"

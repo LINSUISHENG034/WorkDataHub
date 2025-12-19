@@ -256,6 +256,11 @@ development_status:
   # Single Source of Truth for domain schema definitions, eliminates 6-location fragmentation
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-18-unified-schema-management.md
   6.2-p13-unified-domain-schema-management: done  # Domain Registry + Shared Models + Alembic Unification - Code Review PASSED 2025-12-19
+  # Story 6.2-P14: Config File Modularization (Zero Legacy)
+  # Added 2025-12-19 via create-story workflow
+  # Separates FK backfill and reference_sync from data_sources.yml per SRP
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-19.md
+  6.2-p14-config-file-modularization: done  # Config separation: foreign_keys.yml + reference_sync.yml - Code Review PASSED 2025-12-20
 
   # Epic 7: Testing & Validation Infrastructure
   epic-7: backlog

@@ -1,27 +1,49 @@
 # WorkDataHub Data Source Configuration
 # Epic 3: Intelligent File Discovery & Version Detection
-# Schema Version: 1.0
+# Schema Version: 1.1
 #
-# This file defines file discovery patterns for all data domains using the
-# new Epic 3 architecture with version-aware folder scanning.
+# Story 6.2-P14: Config File Modularization (2025-12-19)
+# This file now contains ONLY domain file discovery patterns.
+# FK backfill rules: config/foreign_keys.yml
+# Reference sync: config/reference_sync.yml
 #
-# Configuration Structure:
-# - base_path: Path template with {YYYYMM}, {YYYY}, {MM} placeholders
-# - file_patterns: Glob patterns to match files (e.g., "*年金终稿*.xlsx")
-# - exclude_patterns: Patterns to exclude (temp files, emails, etc.)
-# - sheet_name: Excel sheet name (string) or 0-based index (int)
-# - version_strategy: How to select version folder (highest_number, latest_modified, manual)
-# - fallback: Behavior when version detection is ambiguous (error, use_latest_modified)
+# Story 6.2-P14 AC-4: Defaults/Overrides Mechanism (2025-12-20)
+# Uses: defaults + per-domain overrides pattern (similar to Ansible defaults)
+#
+# Inheritance Rules:
+# - Scalars: domain value wins over default
+# - Lists: replace by default. Use "+" prefix to extend (e.g., "+*pattern*")
+# - Dicts: deep merge (domain values override defaults)
 
 # Schema version for backward compatibility
 # Version 1.0: Initial schema with file discovery patterns
-# Version 1.0+: Added optional foreign_keys section for reference backfill (backward compatible)
-schema_version: "1.0"
+# Version 1.1: Added defaults section with inheritance support
+schema_version: "1.1"
 
+# ============================================================================
+# DEFAULTS - Applied to all domains unless overridden
+# ============================================================================
+defaults:
+  # Common exclusion patterns for all domains
+  exclude_patterns:
+    - "~$*"         # Excel temp files
+    - "*.eml"       # Email files
+
+  # Default version selection strategy
+  version_strategy: "highest_number"
+  fallback: "error"
+
+  # Default output schema
+  output:
+    schema_name: "business"
+
+# ============================================================================
+# DOMAINS - Only specify what differs from defaults
+# ============================================================================
 domains:
   # Sandbox Trustee Performance Domain (dev/test)
   # Used by Dagster schedules/sensors and sandbox jobs.
-  # Path structure: tests/fixtures/real_data/202411/收集数据/业务收集/V1/**/*
+  # Override: output.schema_name = sandbox (instead of business)
   sandbox_trustee_performance:
     # NOTE: No {YYYYMM} here to keep sensors/schedules period-free.
     base_path: "tests/fixtures/real_data/202411/收集数据/业务收集"
@@ -30,184 +52,62 @@ domains:
     file_patterns:
       - "**/*受托业绩*.xlsx"
 
-    exclude_patterns:
-      - "~$*"
-      - "*.eml"
-
     # This sheet is primarily for sample job usage; override via CLI if needed.
     sheet_name: 0
 
-    version_strategy: "highest_number"
-    fallback: "error"
-
     output:
       table: "sandbox_trustee_performance"
-      schema_name: "sandbox"
+      schema_name: "sandbox"  # Override: sandbox instead of business
 
   # Annuity Performance Domain
   # ✅ VALIDATED with real 202411 data (Epic 3 Tech Spec Action Item #2)
   # Path structure: tests/fixtures/real_data/202411/收集数据/数据采集/V1/*.xlsx
+  #
+  # Story 6.2-P14: FK backfill rules moved to config/foreign_keys.yml
   annuity_performance:
     # Base path with template variable {YYYYMM} (e.g., 202501)
-    # Corrected from 业务收集 to 数据采集 based on real data validation
     base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集"
 
     # File patterns to match (glob syntax)
-    # Updated 2025-12-13: Changed to match real data file naming convention
-    # Example: 【for年金机构经营分析】25年10月年金规模收入数据 1111.xlsx
     file_patterns:
       - "*规模收入数据*.xlsx"
 
-    # Patterns to exclude (temp files, emails, etc.)
+    # Extend default exclusions with domain-specific pattern
     exclude_patterns:
-      - "~$*"         # Excel temp files
-      - "*回复*"      # Email reply files
-      - "*.eml"       # Email message files
+      - "+*回复*"    # Extend: add to default exclusions (+ prefix)
 
     # Excel sheet name to load
     sheet_name: "规模明细"
 
-    # Version selection strategy:
-    # - highest_number: Select V3 > V2 > V1 (default)
-    # - latest_modified: Select most recently modified folder
-    # - manual: Require explicit --version CLI flag
-    version_strategy: "highest_number"
-
-    # Fallback behavior when version detection ambiguous:
-    # - error: Raise error and halt (default, safest)
-    # - use_latest_modified: Fall back to timestamp-based selection
-    fallback: "error"
-
     # Output destination configuration
     output:
       table: "annuity_performance"
-      schema_name: "business"
       # Refresh key for delete_insert mode (Legacy-compatible refresh scope)
       pk:
         - "月度"
         - "业务类型"
         - "计划类型"
 
-    # Foreign key backfill configuration for reference data management
-    # Schema Version: 1.0 (backward compatible addition)
-    # This section is optional - if missing, no backfill operations will be performed
-    foreign_keys:
-      # 年金计划 (Annuity Plan) reference table backfill
-      # Fixed 2025-12-13: Added target_schema: mapping (actual location in Legacy DB)
-      - name: "fk_plan"
-        source_column: "计划代码"
-        target_table: "年金计划"
-        target_key: "年金计划号"
-        target_schema: "mapping"
-        mode: "insert_missing"
-        backfill_columns:
-          - source: "计划代码"
-            target: "年金计划号"
-          - source: "计划名称"
-            target: "计划全称"  # Fixed: actual column name
-            optional: true
-          - source: "计划类型"
-            target: "计划类型"
-            optional: true
-          - source: "客户名称"
-            target: "客户名称"
-            optional: true
-          - source: "主拓代码"
-            target: "主拓代码"
-            optional: true
-          - source: "主拓机构"
-            target: "主拓机构"
-            optional: true
-          - source: "资格"
-            target: "管理资格"  # Fixed: actual column name
-            optional: true
-
-      # 组合计划 (Portfolio Plan) reference table backfill
-      # Fixed 2025-12-13: Added target_schema: mapping
-      - name: "fk_portfolio"
-        source_column: "组合代码"
-        target_table: "组合计划"
-        target_key: "组合代码"
-        target_schema: "mapping"
-        mode: "insert_missing"
-        depends_on: ["fk_plan"]  # Portfolio depends on Plan
-        backfill_columns:
-          - source: "组合代码"
-            target: "组合代码"
-          - source: "计划代码"
-            target: "年金计划号"  # Foreign key to 年金计划
-          - source: "组合名称"
-            target: "组合名称"
-            optional: true
-          - source: "组合类型"
-            target: "组合类型"
-            optional: true
-
-      # 产品线 (Product Line) reference table backfill
-      # Note: 产品线代码 is derived by Pipeline Step 6 (业务类型 → 产品线代码)
-      # via BUSINESS_TYPE_CODE_MAPPING in infrastructure/mappings/shared.py
-      # FK Backfill runs AFTER pipeline, so 产品线代码 column will exist
-      - name: "fk_product_line"
-        source_column: "产品线代码"
-        target_table: "产品线"
-        target_key: "产品线代码"
-        target_schema: "mapping"
-        mode: "insert_missing"
-        backfill_columns:
-          - source: "产品线代码"
-            target: "产品线代码"
-          - source: "业务类型"
-            target: "产品线"
-            optional: true
-
-      # 组织架构 (Organization) reference table backfill
-      # Fixed 2025-12-13: source_column and target_key corrected to 机构代码
-      # Edge case: "(空白)" values should be skipped (handled by skip_blank_values flag)
-      - name: "fk_organization"
-        source_column: "机构代码"
-        target_table: "组织架构"
-        target_key: "机构代码"
-        target_schema: "mapping"
-        mode: "insert_missing"
-        skip_blank_values: true  # Skip "(空白)" and empty values
-        backfill_columns:
-          - source: "机构代码"
-            target: "机构代码"
-          - source: "机构"
-            target: "机构"
-            optional: true
-
   # Annuity Income Domain (Epic 5.5 - Pipeline Architecture Validation)
   # Story 5.5.2: Second domain to validate Infrastructure Layer architecture
   annuity_income:
     # Base path with template variable {YYYYMM}
-    # Uses same directory structure as annuity_performance
     base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集"
 
     # File patterns to match (glob syntax)
-    # Updated 2025-12-13: Same pattern as annuity_performance (same file, different sheet)
     file_patterns:
       - "*规模收入数据*.xlsx"
 
-    # Patterns to exclude (temp files, emails, etc.)
+    # Extend default exclusions
     exclude_patterns:
-      - "~$*"         # Excel temp files
-      - "*回复*"      # Email reply files
-      - "*.eml"       # Email message files
+      - "+*回复*"    # Extend defaults
 
     # Excel sheet name to load (different from annuity_performance)
     sheet_name: "收入明细"
 
-    # Version selection strategy
-    version_strategy: "highest_number"
-
-    # Fallback behavior when version detection ambiguous
-    fallback: "error"
-
     # Output destination configuration
     output:
       table: "annuity_income"
-      schema_name: "business"
       # Primary key for delete_insert mode (matches GOLD_COMPOSITE_KEY in schemas.py)
       pk:
         - "月度"
@@ -216,99 +116,28 @@ domains:
         - "company_id"
 
   # Future domains (Epic 9) can be added here:
+  # Minimal config using defaults inheritance:
+  #
   # universal_insurance:
   #   base_path: "reference/monthly/{YYYYMM}/收集数据/业务收集"
   #   file_patterns:
   #     - "*万能险*.xlsx"
-  #   exclude_patterns:
-  #     - "~$*"
   #   sheet_name: "明细数据"
-  #   version_strategy: "highest_number"
-  #   fallback: "error"
+  #   output:
+  #     table: "universal_insurance"  # Only override what's needed
 
-# Story 6.2.4: Reference Sync Configuration
-# Pre-load reference data from authoritative sources
-# Updated 2025-12-13: Changed from legacy_mysql to postgres (Story 6.2-P1)
-# The legacy data has been migrated to PostgreSQL database 'legacy' with schemas:
-# - enterprise (was MySQL database 'enterprise')
-# - business (was MySQL database 'business')
-# - mapping (was MySQL database 'mapping')
-reference_sync:
-  enabled: true
-  schedule: "0 1 * * *"  # Daily at 01:00 AM (Asia/Shanghai)
-  concurrency: 1
-  batch_size: 5000
-
-  tables:
-    # 年金计划 - from Legacy PostgreSQL (migrated from MySQL)
-    - name: "年金计划"
-      target_table: "年金计划"
-      target_schema: "business"
-      source_type: "postgres"
-      source_config:
-        connection_env_prefix: "WDH_LEGACY"
-        schema: "enterprise"
-        table: "annuity_plan"
-        columns:
-          - source: "plan_code"
-            target: "年金计划号"
-          - source: "plan_name"
-            target: "计划名称"
-          - source: "plan_type"
-            target: "计划类型"
-          - source: "customer_name"
-            target: "客户名称"
-      sync_mode: "upsert"
-      primary_key: "年金计划号"
-
-    # 组合计划 - from Legacy PostgreSQL (migrated from MySQL)
-    - name: "组合计划"
-      target_table: "组合计划"
-      target_schema: "business"
-      source_type: "postgres"
-      source_config:
-        connection_env_prefix: "WDH_LEGACY"
-        schema: "enterprise"
-        table: "portfolio_plan"
-        columns:
-          - source: "portfolio_code"
-            target: "组合代码"
-          - source: "plan_code"
-            target: "年金计划号"
-          - source: "portfolio_name"
-            target: "组合名称"
-          - source: "portfolio_type"
-            target: "组合类型"
-      sync_mode: "upsert"
-      primary_key: "组合代码"
-
-    # 组织架构 - from Legacy PostgreSQL with incremental sync
-    - name: "组织架构"
-      target_table: "组织架构"
-      target_schema: "business"
-      source_type: "postgres"
-      source_config:
-        connection_env_prefix: "WDH_LEGACY"
-        schema: "enterprise"
-        table: "organization"
-        columns:
-          - source: "org_code"
-            target: "组织代码"
-          - source: "org_name"
-            target: "组织名称"
-        incremental:
-          where: "updated_at >= :last_synced_at"
-          updated_at_column: "updated_at"
-      sync_mode: "upsert"
-      primary_key: "组织代码"
-
-    # 产品线 - from config file
-    - name: "产品线"
-      target_table: "产品线"
-      target_schema: "business"
-      source_type: "config_file"
-      source_config:
-        file_path: "config/reference_data/product_lines.yml"
-        schema_version: "1.0"
-      sync_mode: "delete_insert"
-      primary_key: "产品线代码"
+# =============================================================================
+# Configuration Split Notice (Story 6.2-P14)
+# =============================================================================
+# The following configurations have been moved to dedicated files:
+#
+# 1. Foreign Key Backfill Rules:
+#    - Moved to: config/foreign_keys.yml
+#    - Contains: domains.*.foreign_keys sections
+#    - Used by: load_foreign_keys_config() in config_loader.py
+#
+# 2. Reference Sync Configuration:
+#    - Moved to: config/reference_sync.yml
+#    - Contains: reference_sync section (schedule, tables, etc.)
+#    - Used by: load_reference_sync_config() in sync_config_loader.py
+# =============================================================================

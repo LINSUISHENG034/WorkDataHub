@@ -391,85 +391,82 @@ class TestConfigLoaderIntegration:
         mock_open,
         mock_exists,
     ):
-        """Test loading complete config from data_sources.yml."""
+        """Test loading complete config from reference_sync.yml."""
         mock_exists.return_value = True
 
-        # Full config matching data_sources.yml structure
+        # Full config matching reference_sync.yml structure (Story 6.2-P14)
         mock_yaml_load.return_value = {
             "schema_version": "1.0",
-            "domains": {},
-            "reference_sync": {
-                "enabled": True,
-                "schedule": "0 1 * * *",
-                "concurrency": 1,
-                "batch_size": 5000,
-                "tables": [
-                    {
-                        "name": "年金计划",
-                        "target_table": "年金计划",
-                        "target_schema": "business",
-                        "source_type": "legacy_mysql",
-                        "source_config": {
-                            "table": "annuity_plan",
-                            "columns": [
-                                {"source": "plan_code", "target": "年金计划号"},
-                                {"source": "plan_name", "target": "计划名称"},
-                            ]
-                        },
-                        "sync_mode": "upsert",
-                        "primary_key": "年金计划号",
+            "enabled": True,
+            "schedule": "0 1 * * *",
+            "concurrency": 1,
+            "batch_size": 5000,
+            "tables": [
+                {
+                    "name": "年金计划",
+                    "target_table": "年金计划",
+                    "target_schema": "business",
+                    "source_type": "legacy_mysql",
+                    "source_config": {
+                        "table": "annuity_plan",
+                        "columns": [
+                            {"source": "plan_code", "target": "年金计划号"},
+                            {"source": "plan_name", "target": "计划名称"},
+                        ]
                     },
-                    {
-                        "name": "组合计划",
-                        "target_table": "组合计划",
-                        "target_schema": "business",
-                        "source_type": "legacy_mysql",
-                        "source_config": {
-                            "table": "portfolio_plan",
-                            "columns": [
-                                {"source": "portfolio_code", "target": "组合代码"},
-                                {"source": "plan_code", "target": "年金计划号"},
-                            ]
-                        },
-                        "sync_mode": "upsert",
-                        "primary_key": "组合代码",
+                    "sync_mode": "upsert",
+                    "primary_key": "年金计划号",
+                },
+                {
+                    "name": "组合计划",
+                    "target_table": "组合计划",
+                    "target_schema": "business",
+                    "source_type": "legacy_mysql",
+                    "source_config": {
+                        "table": "portfolio_plan",
+                        "columns": [
+                            {"source": "portfolio_code", "target": "组合代码"},
+                            {"source": "plan_code", "target": "年金计划号"},
+                        ]
                     },
-                    {
-                        "name": "组织架构",
-                        "target_table": "组织架构",
-                        "target_schema": "business",
-                        "source_type": "legacy_mysql",
-                        "source_config": {
-                            "table": "organization",
-                            "columns": [
-                                {"source": "org_code", "target": "组织代码"},
-                                {"source": "org_name", "target": "组织名称"},
-                            ],
-                            "incremental": {
-                                "where": "updated_at >= :last_synced_at",
-                                "updated_at_column": "updated_at",
-                            }
-                        },
-                        "sync_mode": "upsert",
-                        "primary_key": "组织代码",
+                    "sync_mode": "upsert",
+                    "primary_key": "组合代码",
+                },
+                {
+                    "name": "组织架构",
+                    "target_table": "组织架构",
+                    "target_schema": "business",
+                    "source_type": "legacy_mysql",
+                    "source_config": {
+                        "table": "organization",
+                        "columns": [
+                            {"source": "org_code", "target": "组织代码"},
+                            {"source": "org_name", "target": "组织名称"},
+                        ],
+                        "incremental": {
+                            "where": "updated_at >= :last_synced_at",
+                            "updated_at_column": "updated_at",
+                        }
                     },
-                    {
-                        "name": "产品线",
-                        "target_table": "产品线",
-                        "target_schema": "business",
-                        "source_type": "config_file",
-                        "source_config": {
-                            "file_path": "config/reference_data/product_lines.yml",
-                            "schema_version": "1.0",
-                        },
-                        "sync_mode": "delete_insert",
-                        "primary_key": "产品线代码",
+                    "sync_mode": "upsert",
+                    "primary_key": "组织代码",
+                },
+                {
+                    "name": "产品线",
+                    "target_table": "产品线",
+                    "target_schema": "business",
+                    "source_type": "config_file",
+                    "source_config": {
+                        "file_path": "config/reference_data/product_lines.yml",
+                        "schema_version": "1.0",
                     },
-                ]
-            }
+                    "sync_mode": "delete_insert",
+                    "primary_key": "产品线代码",
+                },
+            ],
         }
 
-        config = load_reference_sync_config("config/data_sources.yml")
+        config = load_reference_sync_config("config/reference_sync.yml")
 
         # Verify all 4 tables loaded
         assert config is not None

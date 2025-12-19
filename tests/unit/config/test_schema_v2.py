@@ -490,7 +490,10 @@ class TestIntegration:
         assert universal.version_strategy == "highest_number"  # Default
 
     def test_real_config_file_validation(self):
-        """AC-4: Validation of actual config/data_sources.yml file."""
+        """AC-4: Validation of actual config/data_sources.yml file.
+
+        Story 6.2-P14 AC-4: get_domain_config_v2 merges defaults/overrides.
+        """
         config_path = "config/data_sources.yml"
 
         # Check if file exists (it should after Story 3.0)
@@ -498,20 +501,25 @@ class TestIntegration:
             result = validate_data_sources_config_v2(config_path)
             assert result is True
 
-            # Test getting the annuity_performance domain
+            # Test getting the annuity_performance domain with defaults merged
             annuity_config = get_domain_config_v2("annuity_performance", config_path)
 
             assert annuity_config.sheet_name == "规模明细"
-            assert annuity_config.version_strategy == "highest_number"
+            assert annuity_config.version_strategy == "highest_number"  # From defaults
             assert "*规模收入数据*.xlsx" in annuity_config.file_patterns
-            
+
             # Verify output configuration
             assert annuity_config.output is not None
             assert annuity_config.output.table == "annuity_performance"
-            assert annuity_config.output.schema_name == "business"
+            assert annuity_config.output.schema_name == "business"  # From defaults
+
+            # Verify exclude_patterns extended from defaults
+            assert "~$*" in annuity_config.exclude_patterns  # From defaults
+            assert "*.eml" in annuity_config.exclude_patterns  # From defaults
+            assert "*回复*" in annuity_config.exclude_patterns  # Extended via +
 
             # Test getting the annuity_income domain
             income_config = get_domain_config_v2("annuity_income", config_path)
             assert income_config.output is not None
             assert income_config.output.table == "annuity_income"
-            assert income_config.output.schema_name == "business"
+            assert income_config.output.schema_name == "business"  # From defaults

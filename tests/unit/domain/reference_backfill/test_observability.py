@@ -23,23 +23,20 @@ from work_data_hub.domain.reference_backfill.hybrid_service import HybridResult
 
 @pytest.fixture
 def observability_config_file(tmp_path: Path) -> Path:
-    """Create a minimal data_sources.yml with required sensitive fields."""
+    """Create a minimal reference_sync.yml with required sensitive fields."""
     config_content = """
-domains:
-  annuity_performance:
-    foreign_keys:
-      - target_table: "年金计划"
-      - target_table: "组合计划"
-reference_sync:
-  tables:
-    - target_table: "年金计划"
-      sensitive_fields: ["客户名称"]
-    - target_table: "组织架构"
-      sensitive_fields: ["部门名称"]
-    - target_table: "产品线"
-      sensitive_fields: ["产品线名称"]
+schema_version: "1.0"
+enabled: true
+schedule: "0 1 * * *"
+tables:
+  - target_table: "年金计划"
+    sensitive_fields: ["客户名称"]
+  - target_table: "组织架构"
+    sensitive_fields: ["部门名称"]
+  - target_table: "产品线"
+    sensitive_fields: ["产品线名称"]
 """
-    config_path = tmp_path / "data_sources.yml"
+    config_path = tmp_path / "reference_sync.yml"
     config_path.write_text(config_content, encoding="utf-8")
     return config_path
 

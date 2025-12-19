@@ -6,7 +6,6 @@ and alert triggering with threshold violations.
 """
 
 import os
-import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -151,30 +150,40 @@ def test_db_connection():
 
 
 @pytest.fixture
-def mock_config_file():
-    """Create a mock data_sources.yml config file."""
-    config_content = """
+def mock_project_root(tmp_path: Path) -> Path:
+    """Create a mock project root with config/foreign_keys.yml + config/reference_sync.yml."""
+    config_dir = tmp_path / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    (config_dir / "foreign_keys.yml").write_text(
+        """
+schema_version: "1.0"
 domains:
   annuity_performance:
     foreign_keys:
       - target_table: "年金计划"
       - target_table: "组合计划"
+""".lstrip(),
+        encoding="utf-8",
+    )
 
-reference_sync:
-  tables:
-    - target_table: "年金计划"
-      sensitive_fields: ["客户名称"]
-    - target_table: "组织架构"
-      sensitive_fields: ["部门名称"]
-    - target_table: "产品线"
-      sensitive_fields: ["产品线名称"]
-"""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yml', delete=False) as f:
-        f.write(config_content)
-        temp_path = f.name
+    (config_dir / "reference_sync.yml").write_text(
+        """
+schema_version: "1.0"
+enabled: true
+schedule: "0 1 * * *"
+tables:
+  - target_table: "年金计划"
+    sensitive_fields: ["客户名称"]
+  - target_table: "组织架构"
+    sensitive_fields: ["部门名称"]
+  - target_table: "产品线"
+    sensitive_fields: ["产品线名称"]
+""".lstrip(),
+        encoding="utf-8",
+    )
 
-    yield temp_path
-    os.unlink(temp_path)
+    return tmp_path
 
 
 class TestObservabilityServiceIntegration:
@@ -230,7 +239,7 @@ class TestObservabilityServiceIntegration:
             assert "auto_derived_ratio" in alert_types
             assert "needs_review_count" in alert_types
 
-    def test_csv_export_with_real_data(self, test_db_connection, mock_config_file, tmp_path: Path):
+    def test_csv_export_with_real_data(self, test_db_connection, mock_project_root, tmp_path: Path):
         """Test CSV export with actual database data."""
         # Mock pandas DataFrame
         mock_df = pd.DataFrame({
@@ -248,29 +257,32 @@ class TestObservabilityServiceIntegration:
             output = service.export_pending_review(
                 table="年金计划",
                 conn=test_db_connection,
-                config_path=mock_config_file,
+                config_path=str(Path(mock_project_root) / "config" / "reference_sync.yml"),
                 export_policy_path=str(policy_path),
             )
 
             assert output.endswith(".csv")
             assert Path(output).exists()
 
-    def test_load_reference_tables_from_config(self, mock_config_file):
+    def test_load_reference_tables_from_config(self, mock_project_root):
         """Test loading reference tables from config file."""
-        with patch.dict(os.environ, {"WDH_PROJECT_ROOT": str(Path(mock_config_file).parent)}):
+        with patch.dict(os.environ, {"WDH_PROJECT_ROOT": str(mock_project_root)}):
             service = ObservabilityService(reference_tables=[])
-            tables = service._load_reference_tables_from_config(mock_config_file)
+            tables = service._load_reference_tables_from_config(None)
 
-            # Should extract tables from both domains and reference_sync sections
+            # Should extract tables from both config/foreign_keys.yml and config/reference_sync.yml
             assert "年金计划" in tables
             assert "组合计划" in tables
             assert "组织架构" in tables
             assert "产品线" in tables
 
-    def test_sensitive_fields_loading(self, mock_config_file):
+    def test_sensitive_fields_loading(self, mock_project_root):
         """Test loading sensitive fields for a table."""
         service = ObservabilityService()
-        sensitive_fields = service._load_sensitive_columns_from_config("年金计划", mock_config_file)
+        sensitive_fields = service._load_sensitive_columns_from_config(
+            "年金计划",
+            str(Path(mock_project_root) / "config" / "reference_sync.yml"),
+        )
 
         assert "客户名称" in sensitive_fields
 

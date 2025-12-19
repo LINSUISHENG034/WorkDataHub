@@ -23,6 +23,7 @@ from .generic_service import GenericBackfillService, BackfillResult
 from .sync_service import ReferenceSyncService, SyncResult
 from .hybrid_service import HybridReferenceService, HybridResult, CoverageMetrics
 from .config_loader import load_foreign_keys_config, get_domain_from_context
+from .sync_config_loader import load_reference_sync_config
 from .observability import (
     ObservabilityService,
     ReferenceDataMetrics,
@@ -49,6 +50,7 @@ __all__ = [
     "HybridResult",
     "CoverageMetrics",
     "load_foreign_keys_config",
+    "load_reference_sync_config",
     "get_domain_from_context",
     "ObservabilityService",
     "ReferenceDataMetrics",

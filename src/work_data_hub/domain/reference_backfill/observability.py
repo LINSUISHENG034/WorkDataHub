@@ -97,58 +97,74 @@ class ObservabilityService:
 
     def _load_reference_tables_from_config(self, config_path: Optional[str]) -> List[str]:
         """
-        Load reference tables from config/data_sources.yml.
+        Load reference tables from config files.
+
+        Story 6.2-P14: Config File Modularization
+        - Loads from config/foreign_keys.yml for FK target tables
+        - Loads from config/reference_sync.yml for sync target tables
 
         Args:
-            config_path: Path to config file (default: config/data_sources.yml)
+            config_path: Optional config path (currently unused)
 
         Returns:
-            List of reference table names from the config
+            List of reference table names from the configs
         """
-        if config_path is None:
-            # Try to find config file relative to project root
-            project_root = os.environ.get("WDH_PROJECT_ROOT", ".")
-            config_path = os.path.join(project_root, "config", "data_sources.yml")
-
-        config_file = Path(config_path)
-        if not config_file.exists():
-            # Fail closed per AC requirement
-            raise FileNotFoundError(
-                f"observability config file not found: {config_path}"
-            )
-
-        try:
-            with open(config_file, 'r', encoding='utf-8') as f:
-                config = yaml.safe_load(f) or {}
-        except Exception as e:
-            # Fail closed if config cannot be parsed
-            raise ValueError(f"failed to load config {config_path}: {e}") from e
+        project_root = os.environ.get("WDH_PROJECT_ROOT", ".")
 
         tables = set()
-        if 'domains' in config:
-            for domain_config in config['domains'].values():
-                if 'foreign_keys' in domain_config:
-                    for fk in domain_config['foreign_keys']:
-                        target = fk.get('target_table')
+
+        # Load from foreign_keys.yml
+        fk_config_path = Path(project_root) / "config" / "foreign_keys.yml"
+        if fk_config_path.exists():
+            try:
+                with open(fk_config_path, 'r', encoding='utf-8') as f:
+                    fk_config = yaml.safe_load(f) or {}
+
+                # Story 6.2-P14: New structure is domains.<name>.foreign_keys
+                if 'domains' in fk_config:
+                    for domain_config in fk_config['domains'].values():
+                        if 'foreign_keys' in domain_config:
+                            for fk in domain_config['foreign_keys']:
+                                target = fk.get('target_table')
+                                if target:
+                                    tables.add(target)
+            except Exception as e:
+                self.logger.warning(
+                    "observability.fk_config_load_failed",
+                    config_path=str(fk_config_path),
+                    error=str(e)
+                )
+
+        # Load from reference_sync.yml
+        sync_config_path = Path(project_root) / "config" / "reference_sync.yml"
+        if sync_config_path.exists():
+            try:
+                with open(sync_config_path, 'r', encoding='utf-8') as f:
+                    sync_config = yaml.safe_load(f) or {}
+
+                # Story 6.2-P14: New structure has tables at root level
+                if 'tables' in sync_config:
+                    for table_config in sync_config['tables']:
+                        target = table_config.get('target_table')
                         if target:
                             tables.add(target)
-
-        # Also extract from reference_sync config
-        if 'reference_sync' in config and 'tables' in config['reference_sync']:
-            for table_config in config['reference_sync']['tables']:
-                target = table_config.get('target_table')
-                if target:
-                    tables.add(target)
+            except Exception as e:
+                self.logger.warning(
+                    "observability.sync_config_load_failed",
+                    config_path=str(sync_config_path),
+                    error=str(e)
+                )
 
         if not tables:
             raise ValueError(
-                f"no reference tables found in config: {config_path}"
+                "no reference tables found in config/foreign_keys.yml or config/reference_sync.yml"
             )
 
         resolved = sorted(tables)
         self.logger.info(
             "observability.loaded_tables_from_config",
-            config_path=config_path,
+            fk_config=str(fk_config_path),
+            sync_config=str(sync_config_path),
             tables=resolved
         )
         return resolved
@@ -489,43 +505,49 @@ class ObservabilityService:
         """
         Load sensitive columns for a table from config.
 
+        Story 6.2-P14: Config File Modularization
+        - Default: load from config/reference_sync.yml
+        - If config_path is provided, load from that path (tests/overrides)
+
         Args:
             table: Table name
-            config_path: Path to config file
+            config_path: Optional path to reference_sync.yml (tests/overrides)
 
         Returns:
             Set of sensitive column names
         """
-        if config_path is None:
+        if config_path is not None:
+            # Explicit override (tests)
+            sync_config_path = Path(config_path)
+        else:
+            # New default: use config/reference_sync.yml
             project_root = os.environ.get("WDH_PROJECT_ROOT", ".")
-            config_path = os.path.join(project_root, "config", "data_sources.yml")
+            sync_config_path = Path(project_root) / "config" / "reference_sync.yml"
 
         sensitive_columns = set()
-        config_file = Path(config_path)
-        if not config_file.exists():
+        if not sync_config_path.exists():
             raise FileNotFoundError(
-                f"export config file not found: {config_path}"
+                f"reference_sync config not found: {sync_config_path}"
             )
 
         try:
-            with open(config_file, 'r', encoding='utf-8') as f:
+            with open(sync_config_path, 'r', encoding='utf-8') as f:
                 config = yaml.safe_load(f) or {}
 
-            # Check for sensitive_fields in reference_sync tables
-            if 'reference_sync' in config and 'tables' in config['reference_sync']:
-                for table_config in config['reference_sync']['tables']:
-                    if table_config.get('target_table') == table:
-                        sensitive_fields = table_config.get('sensitive_fields', [])
-                        sensitive_columns.update(sensitive_fields)
+            # Story 6.2-P14 (Zero Legacy): tables are at root level in reference_sync.yml
+            for table_config in config.get("tables", []) or []:
+                if table_config.get('target_table') == table:
+                    sensitive_fields = table_config.get('sensitive_fields', [])
+                    sensitive_columns.update(sensitive_fields)
 
             if not sensitive_columns:
                 raise ValueError(
-                    f"sensitive_fields not defined for table '{table}' in config {config_path}"
+                    f"sensitive_fields not defined for table '{table}' in {sync_config_path}"
                 )
 
         except Exception as e:
             raise ValueError(
-                f"failed to load sensitive fields for {table} from {config_path}: {e}"
+                f"failed to load sensitive fields for {table} from {sync_config_path}: {e}"
             ) from e
 
         return sensitive_columns
