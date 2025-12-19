@@ -59,25 +59,92 @@ def test_db_connection():
 
     # Insert test data
     test_data = [
-        ("P001", "测试计划1", "年金", "客户1", "authoritative", False, None, None),
-        ("P002", "测试计划2", "年金", "客户2", "auto_derived", True, "annuity_performance", "2025-01-01T00:00:00Z"),
-        ("P003", "测试计划3", "年金", "客户3", "auto_derived", True, "annuity_income", "2025-01-02T00:00:00Z"),
+        {
+            "plan_id": "P001",
+            "plan_name": "测试计划1",
+            "plan_type": "年金",
+            "customer_name": "客户1",
+            "source": "authoritative",
+            "needs_review": False,
+            "derived_from": None,
+            "derived_at": None,
+        },
+        {
+            "plan_id": "P002",
+            "plan_name": "测试计划2",
+            "plan_type": "年金",
+            "customer_name": "客户2",
+            "source": "auto_derived",
+            "needs_review": True,
+            "derived_from": "annuity_performance",
+            "derived_at": "2025-01-01T00:00:00Z",
+        },
+        {
+            "plan_id": "P003",
+            "plan_name": "测试计划3",
+            "plan_type": "年金",
+            "customer_name": "客户3",
+            "source": "auto_derived",
+            "needs_review": True,
+            "derived_from": "annuity_income",
+            "derived_at": "2025-01-02T00:00:00Z",
+        },
     ]
 
-    conn.execute(text("""
-        INSERT INTO 年金计划 (年金计划号, 计划名称, 计划类型, 客户名称, _source, _needs_review, _derived_from_domain, _derived_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """), test_data)
+    conn.execute(
+        text(
+            """
+            INSERT INTO 年金计划 (
+                年金计划号, 计划名称, 计划类型, 客户名称,
+                _source, _needs_review, _derived_from_domain, _derived_at
+            )
+            VALUES (
+                :plan_id, :plan_name, :plan_type, :customer_name,
+                :source, :needs_review, :derived_from, :derived_at
+            )
+            """
+        ),
+        test_data,
+    )
 
     test_portfolio_data = [
-        ("PF001", "P001", "组合1", "平衡型", "authoritative", False, None, None),
-        ("PF002", "P002", "组合2", "保守型", "auto_derived", True, "annuity_performance", "2025-01-01T00:00:00Z"),
+        {
+            "portfolio_code": "PF001",
+            "plan_id": "P001",
+            "portfolio_name": "组合1",
+            "portfolio_type": "平衡型",
+            "source": "authoritative",
+            "needs_review": False,
+            "derived_from": None,
+            "derived_at": None,
+        },
+        {
+            "portfolio_code": "PF002",
+            "plan_id": "P002",
+            "portfolio_name": "组合2",
+            "portfolio_type": "保守型",
+            "source": "auto_derived",
+            "needs_review": True,
+            "derived_from": "annuity_performance",
+            "derived_at": "2025-01-01T00:00:00Z",
+        },
     ]
 
-    conn.execute(text("""
-        INSERT INTO 组合计划 (组合代码, 年金计划号, 组合名称, 组合类型, _source, _needs_review, _derived_from_domain, _derived_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """), test_portfolio_data)
+    conn.execute(
+        text(
+            """
+            INSERT INTO 组合计划 (
+                组合代码, 年金计划号, 组合名称, 组合类型,
+                _source, _needs_review, _derived_from_domain, _derived_at
+            )
+            VALUES (
+                :portfolio_code, :plan_id, :portfolio_name, :portfolio_type,
+                :source, :needs_review, :derived_from, :derived_at
+            )
+            """
+        ),
+        test_portfolio_data,
+    )
 
     yield conn
     conn.close()
@@ -190,8 +257,8 @@ class TestObservabilityServiceIntegration:
 
     def test_load_reference_tables_from_config(self, mock_config_file):
         """Test loading reference tables from config file."""
-        with patch.dict(os.environ, {"WDH_PROJECT_ROOT": Path(mock_config_file).parent}):
-            service = ObservabilityService()
+        with patch.dict(os.environ, {"WDH_PROJECT_ROOT": str(Path(mock_config_file).parent)}):
+            service = ObservabilityService(reference_tables=[])
             tables = service._load_reference_tables_from_config(mock_config_file)
 
             # Should extract tables from both domains and reference_sync sections
@@ -220,10 +287,9 @@ class TestReferenceDataAuditLoggerIntegration:
 
     def test_audit_logger_with_real_service(self):
         """Test audit logging integration with actual services."""
-        audit_logger = ReferenceDataAuditLogger()
-
         with patch("work_data_hub.domain.reference_backfill.observability.structlog.get_logger") as mock_get_logger:
             mock_logger = mock_get_logger.return_value
+            audit_logger = ReferenceDataAuditLogger()
 
             audit_logger.log_insert(
                 table="年金计划",

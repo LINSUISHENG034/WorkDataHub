@@ -16,8 +16,8 @@ from .jobs import (
     annuity_performance_job,
     annuity_performance_story45_job,
     sample_pipeline_job,
-    sample_trustee_performance_job,
-    sample_trustee_performance_multi_file_job,
+    sandbox_trustee_performance_job,
+    sandbox_trustee_performance_multi_file_job,
 )
 
 # Import schedules
@@ -31,8 +31,8 @@ from .sensors import trustee_data_quality_sensor, trustee_new_files_sensor
 defs = Definitions(
     jobs=[
         sample_pipeline_job,
-        sample_trustee_performance_job,
-        sample_trustee_performance_multi_file_job,
+        sandbox_trustee_performance_job,
+        sandbox_trustee_performance_multi_file_job,
         annuity_performance_job,
         annuity_performance_story45_job,
     ],

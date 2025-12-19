@@ -26,7 +26,6 @@ from work_data_hub.config import get_settings
 from work_data_hub.io.schema import migration_runner
 
 
-SCHEMA_NAME = os.getenv("WDH_REFERENCE_SCHEMA", "business")
 MIGRATION_REVISION = "20251212_120000"
 DOWN_REVISION = "20251208_000001"
 
@@ -85,6 +84,75 @@ def db_engine():
     return engine
 
 
+@pytest.fixture(scope="module", autouse=True)
+def reference_schema(db_engine: Engine) -> str:
+    """
+    Create an isolated reference schema for this test module and point the
+    migration at it via WDH_REFERENCE_SCHEMA.
+
+    This avoids mutating or depending on production-like schemas (e.g. mapping)
+    that may already contain large legacy tables.
+    """
+    schema = f"wdh_test_reference_{uuid.uuid4().hex[:8]}"
+    previous = os.environ.get("WDH_REFERENCE_SCHEMA")
+    os.environ["WDH_REFERENCE_SCHEMA"] = schema
+
+    with db_engine.connect() as conn:
+        conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
+        conn.execute(
+            text(
+                f"""
+                CREATE TABLE IF NOT EXISTS {schema}."年金计划" (
+                    "年金计划号" VARCHAR(255) PRIMARY KEY,
+                    "计划简称" VARCHAR(255)
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                f"""
+                CREATE TABLE IF NOT EXISTS {schema}."组合计划" (
+                    "组合代码" VARCHAR(255) PRIMARY KEY,
+                    "组合名称" VARCHAR(255)
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                f"""
+                CREATE TABLE IF NOT EXISTS {schema}."产品线" (
+                    "产品线代码" VARCHAR(255) PRIMARY KEY,
+                    "产品线" VARCHAR(255)
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                f"""
+                CREATE TABLE IF NOT EXISTS {schema}."组织架构" (
+                    "机构代码" VARCHAR(255) PRIMARY KEY,
+                    "机构" VARCHAR(255)
+                )
+                """
+            )
+        )
+        conn.commit()
+
+    try:
+        yield schema
+    finally:
+        with db_engine.connect() as conn:
+            conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+            conn.commit()
+        if previous is None:
+            os.environ.pop("WDH_REFERENCE_SCHEMA", None)
+        else:
+            os.environ["WDH_REFERENCE_SCHEMA"] = previous
+
+
 @pytest.fixture
 def migrated_db(db_engine: Engine):
     """Upgrade to the target revision for the test, then downgrade afterward."""
@@ -102,12 +170,14 @@ class TestTrackingColumnsExist:
     """Test that tracking columns exist on all reference tables (AC1, AC2)."""
 
     @pytest.mark.parametrize("table_name", TARGET_TABLES)
-    def test_table_has_tracking_columns(self, migrated_db: Engine, table_name: str):
+    def test_table_has_tracking_columns(
+        self, migrated_db: Engine, reference_schema: str, table_name: str
+    ):
         """AC1, AC2: Verify each reference table has all tracking columns."""
         inspector = inspect(migrated_db)
         columns = {
             c["name"]
-            for c in inspector.get_columns(table_name, schema=SCHEMA_NAME)
+            for c in inspector.get_columns(table_name, schema=reference_schema)
         }
 
         for tracking_col in TRACKING_COLUMNS:
@@ -116,12 +186,14 @@ class TestTrackingColumnsExist:
             )
 
     @pytest.mark.parametrize("table_name", TARGET_TABLES)
-    def test_source_column_properties(self, migrated_db: Engine, table_name: str):
+    def test_source_column_properties(
+        self, migrated_db: Engine, reference_schema: str, table_name: str
+    ):
         """AC1: Verify _source column has correct type and default."""
         inspector = inspect(migrated_db)
         columns = {
             c["name"]: c
-            for c in inspector.get_columns(table_name, schema=SCHEMA_NAME)
+            for c in inspector.get_columns(table_name, schema=reference_schema)
         }
 
         source_col = columns["_source"]
@@ -133,12 +205,14 @@ class TestTrackingColumnsExist:
         assert source_col["default"] is not None
 
     @pytest.mark.parametrize("table_name", TARGET_TABLES)
-    def test_needs_review_column_properties(self, migrated_db: Engine, table_name: str):
+    def test_needs_review_column_properties(
+        self, migrated_db: Engine, reference_schema: str, table_name: str
+    ):
         """AC1: Verify _needs_review column has correct type and default."""
         inspector = inspect(migrated_db)
         columns = {
             c["name"]: c
-            for c in inspector.get_columns(table_name, schema=SCHEMA_NAME)
+            for c in inspector.get_columns(table_name, schema=reference_schema)
         }
 
         needs_review_col = columns["_needs_review"]
@@ -151,13 +225,13 @@ class TestTrackingColumnsExist:
 
     @pytest.mark.parametrize("table_name", TARGET_TABLES)
     def test_derived_from_domain_column_properties(
-        self, migrated_db: Engine, table_name: str
+        self, migrated_db: Engine, reference_schema: str, table_name: str
     ):
         """AC1: Verify _derived_from_domain column is nullable VARCHAR(50)."""
         inspector = inspect(migrated_db)
         columns = {
             c["name"]: c
-            for c in inspector.get_columns(table_name, schema=SCHEMA_NAME)
+            for c in inspector.get_columns(table_name, schema=reference_schema)
         }
 
         derived_col = columns["_derived_from_domain"]
@@ -167,12 +241,14 @@ class TestTrackingColumnsExist:
         assert derived_col["nullable"] is True
 
     @pytest.mark.parametrize("table_name", TARGET_TABLES)
-    def test_derived_at_column_properties(self, migrated_db: Engine, table_name: str):
+    def test_derived_at_column_properties(
+        self, migrated_db: Engine, reference_schema: str, table_name: str
+    ):
         """AC1: Verify _derived_at column is nullable TIMESTAMP WITH TIME ZONE."""
         inspector = inspect(migrated_db)
         columns = {
             c["name"]: c
-            for c in inspector.get_columns(table_name, schema=SCHEMA_NAME)
+            for c in inspector.get_columns(table_name, schema=reference_schema)
         }
 
         derived_at_col = columns["_derived_at"]
@@ -187,10 +263,12 @@ class TestPerformanceIndexes:
     """Test that performance indexes exist on all reference tables (AC4)."""
 
     @pytest.mark.parametrize("table_name", TARGET_TABLES)
-    def test_source_index_exists(self, migrated_db: Engine, table_name: str):
+    def test_source_index_exists(
+        self, migrated_db: Engine, reference_schema: str, table_name: str
+    ):
         """AC4: Verify _source index exists for each table."""
         inspector = inspect(migrated_db)
-        indexes = inspector.get_indexes(table_name, schema=SCHEMA_NAME)
+        indexes = inspector.get_indexes(table_name, schema=reference_schema)
         index_names = [idx["name"] for idx in indexes]
 
         expected_index = f"ix_{table_name}_source"
@@ -199,10 +277,12 @@ class TestPerformanceIndexes:
         )
 
     @pytest.mark.parametrize("table_name", TARGET_TABLES)
-    def test_source_index_columns(self, migrated_db: Engine, table_name: str):
+    def test_source_index_columns(
+        self, migrated_db: Engine, reference_schema: str, table_name: str
+    ):
         """AC4: Verify _source index has correct column."""
         inspector = inspect(migrated_db)
-        indexes = inspector.get_indexes(table_name, schema=SCHEMA_NAME)
+        indexes = inspector.get_indexes(table_name, schema=reference_schema)
 
         expected_index = f"ix_{table_name}_source"
         source_index = next(
@@ -213,10 +293,12 @@ class TestPerformanceIndexes:
         assert "_source" in source_index["column_names"]
 
     @pytest.mark.parametrize("table_name", TARGET_TABLES)
-    def test_needs_review_index_exists(self, migrated_db: Engine, table_name: str):
+    def test_needs_review_index_exists(
+        self, migrated_db: Engine, reference_schema: str, table_name: str
+    ):
         """AC4: Verify _needs_review index exists for each table."""
         inspector = inspect(migrated_db)
-        indexes = inspector.get_indexes(table_name, schema=SCHEMA_NAME)
+        indexes = inspector.get_indexes(table_name, schema=reference_schema)
         index_names = [idx["name"] for idx in indexes]
 
         expected_index = f"ix_{table_name}_needs_review"
@@ -225,10 +307,12 @@ class TestPerformanceIndexes:
         )
 
     @pytest.mark.parametrize("table_name", TARGET_TABLES)
-    def test_needs_review_index_columns(self, migrated_db: Engine, table_name: str):
+    def test_needs_review_index_columns(
+        self, migrated_db: Engine, reference_schema: str, table_name: str
+    ):
         """AC4: Verify _needs_review index has correct column."""
         inspector = inspect(migrated_db)
-        indexes = inspector.get_indexes(table_name, schema=SCHEMA_NAME)
+        indexes = inspector.get_indexes(table_name, schema=reference_schema)
 
         expected_index = f"ix_{table_name}_needs_review"
         review_index = next(
@@ -242,7 +326,9 @@ class TestPerformanceIndexes:
 class TestBackwardCompatibility:
     """Test backward compatibility with existing data (AC3)."""
 
-    def test_existing_records_get_defaults(self, migrated_db: Engine):
+    def test_existing_records_get_defaults(
+        self, migrated_db: Engine, reference_schema: str
+    ):
         """AC3: Verify existing records automatically get default values.
 
         This test simulates the scenario where data exists before migration.
@@ -257,7 +343,7 @@ class TestBackwardCompatibility:
             conn.execute(
                 text(
                     f"""
-                    INSERT INTO {SCHEMA_NAME}."{table_name}"
+                    INSERT INTO {reference_schema}."{table_name}"
                         ({pk_col})
                     VALUES
                         (:code)
@@ -272,7 +358,7 @@ class TestBackwardCompatibility:
                 text(
                     f"""
                     SELECT _source, _needs_review, _derived_from_domain, _derived_at
-                    FROM {SCHEMA_NAME}."{table_name}"
+                    FROM {reference_schema}."{table_name}"
                     WHERE {pk_col} = :code
                     """
                 ),
@@ -289,7 +375,7 @@ class TestBackwardCompatibility:
             # Cleanup
             conn.execute(
                 text(
-                    f'DELETE FROM {SCHEMA_NAME}."{table_name}" WHERE {pk_col} = :code'
+                    f'DELETE FROM {reference_schema}."{table_name}" WHERE {pk_col} = :code'
                 ),
                 {"code": "TEST_PRODUCT_LINE"},
             )
@@ -299,7 +385,9 @@ class TestBackwardCompatibility:
 class TestSchemaValidation:
     """Test schema validation before migration (AC7)."""
 
-    def test_upgrade_validates_table_existence(self, db_engine: Engine):
+    def test_upgrade_validates_table_existence(
+        self, db_engine: Engine, reference_schema: str
+    ):
         """AC7: Migration should verify tables exist before adding columns.
 
         This test verifies that the _table_exists check in upgrade() works correctly.
@@ -316,7 +404,7 @@ class TestSchemaValidation:
         for table_name in TARGET_TABLES:
             columns = {
                 c["name"]
-                for c in inspector.get_columns(table_name, schema=SCHEMA_NAME)
+                for c in inspector.get_columns(table_name, schema=reference_schema)
             }
             assert "_source" in columns, f"Table {table_name} should have _source column"
 
@@ -327,7 +415,7 @@ class TestSchemaValidation:
 class TestMigrationIdempotency:
     """Test that migration operations are idempotent (AC5)."""
 
-    def test_upgrade_twice_no_error(self, db_engine: Engine):
+    def test_upgrade_twice_no_error(self, db_engine: Engine, reference_schema: str):
         """AC5: Running upgrade twice should not fail."""
         url = str(db_engine.url)
         # First upgrade
@@ -340,7 +428,7 @@ class TestMigrationIdempotency:
         for table_name in TARGET_TABLES:
             columns = {
                 c["name"]
-                for c in inspector.get_columns(table_name, schema=SCHEMA_NAME)
+                for c in inspector.get_columns(table_name, schema=reference_schema)
             }
             for tracking_col in TRACKING_COLUMNS:
                 assert tracking_col in columns
@@ -352,7 +440,7 @@ class TestMigrationIdempotency:
 class TestMigrationReversibility:
     """Test that downgrade removes objects created by the migration (AC6)."""
 
-    def test_downgrade_removes_columns(self, db_engine: Engine):
+    def test_downgrade_removes_columns(self, db_engine: Engine, reference_schema: str):
         """AC6: Upgrade then downgrade should remove tracking columns."""
         url = str(db_engine.url)
         migration_runner.upgrade(url, MIGRATION_REVISION)
@@ -362,7 +450,7 @@ class TestMigrationReversibility:
         for table_name in TARGET_TABLES:
             columns = {
                 c["name"]
-                for c in inspector.get_columns(table_name, schema=SCHEMA_NAME)
+                for c in inspector.get_columns(table_name, schema=reference_schema)
             }
             # Tracking columns should be removed
             for tracking_col in TRACKING_COLUMNS:
@@ -376,7 +464,9 @@ class TestMigrationReversibility:
         for table_name in TARGET_TABLES:
             columns = {
                 c["name"]
-                for c in inspector_after_upgrade.get_columns(table_name, schema=SCHEMA_NAME)
+                for c in inspector_after_upgrade.get_columns(
+                    table_name, schema=reference_schema
+                )
             }
             for tracking_col in TRACKING_COLUMNS:
                 assert tracking_col in columns
@@ -384,7 +474,7 @@ class TestMigrationReversibility:
         # Final cleanup
         migration_runner.downgrade(url, DOWN_REVISION)
 
-    def test_downgrade_removes_indexes(self, db_engine: Engine):
+    def test_downgrade_removes_indexes(self, db_engine: Engine, reference_schema: str):
         """AC6: Downgrade should remove all tracking field indexes."""
         url = str(db_engine.url)
         migration_runner.upgrade(url, MIGRATION_REVISION)
@@ -404,7 +494,7 @@ class TestMigrationReversibility:
                         """
                     ),
                     {
-                        "schema": SCHEMA_NAME,
+                        "schema": reference_schema,
                         "table": table_name,
                         "source_pattern": f"ix_{table_name}_source",
                         "review_pattern": f"ix_{table_name}_needs_review",
@@ -419,7 +509,9 @@ class TestMigrationReversibility:
 class TestIntegrationWithBackfillService:
     """Test integration with GenericBackfillService from Story 6.2.1 (AC9)."""
 
-    def test_backfill_service_can_write_tracking_fields(self, migrated_db: Engine):
+    def test_backfill_service_can_write_tracking_fields(
+        self, migrated_db: Engine, reference_schema: str
+    ):
         """AC9: GenericBackfillService can write tracking fields to enhanced tables.
 
         This test verifies that the schema enhancement is compatible with
@@ -436,7 +528,7 @@ class TestIntegrationWithBackfillService:
             conn.execute(
                 text(
                     f"""
-                    INSERT INTO {SCHEMA_NAME}."{table_name}"
+                    INSERT INTO {reference_schema}."{table_name}"
                         ({pk_col}, {name_col}, _source, _needs_review,
                          _derived_from_domain, _derived_at)
                     VALUES
@@ -460,7 +552,7 @@ class TestIntegrationWithBackfillService:
                 text(
                     f"""
                     SELECT _source, _needs_review, _derived_from_domain, _derived_at
-                    FROM {SCHEMA_NAME}."{table_name}"
+                    FROM {reference_schema}."{table_name}"
                     WHERE {pk_col} = :code
                     """
                 ),
@@ -477,13 +569,13 @@ class TestIntegrationWithBackfillService:
             # Cleanup
             conn.execute(
                 text(
-                    f'DELETE FROM {SCHEMA_NAME}."{table_name}" WHERE {pk_col} = :code'
+                    f'DELETE FROM {reference_schema}."{table_name}" WHERE {pk_col} = :code'
                 ),
                 {"code": code},
             )
             conn.commit()
 
-    def test_query_by_source_type(self, migrated_db: Engine):
+    def test_query_by_source_type(self, migrated_db: Engine, reference_schema: str):
         """AC4: Verify _source index enables efficient filtering by source type."""
         table_name = "年金计划"
         pk_col = PK_COLUMNS[table_name]
@@ -494,7 +586,7 @@ class TestIntegrationWithBackfillService:
             conn.execute(
                 text(
                     f"""
-                    INSERT INTO {SCHEMA_NAME}."{table_name}"
+                    INSERT INTO {reference_schema}."{table_name}"
                         ({pk_col}, {name_col}, _source)
                     VALUES
                         (:code1, :name1, 'authoritative'),
@@ -515,7 +607,7 @@ class TestIntegrationWithBackfillService:
                 text(
                     f"""
                     SELECT {pk_col}, _source
-                    FROM {SCHEMA_NAME}."{table_name}"
+                    FROM {reference_schema}."{table_name}"
                     WHERE _source = :source
                     ORDER BY {pk_col}
                     """
@@ -531,7 +623,7 @@ class TestIntegrationWithBackfillService:
             conn.execute(
                 text(
                     f"""
-                    DELETE FROM {SCHEMA_NAME}."{table_name}"
+                    DELETE FROM {reference_schema}."{table_name}"
                     WHERE {pk_col} IN (:code1, :code2)
                     """
                 ),
@@ -539,7 +631,9 @@ class TestIntegrationWithBackfillService:
             )
             conn.commit()
 
-    def test_query_records_needing_review(self, migrated_db: Engine):
+    def test_query_records_needing_review(
+        self, migrated_db: Engine, reference_schema: str
+    ):
         """AC4: Verify _needs_review index enables efficient filtering."""
         table_name = "组合计划"
 
@@ -548,7 +642,7 @@ class TestIntegrationWithBackfillService:
             conn.execute(
                 text(
                     f"""
-                    INSERT INTO {SCHEMA_NAME}."{table_name}"
+                    INSERT INTO {reference_schema}."{table_name}"
                         (组合代码, 组合名称, _needs_review)
                     VALUES
                         (:code1, :name1, false),
@@ -569,7 +663,7 @@ class TestIntegrationWithBackfillService:
                 text(
                     f"""
                     SELECT 组合代码, _needs_review
-                    FROM {SCHEMA_NAME}."{table_name}"
+                    FROM {reference_schema}."{table_name}"
                     WHERE _needs_review = true
                     ORDER BY 组合代码
                     """
@@ -583,7 +677,7 @@ class TestIntegrationWithBackfillService:
             conn.execute(
                 text(
                     f"""
-                    DELETE FROM {SCHEMA_NAME}."{table_name}"
+                    DELETE FROM {reference_schema}."{table_name}"
                     WHERE 组合代码 IN (:code1, :code2)
                     """
                 ),

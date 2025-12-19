@@ -1,8 +1,9 @@
 """
-Pydantic v2 data models for trustee performance domain.
+Pydantic v2 data models for sandbox trustee performance domain.
 
-This module defines the input and output data contracts for trustee performance
-data processing, providing robust validation and type safety using Pydantic v2.
+This module defines the input and output data contracts for sandbox trustee
+performance data processing, providing robust validation and type safety using
+Pydantic v2.
 """
 
 import logging

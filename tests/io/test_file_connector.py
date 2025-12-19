@@ -5,7 +5,7 @@ This module tests the DataSourceConnector with various file patterns,
 including Unicode filenames and version selection strategies.
 
 NOTE: Some tests are skipped pending Epic 5 infrastructure refactoring.
-Tests depend on sample_trustee_performance domain configuration.
+Tests depend on sandbox_trustee_performance domain configuration.
 """
 
 import os
@@ -25,7 +25,7 @@ def sample_config():
     """Sample configuration for testing."""
     return {
         "domains": {
-            "sample_trustee_performance": {
+            "sandbox_trustee_performance": {
                 "description": "Test trustee performance files",
                 "pattern": r"(?P<year>20\d{2})[-_/]?(?P<month>0?[1-9]|1[0-2]).*受托业绩.*\.xlsx$",
                 "select": "latest_by_year_month",
@@ -91,7 +91,7 @@ class TestDataSourceConnector:
 
         assert connector.config is not None
         assert "domains" in connector.config
-        assert "sample_trustee_performance" in connector.config["domains"]
+        assert "sandbox_trustee_performance" in connector.config["domains"]
         assert len(connector.compiled_patterns) == 2
 
     def test_init_with_missing_config_file(self):
@@ -140,10 +140,10 @@ class TestDataSourceConnector:
             DataSourceConnector(config_path=str(config_path))
 
     @pytest.mark.skip(
-        reason="Test depends on deprecated sample_trustee_performance domain - pending Epic 5"
+        reason="Test depends on deprecated legacy connector behavior - pending Epic 5"
     )
     @patch("work_data_hub.config.settings.get_settings")
-    def test_discover_sample_trustee_performance_files(
+    def test_discover_sandbox_trustee_performance_files(
         self, mock_settings, config_file, test_data_dir
     ):
         """Test discovery of trustee performance files with Chinese characters."""
@@ -152,14 +152,14 @@ class TestDataSourceConnector:
         mock_settings.return_value.data_sources_config = config_file
 
         connector = DataSourceConnector(config_path=config_file)
-        files = connector.discover("sample_trustee_performance")
+        files = connector.discover("sandbox_trustee_performance")
 
         # Should find trustee performance files and ignore others
         assert len(files) > 0
 
         # Check that discovered files have correct domain
         for file in files:
-            assert file.domain == "trustee_performance"
+            assert file.domain == "sandbox_trustee_performance"
             assert "受托业绩" in file.path
             assert file.path.endswith(".xlsx")
 
@@ -221,7 +221,7 @@ class TestDataSourceConnector:
         mock_settings.return_value.data_base_dir = str(tmp_path)
 
         connector = DataSourceConnector(config_path=config_file)
-        files = connector.discover("trustee_performance")
+        files = connector.discover("sandbox_trustee_performance")
 
         # Should only return the latest file (2024_12)
         assert len(files) == 1
@@ -298,7 +298,7 @@ class TestDataSourceConnector:
 
         # Should find files from both domains
         domains = {f.domain for f in files}
-        assert "trustee_performance" in domains
+        assert "sandbox_trustee_performance" in domains
         assert "simple_test" in domains
 
     @patch("work_data_hub.config.settings.get_settings")
@@ -332,7 +332,7 @@ class TestDataSourceConnector:
             mock_settings.return_value.data_base_dir = str(tmp_path)
 
             connector = DataSourceConnector(config_path=config_file)
-            files = connector.discover("trustee_performance")
+            files = connector.discover("sandbox_trustee_performance")
 
             if files:
                 file = files[0]

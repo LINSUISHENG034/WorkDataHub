@@ -1033,12 +1033,9 @@ class CompanyMappingRepository:
                  CAST(:raw_data AS JSONB), CAST(:raw_business_info AS JSONB),
                  CAST(:raw_biz_label AS JSONB), NOW(), NOW())
             ON CONFLICT (company_id) DO UPDATE SET
-                search_key_word = COALESCE(EXCLUDED.search_key_word, enterprise.base_info.search_key_word),
-                "companyFullName" = COALESCE(EXCLUDED."companyFullName", enterprise.base_info."companyFullName"),
-                unite_code = COALESCE(EXCLUDED.unite_code, enterprise.base_info.unite_code),
-                raw_data = COALESCE(EXCLUDED.raw_data, enterprise.base_info.raw_data),
-                raw_business_info = COALESCE(EXCLUDED.raw_business_info, enterprise.base_info.raw_business_info),
-                raw_biz_label = COALESCE(EXCLUDED.raw_biz_label, enterprise.base_info.raw_biz_label),
+                raw_data = EXCLUDED.raw_data,
+                raw_business_info = EXCLUDED.raw_business_info,
+                raw_biz_label = EXCLUDED.raw_biz_label,
                 api_fetched_at = NOW(),
                 updated_at = NOW()
             RETURNING (xmax = 0) AS inserted

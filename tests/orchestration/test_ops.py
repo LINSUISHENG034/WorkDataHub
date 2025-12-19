@@ -32,8 +32,8 @@ from work_data_hub.orchestration.ops import (
     load_op,
     process_annuity_income_op,
     process_annuity_performance_op,
-    process_sample_trustee_performance_op,
-    read_and_process_sample_trustee_files_op,
+    process_sandbox_trustee_performance_op,
+    read_and_process_sandbox_trustee_files_op,
     read_excel_op,
 )
 
@@ -122,10 +122,10 @@ class TestDiscoverFilesOp:
                 # Create mock legacy schema config
                 config_data = {
                     "domains": {
-                        "sample_trustee_performance": {
+                        "sandbox_trustee_performance": {
                             "pattern": ".*trustee.*\\.xlsx",
                             "select": "latest_by_mtime",
-                            "table": "sample_trustee_performance",
+                            "table": "sandbox_trustee_performance",
                         }
                     }
                 }
@@ -134,13 +134,13 @@ class TestDiscoverFilesOp:
                     yaml.dump(config_data, f)
 
                 context = build_op_context()
-                config = DiscoverFilesConfig(domain="sample_trustee_performance")
+                config = DiscoverFilesConfig(domain="sandbox_trustee_performance")
 
                 result = discover_files_op(context, config)
 
                 # Verify DataSourceConnector was used
                 mock_dsc_class.assert_called_once()
-                mock_dsc.discover.assert_called_once_with("sample_trustee_performance")
+                mock_dsc.discover.assert_called_once_with("sandbox_trustee_performance")
 
                 # Verify result is list of string paths
                 assert result == [mock_file.path]
@@ -268,9 +268,9 @@ class TestReadExcelOp:
 
 
 class TestProcessTrusteePerformanceOp:
-    """Test process_sample_trustee_performance_op functionality."""
+    """Test process_sandbox_trustee_performance_op functionality."""
 
-    def test_process_sample_trustee_performance_op_success(self):
+    def test_process_sandbox_trustee_performance_op_success(self):
         """Test successful domain processing."""
         # Mock input data
         excel_rows = [
@@ -289,7 +289,7 @@ class TestProcessTrusteePerformanceOp:
             mock_process.return_value = [mock_model]
 
             context = build_op_context()
-            result = process_sample_trustee_performance_op(
+            result = process_sandbox_trustee_performance_op(
                 context, excel_rows, ["/path/to/file.xlsx"]
             )
 
@@ -304,19 +304,19 @@ class TestProcessTrusteePerformanceOp:
                 excel_rows, data_source="/path/to/file.xlsx"
             )
 
-    def test_process_sample_trustee_performance_op_empty_data(self):
+    def test_process_sandbox_trustee_performance_op_empty_data(self):
         """Test processing empty data."""
         with patch("work_data_hub.orchestration.ops.process") as mock_process:
             mock_process.return_value = []
 
             context = build_op_context()
-            result = process_sample_trustee_performance_op(
+            result = process_sandbox_trustee_performance_op(
                 context, [], ["/path/to/file.xlsx"]
             )
 
             assert result == []
 
-    def test_process_sample_trustee_performance_op_empty_file_paths(self):
+    def test_process_sandbox_trustee_performance_op_empty_file_paths(self):
         """Test processing with empty file paths."""
         excel_rows = [{"年": "2024", "月": "11", "计划代码": "PLAN001"}]
 
@@ -324,7 +324,7 @@ class TestProcessTrusteePerformanceOp:
             mock_process.return_value = []
 
             context = build_op_context()
-            result = process_sample_trustee_performance_op(context, excel_rows, [])
+            result = process_sandbox_trustee_performance_op(context, excel_rows, [])
 
             assert result == []
             # Should use "unknown" as data_source when no file paths provided
@@ -348,7 +348,7 @@ class TestLoadOp:
         # Mock the load function result
         mock_result = {
             "mode": "delete_insert",
-            "table": "sample_trustee_performance",
+            "table": "sandbox_trustee_performance",
             "deleted": 1,
             "inserted": 1,
             "batches": 1,
@@ -413,7 +413,9 @@ class TestLoadOp:
         """Test _load_valid_domains loads from YAML correctly."""
         config_data = {
             "domains": {
-                "sample_trustee_performance": {"table": "sample_trustee_performance"},
+                "sandbox_trustee_performance": {
+                    "table": "sandbox_trustee_performance"
+                },
                 "annuity_performance": {"table": "annuity_performance"},
             }
         }
@@ -426,7 +428,7 @@ class TestLoadOp:
 
             domains = _load_valid_domains()
 
-            assert domains == ["annuity_performance", "sample_trustee_performance"]
+            assert domains == ["annuity_performance", "sandbox_trustee_performance"]
 
     @pytest.mark.skip(
         reason="Test depends on deprecated domain config - pending Epic 5"
@@ -441,7 +443,7 @@ class TestLoadOp:
             domains = _load_valid_domains()
 
             # Should fallback to default
-            assert domains == ["sample_trustee_performance"]
+            assert domains == ["sandbox_trustee_performance"]
 
     def test_load_valid_domains_empty_config(self, tmp_path):
         """Test _load_valid_domains handles empty domains gracefully."""
@@ -456,7 +458,7 @@ class TestLoadOp:
             domains = _load_valid_domains()
 
             # Should fallback to default when no domains found
-            assert domains == ["trustee_performance"]
+            assert domains == ["sandbox_trustee_performance"]
 
     def test_load_valid_domains_invalid_yaml(self, tmp_path):
         """Test _load_valid_domains handles invalid YAML gracefully."""
@@ -470,7 +472,7 @@ class TestLoadOp:
             domains = _load_valid_domains()
 
             # Should fallback to default on YAML parse error
-            assert domains == ["trustee_performance"]
+            assert domains == ["sandbox_trustee_performance"]
 
     def test_load_op_execute_mode_mocked(self):
         """Test load_op with execute=True using mocked psycopg2."""

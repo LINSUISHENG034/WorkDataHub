@@ -263,10 +263,9 @@ class TestHybridReferenceIntegration:
                 if call_count["coverage_check"] <= 2:  # First call (2 tables)
                     result.fetchall.return_value = []  # No existing records
                 else:  # Second call
-                    result.fetchall.return_value = [
-                        ("PLAN001",),
-                        ("PLAN002",),
-                    ]  # All exist now
+                    # All requested keys exist now (return exactly what was asked for)
+                    fk_values = (params or {}).get("fk_values", [])
+                    result.fetchall.return_value = [(v,) for v in fk_values]
             elif "COUNT" in str(query):
                 result.scalar.return_value = 2
             elif "INSERT" in str(query):

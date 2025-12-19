@@ -170,6 +170,10 @@ class CompanyIdResolutionStep(TransformStep):
         return "company_id_resolution"
 
     def apply(self, df: pd.DataFrame, context: PipelineContext) -> pd.DataFrame:
+        if "客户名称" not in df.columns:
+            df = df.copy()
+            df["客户名称"] = pd.NA
+
         strategy = ResolutionStrategy(
             plan_code_column="计划代码",
             customer_name_column="客户名称",

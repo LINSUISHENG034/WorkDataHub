@@ -203,6 +203,16 @@ def get_logger(name: str) -> Any:
         >>> logger = get_logger(__name__)
         >>> logger.info("event_occurred", user_id=123, action="login")
     """
+    # Ensure the underlying stdlib logger propagates to the root logger so
+    # pytest's caplog and other root handlers can consistently capture output.
+    stdlib_logger = logging.getLogger(name)
+    if stdlib_logger.propagate is False:
+        stdlib_logger.propagate = True
+    # Keep module loggers "open" and let handlers control filtering. This also
+    # avoids surprising suppression if an intermediate parent logger level is
+    # raised elsewhere in the process.
+    if stdlib_logger.level == logging.NOTSET:
+        stdlib_logger.setLevel(logging.DEBUG)
     return structlog.get_logger(name)
 
 

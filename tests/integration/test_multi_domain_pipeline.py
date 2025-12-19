@@ -50,6 +50,13 @@ DEFAULT_SHEET = "收入明细"
 PERFORMANCE_BASELINE_PATH = Path("tests/fixtures/performance_baseline.json")
 
 
+def _safe_platform_string() -> str:
+    try:
+        return platform.platform()
+    except Exception:
+        return sys.platform
+
+
 @dataclass
 class PerformanceMetrics:
     """Performance metrics for a single domain processing run."""
@@ -67,7 +74,7 @@ class EnvironmentInfo:
     """Environment information for performance baseline."""
 
     python_version: str = field(default_factory=lambda: sys.version)
-    platform: str = field(default_factory=lambda: platform.platform())
+    platform: str = field(default_factory=_safe_platform_string)
     cpu_count: int = field(default_factory=lambda: os.cpu_count() or 0)
     pandas_version: str = field(default_factory=lambda: pd.__version__)
 

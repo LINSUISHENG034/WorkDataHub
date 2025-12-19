@@ -39,8 +39,8 @@ from .ops import (
     process_annuity_income_op,
     process_annuity_performance_op,
     process_company_lookup_queue_op,
-    process_sample_trustee_performance_op,
-    read_and_process_sample_trustee_files_op,
+    process_sandbox_trustee_performance_op,
+    read_and_process_sandbox_trustee_files_op,
     read_csv_op,
     read_excel_op,
     validate_op,
@@ -50,7 +50,7 @@ from .reference_sync_ops import ReferenceSyncOpConfig
 
 
 @job
-def sample_trustee_performance_job() -> Any:
+def sandbox_trustee_performance_job() -> Any:
     """
     End-to-end trustee performance processing job.
 
@@ -66,12 +66,14 @@ def sample_trustee_performance_job() -> Any:
     # Note: For MVP, we'll modify the ops to handle the first file selection
     # The read_excel_op will internally select the first file from the list
     excel_rows = read_excel_op(discovered_paths)
-    processed_data = process_sample_trustee_performance_op(excel_rows, discovered_paths)
+    processed_data = process_sandbox_trustee_performance_op(
+        excel_rows, discovered_paths
+    )
     load_op(processed_data)  # No return needed
 
 
 @job
-def sample_trustee_performance_multi_file_job() -> Any:
+def sandbox_trustee_performance_multi_file_job() -> Any:
     """
     End-to-end trustee performance processing job for multi-file scenarios.
 
@@ -84,13 +86,8 @@ def sample_trustee_performance_multi_file_job() -> Any:
     discovered_paths = discover_files_op()
 
     # Use combined op for multi-file processing
-    processed_data = read_and_process_sample_trustee_files_op(discovered_paths)
+    processed_data = read_and_process_sandbox_trustee_files_op(discovered_paths)
     load_op(processed_data)  # No return needed
-
-
-# Backward compatibility aliases for legacy tests/integrations
-trustee_performance_job = sample_trustee_performance_job
-trustee_performance_multi_file_job = sample_trustee_performance_multi_file_job
 
 
 @job
@@ -394,7 +391,7 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
 
     if max_files > 1:
         # Use new combined op for multi-file processing
-        run_config["ops"]["read_and_process_sample_trustee_files_op"] = {
+        run_config["ops"]["read_and_process_sandbox_trustee_files_op"] = {
             "config": {"sheet": sheet_value, "max_files": max_files}
         }
     else:
@@ -410,8 +407,8 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
 
     # Epic 6.2: Generic backfill configuration (configuration-driven approach)
     # Replaces legacy backfill_refs_op with generic_backfill_refs_op
-    # Only add for domains that require backfill (annuity_performance, sample_trustee_performance)
-    if args.domain in ["annuity_performance", "sample_trustee_performance"]:
+    # Only add for domains that require backfill (annuity_performance, sandbox_trustee_performance)
+    if args.domain in ["annuity_performance", "sandbox_trustee_performance"]:
         run_config["ops"]["generic_backfill_refs_op"] = {
             "config": {
                 "domain": args.domain,

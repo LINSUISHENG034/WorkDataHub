@@ -13,6 +13,7 @@ from src.work_data_hub.infrastructure.settings.data_source_schema import (
     DataSourcesValidationError,
     DiscoveryConfig,
     DomainConfig,
+    DomainConfigV2,
     get_domain_config,
     validate_data_sources_config,
 )
@@ -64,11 +65,39 @@ def valid_data_sources_config(valid_domain_config, valid_discovery_config):
 
 
 @pytest.fixture
-def config_file(tmp_path, valid_data_sources_config):
-    """Create a temporary data sources config file for testing."""
+def valid_data_sources_config_v2():
+    """Sample valid Epic 3 (V2) data sources configuration."""
+    return {
+        "schema_version": "1.0",
+        "domains": {
+            "test_domain": {
+                "base_path": "reference/monthly/{YYYYMM}/test-data",
+                "file_patterns": ["*test*.xlsx"],
+                "exclude_patterns": ["~$*"],
+                "sheet_name": 0,
+                "version_strategy": "highest_number",
+                "fallback": "error",
+                "output": {"schema_name": "public", "table": "test_table"},
+            },
+            "another_domain": {
+                "base_path": "reference/monthly/{YYYYMM}/another-data",
+                "file_patterns": ["another*.xlsx"],
+                "exclude_patterns": ["~$*"],
+                "sheet_name": "Sheet1",
+                "version_strategy": "latest_modified",
+                "fallback": "use_latest_modified",
+                "output": {"schema_name": "public", "table": "another_table"},
+            },
+        },
+    }
+
+
+@pytest.fixture
+def config_file(tmp_path, valid_data_sources_config_v2):
+    """Create a temporary Epic 3 (V2) data sources config file for testing."""
     config_path = tmp_path / "test_data_sources.yml"
     with open(config_path, "w", encoding="utf-8") as f:
-        yaml.dump(valid_data_sources_config, f, allow_unicode=True)
+        yaml.dump(valid_data_sources_config_v2, f, allow_unicode=True)
     return str(config_path)
 
 
@@ -232,7 +261,7 @@ class TestValidateDataSourcesConfig:
     def test_validate_current_data_sources_succeeds(self):
         """Test that current data_sources.yml passes validation."""
         result = validate_data_sources_config(
-            "src/work_data_hub/config/data_sources.yml"
+            "config/data_sources.yml"
         )
         assert result is True
 
@@ -302,10 +331,14 @@ class TestGetDomainConfig:
         """Test retrieving configuration for an existing domain."""
         domain_config = get_domain_config("test_domain", config_file)
 
-        assert isinstance(domain_config, DomainConfig)
-        assert domain_config.description == "Test domain configuration"
-        assert domain_config.table == "test_table"
-        assert domain_config.pk == ["id", "date"]
+        assert isinstance(domain_config, DomainConfigV2)
+        assert domain_config.base_path == "reference/monthly/{YYYYMM}/test-data"
+        assert domain_config.file_patterns == ["*test*.xlsx"]
+        assert domain_config.sheet_name == 0
+        assert domain_config.version_strategy == "highest_number"
+        assert domain_config.output is not None
+        assert domain_config.output.table == "test_table"
+        assert domain_config.output.schema_name == "public"
 
     def test_get_domain_config_not_found(self, config_file):
         """Test error when requested domain doesn't exist."""
@@ -335,27 +368,28 @@ class TestIntegration:
         another_domain = get_domain_config("another_domain", config_file)
 
         # Verify domain configurations
-        assert test_domain.table == "test_table"
-        assert another_domain.table == "another_table"
-
-        assert test_domain.select == "latest_by_year_month"
-        assert another_domain.select == "latest_by_mtime"
+        assert test_domain.output is not None
+        assert another_domain.output is not None
+        assert test_domain.output.table == "test_table"
+        assert another_domain.output.table == "another_table"
+        assert test_domain.version_strategy == "highest_number"
+        assert another_domain.version_strategy == "latest_modified"
 
     def test_real_data_sources_yml_validation(self):
         """Test validation of the actual data_sources.yml file in the project."""
         # This should pass if the real file is properly structured
         result = validate_data_sources_config(
-            "src/work_data_hub/config/data_sources.yml"
+            "config/data_sources.yml"
         )
         assert result is True
 
-        # Test getting the sample_trustee_performance domain
+        # Test getting the sandbox_trustee_performance domain
         sample_config = get_domain_config(
-            "sample_trustee_performance", "src/work_data_hub/config/data_sources.yml"
+            "sandbox_trustee_performance", "config/data_sources.yml"
         )
 
-        assert sample_config.table == "sample_trustee_performance"
-        assert sample_config.select == "latest_by_year_month"
-        assert "report_date" in sample_config.pk
-        assert "plan_code" in sample_config.pk
-        assert "company_code" in sample_config.pk
+        assert sample_config.sheet_name == 0
+        assert sample_config.version_strategy == "highest_number"
+        assert sample_config.output is not None
+        assert sample_config.output.table == "sandbox_trustee_performance"
+        assert sample_config.output.schema_name == "sandbox"

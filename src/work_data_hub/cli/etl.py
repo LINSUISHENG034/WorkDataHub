@@ -235,7 +235,7 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:
 
     if max_files > 1:
         # Use new combined op for multi-file processing
-        run_config["ops"]["read_and_process_sample_trustee_files_op"] = {
+        run_config["ops"]["read_and_process_sandbox_trustee_files_op"] = {
             "config": {"sheet": sheet_value, "max_files": max_files}
         }
     else:
@@ -248,7 +248,7 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:
         run_config["ops"]["read_excel_op"] = {"config": {"sheet": sheet_cfg}}
 
     # Epic 6.2: Generic backfill configuration
-    if domain in ["annuity_performance", "sample_trustee_performance"]:
+    if domain in ["annuity_performance", "sandbox_trustee_performance"]:
         run_config["ops"]["generic_backfill_refs_op"] = {
             "config": {
                 "domain": domain,
@@ -594,8 +594,6 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:
     max_files = getattr(args, "max_files", 1)
 
     domain_key = domain
-    if domain_key == "trustee_performance":
-        domain_key = "sample_trustee_performance"
 
     if domain_key == "annuity_performance":
         from work_data_hub.orchestration.jobs import annuity_performance_job
@@ -609,16 +607,16 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:
         selected_job = annuity_income_job
         if max_files > 1:
             print(f"Warning: max_files > 1 not yet supported for {domain}, using 1")
-    elif domain_key == "sample_trustee_performance":
+    elif domain_key == "sandbox_trustee_performance":
         from work_data_hub.orchestration.jobs import (
-            sample_trustee_performance_job,
-            sample_trustee_performance_multi_file_job,
+            sandbox_trustee_performance_job,
+            sandbox_trustee_performance_multi_file_job,
         )
 
         selected_job = (
-            sample_trustee_performance_multi_file_job
+            sandbox_trustee_performance_multi_file_job
             if max_files > 1
-            else sample_trustee_performance_job
+            else sandbox_trustee_performance_job
         )
     elif domain_key == "company_mapping":
         return _execute_company_mapping_job(args)
@@ -629,7 +627,7 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:
     else:
         raise ValueError(
             f"Unsupported domain: {domain}. "
-            f"Supported: sample_trustee_performance, annuity_performance, annuity_income, "
+            f"Supported: sandbox_trustee_performance, annuity_performance, annuity_income, "
             f"company_mapping, company_lookup_queue, reference_sync"
         )
 

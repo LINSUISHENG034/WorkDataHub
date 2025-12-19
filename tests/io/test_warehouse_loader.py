@@ -101,9 +101,11 @@ class TestSQLBuilders:
     def test_build_insert_sql_basic(self, sample_rows):
         """Test basic INSERT SQL generation."""
         cols = ["report_date", "plan_code", "return_rate"]
-        sql, params = build_insert_sql("trustee_performance", cols, sample_rows[:1])
+        sql, params = build_insert_sql(
+            "sandbox_trustee_performance", cols, sample_rows[:1]
+        )
 
-        expected_sql = 'INSERT INTO "trustee_performance" ("report_date","plan_code","return_rate") VALUES (%s,%s,%s)'
+        expected_sql = 'INSERT INTO "sandbox_trustee_performance" ("report_date","plan_code","return_rate") VALUES (%s,%s,%s)'
         assert sql == expected_sql
         assert params == ["2024-01-01", "P001", 0.05]
 
@@ -152,9 +154,11 @@ class TestSQLBuilders:
     def test_build_delete_sql_composite_key(self, sample_rows):
         """Test DELETE with composite primary key."""
         pk_cols = ["report_date", "plan_code", "company_code"]
-        sql, params = build_delete_sql("trustee_performance", pk_cols, sample_rows)
+        sql, params = build_delete_sql(
+            "sandbox_trustee_performance", pk_cols, sample_rows
+        )
 
-        expected_sql = 'DELETE FROM "trustee_performance" WHERE ("report_date","plan_code","company_code") IN ((%s,%s,%s),(%s,%s,%s),(%s,%s,%s))'
+        expected_sql = 'DELETE FROM "sandbox_trustee_performance" WHERE ("report_date","plan_code","company_code") IN ((%s,%s,%s),(%s,%s,%s),(%s,%s,%s))'
         assert sql == expected_sql
 
         # Should have flattened PK values
@@ -234,7 +238,7 @@ class TestLoaderOrchestration:
         """Test delete_insert mode returns complete plan."""
         pk = ["report_date", "plan_code", "company_code"]
         result = load(
-            table="trustee_performance",
+            table="sandbox_trustee_performance",
             rows=sample_rows,
             mode="delete_insert",
             pk=pk,
@@ -334,8 +338,8 @@ class TestWarehouseLoaderClass:
         loader._get_connection_with_retry = MagicMock(return_value=conn)
         loader._pool.putconn = MagicMock()
 
-        first = loader.get_allowed_columns("trustee_performance")
-        second = loader.get_allowed_columns("trustee_performance")
+        first = loader.get_allowed_columns("sandbox_trustee_performance")
+        second = loader.get_allowed_columns("sandbox_trustee_performance")
 
         assert first == ["plan_code", "return_rate"]
         assert second == first
@@ -368,7 +372,7 @@ class TestWarehouseLoaderClass:
         )
 
         result = loader.load_dataframe(
-            df, table="trustee_performance", upsert_keys=["plan_code"]
+            df, table="sandbox_trustee_performance", upsert_keys=["plan_code"]
         )
 
         assert isinstance(result, LoadResult)
@@ -747,7 +751,7 @@ class TestJSONBParameterAdaptation:
             }
         ]
 
-        result = load("trustee_performance", rows, mode="append", conn=None)
+        result = load("sandbox_trustee_performance", rows, mode="append", conn=None)
 
         # Verify sql_plans are generated
         assert "sql_plans" in result
@@ -837,7 +841,7 @@ class TestJSONBParameterAdaptation:
                 "return_rate": 0.055,
                 "validation_warnings": ["Rate exceeds threshold"],
                 "metadata": {
-                    "file_source": "2024_11_trustee_performance.xlsx",
+                    "file_source": "2024_11_sandbox_trustee_performance.xlsx",
                     "processing_info": {"batch_size": 1000, "warnings_count": 1},
                 },
             }
@@ -852,7 +856,12 @@ class TestJSONBParameterAdaptation:
         mock_conn.__exit__.return_value = None
 
         with patch("psycopg2.extras.execute_values") as mock_execute_values:
-            load(table="trustee_performance", rows=rows, mode="append", conn=mock_conn)
+            load(
+                table="sandbox_trustee_performance",
+                rows=rows,
+                mode="append",
+                conn=mock_conn,
+            )
 
             # Verify execute_values call structure
             mock_execute_values.assert_called_once()
@@ -866,7 +875,7 @@ class TestJSONBParameterAdaptation:
             )
 
             # Verify SQL structure
-            assert 'INSERT INTO "trustee_performance"' in sql
+            assert 'INSERT INTO "sandbox_trustee_performance"' in sql
             assert "VALUES %s" in sql
 
             # Verify row_data structure for execute_values
@@ -886,7 +895,7 @@ class TestJSONBParameterAdaptation:
             assert validation_warnings_param.adapted == ["Rate exceeds threshold"]
             assert (
                 metadata_param.adapted["file_source"]
-                == "2024_11_trustee_performance.xlsx"
+                == "2024_11_sandbox_trustee_performance.xlsx"
             )
 
             # Verify page_size parameter

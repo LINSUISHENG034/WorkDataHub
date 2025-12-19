@@ -20,7 +20,7 @@ class DiscoveredFile:
     such as year/month from filename patterns.
 
     Args:
-        domain: The business domain this file belongs to (e.g., 'trustee_performance')
+        domain: The business domain this file belongs to (e.g., 'sandbox_trustee_performance')
         path: Full filesystem path to the discovered file
         year: Year extracted from filename pattern (None if not extractable)
         month: Month extracted from filename pattern (None if not extractable)

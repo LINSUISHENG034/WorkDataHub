@@ -154,7 +154,7 @@ class TestProcessAnnuityPerformance:
         assert result.rows_failed == 1  # 1 intentionally invalid row dropped
         assert result.metrics["discovery"]["row_count"] == len(df.index)
         assert loader.calls[0]["table"] == "annuity_performance_NEW"
-        assert loader.calls[0]["upsert_keys"] == DEFAULT_REFRESH_KEYS
+        assert loader.calls[0]["upsert_keys"] == list(DEFAULT_REFRESH_KEYS)
 
     def test_idempotent_re_run_tracks_updates(self):
         df = _build_source_dataframe()

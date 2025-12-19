@@ -264,6 +264,7 @@ class TestMigrationReversibility:
 
         # Re-upgrade to ensure reversibility and idempotency
         migration_runner.upgrade(url, MIGRATION_REVISION)
+        inspector = inspect(db_engine)  # refresh inspector cache after DDL
         tables = set(inspector.get_table_names(schema=SCHEMA_NAME))
         assert "enrichment_index" in tables
 

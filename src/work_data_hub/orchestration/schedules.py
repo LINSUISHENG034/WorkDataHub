@@ -15,7 +15,10 @@ from dagster import RunRequest, ScheduleEvaluationContext, schedule
 
 from work_data_hub.config.settings import get_settings
 
-from .jobs import process_company_lookup_queue_job, sample_trustee_performance_multi_file_job
+from .jobs import (
+    process_company_lookup_queue_job,
+    sandbox_trustee_performance_multi_file_job,
+)
 from .reference_sync_jobs import reference_sync_job
 
 logger = structlog.get_logger(__name__)
@@ -27,7 +30,7 @@ def _build_schedule_run_config() -> Dict[str, Any]:
 
     This function mirrors the build_run_config pattern from jobs.py but is
     specifically configured for production scheduled runs with:
-    - Fixed domain: sample_trustee_performance
+    - Fixed domain: sandbox_trustee_performance
     - Multi-file processing enabled (max_files=5)
     - Execute mode (plan_only=False)
     - Delete-insert mode for data consistency
@@ -47,7 +50,7 @@ def _build_schedule_run_config() -> Dict[str, Any]:
             data_sources = {}
 
         domain_config = (data_sources.get("domains") or {}).get(
-            "sample_trustee_performance", {}
+            "sandbox_trustee_performance", {}
         ) or {}
         if not isinstance(domain_config, dict):
             domain_config = {}
@@ -58,21 +61,21 @@ def _build_schedule_run_config() -> Dict[str, Any]:
             table_name = str(output_cfg["table"])
             table = f"{schema_name}.{table_name}" if schema_name else table_name
         else:
-            table = domain_config.get("table", "sample_trustee_performance")
+            table = domain_config.get("table", "sandbox_trustee_performance")
 
         pk = domain_config.get("pk", ["report_date", "plan_code", "company_code"])
 
     except Exception as e:
         # Fallback to sensible defaults if config loading fails
         print(f"Warning: Could not load data sources config: {e}")
-        table = "sample_trustee_performance"
+        table = "sandbox_trustee_performance"
         pk = ["report_date", "plan_code", "company_code"]
 
     # Build run_config matching the multi-file job pattern
     return {
         "ops": {
-            "discover_files_op": {"config": {"domain": "sample_trustee_performance"}},
-            "read_and_process_sample_trustee_files_op": {
+            "discover_files_op": {"config": {"domain": "sandbox_trustee_performance"}},
+            "read_and_process_sandbox_trustee_files_op": {
                 "config": {"sheet": 0, "max_files": 5}
             },
             "load_op": {
@@ -89,16 +92,16 @@ def _build_schedule_run_config() -> Dict[str, Any]:
 
 @schedule(
     cron_schedule="0 2 * * *",  # 02:00 daily
-    job=sample_trustee_performance_multi_file_job,
+    job=sandbox_trustee_performance_multi_file_job,
     execution_timezone="Asia/Shanghai",
 )
 def trustee_daily_schedule(_context):
     """
     Daily schedule for trustee performance data processing.
 
-    Runs at 02:00 Asia/Shanghai timezone to process sample trustee performance
+    Runs at 02:00 Asia/Shanghai timezone to process sandbox trustee performance
     files using the multi-file job with production configuration:
-    - Discovers sample_trustee_performance files from configured directories
+    - Discovers sandbox_trustee_performance files from configured directories
     - Processes up to 5 Excel files with combined operations
     - Loads data using delete_insert mode for data consistency
 

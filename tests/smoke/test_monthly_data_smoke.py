@@ -1,7 +1,7 @@
 """
 Smoke tests using reference/monthly data - opt-in via marker.
 
-These tests validate the complete sample_trustee_performance pipeline using real
+These tests validate the complete sandbox_trustee_performance pipeline using real
 reference data and optional database integration. Tests are skipped by
 default and require explicit marker activation.
 
@@ -45,7 +45,7 @@ class TestMonthlyDataSmoke:
             connector = DataSourceConnector()
 
             try:
-                discovered_files = connector.discover("sample_trustee_performance")
+                discovered_files = connector.discover("sandbox_trustee_performance")
             except Exception as e:
                 pytest.skip(f"Discovery failed: {e}")
 
@@ -54,7 +54,7 @@ class TestMonthlyDataSmoke:
 
             # Log discovery results for debugging
             print(
-                f"Discovered {len(discovered_files)} sample_trustee_performance files in reference/monthly"
+                f"Discovered {len(discovered_files)} sandbox_trustee_performance files in reference/monthly"
             )
 
             if discovered_files:
@@ -86,7 +86,7 @@ class TestMonthlyDataSmoke:
                 try:
                     # Test discovery phase
                     connector = DataSourceConnector()
-                    discovered_files = connector.discover("sample_trustee_performance")
+                    discovered_files = connector.discover("sandbox_trustee_performance")
 
                     if not discovered_files:
                         pytest.skip("No files discovered for plan-only smoke test")
@@ -112,7 +112,7 @@ class TestMonthlyDataSmoke:
     @pytest.mark.postgres
     def test_execute_smoke(self, db_connection):
         """Optional execute test with real database."""
-        from src.work_data_hub.domain.sample_trustee_performance.service import process
+        from src.work_data_hub.domain.sandbox_trustee_performance.service import process
         from src.work_data_hub.io.loader.warehouse_loader import load
         from src.work_data_hub.io.readers.excel_reader import ExcelReader
 
@@ -121,7 +121,7 @@ class TestMonthlyDataSmoke:
             try:
                 # Discovery phase
                 connector = DataSourceConnector()
-                discovered_files = connector.discover("sample_trustee_performance")
+                discovered_files = connector.discover("sandbox_trustee_performance")
 
                 if not discovered_files:
                     pytest.skip("No files discovered for execute smoke test")
@@ -140,7 +140,7 @@ class TestMonthlyDataSmoke:
                 print(f"Read {len(excel_rows)} rows from Excel")
 
                 # Process domain transformation
-                processed_records = process(excel_rows, source_file=first_file.path)
+                processed_records = process(excel_rows, data_source=first_file.path)
 
                 if not processed_records:
                     pytest.skip("No processed records for database test")
@@ -152,7 +152,7 @@ class TestMonthlyDataSmoke:
 
                 # Test database load in plan-only mode first
                 plan_result = load(
-                    table="sample_trustee_performance",
+                    table="sandbox_trustee_performance",
                     rows=processed_dicts,
                     mode="delete_insert",
                     pk=["report_date", "plan_code", "company_code"],
@@ -165,7 +165,7 @@ class TestMonthlyDataSmoke:
 
                 # Test actual execution with database
                 execute_result = load(
-                    table="sample_trustee_performance",
+                    table="sandbox_trustee_performance",
                     rows=processed_dicts,
                     mode="delete_insert",
                     pk=["report_date", "plan_code", "company_code"],
@@ -214,7 +214,7 @@ class TestMonthlyDataSmoke:
             with conn.cursor() as cursor:
                 # Use the same schema as our test DDL
                 cursor.execute("""
-                    CREATE TEMP TABLE sample_trustee_performance (
+                    CREATE TEMP TABLE sandbox_trustee_performance (
                         report_date DATE,
                         plan_code VARCHAR(50),
                         company_code VARCHAR(20),

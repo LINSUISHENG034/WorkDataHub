@@ -18,7 +18,10 @@ from work_data_hub.io.connectors.file_connector import FileDiscoveryService
 from work_data_hub.io.loader.warehouse_loader import build_insert_sql
 from work_data_hub.utils.types import DiscoveredFile, extract_file_metadata
 
-from .jobs import process_company_lookup_queue_job, sample_trustee_performance_multi_file_job
+from .jobs import (
+    process_company_lookup_queue_job,
+    sandbox_trustee_performance_multi_file_job,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -45,7 +48,7 @@ def _build_sensor_run_config() -> Dict[str, Any]:
             data_sources = {}
 
         domain_config = (data_sources.get("domains") or {}).get(
-            "sample_trustee_performance", {}
+            "sandbox_trustee_performance", {}
         ) or {}
         if not isinstance(domain_config, dict):
             domain_config = {}
@@ -56,20 +59,20 @@ def _build_sensor_run_config() -> Dict[str, Any]:
             table_name = str(output_cfg["table"])
             table = f"{schema_name}.{table_name}" if schema_name else table_name
         else:
-            table = domain_config.get("table", "sample_trustee_performance")
+            table = domain_config.get("table", "sandbox_trustee_performance")
 
         pk = domain_config.get("pk", ["report_date", "plan_code", "company_code"])
 
     except Exception:
         # Fallback to sensible defaults if config loading fails
-        table = "sample_trustee_performance"
+        table = "sandbox_trustee_performance"
         pk = ["report_date", "plan_code", "company_code"]
 
     # Build run_config matching the multi-file job pattern
     return {
         "ops": {
-            "discover_files_op": {"config": {"domain": "sample_trustee_performance"}},
-            "read_and_process_sample_trustee_files_op": {
+            "discover_files_op": {"config": {"domain": "sandbox_trustee_performance"}},
+            "read_and_process_sandbox_trustee_files_op": {
                 "config": {"sheet": 0, "max_files": 5}
             },
             "load_op": {
@@ -85,7 +88,7 @@ def _build_sensor_run_config() -> Dict[str, Any]:
 
 
 @sensor(
-    job=sample_trustee_performance_multi_file_job,
+    job=sandbox_trustee_performance_multi_file_job,
     minimum_interval_seconds=300,  # Check every 5 minutes
 )
 def trustee_new_files_sensor(context: SensorEvaluationContext):
@@ -107,12 +110,12 @@ def trustee_new_files_sensor(context: SensorEvaluationContext):
     try:
         # Discover a single best-match file using Epic 3 discovery
         discovery = FileDiscoveryService()
-        match = discovery.discover_file(domain="sample_trustee_performance")
+        match = discovery.discover_file(domain="sandbox_trustee_performance")
         file_meta = extract_file_metadata(str(match.file_path))
         file_meta.update({"version": match.version, "sheet_name": match.sheet_name})
         files = [
             DiscoveredFile(
-                domain="sample_trustee_performance",
+                domain="sandbox_trustee_performance",
                 path=str(match.file_path),
                 year=None,
                 month=None,
@@ -122,7 +125,7 @@ def trustee_new_files_sensor(context: SensorEvaluationContext):
 
         if not files:
             return SkipReason(
-                "No sample_trustee_performance files found in configured directories"
+                "No sandbox_trustee_performance files found in configured directories"
             )
 
         # Cursor management: track last processed modification time
@@ -152,7 +155,7 @@ def trustee_new_files_sensor(context: SensorEvaluationContext):
         run_key = f"new_files_{max_mtime}"
 
         context.log.info(
-            "Detected %s new sample trustee performance files "
+            "Detected %s new sandbox trustee performance files "
             "(max_mtime: %s, run_key: %s)",
             len(new_files),
             max_mtime,
@@ -168,7 +171,7 @@ def trustee_new_files_sensor(context: SensorEvaluationContext):
 
 
 @sensor(
-    job=sample_trustee_performance_multi_file_job,
+    job=sandbox_trustee_performance_multi_file_job,
     minimum_interval_seconds=600,  # Check every 10 minutes
 )
 def trustee_data_quality_sensor(context: SensorEvaluationContext):
@@ -191,11 +194,11 @@ def trustee_data_quality_sensor(context: SensorEvaluationContext):
     try:
         # Check 1: File discovery health
         connector = DataSourceConnector()
-        files = connector.discover("sample_trustee_performance")
+        files = connector.discover("sandbox_trustee_performance")
 
         if not files:
             context.log.warning(
-                "DATA QUALITY ALERT: No sample trustee performance files discovered. "
+                "DATA QUALITY ALERT: No sandbox trustee performance files discovered. "
                 "Check data directories and file patterns."
             )
             return SkipReason("No files found for health check")
@@ -232,7 +235,7 @@ def trustee_data_quality_sensor(context: SensorEvaluationContext):
             }
 
             sql, params = build_insert_sql(
-                table="sample_trustee_performance",
+                table="sandbox_trustee_performance",
                 cols=["report_date", "plan_code", "company_code"],
                 rows=[sample_row],
             )

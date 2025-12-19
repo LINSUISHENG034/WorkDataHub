@@ -30,10 +30,16 @@ class TestDomainValidation:
         """Test that configured domains are validated correctly."""
         # Mock configured domains
         with patch('work_data_hub.cli.etl._load_configured_domains') as mock_load:
-            mock_load.return_value = ['annuity_performance', 'annuity_income', 'sample_trustee_performance']
+            mock_load.return_value = [
+                "annuity_performance",
+                "annuity_income",
+                "sandbox_trustee_performance",
+            ]
 
             # Test valid configured domains
-            valid, invalid = _validate_domains(['annuity_performance', 'annuity_income'], allow_special=False)
+            valid, invalid = _validate_domains(
+                ["annuity_performance", "annuity_income"], allow_special=False
+            )
             assert valid == ['annuity_performance', 'annuity_income']
             assert invalid == []
 
@@ -104,7 +110,7 @@ class TestAllDomainsDiscovery:
             mock_load.return_value = [
                 'annuity_performance',
                 'annuity_income',
-                'sample_trustee_performance',
+                'sandbox_trustee_performance',
                 'company_mapping',  # This should be excluded
             ]
 
@@ -174,7 +180,7 @@ class TestMultiDomainCLI:
             mock_load.return_value = [
                 'annuity_performance',
                 'annuity_income',
-                'sample_trustee_performance'
+                "sandbox_trustee_performance"
             ]
 
             # Mock _execute_single_domain to avoid actual execution
@@ -234,7 +240,11 @@ class TestMultiDomainExecution:
         """Test that multi-domain execution continues after domain failure."""
         # Mock configured domains
         with patch('work_data_hub.cli.etl._load_configured_domains') as mock_load:
-            mock_load.return_value = ['annuity_performance', 'annuity_income', 'sample_trustee_performance']
+            mock_load.return_value = [
+                "annuity_performance",
+                "annuity_income",
+                "sandbox_trustee_performance",
+            ]
 
             # Mock _execute_single_domain to simulate failure on second domain
             execution_order = []
@@ -248,7 +258,7 @@ class TestMultiDomainExecution:
             with patch('work_data_hub.cli.etl._execute_single_domain', side_effect=mock_execute):
                 # Test multi-domain execution with failure
                 argv = [
-                    '--domains', 'annuity_performance,annuity_income,sample_trustee_performance',
+                    '--domains', 'annuity_performance,annuity_income,sandbox_trustee_performance',
                     '--period', '202411',
                     '--plan-only'
                 ]
@@ -256,7 +266,11 @@ class TestMultiDomainExecution:
                 exit_code = etl_main(argv)
 
                 # Verify all domains were attempted despite failure
-                assert execution_order == ['annuity_performance', 'annuity_income', 'sample_trustee_performance']
+                assert execution_order == [
+                    "annuity_performance",
+                    "annuity_income",
+                    "sandbox_trustee_performance",
+                ]
 
                 # Verify exit code indicates failure
                 assert exit_code == 1

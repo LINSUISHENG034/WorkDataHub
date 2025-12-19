@@ -624,6 +624,10 @@ class TestEQCClientIntegration:
     def test_integration_search_and_detail(self):
         """Test integration with real EQC API."""
         from work_data_hub.config.settings import get_settings
+        from work_data_hub.io.connectors.eqc_client import (
+            EQCAuthenticationError,
+            EQCClientError,
+        )
         settings = get_settings()
         token = settings.eqc_token
         if not token:
@@ -632,7 +636,10 @@ class TestEQCClientIntegration:
         client = EQCClient(token=token)
 
         # Test search
-        results = client.search_company("中国平安")
+        try:
+            results = client.search_company("中国平安")
+        except (EQCAuthenticationError, EQCClientError) as exc:
+            pytest.skip(f"EQC integration not available with current token: {exc}")
         assert isinstance(results, list)
 
         # If we got results, test detail retrieval

@@ -8,7 +8,7 @@ layer of the hybrid reference data strategy (AD-011).
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import pandas as pd
 from sqlalchemy import text
@@ -81,6 +81,11 @@ class HybridReferenceService:
         self.sync_configs = sync_configs
         self.sync_adapters = sync_adapters
         self.logger = logging.getLogger(f"{__name__}")
+        # Ensure warnings/metrics can be captured via root handlers (e.g. pytest caplog).
+        if self.logger.propagate is False:
+            self.logger.propagate = True
+        if self.logger.level == logging.NOTSET:
+            self.logger.setLevel(logging.DEBUG)
 
     def ensure_references(
         self,
@@ -139,13 +144,15 @@ class HybridReferenceService:
 
         # Step 1: Check coverage of existing reference data with error handling
         coverage_metrics: List[CoverageMetrics] = []
+        missing_by_table: Dict[str, Set[Any]] = {}
         failed_tables: List[str] = []
 
         for config in fk_configs:
             try:
-                metrics = self._check_coverage_for_config(df, config, conn)
+                metrics, missing_values = self._check_coverage_for_config(df, config, conn)
                 if metrics:
                     coverage_metrics.append(metrics)
+                    missing_by_table[config.target_table] = missing_values
                     self.logger.info(
                         f"Coverage for '{metrics.table}': "
                         f"{metrics.covered_values}/{metrics.total_fk_values} "
@@ -159,7 +166,11 @@ class HybridReferenceService:
                     f"Will use full backfill for this table."
                 )
                 # Add zero-coverage metric to trigger full backfill
-                fk_values = set(df[config.source_column].dropna().unique()) if config.source_column in df.columns else set()
+                fk_values = (
+                    set(df[config.source_column].dropna().unique())
+                    if config.source_column in df.columns
+                    else set()
+                )
                 coverage_metrics.append(CoverageMetrics(
                     table=config.target_table,
                     total_fk_values=len(fk_values),
@@ -167,6 +178,7 @@ class HybridReferenceService:
                     missing_values=len(fk_values),
                     coverage_rate=0.0,
                 ))
+                missing_by_table[config.target_table] = fk_values
 
         # Set degradation status if any tables failed
         if failed_tables:
@@ -189,7 +201,7 @@ class HybridReferenceService:
             )
             try:
                 backfill_result = self._selective_backfill(
-                    df, fk_configs, coverage_metrics, conn
+                    df, fk_configs, coverage_metrics, missing_by_table, conn
                 )
             except Exception as e:
                 # AC #5: Backfill errors don't block the pipeline
@@ -249,7 +261,7 @@ class HybridReferenceService:
         df: pd.DataFrame,
         config: ForeignKeyConfig,
         conn: Connection,
-    ) -> Optional[CoverageMetrics]:
+    ) -> Tuple[Optional[CoverageMetrics], Set[Any]]:
         """
         Check FK coverage for a single reference table.
 
@@ -259,14 +271,14 @@ class HybridReferenceService:
             conn: Database connection
 
         Returns:
-            CoverageMetrics for the table, or None if source column missing
+            Tuple of (CoverageMetrics for the table or None, missing FK values set)
         """
         # Get unique FK values from fact data
         if config.source_column not in df.columns:
             self.logger.warning(
                 f"Source column '{config.source_column}' not in DataFrame"
             )
-            return None
+            return (None, set())
 
         fk_values = set(df[config.source_column].dropna().unique())
         total_values = len(fk_values)
@@ -278,13 +290,14 @@ class HybridReferenceService:
                 covered_values=0,
                 missing_values=0,
                 coverage_rate=1.0,
-            )
+            ), set()
 
         # Batch check existence in reference table
         existing_values = self._get_existing_fk_values(fk_values, config, conn)
 
         covered = len(existing_values)
-        missing = total_values - covered
+        missing_values = fk_values - existing_values
+        missing = len(missing_values)
         coverage_rate = covered / total_values if total_values > 0 else 1.0
 
         return CoverageMetrics(
@@ -293,7 +306,7 @@ class HybridReferenceService:
             covered_values=covered,
             missing_values=missing,
             coverage_rate=coverage_rate,
-        )
+        ), missing_values
 
     def _check_coverage(
         self,
@@ -317,7 +330,7 @@ class HybridReferenceService:
         metrics = []
 
         for config in fk_configs:
-            result = self._check_coverage_for_config(df, config, conn)
+            result, _missing_values = self._check_coverage_for_config(df, config, conn)
             if result:
                 metrics.append(result)
                 self.logger.info(
@@ -424,6 +437,7 @@ class HybridReferenceService:
         df: pd.DataFrame,
         fk_configs: List[ForeignKeyConfig],
         coverage_metrics: List[CoverageMetrics],
+        missing_by_table: Dict[str, Set[Any]],
         conn: Connection,
     ) -> Optional[BackfillResult]:
         """
@@ -448,26 +462,15 @@ class HybridReferenceService:
             return None
 
         # Build mask of rows that contain missing FK values only
-        config_by_table = {cfg.target_table: cfg for cfg in fk_configs}
         rows_to_backfill = pd.Series(False, index=df.index)
 
-        for metric in coverage_metrics:
-            config = config_by_table.get(metric.table)
-            if not config:
-                continue
+        for config in fk_configs:
             if config.source_column not in df.columns:
                 continue
-
-            fk_values = set(df[config.source_column].dropna().unique())
-            if not fk_values:
+            missing_values = missing_by_table.get(config.target_table)
+            if not missing_values:
                 continue
-
-            existing = self._get_existing_fk_values(fk_values, config, conn)
-            missing_values = fk_values - existing
-            if missing_values:
-                rows_to_backfill = rows_to_backfill | df[config.source_column].isin(
-                    missing_values
-                )
+            rows_to_backfill |= df[config.source_column].isin(missing_values)
 
         if not rows_to_backfill.any():
             self.logger.info(

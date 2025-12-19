@@ -10,13 +10,13 @@ from decimal import Decimal
 
 import pytest
 
-pytestmark = pytest.mark.sample_domain
+pytestmark = pytest.mark.sandbox_domain
 
-from src.work_data_hub.domain.sample_trustee_performance.models import (
+from src.work_data_hub.domain.sandbox_trustee_performance.models import (
     TrusteePerformanceIn,
     TrusteePerformanceOut,
 )
-from src.work_data_hub.domain.sample_trustee_performance.service import (
+from src.work_data_hub.domain.sandbox_trustee_performance.service import (
     TrusteePerformanceTransformationError,
     _extract_company_code,
     _extract_plan_code,
@@ -463,7 +463,7 @@ class TestDecimalQuantization:
         """Test return_rate quantization to 6 decimal places."""
         from decimal import Decimal
 
-        from src.work_data_hub.domain.sample_trustee_performance.models import (
+        from src.work_data_hub.domain.sandbox_trustee_performance.models import (
             TrusteePerformanceOut,
         )
 
@@ -484,7 +484,7 @@ class TestDecimalQuantization:
         """Test net_asset_value quantization to 4 decimal places."""
         from decimal import Decimal
 
-        from src.work_data_hub.domain.sample_trustee_performance.models import (
+        from src.work_data_hub.domain.sandbox_trustee_performance.models import (
             TrusteePerformanceOut,
         )
 
@@ -504,7 +504,7 @@ class TestDecimalQuantization:
         """Test fund_scale quantization to 2 decimal places."""
         from decimal import Decimal
 
-        from src.work_data_hub.domain.sample_trustee_performance.models import (
+        from src.work_data_hub.domain.sandbox_trustee_performance.models import (
             TrusteePerformanceOut,
         )
 
@@ -524,7 +524,7 @@ class TestDecimalQuantization:
         """Test that string inputs avoid float precision issues."""
         from decimal import Decimal
 
-        from src.work_data_hub.domain.sample_trustee_performance.models import (
+        from src.work_data_hub.domain.sandbox_trustee_performance.models import (
             TrusteePerformanceOut,
         )
 
@@ -543,7 +543,7 @@ class TestDecimalQuantization:
         """Test percentage format conversion with quantization."""
         from decimal import Decimal
 
-        from src.work_data_hub.domain.sample_trustee_performance.models import (
+        from src.work_data_hub.domain.sandbox_trustee_performance.models import (
             TrusteePerformanceOut,
         )
 
@@ -562,7 +562,7 @@ class TestDecimalQuantization:
         """Test that different fields get different precision levels."""
         from decimal import Decimal
 
-        from src.work_data_hub.domain.sample_trustee_performance.models import (
+        from src.work_data_hub.domain.sandbox_trustee_performance.models import (
             TrusteePerformanceOut,
         )
 
@@ -582,7 +582,7 @@ class TestDecimalQuantization:
 
     def test_none_values_preserved(self):
         """Test that None values are preserved through quantization."""
-        from src.work_data_hub.domain.sample_trustee_performance.models import (
+        from src.work_data_hub.domain.sandbox_trustee_performance.models import (
             TrusteePerformanceOut,
         )
 

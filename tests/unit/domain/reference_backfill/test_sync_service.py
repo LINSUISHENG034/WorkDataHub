@@ -270,7 +270,13 @@ class TestReferenceSyncService:
         mock_insert_result = MagicMock()
         mock_insert_result.rowcount = 3
 
-        mock_connection.execute.side_effect = [mock_delete_result, mock_insert_result]
+        def execute_side_effect(query, params=None):
+            query_str = str(query).strip().upper()
+            if query_str.startswith("DELETE"):
+                return mock_delete_result
+            return mock_insert_result
+
+        mock_connection.execute.side_effect = execute_side_effect
 
         rows_deleted, rows_inserted = service._sync_delete_insert(
             df_with_tracking,

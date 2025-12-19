@@ -86,7 +86,7 @@ markers = [
     "performance: marks slow or resource-intensive scenarios",
     "legacy_suite: opt-in regression tests that exercise the legacy annuity stack (RUN_LEGACY_TESTS=1 or --run-legacy-tests)",
     "e2e_suite: opt-in Dagster/warehouse E2E flows that require heavy fixtures (RUN_E2E_TESTS=1 or --run-e2e-tests)",
-    "sample_domain: marks tests for the non-production sample domain (sample_trustee_performance)"
+    "sandbox_domain: marks tests for the non-production sandbox domain (sandbox_trustee_performance)"
 ]
 
 [dependency-groups]

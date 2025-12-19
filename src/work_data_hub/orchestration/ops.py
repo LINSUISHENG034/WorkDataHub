@@ -39,7 +39,7 @@ from work_data_hub.domain.reference_backfill.service import (
 from work_data_hub.domain.reference_backfill.sync_config_loader import (
     load_reference_sync_config,
 )
-from work_data_hub.domain.sample_trustee_performance.service import process
+from work_data_hub.domain.sandbox_trustee_performance.service import process
 from work_data_hub.io.connectors.config_file_connector import ConfigFileConnector
 from work_data_hub.io.loader.warehouse_loader import (
     DataWarehouseLoaderError,
@@ -67,7 +67,7 @@ def _load_valid_domains() -> List[str]:
         List of valid domain names sorted alphabetically
 
     Notes:
-        - Returns fallback ["trustee_performance"] if config cannot be loaded
+        - Returns fallback ["sandbox_trustee_performance"] if config cannot be loaded
         - Logs warnings for missing config or empty domains
         - Handles exceptions gracefully to prevent complete failure
     """
@@ -77,7 +77,7 @@ def _load_valid_domains() -> List[str]:
 
         if not config_path.exists():
             logger.warning("Data sources config not found: %s", config_path)
-            return ["trustee_performance"]  # Fallback to current default
+            return ["sandbox_trustee_performance"]  # Fallback to current default
 
         with open(config_path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
@@ -109,7 +109,7 @@ def _load_valid_domains() -> List[str]:
 
         if not valid_domains:
             logger.warning("No domains found in configuration, using default")
-            return ["trustee_performance"]
+            return ["sandbox_trustee_performance"]
 
         logger.debug("Loaded %s valid domains: %s", len(valid_domains), valid_domains)
         return valid_domains
@@ -117,13 +117,13 @@ def _load_valid_domains() -> List[str]:
     except Exception as e:
         logger.error("Failed to load domains from configuration: %s", e)
         # Fallback to prevent complete failure
-        return ["trustee_performance"]
+        return ["sandbox_trustee_performance"]
 
 
 class DiscoverFilesConfig(Config):
     """Configuration for file discovery operation."""
 
-    domain: str = "trustee_performance"
+    domain: str = "sandbox_trustee_performance"
     period: Optional[str] = None  # YYYYMM format for Epic 3 schema domains
 
     @field_validator("domain")
@@ -340,7 +340,7 @@ def read_excel_op(
 
 
 @op
-def process_sample_trustee_performance_op(
+def process_sandbox_trustee_performance_op(
     context: OpExecutionContext, excel_rows: List[Dict[str, Any]], file_paths: List[str]
 ) -> List[Dict[str, Any]]:
     """
@@ -370,7 +370,7 @@ def process_sample_trustee_performance_op(
 
         context.log.info(
             "Domain processing completed - source: %s, input_rows: %s, "
-            "output_records: %s, domain: sample_trustee_performance",
+            "output_records: %s, domain: sandbox_trustee_performance",
             file_path,
             len(excel_rows),
             len(result_dicts),
@@ -643,7 +643,7 @@ class ReadProcessConfig(Config):
 
 
 @op
-def read_and_process_sample_trustee_files_op(
+def read_and_process_sandbox_trustee_files_op(
     context: OpExecutionContext, config: ReadProcessConfig, file_paths: List[str]
 ) -> List[Dict[str, Any]]:
     """
@@ -699,7 +699,7 @@ def read_and_process_sample_trustee_files_op(
 class LoadConfig(Config):
     """Configuration for data loading operation."""
 
-    table: str = "sample_trustee_performance"
+    table: str = "sandbox_trustee_performance"
     mode: str = "delete_insert"
     pk: List[str] = ["report_date", "plan_code", "company_code"]
     plan_only: bool = True

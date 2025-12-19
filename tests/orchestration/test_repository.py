@@ -5,7 +5,7 @@ This module tests the repository definitions to ensure all components
 (jobs, schedules, sensors) are properly registered for Dagster discovery.
 
 NOTE: Tests skipped pending Epic 5 infrastructure refactoring.
-Tests depend on deprecated trustee_performance jobs/schedules.
+Tests depend on deprecated jobs.py CLI - pending Epic 5.
 """
 
 import pytest
@@ -14,7 +14,7 @@ from dagster import Definitions, JobDefinition, ScheduleDefinition, SensorDefini
 from src.work_data_hub.orchestration.repository import defs
 
 pytestmark = pytest.mark.skip(
-    reason="Tests depend on deprecated trustee_performance jobs - pending Epic 5"
+    reason="Tests depend on deprecated jobs.py CLI - pending Epic 5"
 )
 
 
@@ -34,8 +34,8 @@ class TestDefinitionsModule:
 
         # Verify expected jobs are present
         expected_jobs = [
-            "trustee_performance_job",
-            "trustee_performance_multi_file_job",
+            "sandbox_trustee_performance_job",
+            "sandbox_trustee_performance_multi_file_job",
         ]
 
         for expected_job in expected_jobs:
@@ -92,7 +92,7 @@ class TestDefinitionsModule:
         for schedule in schedules:
             if schedule.name == "trustee_daily_schedule":
                 # Verify schedule targets the correct job
-                assert schedule.job_name == "trustee_performance_multi_file_job"
+                assert schedule.job_name == "sandbox_trustee_performance_multi_file_job"
                 assert schedule.job_name in job_names
 
     def test_sensor_job_relationships(self):
@@ -107,7 +107,7 @@ class TestDefinitionsModule:
                 "trustee_data_quality_sensor",
             ]:
                 # Verify sensor targets the correct job
-                assert sensor.job_name == "sample_trustee_performance_multi_file_job"
+                assert sensor.job_name == "sandbox_trustee_performance_multi_file_job"
                 assert sensor.job_name in job_names
 
     def test_definitions_completeness(self):
@@ -115,7 +115,7 @@ class TestDefinitionsModule:
         # Verify we have the expected number of components
         assert (
             len(defs.jobs) == 2
-        )  # sample_trustee_performance_job, sample_trustee_performance_multi_file_job
+        )  # sandbox_trustee_performance_job, sandbox_trustee_performance_multi_file_job
         assert len(defs.schedules) == 1  # trustee_daily_schedule
         assert (
             len(defs.sensors) == 2
@@ -130,7 +130,7 @@ class TestDefinitionsModule:
                 # Verify schedule configuration
                 assert schedule.cron_schedule == "0 2 * * *"  # 02:00 daily
                 assert schedule.execution_timezone == "Asia/Shanghai"
-                assert schedule.job_name == "sample_trustee_performance_multi_file_job"
+                assert schedule.job_name == "sandbox_trustee_performance_multi_file_job"
 
     def test_sensor_configuration(self):
         """Test sensor configuration properties."""
@@ -140,11 +140,11 @@ class TestDefinitionsModule:
             if sensor.name == "trustee_new_files_sensor":
                 # Verify file discovery sensor configuration
                 assert sensor.minimum_interval_seconds == 300  # 5 minutes
-                assert sensor.job_name == "sample_trustee_performance_multi_file_job"
+                assert sensor.job_name == "sandbox_trustee_performance_multi_file_job"
             elif sensor.name == "trustee_data_quality_sensor":
                 # Verify data quality sensor configuration
                 assert sensor.minimum_interval_seconds == 600  # 10 minutes
-                assert sensor.job_name == "sample_trustee_performance_multi_file_job"
+                assert sensor.job_name == "sandbox_trustee_performance_multi_file_job"
 
     def test_definitions_import_lightweight(self):
         """Test that definitions import is lightweight and doesn't fail."""

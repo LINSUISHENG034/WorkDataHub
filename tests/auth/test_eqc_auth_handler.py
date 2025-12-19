@@ -95,7 +95,7 @@ class TestEqcAuthHandler:
     async def test_successful_token_capture(self):
         """Test successful token capture via network interception."""
         with patch(
-            "src.work_data_hub.auth.eqc_auth_handler.async_playwright"
+            "work_data_hub.io.auth.eqc_auth_handler.async_playwright"
         ) as mock_playwright:
             # Mock the Playwright components
             mock_playwright_instance = AsyncMock()
@@ -151,7 +151,7 @@ class TestEqcAuthHandler:
     async def test_authentication_timeout(self):
         """Test timeout handling when user doesn't complete login."""
         with patch(
-            "src.work_data_hub.auth.eqc_auth_handler.async_playwright"
+            "work_data_hub.io.auth.eqc_auth_handler.async_playwright"
         ) as mock_playwright:
             # Mock browser that never captures token
             mock_playwright_instance = AsyncMock()
@@ -180,7 +180,7 @@ class TestEqcAuthHandler:
     async def test_browser_error_handling(self):
         """Test handling of browser-related errors."""
         with patch(
-            "src.work_data_hub.auth.eqc_auth_handler.async_playwright"
+            "work_data_hub.io.auth.eqc_auth_handler.async_playwright"
         ) as mock_playwright:
             # Mock playwright to raise an exception during browser launch
             mock_playwright_instance = AsyncMock()
@@ -200,7 +200,7 @@ class TestEqcAuthHandler:
     async def test_request_interception_continues_non_target_requests(self):
         """Test that non-target requests are properly continued."""
         with patch(
-            "src.work_data_hub.auth.eqc_auth_handler.async_playwright"
+            "work_data_hub.io.auth.eqc_auth_handler.async_playwright"
         ) as mock_playwright:
             mock_playwright_instance = AsyncMock()
             mock_browser = AsyncMock()
@@ -254,7 +254,7 @@ class TestEqcAuthHandler:
     async def test_get_auth_token_with_validation_success(self):
         """Test get_auth_token_with_validation returns AuthTokenResult."""
         with patch(
-            "src.work_data_hub.auth.eqc_auth_handler.get_auth_token_interactively"
+            "work_data_hub.io.auth.eqc_auth_handler.get_auth_token_interactively"
         ) as mock_get_token:
             test_token = "test_token_1234567890123456"
             mock_get_token.return_value = test_token
@@ -271,7 +271,7 @@ class TestEqcAuthHandler:
     async def test_get_auth_token_with_validation_failure(self):
         """Test get_auth_token_with_validation returns None on failure."""
         with patch(
-            "src.work_data_hub.auth.eqc_auth_handler.get_auth_token_interactively"
+            "work_data_hub.io.auth.eqc_auth_handler.get_auth_token_interactively"
         ) as mock_get_token:
             mock_get_token.return_value = None
 
@@ -281,7 +281,7 @@ class TestEqcAuthHandler:
 
     def test_run_get_token_sync_wrapper(self):
         """Test synchronous wrapper function."""
-        with patch("src.work_data_hub.auth.eqc_auth_handler.asyncio.run") as mock_run:
+        with patch("work_data_hub.io.auth.eqc_auth_handler.asyncio.run") as mock_run:
             test_token = "sync_test_token_1234567890"
             mock_run.return_value = test_token
 
@@ -292,7 +292,7 @@ class TestEqcAuthHandler:
 
     def test_run_get_token_with_validation_sync_wrapper(self):
         """Test synchronous wrapper for validation function."""
-        with patch("src.work_data_hub.auth.eqc_auth_handler.asyncio.run") as mock_run:
+        with patch("work_data_hub.io.auth.eqc_auth_handler.asyncio.run") as mock_run:
             test_result = AuthTokenResult(
                 token="sync_validation_token_1234567890",
                 source_url="https://eqc.pingan.com/",
@@ -307,7 +307,7 @@ class TestEqcAuthHandler:
 
     def test_sync_wrapper_error_handling(self):
         """Test error handling in synchronous wrappers."""
-        with patch("src.work_data_hub.auth.eqc_auth_handler.asyncio.run") as mock_run:
+        with patch("work_data_hub.io.auth.eqc_auth_handler.asyncio.run") as mock_run:
             mock_run.side_effect = Exception("Async execution failed")
 
             result = run_get_token(timeout_seconds=1)

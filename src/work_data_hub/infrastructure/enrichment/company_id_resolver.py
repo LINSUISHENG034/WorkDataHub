@@ -18,6 +18,7 @@ Resolution Priority (Story 6.4 - Multi-Tier Lookup):
 """
 
 import os
+import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -42,6 +43,11 @@ if TYPE_CHECKING:
     )
 
 logger = get_logger(__name__)
+_stdlib_logger = logging.getLogger(__name__)
+if _stdlib_logger.propagate is False:
+    _stdlib_logger.propagate = True
+if _stdlib_logger.level == logging.NOTSET:
+    _stdlib_logger.setLevel(logging.DEBUG)
 
 # Default salt for development - MUST be overridden in production
 DEFAULT_SALT = "default_dev_salt_change_in_prod"
@@ -111,8 +117,13 @@ class CompanyIdResolver:
         self.enrichment_service = enrichment_service
         self.mapping_repository = mapping_repository
 
-        # Auto-create EqcProvider if not provided and mapping_repository is available
-        if eqc_provider is None and mapping_repository is not None:
+        # Auto-create EqcProvider only when explicitly needed (i.e., no injected enrichment_service),
+        # to keep unit tests deterministic and avoid unexpected network calls.
+        if (
+            eqc_provider is None
+            and mapping_repository is not None
+            and enrichment_service is None
+        ):
             try:
                 from work_data_hub.config.settings import get_settings
                 from work_data_hub.infrastructure.enrichment.eqc_provider import EqcProvider
@@ -294,11 +305,13 @@ class CompanyIdResolver:
         if strategy.company_id_column in result_df.columns:
             existing_values_all = result_df[strategy.company_id_column]
             existing_values_text = existing_values_all.astype(str).str.strip()
-            # Only trust numeric company IDs from source column.
-            # Reject placeholders like 'N' to avoid treating them as valid IDs.
+            # Preserve non-empty company IDs from the source column.
+            # Reject common placeholders like 'N' to avoid treating them as valid IDs.
+            invalid_sentinels = {"N", "NA", "N/A", "NONE", "NULL", "NAN"}
             valid_existing_all = (
                 existing_values_all.notna()
-                & existing_values_text.str.fullmatch(r"\d+").fillna(False)
+                & (existing_values_text != "")
+                & ~existing_values_text.str.upper().isin(invalid_sentinels)
             )
             valid_mask = mask_missing & valid_existing_all
             result_df.loc[valid_mask, strategy.output_column] = existing_values_text[
@@ -363,25 +376,6 @@ class CompanyIdResolver:
                 hits=eqc_hits,
                 budget_consumed=stats.budget_consumed,
                 budget_remaining=budget_remaining,
-            )
-
-        # Step 4.5: Default fallback for empty customer_name (Legacy compatibility)
-        # From legacy data_cleaner.py lines 215-217: when company_id is empty AND
-        # customer_name is empty, use hardcoded default '600866980'
-        mask_missing = result_df[strategy.output_column].isna()
-        customer_name_col = strategy.customer_name_column
-        mask_empty_customer = mask_missing & (
-            result_df[customer_name_col].isna() |
-            (result_df[customer_name_col].astype(str).str.strip() == "")
-        )
-        if mask_empty_customer.any():
-            result_df.loc[mask_empty_customer, strategy.output_column] = "600866980"
-            stats.default_fallback_hits = int(mask_empty_customer.sum())
-            resolution_mask |= mask_empty_customer
-
-            logger.debug(
-                "company_id_resolver.default_fallback_applied",
-                count=stats.default_fallback_hits,
             )
 
         # Step 5: Generate temp IDs for remaining (vectorized apply)
@@ -686,10 +680,9 @@ class CompanyIdResolver:
                 record = results.get((lookup_type, key))
                 if isinstance(record, EnrichmentIndexRecord):
                     company_id = str(record.company_id).strip()
-                    # Validate cache entries: reject obvious placeholders like 'N' or empty values,
-                    # but accept alphanumeric IDs like '602671512X' (special customer IDs).
-                    # Valid format: at least 5 chars starting with digit (e.g., '602671512X')
-                    if not company_id or len(company_id) < 5 or not company_id[0].isdigit():
+                    # Validate cache entries: reject obvious placeholders like 'N' or empty values.
+                    invalid_sentinels = {"N", "NA", "N/A", "NONE", "NULL", "NAN"}
+                    if not company_id or company_id.upper() in invalid_sentinels:
                         path_segments.append(f"{label}:INVALID")
                         continue
                     resolved.loc[idx] = company_id
@@ -708,6 +701,11 @@ class CompanyIdResolver:
                 index=int(row_idx),
                 path=path,
                 decision_path=path,
+            )
+            _stdlib_logger.debug(
+                "company_id_resolver.db_cache_decision_path index=%s path=%s",
+                int(row_idx),
+                path,
             )
 
         decision_path_counts: Dict[str, int] = {}
@@ -730,6 +728,13 @@ class CompanyIdResolver:
             decision_path_counts=decision_path_counts,
             total_hits=sum(hits_by_priority.values()),
             resolved_rows=int(resolved.notna().sum()),
+        )
+        _stdlib_logger.info(
+            "company_id_resolver.db_cache_metrics total_hits=%s resolved_rows=%s hits_by_priority=%s decision_path_counts=%s",
+            sum(hits_by_priority.values()),
+            int(resolved.notna().sum()),
+            dict(hits_by_priority),
+            decision_path_counts,
         )
 
         # Increment hit_count on matched records (best-effort)
@@ -1196,7 +1201,7 @@ class CompanyIdResolver:
         Returns:
             Temporary ID in format "IN_<16-char-Base32>".
         """
-        if not customer_name or not str(customer_name).strip():
+        if customer_name is None or pd.isna(customer_name) or not str(customer_name).strip():
             # For empty names, use a placeholder
             customer_name = "__EMPTY__"
 

@@ -12,7 +12,6 @@ Set DATABASE_URL environment variable to run.
 """
 
 import os
-import sys
 from decimal import Decimal
 from typing import Generator
 
@@ -20,12 +19,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection, Engine
 
-# Add scripts directory to path
-scripts_path = os.path.join(os.path.dirname(__file__), "../../../scripts")
-if scripts_path not in sys.path:
-    sys.path.insert(0, scripts_path)
-
-from migrations.migrate_legacy_to_enrichment_index import (
+from work_data_hub.scripts.migrate_legacy_to_enrichment_index import (
     LegacyMigrationConfig,
     MigrationReport,
     migrate_company_id_mapping,
@@ -60,6 +54,12 @@ def database_url() -> str:
 def engine(database_url: str) -> Generator[Engine, None, None]:
     """Create database engine."""
     eng = create_engine(database_url)
+    try:
+        with eng.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception as exc:
+        eng.dispose()
+        pytest.skip(f"DATABASE_URL not reachable for integration tests: {exc}")
     yield eng
     eng.dispose()
 

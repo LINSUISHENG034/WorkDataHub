@@ -519,16 +519,15 @@ class TestHybridReferenceServiceIdempotency:
 
         def mock_execute(query, params=None):
             result = Mock()
-            if "SELECT" in str(query) and "WHERE" in str(query):
+            if "SELECT" in str(query) and "WHERE" in str(query) and "COUNT" not in str(query):
                 call_count["coverage_check"] += 1
+                fk_values = (params or {}).get("fk_values", [])
                 if call_count["coverage_check"] <= 2:  # First call (2 tables)
-                    result.fetchall.return_value = [("PLAN001",)]  # Partial coverage
+                    # Partial coverage: only the first requested key exists
+                    result.fetchall.return_value = [(fk_values[0],)] if fk_values else []
                 else:  # Second call
-                    result.fetchall.return_value = [
-                        ("PLAN001",),
-                        ("PLAN002",),
-                        ("PLAN003",),
-                    ]  # Full coverage
+                    # Full coverage: return exactly what was requested
+                    result.fetchall.return_value = [(v,) for v in fk_values]
             elif "COUNT" in str(query):
                 result.scalar.return_value = 5
             elif "INSERT" in str(query):

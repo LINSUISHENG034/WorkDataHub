@@ -4,11 +4,11 @@ in the exception handling of the trustee performance service.
 """
 
 import pytest
-from src.work_data_hub.domain.sample_trustee_performance.service import (
+from src.work_data_hub.domain.sandbox_trustee_performance.service import (
     _transform_single_row,
 )
 
-pytestmark = pytest.mark.sample_domain
+pytestmark = pytest.mark.sandbox_domain
 
 
 def test_transform_row_with_invalid_month_reproduces_bug():

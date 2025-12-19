@@ -19,10 +19,10 @@
 schema_version: "1.0"
 
 domains:
-  # Sample Trustee Performance Domain (demo/test)
-  # Used by Dagster schedules/sensors and sample jobs.
+  # Sandbox Trustee Performance Domain (dev/test)
+  # Used by Dagster schedules/sensors and sandbox jobs.
   # Path structure: tests/fixtures/real_data/202411/收集数据/业务收集/V1/**/*
-  sample_trustee_performance:
+  sandbox_trustee_performance:
     # NOTE: No {YYYYMM} here to keep sensors/schedules period-free.
     base_path: "tests/fixtures/real_data/202411/收集数据/业务收集"
 
@@ -41,8 +41,8 @@ domains:
     fallback: "error"
 
     output:
-      table: "sample_trustee_performance"
-      schema_name: "sample"
+      table: "sandbox_trustee_performance"
+      schema_name: "sandbox"
 
   # Annuity Performance Domain
   # ✅ VALIDATED with real 202411 data (Epic 3 Tech Spec Action Item #2)
@@ -80,7 +80,7 @@ domains:
 
     # Output destination configuration
     output:
-      table: "规模明细"
+      table: "annuity_performance"
       schema_name: "business"
       # Refresh key for delete_insert mode (Legacy-compatible refresh scope)
       pk:
@@ -206,7 +206,7 @@ domains:
 
     # Output destination configuration
     output:
-      table: "收入明细"
+      table: "annuity_income"
       schema_name: "business"
       # Primary key for delete_insert mode (matches GOLD_COMPOSITE_KEY in schemas.py)
       pk:

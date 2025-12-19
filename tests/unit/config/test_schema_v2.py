@@ -503,7 +503,7 @@ class TestIntegration:
 
             assert annuity_config.sheet_name == "规模明细"
             assert annuity_config.version_strategy == "highest_number"
-            assert "*年金终稿*.xlsx" in annuity_config.file_patterns
+            assert "*规模收入数据*.xlsx" in annuity_config.file_patterns
             
             # Verify output configuration
             assert annuity_config.output is not None

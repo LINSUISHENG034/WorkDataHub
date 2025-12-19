@@ -23,7 +23,7 @@ def test_core_tables_exist(test_db_with_migrations: str) -> None:
             text("SELECT version_num FROM alembic_version")
         ).scalar_one()
         # Updated to latest migration revision (includes upsert constraints)
-        assert revision == "20251206_000001"
+        assert revision == "20251219_000001"
 
 
 @pytest.mark.integration

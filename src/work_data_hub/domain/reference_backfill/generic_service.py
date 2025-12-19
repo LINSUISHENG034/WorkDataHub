@@ -58,17 +58,24 @@ class GenericBackfillService:
     monitoring.
     """
 
-    def __init__(self, domain: str, enable_audit_logging: bool = True):
+    def __init__(
+        self,
+        domain: str,
+        enable_audit_logging: bool = True,
+        audit_record_limit: int = 0,
+    ):
         """
         Initialize the backfill service.
 
         Args:
             domain: Domain name for logging and tracking
             enable_audit_logging: Whether to enable audit logging for data changes
+            audit_record_limit: Max per-record audit events per run (0 = always log a summary)
         """
         self.domain = domain
         self.logger = logging.getLogger(f"{__name__}.{domain}")
         self.enable_audit_logging = enable_audit_logging
+        self.audit_record_limit = audit_record_limit
 
     def run(
         self,
@@ -251,52 +258,36 @@ class GenericBackfillService:
             )
             return pd.DataFrame()
 
-        # Group by source column to get unique records
-        grouped = source_df.groupby(config.source_column)
+        # Vectorized aggregation: "first non-blank per group per column"
+        mapping_sources = [
+            m.source for m in config.backfill_columns if m.source != config.source_column
+        ]
+        present_sources = [c for c in mapping_sources if c in source_df.columns]
 
-        candidates = []
-        for source_value, group in grouped:
-            candidate = {config.target_key: source_value}
+        # Normalize blanks to NA for string-like columns so groupby.first skips them
+        for col in present_sources:
+            s = source_df[col]
+            if s.dtype == object or str(s.dtype).startswith("string"):
+                s = s.astype("string").str.strip()
+                source_df[col] = s.mask(s == "", pd.NA)
 
-            # Map additional columns
-            for col_mapping in config.backfill_columns:
-                if col_mapping.source not in group.columns:
-                    if col_mapping.optional:
-                        candidate[col_mapping.target] = None
-                        continue
+        grouped_first = source_df.groupby(config.source_column, sort=False).first()
 
-                    self.logger.warning(
-                        f"Required source column '{col_mapping.source}' not found "
-                        f"when deriving '{col_mapping.target}' for "
-                        f"{config.source_column}='{source_value}'. "
-                        f"Available columns: {list(group.columns)}"
-                    )
-                    candidate[col_mapping.target] = None
-                    continue
+        candidates_df = pd.DataFrame({config.target_key: grouped_first.index})
+        for col_mapping in config.backfill_columns:
+            if col_mapping.source == config.source_column:
+                candidates_df[col_mapping.target] = candidates_df[config.target_key].to_numpy()
+                continue
+            if col_mapping.source in grouped_first.columns:
+                candidates_df[col_mapping.target] = grouped_first[col_mapping.source].to_numpy()
+            else:
+                candidates_df[col_mapping.target] = None
 
-                # Find first non-null value in the group
-                values = group[col_mapping.source]
-                values = values[self._non_blank_mask(values)]
-
-                if values.empty:
-                    if col_mapping.optional:
-                        # Optional column - skip if no values
-                        candidate[col_mapping.target] = None
-                    else:
-                        # Required column - log warning but continue with None
-                        self.logger.warning(
-                            f"No values found for required column mapping "
-                            f"'{col_mapping.source}' -> '{col_mapping.target}' "
-                            f"for {config.source_column}='{source_value}'"
-                        )
-                        candidate[col_mapping.target] = None
-                else:
-                    # Use first value (could enhance with aggregation logic)
-                    candidate[col_mapping.target] = values.iloc[0]
-
-            candidates.append(candidate)
-
-        candidates_df = pd.DataFrame(candidates)
+        # Match legacy behavior: optional missing values are represented as Python None
+        for col_mapping in config.backfill_columns:
+            if col_mapping.optional and col_mapping.target in candidates_df.columns:
+                col = candidates_df[col_mapping.target]
+                candidates_df[col_mapping.target] = col.where(col.notna(), None)
 
         # Note: We do NOT filter out records where optional columns are null.
         # A record with only the primary key is still valid for backfill.
@@ -446,7 +437,8 @@ class GenericBackfillService:
                     records = new_records_df.to_dict('records')
                     insert_result = conn.execute(text(insert_query), records)
                     conn.commit()
-                    inserted += insert_result.rowcount if hasattr(insert_result, 'rowcount') else len(records)
+                    rowcount = getattr(insert_result, "rowcount", None)
+                    inserted += rowcount if isinstance(rowcount, int) else len(records)
 
                 # Update existing rows where columns are NULL and candidate has value
                 existing_df = candidates_df[~mask]
@@ -483,35 +475,45 @@ class GenericBackfillService:
         result = conn.execute(text(query), remapped_records)
         conn.commit()
 
-        inserted_count = result.rowcount if hasattr(result, 'rowcount') else len(records)
+        rowcount = getattr(result, "rowcount", None)
+        inserted_count = rowcount if isinstance(rowcount, int) else len(records)
 
         # Log audit events for inserted records
         if self.enable_audit_logging and add_tracking_fields and inserted_count > 0:
             # Import here to avoid circular import
             from .observability import ReferenceDataAuditLogger
 
-            audit_logger = ReferenceDataAuditLogger()
-            # Log inserts for new keys
-            for record in records:
-                pk = str(record[config.target_key])
-                if pk in new_keys:
-                    audit_logger.log_insert(
-                        table=config.target_table,
-                        record_key=pk,
-                        source=record.get('_source', 'auto_derived'),
-                        domain=record.get('_derived_from_domain'),
-                        actor=f"backfill_service.{self.domain}"
-                    )
-                elif config.mode == "fill_null_only":
-                    # Existing records updated with new values (fill nulls)
-                    audit_logger.log_update(
-                        table=config.target_table,
-                        record_key=pk,
-                        old_source="unknown",
-                        new_source=record.get('_source', 'auto_derived'),
-                        domain=record.get('_derived_from_domain'),
-                        actor=f"backfill_service.{self.domain}"
-                    )
+            if self.audit_record_limit <= 0 or len(new_keys) > self.audit_record_limit:
+                self.logger.info(
+                    "Skipping per-record audit logging for large batch",
+                    table=config.target_table,
+                    new_keys=len(new_keys),
+                    limit=self.audit_record_limit,
+                    actor=f"backfill_service.{self.domain}",
+                )
+            else:
+                audit_logger = ReferenceDataAuditLogger()
+                # Log inserts for new keys
+                for record in records:
+                    pk = str(record[config.target_key])
+                    if pk in new_keys:
+                        audit_logger.log_insert(
+                            table=config.target_table,
+                            record_key=pk,
+                            source=record.get('_source', 'auto_derived'),
+                            domain=record.get('_derived_from_domain'),
+                            actor=f"backfill_service.{self.domain}"
+                        )
+                    elif config.mode == "fill_null_only":
+                        # Existing records updated with new values (fill nulls)
+                        audit_logger.log_update(
+                            table=config.target_table,
+                            record_key=pk,
+                            old_source="unknown",
+                            new_source=record.get('_source', 'auto_derived'),
+                            domain=record.get('_derived_from_domain'),
+                            actor=f"backfill_service.{self.domain}"
+                        )
 
         self.logger.debug(
             f"Inserted {inserted_count} records into '{config.target_table}' "

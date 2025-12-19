@@ -13,9 +13,9 @@ import pytest
 from pydantic import ValidationError, ValidationInfo
 import pytest
 
-pytestmark = pytest.mark.sample_domain
+pytestmark = pytest.mark.sandbox_domain
 
-from src.work_data_hub.domain.sample_trustee_performance.models import (
+from src.work_data_hub.domain.sandbox_trustee_performance.models import (
     TrusteePerformanceOut,
 )
 
@@ -234,7 +234,7 @@ class TestFieldValidatorInfoIntegration:
 
     def test_field_validator_receives_correct_field_name(self):
         """Test that field validators receive correct field_name in ValidationInfo."""
-        from src.work_data_hub.domain.sample_trustee_performance.models import (
+        from src.work_data_hub.domain.sandbox_trustee_performance.models import (
             TrusteePerformanceOut,
         )
 
@@ -272,7 +272,7 @@ class TestFieldValidatorInfoIntegration:
 
     def test_field_precision_map_coverage(self):
         """Test that all decimal fields are covered in FIELD_PRECISION_MAP."""
-        from src.work_data_hub.domain.sample_trustee_performance.models import (
+        from src.work_data_hub.domain.sandbox_trustee_performance.models import (
             TrusteePerformanceOut,
         )
 
@@ -303,7 +303,7 @@ class TestFieldValidatorInfoIntegration:
 
     def test_clean_decimal_fields_direct_invocation(self):
         """Test direct invocation of clean_decimal_fields validator."""
-        from src.work_data_hub.domain.sample_trustee_performance.models import (
+        from src.work_data_hub.domain.sandbox_trustee_performance.models import (
             TrusteePerformanceOut,
         )
 
