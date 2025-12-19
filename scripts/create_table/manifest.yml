@@ -1,25 +1,90 @@
+# =============================================================================
+# CREATE TABLE SCRIPTS - MANIFEST
+# =============================================================================
+#
+# SCOPE REDEFINITION (2025-12-19 - Story 6.2-P13):
+# ================================================
+# This module is now ONLY for:
+#   - Temporary tables for data processing
+#   - Standalone utility tables not part of domain schema
+#   - One-time migration scripts
+#   - Data repair scripts
+#
+# Domain tables (annuity_performance, annuity_plans, portfolio_plans, etc.)
+# are now managed via:
+#   - io/schema/domain_registry.py (Single Source of Truth)
+#   - io/schema/migrations/ (Alembic versioned migrations)
+#
+# For domain schema changes, use:
+#   1. Update io/schema/domain_registry.py
+#   2. Create Alembic migration: alembic revision -m "description"
+#   3. Apply migration: alembic upgrade head
+#
+# =============================================================================
+
+# LEGACY (kept for backward compatibility):
+# `scripts/create_table/generate_from_json.py` historically reads `manifest.yml:domains`.
+# Story 6.2-P13 redefines scope, but we keep these entries so legacy tooling and
+# historical DDL regeneration doesn't break unexpectedly.
 domains:
   annuity_performance:
-    table: "规模明细"
+    table: "business.规模明细"
     entity: "annuity_performance"
     delete_scope_key: ["月度", "计划代码", "company_id"]
     ddl: "scripts/create_table/ddl/annuity_performance.sql"
 
   annuity_plans:
-    table: "年金计划"
+    table: "mapping.年金计划"
     entity: "annuity_plans"
     delete_scope_key: ["年金计划号", "company_id"]
     ddl: "scripts/create_table/ddl/annuity_plans.sql"
 
   portfolio_plans:
-    table: "组合计划"
+    table: "mapping.组合计划"
     entity: "portfolio_plans"
     delete_scope_key: ["年金计划号", "组合代码"]
     ddl: "scripts/create_table/ddl/portfolio_plans.sql"
 
+# DEPRECATED: Domain tables (now managed by Alembic + domain_registry)
+# These entries are kept for historical reference only.
+# DO NOT use these for new deployments.
+deprecated_domains:
+  annuity_performance:
+    note: "Migrated to io/schema/migrations/ and domain_registry.py"
+    migration_date: "2025-12-19"
+    alembic_revision: "20251219_000001"
+
+  annuity_plans:
+    note: "Migrated to io/schema/migrations/ and domain_registry.py"
+    migration_date: "2025-12-19"
+    alembic_revision: "20251219_000001"
+
+  portfolio_plans:
+    note: "Migrated to io/schema/migrations/ and domain_registry.py"
+    migration_date: "2025-12-19"
+    alembic_revision: "20251219_000001"
+
+# ACTIVE: Utility and temporary tables
+# These tables are NOT managed by domain_registry, and remain in this manifest.
+utility_tables:
+  # company_mapping is managed here for now (not a domain detail table)
   company_mapping:
     table: "enterprise.company_mapping"
     entity: "company_mapping"
     delete_scope_key: ["alias_name", "match_type"]
     ddl: "scripts/create_table/ddl/company_mapping.sql"
 
+  # lookup_requests is a utility table for EQC API queue
+  lookup_requests:
+    table: "enterprise.lookup_requests"
+    entity: "lookup_requests"
+    delete_scope_key: ["customer_name", "domain_name"]
+    ddl: "scripts/create_table/ddl/lookup_requests.sql"
+
+# One-time scripts (data repairs, migrations, etc.)
+# Example format:
+#   fix_company_id_nulls:
+#     script: "scripts/create_table/repairs/fix_company_id_nulls.sql"
+#     executed_date: null
+#     purpose: "Repair NULL company_id values from legacy migration"
+one_time_scripts: {}

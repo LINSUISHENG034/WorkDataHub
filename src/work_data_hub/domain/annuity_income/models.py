@@ -15,6 +15,8 @@ from pydantic import (
 )
 
 from work_data_hub.infrastructure.cleansing import get_cleansing_registry
+# Story 6.2-P13: Import shared EnrichmentStats from infrastructure layer
+from work_data_hub.infrastructure.models.shared import EnrichmentStats
 from work_data_hub.utils.date_parser import parse_yyyymm_or_chinese
 
 logger = logging.getLogger(__name__)
@@ -279,43 +281,9 @@ class AnnuityIncomeOut(BaseModel):
         return self
 
 
-# NOTE(5.5.4-deferred): Extraction deferred to Epic 6
-# Reason: Low risk, but bundled with other model extractions for consistency
-# See: docs/sprint-artifacts/epic-5.5-optimization-recommendations.md "Reuse Candidates"
-# table
-# Duplicated from: annuity_performance/models.py
-# Reuse potential: HIGH - Epic 6 will extract to infrastructure/models/shared.py
-class EnrichmentStats(BaseModel):
-    """Statistics for company ID enrichment process."""
-
-    model_config = ConfigDict(
-        validate_default=True,
-        extra="forbid",
-    )
-    total_records: int = 0
-    success_internal: int = 0  # Resolved via internal mappings
-    success_external: int = 0  # Resolved via EQC lookup + cached
-    pending_lookup: int = 0  # Queued for async processing
-    temp_assigned: int = 0  # Assigned temporary ID
-    failed: int = 0  # Resolution failed completely
-    sync_budget_used: int = 0  # EQC lookups consumed from budget
-    processing_time_ms: int = 0  # Total enrichment processing time
-
-    def record(self, status: "ResolutionStatus", source: Optional[str] = None) -> None:
-        from work_data_hub.domain.company_enrichment.models import ResolutionStatus
-
-        self.total_records += 1
-        if status == ResolutionStatus.SUCCESS_INTERNAL:
-            self.success_internal += 1
-        elif status == ResolutionStatus.SUCCESS_EXTERNAL:
-            self.success_external += 1
-            self.sync_budget_used += 1
-        elif status == ResolutionStatus.PENDING_LOOKUP:
-            self.pending_lookup += 1
-        elif status == ResolutionStatus.TEMP_ASSIGNED:
-            self.temp_assigned += 1
-        else:
-            self.failed += 1
+# Story 6.2-P13: EnrichmentStats is now imported from
+# work_data_hub.infrastructure.models.shared and re-exported for backward compatibility
+# See: src/work_data_hub/infrastructure/models/shared.py
 
 
 class ProcessingResultWithEnrichment(BaseModel):

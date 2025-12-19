@@ -11,6 +11,7 @@ Components:
 - error_handler: Error handling and threshold checking utilities
 - report_generator: CSV export and summary report generation
 - schema_helpers: Pandera schema validation helpers
+- domain_validators: Registry-driven validation for bronze/gold layers (Story 6.2-P13)
 
 Usage:
     >>> from work_data_hub.infrastructure.validation import (
@@ -25,6 +26,9 @@ Usage:
     ...     raise_schema_error,
     ...     ensure_required_columns,
     ...     ensure_not_empty,
+    ...     # Domain validators (Story 6.2-P13)
+    ...     validate_bronze_layer,
+    ...     validate_gold_layer,
     ...     # Types
     ...     ValidationErrorDetail,
     ...     ValidationSummary,
@@ -66,6 +70,14 @@ from work_data_hub.infrastructure.validation.types import (
     ValidationThresholdExceeded,
 )
 
+# Domain validators (Story 6.2-P13)
+from work_data_hub.infrastructure.validation.domain_validators import (
+    validate_bronze_dataframe,
+    validate_bronze_layer,
+    validate_gold_dataframe,
+    validate_gold_layer,
+)
+
 __all__ = [
     # Types
     "ValidationErrorDetail",
@@ -82,4 +94,10 @@ __all__ = [
     "raise_schema_error",
     "ensure_required_columns",
     "ensure_not_empty",
+    # Domain validators (Story 6.2-P13)
+    "validate_bronze_dataframe",
+    "validate_bronze_layer",
+    "validate_gold_dataframe",
+    "validate_gold_layer",
 ]
+

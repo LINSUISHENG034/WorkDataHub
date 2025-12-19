@@ -1,11 +1,13 @@
-"""Schema management utilities for the IO layer.
+"""Compatibility shim for domain registry (Story 6.2-P13).
 
-Story 1.7: Migration runner for Alembic
-Story 6.2-P13: Domain registry for unified schema management
+Clean Architecture linting forbids other layers importing `work_data_hub.io`.
+The canonical implementation lives in `work_data_hub.infrastructure.schema`.
+
+This module remains for backward compatibility with existing imports:
+`from work_data_hub.io.schema.domain_registry import ...`.
 """
 
-from . import migration_runner
-from .domain_registry import (
+from work_data_hub.infrastructure.schema.domain_registry import (
     ColumnDef,
     ColumnType,
     DomainSchema,
@@ -19,19 +21,15 @@ from .domain_registry import (
 )
 
 __all__ = [
-    # Migration runner
-    "migration_runner",
-    # Domain registry types
     "ColumnType",
     "ColumnDef",
     "IndexDef",
     "DomainSchema",
-    # Domain registry API
     "register_domain",
     "get_domain",
     "list_domains",
-    # Domain registry helpers
     "get_composite_key",
     "get_delete_scope_key",
     "generate_create_table_sql",
 ]
+

@@ -1,16 +1,20 @@
 """
-Generate PostgreSQL DDL from reference/db_migration/db_structure.json with project conventions.
+Generate PostgreSQL DDL from db_structure.json with project conventions.
 
 Usage examples:
   uv run python -m scripts.create_table.generate_from_json --domain annuity_performance
-  uv run python -m scripts.create_table.generate_from_json --domain annuity_performance --out scripts/create_table/ddl/annuity_performance.sql
+  uv run python -m scripts.create_table.generate_from_json \
+    --domain annuity_performance \
+    --out scripts/create_table/ddl/annuity_performance.sql
 
 Conventions applied:
   - Technical primary key: {entity}_id GENERATED ALWAYS AS IDENTITY PRIMARY KEY
   - Audit columns: created_at, updated_at (+ trigger to auto-update updated_at)
-  - Delete scope key (non-unique) from manifest.yml; create composite index, not a unique constraint
+  - Delete scope key (non-unique) from manifest.yml; create composite index, not
+    a unique constraint
   - Column name normalization via work_data_hub.utils.column_normalizer
-  - Map vendor-specific types to PostgreSQL (DOUBLE -> double precision, strip collations)
+  - Map vendor-specific types to PostgreSQL (DOUBLE -> double precision, strip
+    collations)
   - Use DROP TABLE IF EXISTS for idempotent re-creation
 """
 
@@ -33,8 +37,17 @@ def _load_manifest() -> Dict[str, Any]:
 
 
 def _load_structure() -> Dict[str, Any]:
-    json_path = Path("reference/db_migration/db_structure.json")
-    return json.loads(json_path.read_text(encoding="utf-8"))
+    candidates = [
+        Path("reference/db_migration/db_structure.json"),
+        Path("legacy/annuity_hub/scripts/db_structure.json"),
+    ]
+    for json_path in candidates:
+        if json_path.exists():
+            return json.loads(json_path.read_text(encoding="utf-8"))
+    raise FileNotFoundError(
+        "db_structure.json not found. Tried: "
+        + ", ".join(str(p) for p in candidates)
+    )
 
 
 def _pg_type(vendor_type: str) -> str:
@@ -69,18 +82,32 @@ def _emit_table_sql(
 ) -> str:
     lines: List[str] = []
 
-    def q(s):
-        escaped = s.replace('"', '""')
+    def q_ident(identifier: str) -> str:
+        escaped = identifier.replace('"', '""')
         return f'"{escaped}"'
+
+    def q_schema(schema: str) -> str:
+        # Match existing DDL style: don't quote simple schema names.
+        s = schema.strip()
+        if s and s.islower() and s.replace("_", "").isalnum() and s[0].isalpha():
+            return s
+        return q_ident(s)
+
+    def q_table(qualified: str) -> str:
+        raw = qualified.strip()
+        if "." in raw:
+            schema, table = raw.split(".", 1)
+            return f"{q_schema(schema)}.{q_ident(table)}"
+        return q_ident(raw)
 
     lines.append("-- Auto-generated baseline DDL (initial seed).")
     lines.append(f"-- Entity: {entity} | Table: {table_name}")
     lines.append("")
-    lines.append(f"DROP TABLE IF EXISTS {q(table_name)} CASCADE;")
+    lines.append(f"DROP TABLE IF EXISTS {q_table(table_name)} CASCADE;")
     lines.append("")
-    lines.append(f"CREATE TABLE {q(table_name)} (")
+    lines.append(f"CREATE TABLE {q_table(table_name)} (")
     lines.append(
-        f"  {q(entity + '_id')}    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,"
+        f"  {q_ident(entity + '_id')} INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,"
     )
 
     # Emit business columns (exclude original 'id' field per project conventions)
@@ -99,9 +126,8 @@ def _emit_table_sql(
 
         pgtype = _pg_type(col.get("type", "TEXT"))
         nullable = col.get("nullable", True)
-        null_sql = "" if not nullable else ""
         # Emit line (allow NULL by default unless explicitly not nullable)
-        col_line = f"  {q(normalized)} {pgtype}"
+        col_line = f"  {q_ident(normalized)} {pgtype}"
         if not nullable:
             col_line += " NOT NULL"
         col_line += ","
@@ -109,10 +135,14 @@ def _emit_table_sql(
 
     # Audit columns (no trailing comma after last one)
     lines.append(
-        "  " + q("created_at") + " TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,"
+        "  "
+        + q_ident("created_at")
+        + " TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,"
     )
     lines.append(
-        "  " + q("updated_at") + " TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP"
+        "  "
+        + q_ident("updated_at")
+        + " TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP"
     )
     lines.append(");")
     lines.append("")
@@ -132,8 +162,10 @@ def _emit_table_sql(
 
     for idx_col in common_idx_cols:
         if idx_col in existing_columns:
+            idx_name = q_ident("idx_" + table_name + "_" + idx_col)
             lines.append(
-                f"CREATE INDEX IF NOT EXISTS {q('idx_' + table_name + '_' + idx_col)} ON {q(table_name)} ({q(idx_col)});"
+                f"CREATE INDEX IF NOT EXISTS {idx_name} "
+                f"ON {q_table(table_name)} ({q_ident(idx_col)});"
             )
 
     # Composite indexes - only for columns that exist
@@ -148,15 +180,17 @@ def _emit_table_sql(
         if col1 in existing_columns and col2 in existing_columns:
             idx_name = "idx_" + table_name + "_" + col1 + "_" + col2
             lines.append(
-                f"CREATE INDEX IF NOT EXISTS {q(idx_name)} ON {q(table_name)} ({q(col1)}, {q(col2)});"
+                f"CREATE INDEX IF NOT EXISTS {q_ident(idx_name)} "
+                f"ON {q_table(table_name)} ({q_ident(col1)}, {q_ident(col2)});"
             )
 
     # Delete scope key index
     if delete_scope_key and all(col in existing_columns for col in delete_scope_key):
         idx_name = "idx_" + table_name + "_" + "_".join(delete_scope_key)
-        cols = ", ".join(q(c) for c in delete_scope_key)
+        cols = ", ".join(q_ident(c) for c in delete_scope_key)
         lines.append(
-            f"CREATE INDEX IF NOT EXISTS {q(idx_name)} ON {q(table_name)} ({cols});"
+            f"CREATE INDEX IF NOT EXISTS {q_ident(idx_name)} "
+            f"ON {q_table(table_name)} ({cols});"
         )
     lines.append("")
 
@@ -171,27 +205,34 @@ def _emit_table_sql(
     lines.append("END;")
     lines.append("$$ LANGUAGE plpgsql;")
     lines.append("")
-    lines.append(
-        f"CREATE TRIGGER {trig}\n    BEFORE UPDATE ON {q(table_name)}\n    FOR EACH ROW\n    EXECUTE FUNCTION {func}();"
-    )
+    lines.append(f"CREATE TRIGGER {trig}")
+    lines.append(f"    BEFORE UPDATE ON {q_table(table_name)}")
+    lines.append("    FOR EACH ROW")
+    lines.append(f"    EXECUTE FUNCTION {func}();")
     lines.append("")
 
     # Notices
     lines.append("DO $$")
     lines.append("BEGIN")
-    lines.append(f"    RAISE NOTICE '=== {table_name} Table Creation Complete ===';")
+    lines.append(
+        f"    RAISE NOTICE '=== {table_name} Table Creation Complete ===';"
+    )
     lines.append(
         f"    RAISE NOTICE 'Primary Key: {entity}_id (GENERATED ALWAYS AS IDENTITY)';"
     )
     if delete_scope_key:
         lines.append(
-            f"    RAISE NOTICE 'Delete Scope Key (non-unique): {', '.join(delete_scope_key)}';"
+            "    RAISE NOTICE 'Delete Scope Key (non-unique): "
+            + ", ".join(delete_scope_key)
+            + "';"
         )
     lines.append(
-        "    RAISE NOTICE 'Audit Fields: created_at, updated_at with auto-update trigger';"
+        "    RAISE NOTICE 'Audit Fields: created_at, updated_at with auto-update "
+        "trigger';"
     )
     lines.append(
-        "    RAISE NOTICE 'Indexes: Performance indexes created for common query patterns';"
+        "    RAISE NOTICE 'Indexes: Performance indexes created for common query "
+        "patterns';"
     )
     lines.append("END $$ LANGUAGE plpgsql;")
 
@@ -200,7 +241,9 @@ def _emit_table_sql(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Generate PostgreSQL DDL from db_structure.json with project conventions",
+        description=(
+            "Generate PostgreSQL DDL from db_structure.json with project conventions"
+        ),
     )
     parser.add_argument(
         "--domain", required=True, help="Domain name, e.g., annuity_performance"
@@ -209,29 +252,43 @@ def main() -> int:
     args = parser.parse_args()
 
     manifest = _load_manifest()
-    domains = manifest.get("domains", {})
-    if args.domain not in domains:
+    domains = manifest.get("domains", {}) or {}
+    utility_tables = manifest.get("utility_tables", {}) or {}
+    entries = {**utility_tables, **domains}
+
+    if args.domain not in entries:
         print(f"Domain not found in manifest: {args.domain}")
         return 2
 
-    dom = domains[args.domain]
+    dom = entries[args.domain]
     table_name = dom.get("table")
     entity = dom.get("entity", args.domain)
     delete_scope_key = dom.get("delete_scope_key", [])
 
     struct = _load_structure()
 
-    # Search for table in nested structure
+    # Search for table in nested structure (supports schema-qualified names)
+    table_key_candidates = [table_name]
+    if isinstance(table_name, str) and "." in table_name:
+        table_key_candidates.append(table_name.split(".", 1)[1].replace('"', ""))
+
     tables = None
+    found_key = None
     for category in struct.values():
-        if isinstance(category, dict) and table_name in category:
-            tables = category
+        if not isinstance(category, dict):
+            continue
+        for candidate in table_key_candidates:
+            if candidate in category:
+                tables = category
+                found_key = candidate
+                break
+        if tables:
             break
 
-    if not tables or table_name not in tables:
+    if not tables or not found_key:
         print(f"Table not found in db_structure.json: {table_name}")
         return 2
-    cols = tables[table_name].get("columns", [])
+    cols = tables[found_key].get("columns", [])
 
     ddl = _emit_table_sql(table_name, entity, cols, delete_scope_key)
 
