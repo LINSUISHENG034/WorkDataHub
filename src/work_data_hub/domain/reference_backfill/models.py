@@ -7,9 +7,71 @@ the generic backfill framework.
 """
 
 from datetime import date
+from enum import Enum
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
+
+
+class AggregationType(str, Enum):
+    """
+    Supported aggregation types for backfill column values.
+
+    Story 6.2-P15: Complex Mapping Backfill Enhancement
+    - FIRST: Default behavior - takes first non-null value per group
+    - MAX_BY: Select value from row with maximum order_column value
+    - CONCAT_DISTINCT: Concatenate distinct values with separator
+    """
+    FIRST = "first"
+    MAX_BY = "max_by"
+    CONCAT_DISTINCT = "concat_distinct"
+
+
+class AggregationConfig(BaseModel):
+    """
+    Configuration for column aggregation during backfill.
+
+    Story 6.2-P15: Complex Mapping Backfill Enhancement
+
+    Example for max_by (select value from record with max asset scale):
+        aggregation:
+          type: max_by
+          order_column: 期末资产规模
+
+    Example for concat_distinct (concatenate unique business types):
+        aggregation:
+          type: concat_distinct
+          separator: "+"
+          sort: true
+    """
+
+    model_config = ConfigDict(extra='forbid')
+
+    type: AggregationType = Field(
+        ...,
+        description="Aggregation strategy: first, max_by, or concat_distinct"
+    )
+    order_column: Optional[str] = Field(
+        default=None,
+        description="Column to order by for max_by aggregation"
+    )
+    separator: str = Field(
+        default="+",
+        description="Separator for concat_distinct aggregation"
+    )
+    sort: bool = Field(
+        default=True,
+        description="Whether to sort values before concatenating (concat_distinct)"
+    )
+
+    @model_validator(mode="after")
+    def validate_max_by_requires_order_column(self):
+        """Validate that max_by aggregation type has order_column defined."""
+        if self.type == AggregationType.MAX_BY and not self.order_column:
+            raise ValueError(
+                "aggregation.order_column is required when type is 'max_by'"
+            )
+        return self
 
 
 class AnnuityPlanCandidate(BaseModel):
@@ -58,6 +120,8 @@ class BackfillColumnMapping(BaseModel):
 
     Represents the relationship between source columns in the fact data
     and target columns in the reference table.
+
+    Story 6.2-P15: Added optional aggregation field for complex mapping strategies.
     """
 
     model_config = ConfigDict(extra='forbid')
@@ -65,6 +129,10 @@ class BackfillColumnMapping(BaseModel):
     source: str = Field(..., description="Fact data column name to extract from")
     target: str = Field(..., description="Reference table column name to fill")
     optional: bool = Field(default=False, description="Whether missing source data should be skipped")
+    aggregation: Optional[AggregationConfig] = Field(
+        default=None,
+        description="Aggregation strategy for this column (default: 'first' non-null value)"
+    )
 
     @field_validator('source', 'target')
     @classmethod

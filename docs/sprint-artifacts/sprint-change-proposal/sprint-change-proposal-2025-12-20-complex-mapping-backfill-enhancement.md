@@ -102,10 +102,10 @@ From `complex-mapping-requirements-analysis.md`:
 |------|--------|
 | Configuration schema extension | 1 hour |
 | Model updates | 0.5 hour |
-| Service implementation | 2 hours |
-| Unit tests | 1.5 hours |
+| Service implementation (incl. fallback) | 2.5 hours |
+| Unit tests (incl. edge cases) | 2 hours |
 | Documentation update | 0.5 hour |
-| **Total** | **5.5 hours** |
+| **Total** | **6.5 hours** |
 
 ### Risk Assessment
 
@@ -114,6 +114,28 @@ From `complex-mapping-requirements-analysis.md`:
 | Breaking existing backfill | Low | New features are opt-in; default behavior unchanged |
 | Complex SQL generation | Medium | Use pandas built-in aggregation; avoid raw SQL |
 | Performance degradation | Low | Aggregation adds minimal overhead |
+| `order_column` data missing | Low | **NEW:** Dual-layer validation + runtime fallback to `first` |
+| `idxmax()` NaN handling | Low | **NEW:** Explicit `skipna=True` parameter |
+
+---
+
+### Team Review Summary *(2025-12-20)*
+
+> 通过 Party Mode 团队协作评审，以下改进建议已整合到本提案中：
+
+| Reviewer | Role | Key Contribution |
+|----------|------|------------------|
+| 🏗️ Winston | Architect | 双层校验设计：配置时校验 + 运行时 fallback |
+| 💻 Amelia | Developer | `skipna=True` 处理、枚举类型校验、边界条件处理 |
+| 🧪 Murat | Test Architect | 边界测试用例：all-NULL、empty DataFrame、mixed NULL |
+| 🏃 Bob | Scrum Master | Story 结构调整、AC 强化、工作量评估调整 |
+| 📊 Mary | Analyst | 业务价值确认、替代方案比对 |
+
+**Key Decisions:**
+1. ✅ **Fallback 策略**: `order_column` 缺失时优雅降级为 `first`
+2. ✅ **类型安全**: 使用 `AggregationType` 枚举避免字符串拼写错误
+3. ✅ **工作量调整**: 5.5h → 6.5h (+1h 用于增强实现和测试)
+4. ✅ **边界测试**: 增加 3 个边界条件测试用例
 
 ---
 
@@ -178,9 +200,17 @@ class BackfillColumnMapping:
 
 ### 4.3 Service Implementation (`generic_service.py`)
 
-**Strategy Pattern for Aggregation:**
+**Strategy Pattern for Aggregation (with Team Review Enhancements):**
 
 ```python
+from enum import Enum
+
+class AggregationType(str, Enum):
+    """Supported aggregation types with config-time validation."""
+    FIRST = "first"
+    MAX_BY = "max_by"
+    CONCAT_DISTINCT = "concat_distinct"
+
 def derive_candidates(self, df: pd.DataFrame, config: ForeignKeyConfig) -> pd.DataFrame:
     # ... existing filtering logic ...
     
@@ -190,11 +220,11 @@ def derive_candidates(self, df: pd.DataFrame, config: ForeignKeyConfig) -> pd.Da
         if col_mapping.aggregation is None:
             # Default: first non-null value
             result_columns[col_mapping.target] = grouped_first[col_mapping.source]
-        elif col_mapping.aggregation.type == "max_by":
+        elif col_mapping.aggregation.type == AggregationType.MAX_BY:
             result_columns[col_mapping.target] = self._aggregate_max_by(
                 source_df, config.source_column, col_mapping
             )
-        elif col_mapping.aggregation.type == "concat_distinct":
+        elif col_mapping.aggregation.type == AggregationType.CONCAT_DISTINCT:
             result_columns[col_mapping.target] = self._aggregate_concat_distinct(
                 source_df, config.source_column, col_mapping
             )
@@ -204,10 +234,33 @@ def derive_candidates(self, df: pd.DataFrame, config: ForeignKeyConfig) -> pd.Da
 def _aggregate_max_by(
     self, df: pd.DataFrame, group_col: str, mapping: BackfillColumnMapping
 ) -> pd.Series:
-    """Get value from row with maximum order_column value."""
+    """Get value from row with maximum order_column value.
+    
+    Falls back to 'first' aggregation when:
+    - All values in order_column are NULL for a group
+    - order_column doesn't exist in DataFrame (defensive)
+    """
     order_col = mapping.aggregation.order_column
-    idx = df.groupby(group_col)[order_col].idxmax()
-    return df.loc[idx, mapping.source].set_index(df.loc[idx, group_col])
+    
+    # [TEAM REVIEW] Defensive check: column existence
+    if order_col not in df.columns:
+        self._logger.warning(
+            f"order_column '{order_col}' not found, falling back to 'first'"
+        )
+        return df.groupby(group_col)[mapping.source].first()
+    
+    # [TEAM REVIEW] Per-group fallback for all-NULL order_column
+    def max_by_with_fallback(group):
+        valid = group[order_col].dropna()
+        if valid.empty:
+            self._logger.warning(
+                f"All '{order_col}' values NULL for group, using 'first'"
+            )
+            return group[mapping.source].iloc[0]  # fallback to first
+        max_idx = group[order_col].idxmax(skipna=True)  # [TEAM REVIEW] explicit skipna
+        return group.loc[max_idx, mapping.source]
+    
+    return df.groupby(group_col).apply(max_by_with_fallback)
 
 def _aggregate_concat_distinct(
     self, df: pd.DataFrame, group_col: str, mapping: BackfillColumnMapping
@@ -218,8 +271,10 @@ def _aggregate_concat_distinct(
     
     def concat_func(x):
         unique = x.dropna().unique()
+        if len(unique) == 0:
+            return ""  # [TEAM REVIEW] Handle empty case gracefully
         if sort:
-            unique = sorted(unique)
+            unique = sorted(str(v) for v in unique)  # [TEAM REVIEW] Ensure string sort
         return sep.join(str(v) for v in unique)
     
     return df.groupby(group_col)[mapping.source].agg(concat_func)
@@ -304,6 +359,13 @@ This change can be implemented directly by the development team without backlog 
    - `管理资格`: Concatenated distinct business types (e.g., "受托+账管+投管")
 4. ✅ backfill-mechanism-guide.md updated with new aggregation syntax
 5. ✅ Configuration schema backward compatible (existing configs work unchanged)
+6. ✅ **[TEAM REVIEW]** Graceful Fallback Handling:
+   - Configuration validation: `max_by` type MUST have `order_column` defined
+   - Runtime fallback: If group's `order_column` values are all NULL, fall back to `first` with WARNING log
+7. ✅ **[TEAM REVIEW]** Edge case test coverage:
+   - `order_column` all NULL scenario
+   - Empty DataFrame input
+   - Mixed NULL/non-NULL per group
 
 ### Verification Commands
 
@@ -334,7 +396,7 @@ for fk in config:
 - **ID:** 6.2-P15
 - **Title:** Complex Mapping Backfill Enhancement
 - **Epic:** 6.2 (Generic Reference Data Management)
-- **Effort:** 5.5 hours
+- **Effort:** 6.5 hours *(adjusted per team review)*
 - **Priority:** Medium (blocks correct `年金计划` data population)
 
 **Action Required:**

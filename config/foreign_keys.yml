@@ -1,12 +1,14 @@
 # WorkDataHub Foreign Key Backfill Configuration
 # Story 6.2-P14: Config File Modularization
+# Story 6.2-P15: Complex Mapping Backfill Enhancement (added aggregation support)
 # Created: 2025-12-19
+# Updated: 2025-12-20
 #
 # This file contains foreign key backfill configurations extracted from
 # data_sources.yml to follow Single Responsibility Principle (SRP).
 #
 # Previously: config/data_sources.yml → domains.*.foreign_keys sections
-# Schema Version: 1.0
+# Schema Version: 1.1 (Story 6.2-P15 added aggregation field)
 #
 # Usage: Loaded by work_data_hub.domain.reference_backfill.config_loader
 #
@@ -16,16 +18,24 @@
 # - mode: insert_missing (add records not in target)
 # - depends_on: List of FK names to process first
 # - skip_blank_values: Skip "(空白)" and empty values
+#
+# Aggregation Types (Story 6.2-P15):
+# - first: Default, takes first non-null value per group
+# - max_by: Select value from row with maximum order_column value
+#     Required: order_column (column to order by)
+# - concat_distinct: Concatenate distinct values with separator
+#     Optional: separator (default "+"), sort (default true)
 
-schema_version: "1.0"
+schema_version: "1.1"
 
 domains:
-  # Annuity Performance Domain (규模명세)
+  # Annuity Performance Domain
   # Validated with real 202411 data (Epic 3 Tech Spec)
   annuity_performance:
     foreign_keys:
       # 年金计划 (Annuity Plan) reference table backfill
       # Fixed 2025-12-13: Added target_schema: mapping (actual location in Legacy DB)
+      # Story 6.2-P15: Added aggregation for 主拓代码, 主拓机构, 管理资格
       - name: "fk_plan"
         source_column: "计划代码"
         target_table: "年金计划"
@@ -44,15 +54,31 @@ domains:
           - source: "客户名称"
             target: "客户名称"
             optional: true
+          # Story 6.2-P15: max_by aggregation for 主拓代码
+          # Selects 机构代码 from record with maximum 期末资产规模
           - source: "机构代码"
             target: "主拓代码"
             optional: true
+            aggregation:
+              type: "max_by"
+              order_column: "期末资产规模"
+          # Story 6.2-P15: max_by aggregation for 主拓机构
+          # Selects 机构名称 from record with maximum 期末资产规模
           - source: "机构名称"
             target: "主拓机构"
             optional: true
+            aggregation:
+              type: "max_by"
+              order_column: "期末资产规模"
+          # Story 6.2-P15: concat_distinct aggregation for 管理资格
+          # Concatenates distinct 业务类型 values with "+" separator
           - source: "业务类型"
-            target: "管理资格"  # Fixed: actual column name
+            target: "管理资格"
             optional: true
+            aggregation:
+              type: "concat_distinct"
+              separator: "+"
+              sort: true
           - source: "company_id"
             target: "company_id"
             optional: true

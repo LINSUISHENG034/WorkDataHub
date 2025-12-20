@@ -61,7 +61,7 @@ graph TD
 定义外键映射关系和回填规则：
 
 ```yaml
-schema_version: "1.0"
+schema_version: "1.1"  # v1.1 adds aggregation support (Story 6.2-P15)
 
 domains:
   annuity_performance:
@@ -143,15 +143,15 @@ CREATE TABLE mapping.年金计划 (
 ```
 
 **映射字段**:
-| 源字段 | 目标字段 | 类型 | 必填 |
-|--------|----------|------|------|
-| 计划代码 | 年金计划号 | VARCHAR(255) | ✅ |
-| 计划名称 | 计划全称 | VARCHAR(255) | ⚪ |
-| 计划类型 | 计划类型 | VARCHAR(255) | ⚪ |
-| 客户名称 | 客户名称 | VARCHAR(255) | ⚪ |
-| 主拓代码 | 主拓代码 | VARCHAR(10) | ⚪ |
-| 主拓机构 | 主拓机构 | VARCHAR(10) | ⚪ |
-| 资格 | 管理资格 | VARCHAR(255) | ⚪ |
+| 源字段 | 目标字段 | 类型 | 必填 | 聚合策略 |
+|--------|----------|------|------|----------|
+| 计划代码 | 年金计划号 | VARCHAR(255) | ✅ | - |
+| 计划名称 | 计划全称 | VARCHAR(255) | ⚪ | first |
+| 计划类型 | 计划类型 | VARCHAR(255) | ⚪ | first |
+| 客户名称 | 客户名称 | VARCHAR(255) | ⚪ | first |
+| 机构代码 | 主拓代码 | VARCHAR(10) | ⚪ | **max_by**(期末资产规模) |
+| 机构名称 | 主拓机构 | VARCHAR(10) | ⚪ | **max_by**(期末资产规模) |
+| 业务类型 | 管理资格 | VARCHAR(255) | ⚪ | **concat_distinct**(+) |
 
 ### 2. 组合计划表 (`mapping.组合计划`)
 
@@ -245,6 +245,109 @@ domains:
   mode: "insert_missing"
 ```
 
+### 配置聚合策略 (Story 6.2-P15)
+
+当一个主键对应多条源数据记录时，可以使用聚合策略来决定如何填充目标字段。
+
+#### 可用的聚合类型
+
+| 类型 | 说明 | 必填参数 | 可选参数 |
+|------|------|----------|----------|
+| `first` | 默认策略，取第一个非空值 | 无 | 无 |
+| `max_by` | 取指定排序列最大值对应的记录 | `order_column` | 无 |
+| `concat_distinct` | 将不重复值用分隔符连接 | 无 | `separator` (默认"+"), `sort` (默认true) |
+
+#### 示例：max_by 聚合
+
+当需要从具有最大资产规模的记录中获取机构代码时：
+
+```yaml
+backfill_columns:
+  - source: "机构代码"
+    target: "主拓代码"
+    optional: true
+    aggregation:
+      type: "max_by"
+      order_column: "期末资产规模"
+```
+
+**行为说明**：
+- 按 `order_column` 列的值排序，选择最大值对应的记录
+- 如果所有 `order_column` 值均为 NULL，自动降级为 `first` 策略
+- 如果 `order_column` 列不存在，记录警告日志并降级为 `first`
+
+#### 示例：concat_distinct 聚合
+
+当需要将多条记录的业务类型合并为一个字段时：
+
+```yaml
+backfill_columns:
+  - source: "业务类型"
+    target: "管理资格"
+    optional: true
+    aggregation:
+      type: "concat_distinct"
+      separator: "+"
+      sort: true
+```
+
+**行为说明**：
+- 去除重复值后，使用指定分隔符连接
+- 当 `sort: true` 时，按字符串顺序排序后连接
+- 如果所有值均为 NULL，返回 `NULL`（与 optional 字段处理一致）
+
+#### 完整配置示例（年金计划表）
+
+```yaml
+- name: "fk_plan"
+  source_column: "计划代码"
+  target_table: "年金计划"
+  target_key: "年金计划号"
+  target_schema: "mapping"
+  mode: "insert_missing"
+  backfill_columns:
+    - source: "计划代码"
+      target: "年金计划号"
+    - source: "计划名称"
+      target: "计划全称"
+      optional: true
+    - source: "计划类型"
+      target: "计划类型"
+      optional: true
+    # max_by: 选择资产规模最大记录的机构信息
+    - source: "机构代码"
+      target: "主拓代码"
+      optional: true
+      aggregation:
+        type: "max_by"
+        order_column: "期末资产规模"
+    - source: "机构名称"
+      target: "主拓机构"
+      optional: true
+      aggregation:
+        type: "max_by"
+        order_column: "期末资产规模"
+    # concat_distinct: 合并所有业务类型
+    - source: "业务类型"
+      target: "管理资格"
+      optional: true
+      aggregation:
+        type: "concat_distinct"
+        separator: "+"
+        sort: true
+```
+
+#### 边界情况处理
+
+| 场景 | max_by 行为 | concat_distinct 行为 |
+|------|-------------|---------------------|
+| 空 DataFrame | 返回空结果 | 返回空结果 |
+| 所有 order_column 为 NULL | 降级为 first | N/A |
+| order_column 列不存在 | 降级为 first（记录警告） | N/A |
+| 所有值为 NULL | 返回 NULL | 返回 NULL |
+| 混合 NULL/非NULL 值 | 选择非NULL最大值对应记录 | 仅连接非NULL值 |
+| 多组混合场景 | 每组独立处理，部分组可降级 | 每组独立处理 |
+
 ## 最佳实践
 
 ### 1. 字段映射规范
@@ -324,4 +427,5 @@ python -m work_data_hub.cli etl annuity_performance \
 
 | 版本 | 日期 | 更新内容 |
 |------|------|----------|
+| 1.1 | 2025-12-20 | 新增聚合策略支持 (max_by, concat_distinct) - Story 6.2-P15 |
 | 1.0 | 2025-12-20 | 初始版本，包含回填机制完整说明 |

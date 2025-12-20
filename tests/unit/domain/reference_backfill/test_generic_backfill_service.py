@@ -511,3 +511,420 @@ class TestGenericBackfillServiceIntegration:
         candidates_df = service.derive_candidates(df, config)
         assert len(candidates_df) == 1
         assert candidates_df.iloc[0]["年金计划号"] == "P001"
+
+
+# Story 6.2-P15: Complex Mapping Backfill Enhancement Tests
+from work_data_hub.domain.reference_backfill.models import AggregationType, AggregationConfig
+
+
+class TestAggregationConfigValidation:
+    """Test aggregation configuration validation."""
+
+    def test_max_by_requires_order_column(self):
+        """max_by type must have order_column defined."""
+        with pytest.raises(ValueError) as exc_info:
+            AggregationConfig(type="max_by")
+        assert "order_column is required when type is 'max_by'" in str(exc_info.value)
+
+    def test_max_by_with_order_column(self):
+        """max_by with order_column should succeed."""
+        config = AggregationConfig(type="max_by", order_column="期末资产规模")
+        assert config.type == AggregationType.MAX_BY
+        assert config.order_column == "期末资产规模"
+
+    def test_concat_distinct_defaults(self):
+        """concat_distinct should have sensible defaults."""
+        config = AggregationConfig(type="concat_distinct")
+        assert config.type == AggregationType.CONCAT_DISTINCT
+        assert config.separator == "+"
+        assert config.sort is True
+
+    def test_concat_distinct_custom_separator(self):
+        """concat_distinct can have custom separator."""
+        config = AggregationConfig(type="concat_distinct", separator=",", sort=False)
+        assert config.separator == ","
+        assert config.sort is False
+
+
+class TestMaxByAggregation:
+    """Test max_by aggregation strategy."""
+
+    def test_max_by_selects_record_with_max_value(self):
+        """max_by should select value from row with maximum order_column."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_plan",
+            source_column="计划代码",
+            target_table="年金计划",
+            target_key="年金计划号",
+            backfill_columns=[
+                BackfillColumnMapping(source="计划代码", target="年金计划号"),
+                BackfillColumnMapping(
+                    source="机构代码",
+                    target="主拓代码",
+                    optional=True,
+                    aggregation=AggregationConfig(type="max_by", order_column="期末资产规模")
+                ),
+            ]
+        )
+
+        df = pd.DataFrame([
+            {"计划代码": "P001", "机构代码": "ORG-A", "期末资产规模": 1000.0},
+            {"计划代码": "P001", "机构代码": "ORG-B", "期末资产规模": 5000.0},  # MAX
+            {"计划代码": "P001", "机构代码": "ORG-C", "期末资产规模": 2000.0},
+        ])
+
+        candidates = service.derive_candidates(df, config)
+        assert candidates.iloc[0]["主拓代码"] == "ORG-B"
+
+    def test_max_by_fallback_when_all_order_column_null(self):
+        """max_by should fallback to first when all order_column values are NULL."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_plan",
+            source_column="计划代码",
+            target_table="年金计划",
+            target_key="年金计划号",
+            backfill_columns=[
+                BackfillColumnMapping(source="计划代码", target="年金计划号"),
+                BackfillColumnMapping(
+                    source="机构代码",
+                    target="主拓代码",
+                    optional=True,
+                    aggregation=AggregationConfig(type="max_by", order_column="期末资产规模")
+                ),
+            ]
+        )
+
+        df = pd.DataFrame([
+            {"计划代码": "P001", "机构代码": "ORG-A", "期末资产规模": None},
+            {"计划代码": "P001", "机构代码": "ORG-B", "期末资产规模": None},
+        ])
+
+        candidates = service.derive_candidates(df, config)
+        # Should fallback to first value (ORG-A)
+        assert candidates.iloc[0]["主拓代码"] == "ORG-A"
+
+    def test_max_by_fallback_when_order_column_missing(self):
+        """max_by should fallback to first when order_column doesn't exist."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_plan",
+            source_column="计划代码",
+            target_table="年金计划",
+            target_key="年金计划号",
+            backfill_columns=[
+                BackfillColumnMapping(source="计划代码", target="年金计划号"),
+                BackfillColumnMapping(
+                    source="机构代码",
+                    target="主拓代码",
+                    optional=True,
+                    aggregation=AggregationConfig(type="max_by", order_column="不存在的列")
+                ),
+            ]
+        )
+
+        df = pd.DataFrame([
+            {"计划代码": "P001", "机构代码": "ORG-X"},
+        ])
+
+        candidates = service.derive_candidates(df, config)
+        assert candidates.iloc[0]["主拓代码"] == "ORG-X"
+
+    def test_max_by_handles_mixed_null_values(self):
+        """max_by should correctly handle mixed NULL/non-NULL order_column values."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_plan",
+            source_column="计划代码",
+            target_table="年金计划",
+            target_key="年金计划号",
+            backfill_columns=[
+                BackfillColumnMapping(source="计划代码", target="年金计划号"),
+                BackfillColumnMapping(
+                    source="机构代码",
+                    target="主拓代码",
+                    optional=True,
+                    aggregation=AggregationConfig(type="max_by", order_column="期末资产规模")
+                ),
+            ]
+        )
+
+        df = pd.DataFrame([
+            {"计划代码": "P001", "机构代码": "ORG-A", "期末资产规模": None},
+            {"计划代码": "P001", "机构代码": "ORG-B", "期末资产规模": 5000.0},  # Only non-NULL
+            {"计划代码": "P001", "机构代码": "ORG-C", "期末资产规模": None},
+        ])
+
+        candidates = service.derive_candidates(df, config)
+        assert candidates.iloc[0]["主拓代码"] == "ORG-B"
+
+
+class TestConcatDistinctAggregation:
+    """Test concat_distinct aggregation strategy."""
+
+    def test_concat_distinct_joins_unique_values(self):
+        """concat_distinct should concatenate distinct values with separator."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_plan",
+            source_column="计划代码",
+            target_table="年金计划",
+            target_key="年金计划号",
+            backfill_columns=[
+                BackfillColumnMapping(source="计划代码", target="年金计划号"),
+                BackfillColumnMapping(
+                    source="业务类型",
+                    target="管理资格",
+                    optional=True,
+                    aggregation=AggregationConfig(type="concat_distinct", separator="+", sort=True)
+                ),
+            ]
+        )
+
+        df = pd.DataFrame([
+            {"计划代码": "P001", "业务类型": "受托"},
+            {"计划代码": "P001", "业务类型": "账管"},
+            {"计划代码": "P001", "业务类型": "投管"},
+        ])
+
+        candidates = service.derive_candidates(df, config)
+        # Sorted: 受托 < 投管 < 账管 (by Chinese character order)
+        assert candidates.iloc[0]["管理资格"] == "受托+投管+账管"
+
+    def test_concat_distinct_removes_duplicates(self):
+        """concat_distinct should only include unique values."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_plan",
+            source_column="计划代码",
+            target_table="年金计划",
+            target_key="年金计划号",
+            backfill_columns=[
+                BackfillColumnMapping(source="计划代码", target="年金计划号"),
+                BackfillColumnMapping(
+                    source="业务类型",
+                    target="管理资格",
+                    optional=True,
+                    aggregation=AggregationConfig(type="concat_distinct", separator="+")
+                ),
+            ]
+        )
+
+        df = pd.DataFrame([
+            {"计划代码": "P001", "业务类型": "受托"},
+            {"计划代码": "P001", "业务类型": "受托"},  # Duplicate
+            {"计划代码": "P001", "业务类型": "账管"},
+            {"计划代码": "P001", "业务类型": "受托"},  # Duplicate
+        ])
+
+        candidates = service.derive_candidates(df, config)
+        result = candidates.iloc[0]["管理资格"]
+        assert "受托" in result
+        assert "账管" in result
+        assert result.count("受托") == 1  # Only one occurrence
+
+    def test_concat_distinct_empty_when_all_null(self):
+        """concat_distinct should return empty string when all values are NULL."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_plan",
+            source_column="计划代码",
+            target_table="年金计划",
+            target_key="年金计划号",
+            backfill_columns=[
+                BackfillColumnMapping(source="计划代码", target="年金计划号"),
+                BackfillColumnMapping(
+                    source="业务类型",
+                    target="管理资格",
+                    optional=True,
+                    aggregation=AggregationConfig(type="concat_distinct", separator="+")
+                ),
+            ]
+        )
+
+        df = pd.DataFrame([
+            {"计划代码": "P001", "业务类型": None},
+            {"计划代码": "P001", "业务类型": None},
+        ])
+
+        candidates = service.derive_candidates(df, config)
+        # optional=True means None is used for empty result after post-processing
+        assert candidates.iloc[0]["管理资格"] is None or candidates.iloc[0]["管理资格"] == ""
+
+    def test_concat_distinct_custom_separator(self):
+        """concat_distinct should use custom separator."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_plan",
+            source_column="计划代码",
+            target_table="年金计划",
+            target_key="年金计划号",
+            backfill_columns=[
+                BackfillColumnMapping(source="计划代码", target="年金计划号"),
+                BackfillColumnMapping(
+                    source="业务类型",
+                    target="管理资格",
+                    optional=True,
+                    aggregation=AggregationConfig(type="concat_distinct", separator=",", sort=False)
+                ),
+            ]
+        )
+
+        df = pd.DataFrame([
+            {"计划代码": "P001", "业务类型": "A"},
+            {"计划代码": "P001", "业务类型": "B"},
+        ])
+
+        candidates = service.derive_candidates(df, config)
+        result = candidates.iloc[0]["管理资格"]
+        assert "," in result
+        assert "A" in result
+        assert "B" in result
+
+
+class TestAggregationEdgeCases:
+    """Test edge cases for aggregation strategies."""
+
+    def test_empty_dataframe(self):
+        """Aggregation should handle empty DataFrame gracefully."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_plan",
+            source_column="计划代码",
+            target_table="年金计划",
+            target_key="年金计划号",
+            backfill_columns=[
+                BackfillColumnMapping(source="计划代码", target="年金计划号"),
+                BackfillColumnMapping(
+                    source="机构代码",
+                    target="主拓代码",
+                    aggregation=AggregationConfig(type="max_by", order_column="期末资产规模")
+                ),
+            ]
+        )
+
+        df = pd.DataFrame(columns=["计划代码", "机构代码", "期末资产规模"])
+        candidates = service.derive_candidates(df, config)
+        assert candidates.empty
+
+    def test_multiple_groups_with_different_aggregations(self):
+        """Should correctly apply aggregations across multiple groups."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_plan",
+            source_column="计划代码",
+            target_table="年金计划",
+            target_key="年金计划号",
+            backfill_columns=[
+                BackfillColumnMapping(source="计划代码", target="年金计划号"),
+                BackfillColumnMapping(
+                    source="机构代码",
+                    target="主拓代码",
+                    optional=True,
+                    aggregation=AggregationConfig(type="max_by", order_column="期末资产规模")
+                ),
+                BackfillColumnMapping(
+                    source="业务类型",
+                    target="管理资格",
+                    optional=True,
+                    aggregation=AggregationConfig(type="concat_distinct", separator="+", sort=True)
+                ),
+            ]
+        )
+
+        df = pd.DataFrame([
+            # Plan P001
+            {"计划代码": "P001", "机构代码": "ORG-A", "业务类型": "受托", "期末资产规模": 1000.0},
+            {"计划代码": "P001", "机构代码": "ORG-B", "业务类型": "账管", "期末资产规模": 5000.0},
+            {"计划代码": "P001", "机构代码": "ORG-C", "业务类型": "投管", "期末资产规模": 2000.0},
+            # Plan P002
+            {"计划代码": "P002", "机构代码": "ORG-X", "业务类型": "托管", "期末资产规模": 3000.0},
+        ])
+
+        candidates = service.derive_candidates(df, config)
+
+        p001 = candidates[candidates["年金计划号"] == "P001"].iloc[0]
+        p002 = candidates[candidates["年金计划号"] == "P002"].iloc[0]
+
+        # P001: ORG-B has max asset scale (5000)
+        assert p001["主拓代码"] == "ORG-B"
+        # P001: 3 distinct business types
+        assert p001["管理资格"] == "受托+投管+账管"
+
+        # P002: Only one record
+        assert p002["主拓代码"] == "ORG-X"
+        assert p002["管理资格"] == "托管"
+
+    def test_backward_compatibility_no_aggregation(self):
+        """Columns without aggregation should still use default 'first' behavior."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_plan",
+            source_column="计划代码",
+            target_table="年金计划",
+            target_key="年金计划号",
+            backfill_columns=[
+                BackfillColumnMapping(source="计划代码", target="年金计划号"),
+                BackfillColumnMapping(source="计划名称", target="计划名称"),  # No aggregation
+            ]
+        )
+
+        df = pd.DataFrame([
+            {"计划代码": "P001", "计划名称": "Plan A"},
+            {"计划代码": "P001", "计划名称": "Plan B"},  # Duplicate plan code
+        ])
+
+        candidates = service.derive_candidates(df, config)
+        # Should use first value
+        assert candidates.iloc[0]["计划名称"] == "Plan A"
+
+    def test_multiple_groups_mixed_null_order_column(self):
+        """Test max_by with multiple groups where some have all-NULL order_column."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_plan",
+            source_column="计划代码",
+            target_table="年金计划",
+            target_key="年金计划号",
+            backfill_columns=[
+                BackfillColumnMapping(source="计划代码", target="年金计划号"),
+                BackfillColumnMapping(
+                    source="机构代码",
+                    target="主拓代码",
+                    optional=True,
+                    aggregation=AggregationConfig(type="max_by", order_column="期末资产规模")
+                ),
+            ]
+        )
+
+        df = pd.DataFrame([
+            # P001: has valid order_column values
+            {"计划代码": "P001", "机构代码": "ORG-A", "期末资产规模": 1000.0},
+            {"计划代码": "P001", "机构代码": "ORG-B", "期末资产规模": 5000.0},  # MAX
+            # P002: all order_column values are NULL - should fallback to first
+            {"计划代码": "P002", "机构代码": "ORG-X", "期末资产规模": None},
+            {"计划代码": "P002", "机构代码": "ORG-Y", "期末资产规模": None},
+        ])
+
+        candidates = service.derive_candidates(df, config)
+
+        p001 = candidates[candidates["年金计划号"] == "P001"].iloc[0]
+        p002 = candidates[candidates["年金计划号"] == "P002"].iloc[0]
+
+        # P001: ORG-B has max asset scale
+        assert p001["主拓代码"] == "ORG-B"
+        # P002: fallback to first (ORG-X) since all order_column are NULL
+        assert p002["主拓代码"] == "ORG-X"

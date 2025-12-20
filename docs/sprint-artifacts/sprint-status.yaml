@@ -261,6 +261,11 @@ development_status:
   # Separates FK backfill and reference_sync from data_sources.yml per SRP
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-19.md
   6.2-p14-config-file-modularization: done  # Config separation: foreign_keys.yml + reference_sync.yml - Code Review PASSED 2025-12-20
+  # Story 6.2-P15: Complex Mapping Backfill Enhancement
+  # Added 2025-12-20 via create-story workflow
+  # Extends GenericBackfillService with max_by and concat_distinct aggregation strategies
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-20-complex-mapping-backfill-enhancement.md
+  6.2-p15-complex-mapping-backfill-enhancement: done  # Complex aggregations for 年金计划 reference backfill - Code Review PASSED 2025-12-20
 
   # Epic 7: Testing & Validation Infrastructure
   epic-7: backlog

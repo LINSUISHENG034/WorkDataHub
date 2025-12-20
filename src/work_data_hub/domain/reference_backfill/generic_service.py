@@ -18,7 +18,7 @@ import pandas as pd
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
-from .models import ForeignKeyConfig, BackfillColumnMapping
+from .models import ForeignKeyConfig, BackfillColumnMapping, AggregationType, AggregationConfig
 
 # SQL Module (Story 6.2-P10)
 from work_data_hub.infrastructure.sql import (
@@ -232,6 +232,11 @@ class GenericBackfillService:
         """
         Derive candidate records for a reference table from fact data.
 
+        Story 6.2-P15: Supports aggregation strategies per column:
+        - first: Default, takes first non-null value per group
+        - max_by: Select value from row with maximum order_column value
+        - concat_distinct: Concatenate distinct values with separator
+
         Args:
             df: DataFrame containing fact data
             config: Foreign key configuration
@@ -273,15 +278,36 @@ class GenericBackfillService:
 
         grouped_first = source_df.groupby(config.source_column, sort=False).first()
 
+        # Build candidates DataFrame with aggregation strategies (Story 6.2-P15)
         candidates_df = pd.DataFrame({config.target_key: grouped_first.index})
         for col_mapping in config.backfill_columns:
             if col_mapping.source == config.source_column:
                 candidates_df[col_mapping.target] = candidates_df[config.target_key].to_numpy()
                 continue
-            if col_mapping.source in grouped_first.columns:
-                candidates_df[col_mapping.target] = grouped_first[col_mapping.source].to_numpy()
-            else:
-                candidates_df[col_mapping.target] = None
+
+            # Apply aggregation strategy
+            if col_mapping.aggregation is None:
+                # Default: first non-null value
+                if col_mapping.source in grouped_first.columns:
+                    candidates_df[col_mapping.target] = grouped_first[col_mapping.source].to_numpy()
+                else:
+                    candidates_df[col_mapping.target] = None
+            elif col_mapping.aggregation.type == AggregationType.MAX_BY:
+                # max_by: value from row with maximum order_column
+                candidates_df[col_mapping.target] = self._aggregate_max_by(
+                    source_df, config.source_column, col_mapping
+                ).reindex(grouped_first.index).to_numpy()
+            elif col_mapping.aggregation.type == AggregationType.CONCAT_DISTINCT:
+                # concat_distinct: concatenate unique values
+                candidates_df[col_mapping.target] = self._aggregate_concat_distinct(
+                    source_df, config.source_column, col_mapping
+                ).reindex(grouped_first.index).to_numpy()
+            elif col_mapping.aggregation.type == AggregationType.FIRST:
+                # Explicit first: same as default
+                if col_mapping.source in grouped_first.columns:
+                    candidates_df[col_mapping.target] = grouped_first[col_mapping.source].to_numpy()
+                else:
+                    candidates_df[col_mapping.target] = None
 
         # Match legacy behavior: optional missing values are represented as Python None
         for col_mapping in config.backfill_columns:
@@ -299,6 +325,89 @@ class GenericBackfillService:
         )
 
         return candidates_df
+
+    def _aggregate_max_by(
+        self, df: pd.DataFrame, group_col: str, mapping: BackfillColumnMapping
+    ) -> pd.Series:
+        """
+        Get value from row with maximum order_column value.
+
+        Story 6.2-P15: Complex Mapping Backfill Enhancement
+
+        Falls back to 'first' aggregation when:
+        - order_column doesn't exist in DataFrame (defensive)
+        - All values in order_column are NULL for a group
+
+        Args:
+            df: Source DataFrame
+            group_col: Column to group by
+            mapping: Column mapping with aggregation config
+
+        Returns:
+            Series with aggregated values indexed by group
+        """
+        order_col = mapping.aggregation.order_column
+
+        # Defensive check: column existence
+        if order_col not in df.columns:
+            self.logger.warning(
+                f"order_column '{order_col}' not found in DataFrame, "
+                f"falling back to 'first' for column '{mapping.source}'"
+            )
+            return df.groupby(group_col)[mapping.source].first()
+
+        # Per-group max_by with fallback for all-NULL order_column
+        def max_by_with_fallback(group: pd.DataFrame) -> Any:
+            valid = group[order_col].dropna()
+            if valid.empty:
+                # All order_column values are NULL, fallback to first
+                self.logger.debug(
+                    f"All '{order_col}' values NULL for group, using 'first' "
+                    f"for column '{mapping.source}'"
+                )
+                first_val = group[mapping.source].iloc[0] if len(group) > 0 else None
+                return first_val
+            # Use idxmax with skipna=True (explicit per team review)
+            max_idx = group[order_col].idxmax(skipna=True)
+            return group.loc[max_idx, mapping.source]
+
+        return df.groupby(group_col, sort=False).apply(
+            max_by_with_fallback, include_groups=False
+        )
+
+    def _aggregate_concat_distinct(
+        self, df: pd.DataFrame, group_col: str, mapping: BackfillColumnMapping
+    ) -> pd.Series:
+        """
+        Concatenate distinct values with separator.
+
+        Story 6.2-P15: Complex Mapping Backfill Enhancement
+
+        Args:
+            df: Source DataFrame
+            group_col: Column to group by
+            mapping: Column mapping with aggregation config
+
+        Returns:
+            Series with concatenated values indexed by group
+        """
+        sep = mapping.aggregation.separator
+        sort_values = mapping.aggregation.sort
+
+        def concat_func(x: pd.Series) -> str:
+            # Drop NA and get unique values
+            unique = x.dropna().unique()
+            if len(unique) == 0:
+                return pd.NA  # Handle empty case gracefully, returns NA for optional field handling
+
+            # Convert to strings for sorting and joining
+            str_values = [str(v) for v in unique]
+            if sort_values:
+                str_values = sorted(str_values)
+
+            return sep.join(str_values)
+
+        return df.groupby(group_col, sort=False)[mapping.source].agg(concat_func)
 
     def backfill_table(
         self,
