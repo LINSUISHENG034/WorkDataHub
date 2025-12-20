@@ -115,6 +115,87 @@ def _trigger_token_refresh() -> bool:
         return False
 
 
+def _check_database_connection() -> int:
+    """
+    Test database connection and display diagnostic info.
+
+    Story 6.2-P16 AC-2: Database connection diagnostics.
+    Validates settings and attempts connection without running ETL.
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    print("🔍 Database Connection Diagnostics")
+    print("=" * 50)
+
+    try:
+        settings = get_settings()
+
+        from pathlib import Path
+
+        # Display DSN components (never show password)
+        print(f"   Host: {settings.database_host}")
+        print(f"   Port: {settings.database_port}")
+        print(f"   Database: {settings.database_db}")
+        print(f"   User: {settings.database_user}")
+        print(f"   Password: {'***' if settings.database_password else '(not set)'}")
+        env_file = Path(".wdh_env")
+        print(
+            f"   .wdh_env: {env_file.resolve()} "
+            f"({('found' if env_file.exists() else 'missing')})"
+        )
+
+        # Validate required settings
+        missing = []
+        if not settings.database_host:
+            missing.append("WDH_DATABASE__HOST")
+        if not settings.database_port:
+            missing.append("WDH_DATABASE__PORT")
+        if not settings.database_db:
+            missing.append("WDH_DATABASE__DB")
+        if not settings.database_user:
+            missing.append("WDH_DATABASE__USER")
+        if not settings.database_password:
+            missing.append("WDH_DATABASE__PASSWORD")
+
+        if missing:
+            print(f"\n❌ Missing required settings: {', '.join(missing)}")
+            print("   Add these to your .wdh_env file")
+            return 1
+
+        # Attempt connection
+        print("\n🔌 Attempting connection...", end=" ", flush=True)
+
+        import psycopg2
+
+        dsn = settings.get_database_connection_string()
+        conn = None
+        try:
+            conn = psycopg2.connect(dsn)
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT version();")
+                version = cursor.fetchone()[0]
+        finally:
+            if conn is not None:
+                conn.close()
+
+        print("✅ Connected!")
+        print(f"\n📋 PostgreSQL: {version.split(',')[0] if ',' in version else version}")
+        print("=" * 50)
+        print("✅ Database connection successful")
+        return 0
+
+    except Exception as e:
+        print(f"❌ Failed")
+        print(f"\n❌ Connection error: {e}")
+        print("\n💡 Troubleshooting hints:")
+        print("   - Verify WDH_DATABASE__* settings in .wdh_env")
+        print("   - Check if PostgreSQL server is running")
+        print("   - Verify network connectivity to database host")
+        print("   - Confirm database user has login permissions")
+        return 1
+
+
 def _parse_pk_override(pk_arg: Any) -> List[str]:
     """
     Parse CLI --pk override into a clean list of column names.
@@ -199,10 +280,13 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:
         table = domain
         pk = []
 
-    # Build discover_files_op config with optional period
+    # Build discover_files_op config with optional period and selection strategy
     discover_config = {"domain": domain}
     if hasattr(args, "period") and args.period:
         discover_config["period"] = args.period
+    # Story 6.2-P16: Pass file selection strategy from CLI to op
+    if hasattr(args, "file_selection") and args.file_selection:
+        discover_config["selection_strategy"] = args.file_selection
 
     run_config = {
         "ops": {
@@ -259,15 +343,20 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:
 
     # Add enrichment configuration for annuity_performance domain
     if domain == "annuity_performance":
+        enrichment_enabled = getattr(args, "enrichment_enabled", False)
+        # Story 6.2-P16: When enrichment is disabled, sync_budget must also be 0
+        # to prevent EQC calls from CompanyIdResolutionStep
+        sync_budget = getattr(args, "enrichment_sync_budget", 0) if enrichment_enabled else 0
         run_config["ops"]["process_annuity_performance_op"] = {
             "config": {
-                "enrichment_enabled": getattr(args, "enrichment_enabled", False),
-                "enrichment_sync_budget": getattr(args, "enrichment_sync_budget", 0),
+                "enrichment_enabled": enrichment_enabled,
+                "enrichment_sync_budget": sync_budget,
                 "export_unknown_names": getattr(args, "export_unknown_names", True),
                 "plan_only": effective_plan_only,
                 "use_pipeline": getattr(args, "use_pipeline", None),
             }
         }
+
 
     return run_config
 
@@ -836,6 +925,18 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Maximum number of discovered files to process (default: 1)",
     )
 
+    # Story 6.2-P16 AC-1: File selection strategy for ambiguous matches
+    parser.add_argument(
+        "--file-selection",
+        choices=["error", "newest", "oldest", "first"],
+        default="error",
+        help=(
+            "Strategy when multiple files match patterns. "
+            "'error' (default) raises an error, 'newest' selects most recently modified, "
+            "'oldest' selects oldest, 'first' selects alphabetically first."
+        ),
+    )
+
     # Runtime override for composite key
     parser.add_argument(
         "--pk",
@@ -925,7 +1026,19 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Disable automatic EQC token refresh at startup",
     )
 
+    # Story 6.2-P16 AC-2: Database connection diagnostics
+    parser.add_argument(
+        "--check-db",
+        action="store_true",
+        default=False,
+        help="Test database connection and exit (diagnostic mode)",
+    )
+
     args = parser.parse_args(argv)
+
+    # Story 6.2-P16 AC-2: --check-db diagnostic mode
+    if getattr(args, "check_db", False):
+        return _check_database_connection()
 
     # Validate domain arguments
     if not args.domains and not args.all_domains:

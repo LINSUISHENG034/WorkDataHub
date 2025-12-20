@@ -125,6 +125,8 @@ class DiscoverFilesConfig(Config):
 
     domain: str = "sandbox_trustee_performance"
     period: Optional[str] = None  # YYYYMM format for Epic 3 schema domains
+    # Story 6.2-P16: File selection strategy when multiple files match
+    selection_strategy: str = "error"  # error, newest, oldest, first
 
     @field_validator("domain")
     @classmethod
@@ -133,6 +135,15 @@ class DiscoverFilesConfig(Config):
         valid_domains = _load_valid_domains()
         if v not in valid_domains:
             raise ValueError(f"Domain '{v}' not supported. Valid: {valid_domains}")
+        return v
+
+    @field_validator("selection_strategy")
+    @classmethod
+    def validate_selection_strategy(cls, v: str) -> str:
+        """Validate selection strategy is valid."""
+        valid = ["error", "newest", "oldest", "first"]
+        if v not in valid:
+            raise ValueError(f"Strategy '{v}' not valid. Valid: {valid}")
         return v
 
 
@@ -193,8 +204,19 @@ def discover_files_op(
                 if config.period:
                     template_vars["month"] = config.period
 
+                # Story 6.2-P16: Convert strategy string to enum
+                from work_data_hub.io.connectors.file_pattern_matcher import (
+                    SelectionStrategy,
+                )
+                strategy = SelectionStrategy(config.selection_strategy)
+
+                context.log.info(
+                    f"Discovery with selection_strategy={strategy.value}"
+                )
+
                 match_result = file_discovery.discover_file(
                     domain=config.domain,
+                    selection_strategy=strategy,
                     **template_vars
                 )
 
@@ -417,9 +439,12 @@ def process_annuity_performance_op(
     settings = get_settings()
 
     try:
-        # GUARD: Only setup enrichment in execute mode
-        use_enrichment = (not config.plan_only) and (
-            config.enrichment_enabled or not settings.enrich_enabled
+        # GUARD: Only setup enrichment in execute mode AND when explicitly enabled
+        # Story 6.2-P16: Fixed condition - enrichment requires BOTH CLI and settings to enable
+        use_enrichment = (
+            (not config.plan_only)
+            and config.enrichment_enabled
+            and settings.enrich_enabled
         )
 
         if use_enrichment:
@@ -453,7 +478,60 @@ def process_annuity_performance_op(
 
             # Create database connection only in execute mode
             dsn = settings.get_database_connection_string()
-            conn = psycopg2.connect(dsn)
+
+            # Story 6.2-P16 AC-2: Validate required settings before attempting connect
+            missing = []
+            if not settings.database_host:
+                missing.append("WDH_DATABASE__HOST")
+            if not settings.database_port:
+                missing.append("WDH_DATABASE__PORT")
+            if not settings.database_db:
+                missing.append("WDH_DATABASE__DB")
+            if not settings.database_user:
+                missing.append("WDH_DATABASE__USER")
+            if not settings.database_password:
+                missing.append("WDH_DATABASE__PASSWORD")
+            if missing:
+                context.log.error(
+                    "db_connection.missing_settings",
+                    extra={"missing": missing, "purpose": "enrichment"},
+                )
+                raise DataWarehouseLoaderError(
+                    "Database connection settings missing for enrichment: "
+                    f"{', '.join(missing)}. "
+                    "Set them in .wdh_env and try again."
+                )
+
+            # Story 6.2-P16 AC-2: Log DSN components for debugging (never log password)
+            context.log.info(
+                "db_connection.attempting",
+                extra={
+                    "host": settings.database_host,
+                    "port": settings.database_port,
+                    "database": settings.database_db,
+                    "user": settings.database_user,
+                    "purpose": "enrichment",
+                },
+            )
+
+            try:
+                conn = psycopg2.connect(dsn)
+            except Exception as e:
+                # Story 6.2-P16 AC-2: Improved error message with hints
+                context.log.error(
+                    "db_connection.failed",
+                    extra={
+                        "host": settings.database_host,
+                        "port": settings.database_port,
+                        "database": settings.database_db,
+                        "error": str(e),
+                    },
+                )
+                raise DataWarehouseLoaderError(
+                    f"Database connection failed for enrichment: {e}. "
+                    "Check WDH_DATABASE__HOST, WDH_DATABASE__PORT, WDH_DATABASE__DB, "
+                    "WDH_DATABASE__USER, WDH_DATABASE__PASSWORD in .wdh_env"
+                ) from e
 
             # Setup enrichment service components with connection
             loader = CompanyEnrichmentLoader(conn)
@@ -831,17 +909,65 @@ def load_op(
                     "Database connection failed: invalid DSN resolved from settings"
                 )
 
+            # Story 6.2-P16 AC-2: Validate required settings before attempting connect
+            missing = []
+            if not settings.database_host:
+                missing.append("WDH_DATABASE__HOST")
+            if not settings.database_port:
+                missing.append("WDH_DATABASE__PORT")
+            if not settings.database_db:
+                missing.append("WDH_DATABASE__DB")
+            if not settings.database_user:
+                missing.append("WDH_DATABASE__USER")
+            if not settings.database_password:
+                missing.append("WDH_DATABASE__PASSWORD")
+            if missing:
+                context.log.error(
+                    "db_connection.missing_settings",
+                    extra={
+                        "missing": missing,
+                        "purpose": "load_op",
+                        "table": config.table,
+                    },
+                )
+                raise DataWarehouseLoaderError(
+                    "Database connection settings missing: "
+                    f"{', '.join(missing)}. "
+                    "Set them in .wdh_env and try again."
+                )
+
+            # Story 6.2-P16 AC-2: Log DSN components for debugging (never log password)
             context.log.info(
-                "Connecting to database for execution (table: %s)", config.table
+                "db_connection.attempting",
+                extra={
+                    "host": settings.database_host,
+                    "port": settings.database_port,
+                    "database": settings.database_db,
+                    "user": settings.database_user,
+                    "table": config.table,
+                    "purpose": "load_op",
+                },
             )
 
             # CRITICAL: Only catch psycopg2.connect failures
             try:
                 conn = psycopg2.connect(dsn)  # Bare connection, no context manager
             except Exception as e:
+                # Story 6.2-P16 AC-2: Improved error message with hints
+                context.log.error(
+                    "db_connection.failed",
+                    extra={
+                        "host": settings.database_host,
+                        "port": settings.database_port,
+                        "database": settings.database_db,
+                        "table": config.table,
+                        "error": str(e),
+                    },
+                )
                 raise DataWarehouseLoaderError(
                     f"Database connection failed: {e}. "
-                    "Check WDH_DATABASE__* environment variables."
+                    "Check WDH_DATABASE__HOST, WDH_DATABASE__PORT, WDH_DATABASE__DB, "
+                    "WDH_DATABASE__USER, WDH_DATABASE__PASSWORD in .wdh_env"
                 ) from e
 
             # Call loader - it handles transactions with 'with conn:'

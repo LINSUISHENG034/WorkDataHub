@@ -3,12 +3,15 @@
 This module implements file pattern matching capabilities for Epic 3,
 following Decision #1 (File-Pattern-Aware Version Detection) and
 Decision #4 (Hybrid Error Context Standards) from architecture.
+
+Story 6.2-P16: Added SelectionStrategy for handling ambiguous file matches.
 """
 
 import fnmatch
 import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -16,6 +19,24 @@ from work_data_hub.io.connectors.exceptions import DiscoveryError
 from work_data_hub.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+class SelectionStrategy(str, Enum):
+    """Strategy for selecting files when multiple match.
+
+    Story 6.2-P16 AC-1: Provides configurable behavior for ambiguous matches.
+
+    Strategies:
+      - ERROR: Raise DiscoveryError (default, backward compatible)
+      - NEWEST: Select most recently modified file
+      - OLDEST: Select oldest modified file
+      - FIRST: Select first file in list order (deterministic by name)
+    """
+
+    ERROR = "error"
+    NEWEST = "newest"
+    OLDEST = "oldest"
+    FIRST = "first"
 
 
 @dataclass
@@ -48,6 +69,7 @@ class FilePatternMatcher:
         search_path: Path,
         include_patterns: List[str],
         exclude_patterns: Optional[List[str]] = None,
+        selection_strategy: SelectionStrategy | str = SelectionStrategy.ERROR,
     ) -> FileMatchResult:
         """
         Match files in search_path using include/exclude patterns.
@@ -56,20 +78,27 @@ class FilePatternMatcher:
             search_path: Directory to search for files
             include_patterns: Glob patterns to include (OR logic)
             exclude_patterns: Glob patterns to exclude (AND NOT logic)
+            selection_strategy: How to handle multiple matches (default: ERROR)
+                - ERROR: Raise DiscoveryError (backward compatible)
+                - NEWEST: Select most recently modified file
+                - OLDEST: Select oldest modified file
+                - FIRST: Select first file alphabetically
 
         Returns:
             FileMatchResult with selected file and metadata
 
         Raises:
-            DiscoveryError: If no files match or multiple files remain after filtering
+            DiscoveryError: If no files match, or multiple files match with ERROR strategy
         """
         exclude_patterns = exclude_patterns or []
+        strategy = self._coerce_selection_strategy(selection_strategy)
 
         logger.info(
             "file_matching.started",
             search_path=str(search_path),
             include_patterns=include_patterns,
             exclude_patterns=exclude_patterns,
+            selection_strategy=strategy.value,
         )
 
         # Step 1: Find all files matching include patterns
@@ -78,7 +107,7 @@ class FilePatternMatcher:
         # Step 2: Apply exclude patterns
         (matched, excluded) = self._apply_excludes(candidates, exclude_patterns)
 
-        # Step 3: Validate exactly 1 file remains
+        # Step 3: Validate at least 1 file exists
         if len(matched) == 0:
             raise DiscoveryError(
                 domain="unknown",
@@ -91,19 +120,11 @@ class FilePatternMatcher:
                 ),
             )
 
+        # Step 4: Handle multiple matches based on strategy
         if len(matched) > 1:
-            raise DiscoveryError(
-                domain="unknown",
-                failed_stage="file_matching",
-                original_error=ValueError("Ambiguous file match"),
-                message=(
-                    f"Ambiguous match: Found {len(matched)} files {matched}, "
-                    f"refine patterns or use version detection. "
-                    f"Searched in {search_path} with patterns {include_patterns}"
-                ),
-            )
-
-        selected_file = matched[0]
+            selected_file = self._select_by_strategy(matched, strategy)
+        else:
+            selected_file = matched[0]
 
         logger.info(
             "file_matching.completed",
@@ -112,6 +133,7 @@ class FilePatternMatcher:
             excluded_count=len(excluded),
             selected_file=str(selected_file),
             match_count=len(matched),
+            selection_strategy=strategy.value,
         )
 
         return FileMatchResult(
@@ -123,6 +145,85 @@ class FilePatternMatcher:
             match_count=len(matched),
             selected_at=datetime.now(),
         )
+
+    def _coerce_selection_strategy(
+        self, selection_strategy: SelectionStrategy | str
+    ) -> SelectionStrategy:
+        """Normalize selection_strategy to a SelectionStrategy enum value."""
+        if isinstance(selection_strategy, SelectionStrategy):
+            return selection_strategy
+        return SelectionStrategy(str(selection_strategy))
+
+    def _select_by_strategy(
+        self, files: List[Path], strategy: SelectionStrategy
+    ) -> Path:
+        """
+        Select a single file from multiple matches based on strategy.
+
+        Story 6.2-P16 AC-1: Implements selection strategies for ambiguous matches.
+
+        Args:
+            files: List of matching files (must have >= 2 items)
+            strategy: How to select the file
+
+        Returns:
+            Selected file path
+
+        Raises:
+            DiscoveryError: If strategy is ERROR
+        """
+        if strategy == SelectionStrategy.ERROR:
+            raise DiscoveryError(
+                domain="unknown",
+                failed_stage="file_matching",
+                original_error=ValueError("Ambiguous file match"),
+                message=(
+                    f"Ambiguous match: Found {len(files)} files {files}, "
+                    f"refine patterns, use version detection, or use selection_strategy "
+                    f"(NEWEST/OLDEST/FIRST) to auto-select."
+                ),
+            )
+
+        if strategy == SelectionStrategy.FIRST:
+            # Sort by filename for deterministic selection
+            sorted_files = sorted(files, key=lambda p: p.name)
+            selected = sorted_files[0]
+            logger.info(
+                "file_matching.strategy_selected",
+                strategy="first",
+                selected_file=str(selected),
+                total_candidates=len(files),
+            )
+            return selected
+
+        if strategy == SelectionStrategy.NEWEST:
+            # Sort by modification time descending, take newest
+            sorted_files = sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)
+            selected = sorted_files[0]
+            logger.info(
+                "file_matching.strategy_selected",
+                strategy="newest",
+                selected_file=str(selected),
+                mtime=selected.stat().st_mtime,
+                total_candidates=len(files),
+            )
+            return selected
+
+        if strategy == SelectionStrategy.OLDEST:
+            # Sort by modification time ascending, take oldest
+            sorted_files = sorted(files, key=lambda p: p.stat().st_mtime)
+            selected = sorted_files[0]
+            logger.info(
+                "file_matching.strategy_selected",
+                strategy="oldest",
+                selected_file=str(selected),
+                mtime=selected.stat().st_mtime,
+                total_candidates=len(files),
+            )
+            return selected
+
+        # Fallback (should never reach here with current enum)
+        raise ValueError(f"Unknown selection strategy: {strategy}")
 
     def _find_candidates(self, search_path: Path, patterns: List[str]) -> List[Path]:
         """Find all files matching any include pattern."""

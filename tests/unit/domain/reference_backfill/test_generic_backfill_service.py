@@ -663,6 +663,35 @@ class TestMaxByAggregation:
         candidates = service.derive_candidates(df, config)
         assert candidates.iloc[0]["主拓代码"] == "ORG-B"
 
+    def test_max_by_handles_mixed_type_order_column(self):
+        """max_by should handle mixed numeric/string order_column values without crashing."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_plan",
+            source_column="计划代码",
+            target_table="年金计划",
+            target_key="年金计划号",
+            backfill_columns=[
+                BackfillColumnMapping(source="计划代码", target="年金计划号"),
+                BackfillColumnMapping(
+                    source="机构代码",
+                    target="主拓代码",
+                    optional=True,
+                    aggregation=AggregationConfig(type="max_by", order_column="期末资产规模")
+                ),
+            ]
+        )
+
+        df = pd.DataFrame([
+            {"计划代码": "P001", "机构代码": "ORG-A", "期末资产规模": "N/A"},
+            {"计划代码": "P001", "机构代码": "ORG-B", "期末资产规模": 2000.0},
+            {"计划代码": "P001", "机构代码": "ORG-C", "期末资产规模": "5000"},
+        ])
+
+        candidates = service.derive_candidates(df, config)
+        assert candidates.iloc[0]["主拓代码"] == "ORG-C"
+
 
 class TestConcatDistinctAggregation:
     """Test concat_distinct aggregation strategy."""

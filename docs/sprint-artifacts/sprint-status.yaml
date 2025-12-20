@@ -266,6 +266,11 @@ development_status:
   # Extends GenericBackfillService with max_by and concat_distinct aggregation strategies
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-20-complex-mapping-backfill-enhancement.md
   6.2-p15-complex-mapping-backfill-enhancement: done  # Complex aggregations for 年金计划 reference backfill - Code Review PASSED 2025-12-20
+  # Story 6.2-P16: ETL Execution Robustness Enhancement
+  # Added 2025-12-20 via Correct-Course workflow
+  # Fixes: I001 file discovery ambiguity, I002 database connection failure, I004 token diagnostics
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-20-etl-robustness.md
+  6.2-p16-etl-execution-robustness: done  # File selection strategy + DB diagnostics + check-db + token diagnostics
 
   # Epic 7: Testing & Validation Infrastructure
   epic-7: backlog

@@ -260,3 +260,166 @@ class TestFilePatternMatcher:
         assert exc_info.value.failed_stage == "file_matching"
         assert "Ambiguous match" in str(exc_info.value)
         assert "2 files" in str(exc_info.value)
+
+
+class TestSelectionStrategy:
+    """Story 6.2-P16 AC-1, AC-4: Tests for file selection strategies."""
+
+    def test_default_error_strategy_raises_on_ambiguity(self, tmp_path):
+        """AC: Default behavior raises error on ambiguous match (backward compatible)."""
+        (tmp_path / "file1.xlsx").touch()
+        (tmp_path / "file2.xlsx").touch()
+
+        from work_data_hub.io.connectors.file_pattern_matcher import SelectionStrategy
+
+        matcher = FilePatternMatcher()
+
+        # Default (ERROR strategy) should raise
+        with pytest.raises(DiscoveryError) as exc_info:
+            matcher.match_files(search_path=tmp_path, include_patterns=["*.xlsx"])
+        assert "Ambiguous match" in str(exc_info.value)
+
+        # Explicit ERROR strategy should also raise
+        with pytest.raises(DiscoveryError):
+            matcher.match_files(
+                search_path=tmp_path,
+                include_patterns=["*.xlsx"],
+                selection_strategy=SelectionStrategy.ERROR,
+            )
+
+    def test_first_strategy_alphabetical_selection(self, tmp_path):
+        """AC: FIRST strategy selects first file alphabetically."""
+        # Create files - z comes after a
+        (tmp_path / "z_file.xlsx").touch()
+        (tmp_path / "a_file.xlsx").touch()
+        (tmp_path / "m_file.xlsx").touch()
+
+        from work_data_hub.io.connectors.file_pattern_matcher import SelectionStrategy
+
+        matcher = FilePatternMatcher()
+        result = matcher.match_files(
+            search_path=tmp_path,
+            include_patterns=["*.xlsx"],
+            selection_strategy=SelectionStrategy.FIRST,
+        )
+
+        # Should select first alphabetically
+        assert result.matched_file.name == "a_file.xlsx"
+        assert result.match_count == 3  # All 3 files matched
+
+    def test_newest_strategy_mtime_selection(self, tmp_path):
+        """AC: NEWEST strategy selects most recently modified file."""
+        import os
+        import time
+
+        # Create files with explicit, deterministic modification times
+        old_file = tmp_path / "old_file.xlsx"
+        old_file.touch()
+        mid_file = tmp_path / "mid_file.xlsx"
+        mid_file.touch()
+        new_file = tmp_path / "new_file.xlsx"
+        new_file.touch()
+
+        base_time = time.time()
+        os.utime(old_file, (base_time - 30, base_time - 30))
+        os.utime(mid_file, (base_time - 20, base_time - 20))
+        os.utime(new_file, (base_time - 10, base_time - 10))
+
+        from work_data_hub.io.connectors.file_pattern_matcher import SelectionStrategy
+
+        matcher = FilePatternMatcher()
+        result = matcher.match_files(
+            search_path=tmp_path,
+            include_patterns=["*.xlsx"],
+            selection_strategy=SelectionStrategy.NEWEST,
+        )
+
+        # Should select newest (most recently modified)
+        assert result.matched_file.name == "new_file.xlsx"
+
+    def test_oldest_strategy_mtime_selection(self, tmp_path):
+        """AC: OLDEST strategy selects oldest modified file."""
+        import os
+        import time
+
+        # Create files with explicit, deterministic modification times
+        old_file = tmp_path / "old_file.xlsx"
+        old_file.touch()
+        mid_file = tmp_path / "mid_file.xlsx"
+        mid_file.touch()
+        new_file = tmp_path / "new_file.xlsx"
+        new_file.touch()
+
+        base_time = time.time()
+        os.utime(old_file, (base_time - 30, base_time - 30))
+        os.utime(mid_file, (base_time - 20, base_time - 20))
+        os.utime(new_file, (base_time - 10, base_time - 10))
+
+        from work_data_hub.io.connectors.file_pattern_matcher import SelectionStrategy
+
+        matcher = FilePatternMatcher()
+        result = matcher.match_files(
+            search_path=tmp_path,
+            include_patterns=["*.xlsx"],
+            selection_strategy=SelectionStrategy.OLDEST,
+        )
+
+        # Should select oldest
+        assert result.matched_file.name == "old_file.xlsx"
+
+    def test_selection_strategy_single_file_bypass(self, tmp_path):
+        """AC: Strategy only used when multiple files match - single file works regardless."""
+        (tmp_path / "only_file.xlsx").touch()
+
+        from work_data_hub.io.connectors.file_pattern_matcher import SelectionStrategy
+
+        matcher = FilePatternMatcher()
+
+        # All strategies should return the single file
+        for strategy in SelectionStrategy:
+            result = matcher.match_files(
+                search_path=tmp_path,
+                include_patterns=["*.xlsx"],
+                selection_strategy=strategy,
+            )
+            assert result.matched_file.name == "only_file.xlsx"
+
+    def test_selection_strategy_with_excludes(self, tmp_path):
+        """AC: Selection strategy works correctly with exclude patterns."""
+        (tmp_path / "a_keep.xlsx").touch()
+        (tmp_path / "z_keep.xlsx").touch()
+        (tmp_path / "temp_file.xlsx").touch()
+
+        from work_data_hub.io.connectors.file_pattern_matcher import SelectionStrategy
+
+        matcher = FilePatternMatcher()
+        result = matcher.match_files(
+            search_path=tmp_path,
+            include_patterns=["*.xlsx"],
+            exclude_patterns=["temp_*"],
+            selection_strategy=SelectionStrategy.FIRST,
+        )
+
+        # Should exclude temp_file, then select first from remaining
+        assert result.matched_file.name == "a_keep.xlsx"
+        assert result.match_count == 2  # 2 files after excluding temp
+        assert len(result.excluded_files) == 1
+
+    def test_selection_strategy_with_chinese_filenames(self, tmp_path):
+        """AC: Selection strategy works with Chinese filenames."""
+        (tmp_path / "报表A2024.xlsx").touch()
+        (tmp_path / "报表B2024.xlsx").touch()
+        (tmp_path / "报表C2024.xlsx").touch()
+
+        from work_data_hub.io.connectors.file_pattern_matcher import SelectionStrategy
+
+        matcher = FilePatternMatcher()
+        result = matcher.match_files(
+            search_path=tmp_path,
+            include_patterns=["*报表*.xlsx"],
+            selection_strategy=SelectionStrategy.FIRST,
+        )
+
+        # Should select first alphabetically (containing A)
+        assert result.matched_file.name == "报表A2024.xlsx"
+

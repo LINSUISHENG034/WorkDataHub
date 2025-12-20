@@ -108,6 +108,9 @@ def validate_eqc_token(token: str, base_url: str) -> bool:
     Uses a simple search request to verify token validity without
     consuming significant API resources.
 
+    Story 6.2-P16 AC-3: Adds diagnostic logging (status codes + decision),
+    without ever logging the token or response body.
+
     Args:
         token: EQC API token to validate.
         base_url: EQC API base URL.
@@ -115,22 +118,61 @@ def validate_eqc_token(token: str, base_url: str) -> bool:
     Returns:
         True if token is valid, False if invalid (401) or network error.
     """
+    endpoint_path = "/kg-api-hfd/api/search/searchAll"
+    url = f"{base_url.rstrip('/')}{endpoint_path}"
+    params = {"keyword": "test", "currentPage": 1, "pageSize": 1}
+
+    logger.info(
+        "eqc.token_validation.started",
+        base_url=base_url,
+        endpoint=endpoint_path,
+        timeout_seconds=REQUEST_TIMEOUT_SECONDS,
+    )
     try:
         response = requests.get(
-            f"{base_url}/kg-api-hfd/api/search/searchAll",
-            params={"keyword": "test", "currentPage": 1, "pageSize": 1},
+            url,
+            params=params,
             headers={"token": token},
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
+        elapsed_seconds = None
+        try:
+            elapsed_seconds = response.elapsed.total_seconds()
+        except Exception:
+            pass
+
+        logger.info(
+            "eqc.token_validation.response",
+            status_code=response.status_code,
+            elapsed_seconds=elapsed_seconds,
+        )
         if response.status_code == 200:
+            logger.info("eqc.token_validation.result", valid=True, reason="http_200")
             return True
         # 401/403 are strong signals that the token/session is not usable.
         if response.status_code in {401, 403}:
+            logger.warning(
+                "eqc.token_validation.result",
+                valid=False,
+                reason="http_auth_error",
+                status_code=response.status_code,
+            )
             return False
         # Other errors (e.g., transient 5xx) don't prove token invalidity.
+        logger.warning(
+            "eqc.token_validation.result",
+            valid=True,
+            reason="non_auth_http_error_assume_valid",
+            status_code=response.status_code,
+        )
         return True
-    except requests.RequestException:
-        # Network errors don't indicate token invalidity
+    except requests.RequestException as e:
+        # Network errors don't indicate token invalidity (but log it for diagnosis)
+        logger.warning(
+            "eqc.token_validation.request_error_assume_valid",
+            error=str(e),
+            exc_info=True,
+        )
         return True
 
 

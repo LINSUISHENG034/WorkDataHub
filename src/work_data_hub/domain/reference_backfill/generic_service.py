@@ -333,10 +333,12 @@ class GenericBackfillService:
         Get value from row with maximum order_column value.
 
         Story 6.2-P15: Complex Mapping Backfill Enhancement
+        Story 6.2-P16: Fixed TypeError when order_column has mixed types
 
         Falls back to 'first' aggregation when:
         - order_column doesn't exist in DataFrame (defensive)
         - All values in order_column are NULL for a group
+        - order_column has mixed types that can't be compared
 
         Args:
             df: Source DataFrame
@@ -356,24 +358,42 @@ class GenericBackfillService:
             )
             return df.groupby(group_col)[mapping.source].first()
 
+        # Story 6.2-P16: Convert order_column to numeric for safe comparison
+        # This handles cases where the column has mixed float/str types
+        order_series = pd.to_numeric(df[order_col], errors='coerce')
+
         # Per-group max_by with fallback for all-NULL order_column
         def max_by_with_fallback(group: pd.DataFrame) -> Any:
-            valid = group[order_col].dropna()
+            # Use the converted numeric series for comparison
+            group_indices = group.index
+            numeric_vals = order_series.loc[group_indices]
+            valid = numeric_vals.dropna()
+
             if valid.empty:
-                # All order_column values are NULL, fallback to first
+                # All order_column values are NULL or non-numeric, fallback to first
                 self.logger.debug(
-                    f"All '{order_col}' values NULL for group, using 'first' "
+                    f"All '{order_col}' values NULL/non-numeric for group, using 'first' "
                     f"for column '{mapping.source}'"
                 )
                 first_val = group[mapping.source].iloc[0] if len(group) > 0 else None
                 return first_val
-            # Use idxmax with skipna=True (explicit per team review)
-            max_idx = group[order_col].idxmax(skipna=True)
-            return group.loc[max_idx, mapping.source]
+
+            # Use idxmax on the valid numeric values
+            try:
+                max_idx = numeric_vals.idxmax(skipna=True)
+                return group.loc[max_idx, mapping.source]
+            except (TypeError, ValueError) as e:
+                # Fallback on comparison errors
+                self.logger.warning(
+                    f"max_by comparison error for column '{mapping.source}': {e}, "
+                    "falling back to 'first'"
+                )
+                return group[mapping.source].iloc[0] if len(group) > 0 else None
 
         return df.groupby(group_col, sort=False).apply(
             max_by_with_fallback, include_groups=False
         )
+
 
     def _aggregate_concat_distinct(
         self, df: pd.DataFrame, group_col: str, mapping: BackfillColumnMapping

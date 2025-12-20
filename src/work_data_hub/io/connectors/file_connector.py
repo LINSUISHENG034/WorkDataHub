@@ -677,6 +677,7 @@ class FileDiscoveryService:
         self,
         domain: str,
         version_override: Optional[str] = None,
+        selection_strategy: Optional[Any] = None,
         **template_vars: Any,
     ) -> DiscoveryMatch:
         """
@@ -724,10 +725,21 @@ class FileDiscoveryService:
             )
 
             # Stage 2: File matching
+            # Import SelectionStrategy here to avoid circular imports
+            from work_data_hub.io.connectors.file_pattern_matcher import (
+                SelectionStrategy,
+            )
+
+            strategy = (
+                SelectionStrategy.ERROR
+                if selection_strategy is None
+                else selection_strategy
+            )
             match_result = self.file_matcher.match_files(
                 search_path=version_result.path,
                 include_patterns=list(domain_config.file_patterns),
                 exclude_patterns=list(domain_config.exclude_patterns or []),
+                selection_strategy=strategy,
             )
             self.logger.info(
                 "discovery.file_matched",
@@ -770,6 +782,7 @@ class FileDiscoveryService:
         self,
         domain: str,
         version_override: Optional[str] = None,
+        selection_strategy: Optional[Any] = None,
         **template_vars: Any,
     ) -> DataDiscoveryResult:
         """
@@ -813,11 +826,22 @@ class FileDiscoveryService:
             )
 
             # Stage 2: File matching
+            # Import SelectionStrategy here to avoid circular imports
+            from work_data_hub.io.connectors.file_pattern_matcher import (
+                SelectionStrategy,
+            )
+
             stage_start = time.perf_counter()
+            strategy = (
+                SelectionStrategy.ERROR
+                if selection_strategy is None
+                else selection_strategy
+            )
             match_result = self.file_matcher.match_files(
                 search_path=version_result.path,
                 include_patterns=list(domain_config.file_patterns),
                 exclude_patterns=list(domain_config.exclude_patterns or []),
+                selection_strategy=strategy,
             )
             stage_durations["file_matching"] = self._log_stage(
                 "discovery.file_matched",
