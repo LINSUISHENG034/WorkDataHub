@@ -44,14 +44,17 @@ domains:
           - source: "客户名称"
             target: "客户名称"
             optional: true
-          - source: "主拓代码"
+          - source: "机构代码"
             target: "主拓代码"
             optional: true
-          - source: "主拓机构"
+          - source: "机构名称"
             target: "主拓机构"
             optional: true
-          - source: "资格"
+          - source: "业务类型"
             target: "管理资格"  # Fixed: actual column name
+            optional: true
+          - source: "company_id"
+            target: "company_id"
             optional: true
 
       # 组合计划 (Portfolio Plan) reference table backfill
