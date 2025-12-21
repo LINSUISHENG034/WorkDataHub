@@ -237,47 +237,46 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:
         else getattr(args, "plan_only", True)
     )
 
-    # Load table/pk from data_sources.yml if needed
+    # Load table/pk from data_sources.yml with proper defaults inheritance
+    # Story 6.2-P14 Fix: Use get_domain_config_v2() to apply defaults/overrides mechanism
     from work_data_hub.config.settings import get_settings
+    from work_data_hub.infrastructure.settings.data_source_schema import (
+        get_domain_config_v2,
+        DataSourcesValidationError,
+    )
 
     settings = get_settings()
 
-    data_sources: Dict[str, Any] = {}
     try:
-        with open(settings.data_sources_config, "r", encoding="utf-8") as f:
-            data_sources = yaml.safe_load(f) or {}
-        if not isinstance(data_sources, dict):
-            data_sources = {}
-
-        domain_config = (data_sources.get("domains") or {}).get(domain, {}) or {}
-        if not isinstance(domain_config, dict):
-            domain_config = {}
-
-        # Epic 3 schema prefers output.table + output.schema_name
-        output_cfg = domain_config.get("output") if isinstance(domain_config, dict) else None
-        if isinstance(output_cfg, dict) and output_cfg.get("table"):
-            table_name = str(output_cfg["table"])
-            schema_name = output_cfg.get("schema_name")
-            if schema_name:
-                table = f"{schema_name}.{table_name}"
-            else:
-                table = table_name
+        # Story 6.2-P14: Use get_domain_config_v2 for proper defaults inheritance
+        domain_cfg = get_domain_config_v2(domain, config_path=str(settings.data_sources_config))
+        
+        # Extract table/schema/pk from validated config with inheritance
+        if domain_cfg.output:
+            table_name = domain_cfg.output.table
+            schema_name = domain_cfg.output.schema_name  # ✅ Now inherits from defaults!
+            # Use schema-qualified table name with proper SQL identifier quoting
+            table = f'"{schema_name}"."{table_name}"' if schema_name else f'"{table_name}"'
+            
+            # Try to get pk from output config (may not exist in all configs)
+            pk = getattr(domain_cfg.output, 'pk', [])
         else:
-            table = domain_config.get("table", domain)  # Legacy fallback
-
-        pk = domain_config.get("pk", [])  # Legacy fallback
-        # Epic 3 schema: pk in output section takes precedence
-        if isinstance(output_cfg, dict) and "pk" in output_cfg:
-            pk = output_cfg["pk"]
-
+            # Fallback for legacy domains without output config
+            table = f'"{domain}"'
+            pk = []
+        
         # Runtime override via --pk (only affects delete_insert mode)
         pk_override = _parse_pk_override(getattr(args, "pk", None))
         if pk_override:
             pk = pk_override
 
+    except DataSourcesValidationError as e:
+        print(f"Warning: Could not load domain config for {domain}: {e}")
+        table = f'"{domain}"'
+        pk = []
     except Exception as e:
-        print(f"Warning: Could not load data sources config: {e}")
-        table = domain
+        print(f"Warning: Unexpected error loading config for {domain}: {e}")
+        table = f'"{domain}"'
         pk = []
 
     # Build discover_files_op config with optional period and selection strategy
@@ -310,11 +309,15 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:
     sheet_value = getattr(args, "sheet", None)
     if sheet_value is None:
         # Check if domain is Epic 3 schema and has sheet_name configured
-        domain_config = (data_sources.get("domains") or {}).get(domain, {}) or {}
-        if isinstance(domain_config, dict) and "sheet_name" in domain_config:
-            sheet_value = domain_config["sheet_name"]
-        else:
-            # Fallback to 0 for legacy domains
+        # Story 6.2-P14: Try to get sheet_name from domain config
+        try:
+            if domain_cfg and hasattr(domain_cfg, 'sheet_name'):
+                sheet_value = domain_cfg.sheet_name
+            else:
+                # Fallback to 0 for legacy domains
+                sheet_value = "0"
+        except (NameError, AttributeError):
+            # domain_cfg might not be defined if exception occurred during loading
             sheet_value = "0"
 
     if max_files > 1:
