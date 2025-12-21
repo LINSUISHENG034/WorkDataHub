@@ -29,8 +29,10 @@ CORE_REPLACE_STRING: List[str] = [
     # Original 29 patterns
     "已转出",
     "待转出",
+    "待转移",  # Added: variant of 待转出
     "终止",
     "转出",
+    "转移",  # Added: base form
     "保留",
     "暂停",
     "注销",
@@ -61,6 +63,27 @@ CORE_REPLACE_STRING: List[str] = [
     "作废",
     "存量",
     "原",  # Prefix marker like (原)
+]
+
+# Redundant suffix markers that appear in brackets at end of name
+# These are not status markers but redundant organizational info
+REDUNDANT_SUFFIX_MARKERS: List[str] = [
+    "集团",  # e.g., "XX集团有限公司(集团)" - redundant
+]
+
+# Invalid placeholder values that should be treated as empty
+# These are data entry placeholders, not real company names
+INVALID_PLACEHOLDERS: List[str] = [
+    "null",
+    "NULL",
+    "空白",
+    "无",
+    "N/A",
+    "n/a",
+    "-",
+    "--",
+    "—",
+    "——",
 ]
 
 # Sort by length descending for greedy matching
@@ -101,6 +124,11 @@ def normalize_for_temp_id(company_name: str) -> str:
 
     name = company_name
 
+    # 0. Check for invalid placeholders (before any processing)
+    # These are data entry placeholders, not real company names
+    if name.strip() in INVALID_PLACEHOLDERS:
+        return ""
+
     # 1. Remove all whitespace
     name = re.sub(r"\s+", "", name)
 
@@ -140,11 +168,25 @@ def normalize_for_temp_id(company_name: str) -> str:
     # 5. Normalize brackets to Chinese
     name = name.replace("(", "（").replace(")", "）")
 
-    # 6. Remove trailing punctuation and empty brackets (after bracket normalization)
+    # 6. Remove redundant suffix markers in brackets at end
+    # Only remove if the marker already appears in the name (truly redundant)
+    # e.g., "XX集团有限公司（集团）" -> "XX集团有限公司" (集团 appears twice)
+    # but "中国平安（集团）" stays as is (集团 is part of the name)
+    for suffix in REDUNDANT_SUFFIX_MARKERS:
+        # Check if suffix appears in name before the trailing bracket
+        pattern = rf"（{re.escape(suffix)}）$"
+        if re.search(pattern, name):
+            # Get the name without the trailing bracket
+            name_without_suffix = re.sub(pattern, "", name)
+            # Only remove if the suffix already exists in the remaining name
+            if suffix in name_without_suffix:
+                name = name_without_suffix
+
+    # 7. Remove trailing punctuation and empty brackets (after bracket normalization)
     name = re.sub(r"[\-\.。]+$", "", name)  # Remove trailing dash, period (EN/CN)
     name = re.sub(r"（）$", "", name)  # Remove empty Chinese brackets at end
 
-    # 7. Lowercase for hash stability (NEW - not in legacy)
+    # 8. Lowercase for hash stability (NEW - not in legacy)
     name = name.lower()
 
     return name
