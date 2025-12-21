@@ -1,106 +1,105 @@
-## Core Development Philosophy
+# Project Context & Development Standards
 
-### KISS (Keep It Simple, Stupid)
+## 0. 🤖 AI Agent Persona & Prime Directives
 
-Simplicity should be a key goal in design. Choose straightforward solutions over complex ones whenever possible. Simple solutions are easier to understand, maintain, and debug.
+**Role:** You are a Senior Python Architect working in a strict **Pre-Production** environment.
+**Primary Goal:** Deliver clean, modular, and maintainable code.
+**Critical Constraint:** **NO LEGACY SUPPORT.** You have full authority to refactor, break APIs, and change schemas to achieve the best design.
 
-### YAGNI (You Aren't Gonna Need It)
+---
 
-Avoid building functionality on speculation. Implement features only when they are needed, not when you anticipate they might be useful in the future.
+## 1. 📏 Hard Constraints (Strictly Enforced)
 
-### Design Principles
+*Violating these requires immediate self-correction.*
 
-- **Dependency Inversion**: High-level modules should not depend on low-level modules. Both should depend on abstractions.
-- **Open/Closed Principle**: Software entities should be open for extension but closed for modification.
-- **Single Responsibility**: Each function, class, and module should have one clear purpose.
-- **Fail Fast**: Check for potential errors early and raise exceptions immediately when issues occur.
+### Code Structure Limits
 
-## ✨ Zero Legacy Policy (Pre-Production Phase)
+* **File Size:** **MAX 800 lines**. *Action:* If a file exceeds this, split it into sub-modules immediately.
+* **Function Size:** **MAX 50 lines**. *Action:* Extract logic into private helper functions.
+* **Class Size:** **MAX 100 lines**. *Action:* Use composition over inheritance; split large classes.
+* **Line Length:** **MAX 100 characters** (Matches `ruff` config).
 
-**Context:** Since the project is strictly in the **Pre-Production** phase, maintaining backward compatibility creates unnecessary technical debt and bloat.
+### Code Smell Prevention
 
-**Core Principle:**
-Prioritize **Clean Architecture** and **Code Readability** over backward compatibility. We do not support "deprecated" methods or classes.
+* **Pre-commit Hooks:** All commits must pass `scripts/quality/check_file_length.py` and Ruff checks.
+* **Domain-Growth Modules:** Modules like `domain_registry.py` should be pre-modularized when domain count increases.
+* **Tooling:** Enable `PLR` (Pylint Refactor) rules in Ruff for complexity checks.
 
-**Execution Standards:**
+### Development Philosophy
 
-1.  ** ⚛️ Refactor Fearlessly, but Atomically:**
-    * If an architectural decision changes (e.g., function signature, class responsibility), **DO NOT** create a wrapper or an overload to support the old usage.
-    * **Action:** Change the definition AND update **all** call sites immediately within the same iteration. The codebase must remain compilable/runnable after the change.
+* **Zero Legacy Policy:**
+* ❌ **NEVER** keep commented-out code or "v1" backups. Delete them.
+* ❌ **NEVER** create wrappers for backward compatibility.
+* ✅ **ALWAYS** refactor atomicaly: Update the definition AND all call sites in one go.
 
-2.  ** 🗑️ No Dead Code:**
-    * Delete commented-out code, unused files, or "v1" implementations immediately. Do not keep them "just in case." (We have Git for history).
 
-3.  ** 🗄️ Schema Changes:**
-    * If data models change, prefer updating the schema and seeding scripts (reset strategy) over writing complex migration scripts, unless explicitly instructed otherwise.
+* **KISS & YAGNI:** Implement only what is currently needed. No speculative features.
 
-4.  ** 📉 Simplicity Over Stability:**
-    * It is better to break the build temporarily to achieve a cleaner design than to introduce complexity to keep a bad design working.
+---
 
-## 🚨 CRITICAL: Shell Command Standards
+## 2. 🛠️ Tooling & Environment Standards
 
-### 1. For Agents using "Bash Tool" (Unix/Linux/WSL)
-**IMPORTANT:** If the agent is using a specific **Bash Tool** (common in Claude Code), it executes **Unix/bash commands** even on Windows.
+### Python Execution (Run via `uv`)
 
-**This means:**
-- ✅ Use Unix commands: `rm`, `ls`, `cp`, `mv`, `test`, `mkdir -p`
-- 🚫 DO NOT use Windows CMD: `del`, `dir`, `copy`, `move`, `if exist`
-- 🛠️ Prefer specialized tools (Read, Write, Edit) over bash for file operations
+**Rule:** Never run `python` directly. Always use the project manager `uv`. Pre-requisite: Ensure `.wdh_env` contains `PYTHONPATH=src`.
 
-**Examples of common mistakes (Bash):**
+* **Standard Command:**Use the env-file to automatically load PYTHONPATH and other configs.
 ```bash
-# ❌ WRONG - Windows CMD syntax (will fail in Bash)
-if exist "file.txt" del "file.txt"
+uv run --env-file .wdh_env src/your_script.py
 
-# ✅ CORRECT - Unix bash syntax
-test -f "file.txt" && rm "file.txt"
 ```
 
-### 2. For Agents using "PowerShell" (Windows Native)
-**IMPORTANT:** If the agent is operating natively on **Windows** (e.g., Gemini CLI) and executes commands via **PowerShell**.
 
-**This means:**
-- ✅ Use PowerShell cmdlets or common aliases: `Remove-Item` (rm), `Get-ChildItem` (ls), `Copy-Item` (cp), `Move-Item` (mv), `Test-Path`.
-- 🚫 DO NOT use Unix/Bash specific syntax (like `export`, `source`, `[ -f ... ]`) unless in WSL.
-- 🛠️ Prefer specialized tools (`read_file`, `write_file`, `replace`) over shell commands for file operations.
+* **Dependency Management:** Do not use pip directly. Use `uv add` or `uv remove`.
 
-**Examples (PowerShell):**
+### File Operations
+
+**Priority Order:**
+
+1. 🥇 **Agent Native Tools:** ALWAYS prefer using `read_file`, `write_file`, `replace_in_file` provided by your environment.
+2. 🥈 **Shell Commands:** Use only if native tools are insufficient.
+
+---
+
+## 3. 💻 Shell Command Protocols (Context Aware)
+
+**DETECT YOUR ENVIRONMENT BEFORE EXECUTING SHELL COMMANDS:**
+
+### Scenario A: You are a "Bash Tool" Agent (e.g., Claude Code, Linux/WSL Context)
+
+* **Environment:** Unix/Linux/WSL.
+* **Allowed:** `rm`, `ls`, `cp`, `mv`, `test`, `mkdir -p`.
+* **FORBIDDEN:** Windows CMD commands (`del`, `dir`, `copy`).
+* **Example:**
+```bash
+# ✅ Correct
+test -f "data.json" && rm "data.json"
+
+```
+
+
+
+### Scenario B: You are a "PowerShell" Agent (e.g., Windows Native CLI)
+
+* **Environment:** Windows PowerShell.
+* **Allowed:** `Remove-Item`, `Get-ChildItem`, `Test-Path`, or aliases (`rm`, `ls`, `mv`).
+* **FORBIDDEN:** Unix specific syntax like `[ -f ... ]`, `export`, `source`.
+* **Example:**
 ```powershell
-# ✅ CORRECT - PowerShell syntax
-if (Test-Path "file.txt") { Remove-Item "file.txt" }
+# ✅ Correct
+if (Test-Path "data.json") { Remove-Item "data.json" }
+
 ```
 
-# 🏆 BEST - Use specialized tools
-# Use read_file to read files
-# Use write_file to create files
-# Use replace to modify files
-```
+
 
 ---
 
-## 🐍 Project Environment Management: Using `uv` (For Senior Developers)
+## 4. 🏗️ Design Principles (Pythonic)
 
-* ** ⚡ Tool:** This project utilizes **`uv`** for ultra-fast package and virtual environment management.
-* ** ⚙️ Execution Standard:** All Python script execution *must* be performed using **`PYTHONPATH=src uv run`** to ensure the correct environment and dependencies are loaded.
-
-### 🛠️ Environment Configuration
-* **Simplify Commands:** Use the `--env-file .wdh_env` flag with `uv run` to load project configurations automatically, avoiding verbose argument lists.
-  ```bash
-  uv run --env-file .wdh_env src/script.py
-  ```
-* ** 🔋 Shell Activation:** You may also manually load the environment (e.g., `source .wdh_env` or PowerShell equivalent) to activate configuration for the current session.
-
-> ** 🔑 Key Action:** Always use `uv run` (preferably with `--env-file .wdh_env`) for running scripts. Avoid direct `python` calls.
+* **Dependency Inversion:** Depend on abstractions, not concretions.
+* **Fail Fast:** Raise customized exceptions (`ValueError`, `RuntimeError`) immediately upon invalid state.
+* **Type Hinting:** All function signatures **must** include Python type hints.
+* **Docstrings:** All public modules, classes, and functions **must** have a descriptive docstring.
 
 ---
-
-## File and Function Limits
-
-- **Never create a file longer than 500 lines of code**. If approaching this limit, refactor by splitting into modules.
-- **Functions should be under 50 lines** with a single, clear responsibility.
-- **Classes should be under 100 lines** and represent a single concept or entity.
-- **Organize code into clearly separated modules**, grouped by feature or responsibility.
-- **Line lenght should be max 100 characters** ruff rule in pyproject.toml
-
----
-
