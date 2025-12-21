@@ -15,6 +15,7 @@ from work_data_hub.domain.annuity_performance.pipeline_builder import (
     build_bronze_to_silver_pipeline,
 )
 from work_data_hub.domain.pipelines.types import PipelineContext
+from work_data_hub.infrastructure.enrichment import EqcLookupConfig
 from work_data_hub.infrastructure.mappings import COMPANY_BRANCH_MAPPING
 from datetime import datetime, timezone
 
@@ -95,7 +96,7 @@ class TestInstitutionCodeMapping:
 
     def test_institution_code_mapping_applied(self, sample_df):
         """Test that institution code mapping is applied correctly."""
-        pipeline = build_bronze_to_silver_pipeline()
+        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
         context = make_context("test")
 
         result_df = pipeline.execute(sample_df.copy(), context)
@@ -125,7 +126,7 @@ class TestInstitutionCodeMapping:
             "客户名称": ["客户A"] * 5,  # Required for company_id resolution
         })
 
-        pipeline = build_bronze_to_silver_pipeline()
+        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
         context = make_context("test")
 
         result_df = pipeline.execute(df, context)
@@ -148,7 +149,7 @@ class TestInstitutionCodeMapping:
             "客户名称": [f"客户{i}" for i in range(6)],
         })
 
-        pipeline = build_bronze_to_silver_pipeline()
+        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
         context = make_context("test")
 
         result_df = pipeline.execute(df, context)
@@ -172,7 +173,7 @@ class TestInstitutionCodeMapping:
             "客户名称": ["客户A", "客户B"],
         })
 
-        pipeline = build_bronze_to_silver_pipeline()
+        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
         context = make_context("test")
 
         result_df = pipeline.execute(df, context)
@@ -191,7 +192,7 @@ class TestInstitutionCodeMapping:
             "客户名称": ["客户A"],
         })
 
-        pipeline = build_bronze_to_silver_pipeline()
+        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
         context = make_context("test")
 
         result_df = pipeline.execute(df, context)
@@ -230,7 +231,7 @@ class TestInstitutionCodeLegacyParity:
 
     def test_legacy_parity_comprehensive(self, comprehensive_test_df):
         """Test comprehensive legacy parity."""
-        pipeline = build_bronze_to_silver_pipeline()
+        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
         context = make_context("test")
 
         result_df = pipeline.execute(comprehensive_test_df.copy(), context)

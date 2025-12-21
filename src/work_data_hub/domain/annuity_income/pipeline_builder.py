@@ -98,15 +98,16 @@ class CompanyIdResolutionStep(TransformStep):
         enrichment_service: Optional["CompanyEnrichmentService"] = None,
         plan_override_mapping: Optional[Dict[str, str]] = None,
         generate_temp_ids: bool = True,
+        sync_lookup_budget: int = 0,
     ) -> None:
         """Initialize CompanyIdResolutionStep.
-        
+
         Story 6.2-P17: eqc_config parameter (defaults to disabled for backward compat).
         """
         # Default to disabled if not provided
         if eqc_config is None:
             eqc_config = EqcLookupConfig.disabled()
-            
+
         yaml_overrides = None
         if plan_override_mapping is not None:
             yaml_overrides = {
@@ -122,6 +123,7 @@ class CompanyIdResolutionStep(TransformStep):
             yaml_overrides=yaml_overrides,
         )
         self._generate_temp_ids = generate_temp_ids
+        self._sync_lookup_budget = max(sync_lookup_budget, 0)
 
     @property
     def name(self) -> str:
@@ -138,7 +140,7 @@ class CompanyIdResolutionStep(TransformStep):
             # Story 6.2-P17: Resolver behavior is driven by EqcLookupConfig (SSOT);
             # these legacy flags are ignored by CompanyIdResolver.
             use_enrichment_service=True,
-            sync_lookup_budget=0,
+            sync_lookup_budget=self._sync_lookup_budget,
             generate_temp_ids=self._generate_temp_ids,
         )
 
@@ -161,6 +163,7 @@ def build_bronze_to_silver_pipeline(
     enrichment_service: Optional["CompanyEnrichmentService"] = None,
     plan_override_mapping: Optional[Dict[str, str]] = None,
     generate_temp_ids: bool = True,
+    sync_lookup_budget: int = 0,
 ) -> Pipeline:
     """
     Compose the Bronze → Silver pipeline for AnnuityIncome domain.
@@ -282,6 +285,7 @@ def build_bronze_to_silver_pipeline(
             enrichment_service=enrichment_service,
             plan_override_mapping=plan_override_mapping,
             generate_temp_ids=generate_temp_ids,
+            sync_lookup_budget=sync_lookup_budget,
         ),
         # Step 12: Drop legacy columns
         DropStep(list(LEGACY_COLUMNS_TO_DELETE)),

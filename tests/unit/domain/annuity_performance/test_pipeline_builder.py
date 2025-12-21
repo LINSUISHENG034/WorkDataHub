@@ -22,6 +22,7 @@ from work_data_hub.domain.annuity_performance.pipeline_builder import (
     load_plan_override_mapping,
 )
 from work_data_hub.domain.pipelines.types import PipelineContext
+from work_data_hub.infrastructure.enrichment import EqcLookupConfig
 from work_data_hub.infrastructure.transforms import Pipeline
 
 
@@ -40,12 +41,12 @@ class TestBuildBronzeToSilverPipeline:
 
     def test_returns_pipeline_instance(self):
         """Pipeline builder returns a Pipeline instance."""
-        pipeline = build_bronze_to_silver_pipeline()
+        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
         assert isinstance(pipeline, Pipeline)
 
     def test_pipeline_has_expected_steps(self):
         """Pipeline contains all expected transformation steps."""
-        pipeline = build_bronze_to_silver_pipeline()
+        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
 
         # Should include all documented steps (7+) plus recent additions
         assert len(pipeline.steps) >= 7
@@ -62,9 +63,9 @@ class TestBuildBronzeToSilverPipeline:
         mock_enrichment = None  # Would be a mock in real test
 
         pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled(),
             enrichment_service=mock_enrichment,
             plan_override_mapping={"FP0001": "614810477"},
-            sync_lookup_budget=10,
         )
 
         assert isinstance(pipeline, Pipeline)
@@ -75,6 +76,7 @@ class TestBuildBronzeToSilverPipeline:
         mapping = {"FP0001": "614810477", "FP0002": "123456789"}
 
         pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled(),
             plan_override_mapping=mapping,
         )
 
@@ -111,12 +113,13 @@ class TestCompanyIdResolutionStep:
 
     def test_step_name(self):
         """Step has correct name."""
-        step = CompanyIdResolutionStep()
+        step = CompanyIdResolutionStep(eqc_config=EqcLookupConfig.disabled())
         assert step.name == "company_id_resolution"
 
     def test_resolves_via_plan_override(self, sample_df, context):
         """Step resolves company ID via plan override mapping."""
         step = CompanyIdResolutionStep(
+            eqc_config=EqcLookupConfig.disabled(),
             plan_override_mapping={"FP0001": "614810477"},
         )
 
@@ -136,7 +139,7 @@ class TestCompanyIdResolutionStep:
                 "公司代码": ["EXISTING123"],
             }
         )
-        step = CompanyIdResolutionStep()
+        step = CompanyIdResolutionStep(eqc_config=EqcLookupConfig.disabled())
 
         result_df = step.apply(df, context)
 
@@ -145,7 +148,7 @@ class TestCompanyIdResolutionStep:
 
     def test_generates_temp_id_for_unresolved(self, sample_df, context):
         """Step generates temp ID for unresolved rows."""
-        step = CompanyIdResolutionStep()
+        step = CompanyIdResolutionStep(eqc_config=EqcLookupConfig.disabled())
 
         result_df = step.apply(sample_df, context)
 
@@ -156,7 +159,7 @@ class TestCompanyIdResolutionStep:
 
     def test_temp_id_is_deterministic(self, sample_df, context):
         """Same customer name produces same temp ID."""
-        step = CompanyIdResolutionStep()
+        step = CompanyIdResolutionStep(eqc_config=EqcLookupConfig.disabled())
 
         result1 = step.apply(sample_df.copy(), context)
         result2 = step.apply(sample_df.copy(), context)
@@ -233,6 +236,7 @@ class TestPipelineExecution:
     def test_full_pipeline_execution(self, sample_bronze_df, context):
         """Pipeline executes all steps and produces valid output."""
         pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled(),
             plan_override_mapping={"FP0001": "614810477"},
         )
 
@@ -251,7 +255,7 @@ class TestPipelineExecution:
 
     def test_pipeline_preserves_data_integrity(self, sample_bronze_df, context):
         """Pipeline preserves original data values."""
-        pipeline = build_bronze_to_silver_pipeline()
+        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
 
         result_df = pipeline.execute(sample_bronze_df, context)
 
@@ -292,6 +296,7 @@ class TestAnnuityAccountNumberDerivation:
         })
 
         pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled(),
             plan_override_mapping={"FP0001": "614810477"},
         )
         result_df = pipeline.execute(df, context)
@@ -318,6 +323,7 @@ class TestAnnuityAccountNumberDerivation:
         })
 
         pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled(),
             plan_override_mapping={"FP0001": "614810477"},
         )
         result_df = pipeline.execute(df, context)
@@ -341,6 +347,7 @@ class TestAnnuityAccountNumberDerivation:
         })
 
         pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled(),
             plan_override_mapping={"FP0001": "614810477"},
         )
         result_df = pipeline.execute(df, context)

@@ -15,6 +15,7 @@ from work_data_hub.domain.annuity_performance.pipeline_builder import (
     build_bronze_to_silver_pipeline,
 )
 from work_data_hub.domain.pipelines.types import PipelineContext
+from work_data_hub.infrastructure.enrichment import EqcLookupConfig
 from datetime import datetime, timezone
 
 
@@ -42,7 +43,7 @@ class TestPlanCodeCorrections:
 
     def test_plan_code_corrections_applied(self, sample_df):
         """Test that plan code corrections are applied correctly."""
-        pipeline = build_bronze_to_silver_pipeline()
+        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
         context = make_context("test")
 
         result_df = pipeline.execute(sample_df.copy(), context)
@@ -140,7 +141,7 @@ class TestPlanCodeIntegration:
 
     def test_full_pipeline_plan_code_processing(self, sample_bronze_df):
         """Test plan code processing in full pipeline execution."""
-        pipeline = build_bronze_to_silver_pipeline()
+        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
         context = make_context("test")
 
         result_df = pipeline.execute(sample_bronze_df, context)
