@@ -33,6 +33,7 @@ from .constants import DEFAULT_REFRESH_KEYS, DEFAULT_UPSERT_KEYS
 
 if TYPE_CHECKING:
     from work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
+    from work_data_hub.infrastructure.enrichment.eqc_lookup_config import EqcLookupConfig
 
 logger = structlog.get_logger(__name__)
 
@@ -165,6 +166,7 @@ def process_annuity_performance(
 def process_with_enrichment(
     rows: List[Dict[str, Any]],
     data_source: str = "unknown",
+    eqc_config: Optional["EqcLookupConfig"] = None,  # Story 6.2-P17: Accept EqcLookupConfig
     enrichment_service: Optional["CompanyEnrichmentService"] = None,
     sync_lookup_budget: int = 0,
     export_unknown_names: bool = True,
@@ -199,11 +201,28 @@ def process_with_enrichment(
         mapping_repository = None
         repo_connection = None
 
+    # Story 6.2-P17: EqcLookupConfig is SSOT for EQC lookups. If not provided,
+    # derive from legacy params to avoid breaking older call sites, but warn loudly.
+    if eqc_config is None:
+        from work_data_hub.infrastructure.enrichment import EqcLookupConfig
+
+        logger.bind(domain="annuity_performance", step="process_with_enrichment").warning(
+            "eqc_config not provided; deriving from legacy sync_lookup_budget",
+            legacy_sync_lookup_budget=sync_lookup_budget,
+        )
+        eqc_config = EqcLookupConfig(
+            enabled=sync_lookup_budget > 0,
+            sync_budget=max(sync_lookup_budget, 0),
+            auto_create_provider=True,
+            export_unknown_names=export_unknown_names,
+            auto_refresh_token=True,
+        )
+        
     try:
         pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=eqc_config,  # Story 6.2-P17: Pass explicit config
             enrichment_service=enrichment_service,
             plan_override_mapping=plan_overrides,
-            sync_lookup_budget=sync_lookup_budget,
             mapping_repository=mapping_repository,
         )
         context = PipelineContext(

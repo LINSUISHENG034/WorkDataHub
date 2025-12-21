@@ -8,6 +8,7 @@ import structlog
 from work_data_hub.domain.pipelines.types import PipelineContext
 from work_data_hub.infrastructure.enrichment import (
     CompanyIdResolver,
+    EqcLookupConfig,
     ResolutionStrategy,
 )
 from work_data_hub.infrastructure.transforms import (
@@ -136,11 +137,21 @@ class CompanyIdResolutionStep(TransformStep):
 
     def __init__(
         self,
+        eqc_config: EqcLookupConfig,  # Story 6.2-P17: Required parameter
         enrichment_service: Optional["CompanyEnrichmentService"] = None,
         plan_override_mapping: Optional[Dict[str, str]] = None,
-        sync_lookup_budget: int = 0,
         mapping_repository=None,
     ) -> None:
+        """Initialize CompanyIdResolutionStep.
+        
+        Story 6.2-P17: Breaking Change - eqc_config is now REQUIRED parameter.
+        
+        Args:
+            eqc_config: EqcLookupConfig controlling EQC lookup behavior
+            enrichment_service: Optional legacy enrichment service
+            plan_override_mapping: Optional plan code overrides
+            mapping_repository: Optional database cache repository
+        """
         yaml_overrides = None
         if plan_override_mapping is not None:
             yaml_overrides = {
@@ -151,18 +162,10 @@ class CompanyIdResolutionStep(TransformStep):
                 "account_name": {},
             }
         self._resolver = CompanyIdResolver(
+            eqc_config=eqc_config,  # Story 6.2-P17: Pass explicit config
             enrichment_service=enrichment_service,
             yaml_overrides=yaml_overrides,
             mapping_repository=mapping_repository,
-        )
-        self._sync_lookup_budget = sync_lookup_budget
-        # Enable EQC lookup if:
-        # 1. enrichment_service is provided (legacy), OR
-        # 2. sync_lookup_budget > 0 and mapping_repository is available
-        #    (CompanyIdResolver auto-creates eqc_provider in this case)
-        self._use_enrichment = (
-            enrichment_service is not None
-            or (sync_lookup_budget > 0 and mapping_repository is not None)
         )
 
     @property
@@ -174,6 +177,8 @@ class CompanyIdResolutionStep(TransformStep):
             df = df.copy()
             df["客户名称"] = pd.NA
 
+        # Story 6.2-P17: ResolutionStrategy no longer needs enrichment flags
+        # (CompanyIdResolver uses eqc_config directly)
         strategy = ResolutionStrategy(
             plan_code_column="计划代码",
             customer_name_column="客户名称",
@@ -181,8 +186,8 @@ class CompanyIdResolutionStep(TransformStep):
             account_number_column="集团企业客户号",  # Use 集团企业客户号 for account_number lookup
             company_id_column="公司代码",
             output_column="company_id",
-            use_enrichment_service=self._use_enrichment,
-            sync_lookup_budget=self._sync_lookup_budget,
+            use_enrichment_service=True,  # Legacy flag (ignored by resolver)
+            sync_lookup_budget=0,  # Legacy flag (ignored by resolver)
             generate_temp_ids=True,
         )
 
@@ -196,19 +201,22 @@ class CompanyIdResolutionStep(TransformStep):
         )
         logger.bind(domain=domain, step=self.name).info(
             "Company ID resolution complete",
-            **stats.to_dict(),
+            **stats.to_dict( ),
         )
 
         return result.data
 
 
 def build_bronze_to_silver_pipeline(
+    eqc_config: EqcLookupConfig,  # Story 6.2-P17: Required parameter
     enrichment_service: Optional["CompanyEnrichmentService"] = None,
     plan_override_mapping: Optional[Dict[str, str]] = None,
-    sync_lookup_budget: int = 0,
     mapping_repository=None,
 ) -> Pipeline:
-    """Compose the Bronze → Silver pipeline using shared infrastructure steps."""
+    """Compose the Bronze → Silver pipeline using shared infrastructure steps.
+    
+    Story 6.2-P17: Breaking Change - eqc_config is now REQUIRED parameter.
+    """
     steps: list[TransformStep] = [
         # Step 1: Column name standardization (using comprehensive COLUMN_MAPPING)
         MappingStep(COLUMN_MAPPING),
@@ -278,11 +286,11 @@ def build_bronze_to_silver_pipeline(
         ),
         # Step 11: Data cleansing via CleansingRegistry
         CleansingStep(domain="annuity_performance"),
-        # Step 12: Company ID resolution
+        # Step 12: Company ID resolution (Story 6.2-P17: Pass eqc_config)
         CompanyIdResolutionStep(
+            eqc_config=eqc_config,
             enrichment_service=enrichment_service,
             plan_override_mapping=plan_override_mapping,
-            sync_lookup_budget=sync_lookup_budget,
             mapping_repository=mapping_repository,
         ),
         # Step 13: Drop legacy columns
@@ -290,7 +298,6 @@ def build_bronze_to_silver_pipeline(
     ]
 
     pipeline = Pipeline(steps)
-
     logger.bind(domain="annuity_performance", step="build_pipeline").info(
         "Built bronze_to_silver pipeline",
         step_count=len(steps),

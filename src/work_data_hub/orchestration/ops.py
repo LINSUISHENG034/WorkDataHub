@@ -308,6 +308,9 @@ class ProcessingConfig(Config):
 
     enrichment_enabled: bool = False
     enrichment_sync_budget: int = 0
+    # Story 6.2-P17: EqcLookupConfig serialized dict (preferred SSOT).
+    # Kept optional for transition; if missing, we derive from legacy fields with a warning.
+    eqc_lookup_config: Optional[Dict[str, Any]] = None
     export_unknown_names: bool = True
     plan_only: bool = True
     use_pipeline: Optional[bool] = (
@@ -557,14 +560,39 @@ def process_annuity_performance_op(
                 },
             )
 
+        # Story 6.2-P17: Rehydrate EqcLookupConfig from dict (SSOT).
+        from work_data_hub.infrastructure.enrichment import EqcLookupConfig
+
+        if config.eqc_lookup_config is not None:
+            eqc_config = EqcLookupConfig.from_dict(config.eqc_lookup_config)
+        else:
+            context.log.warning(
+                "eqc_lookup_config missing; deriving from legacy enrichment_* fields",
+                extra={
+                    "enrichment_enabled": config.enrichment_enabled,
+                    "enrichment_sync_budget": config.enrichment_sync_budget,
+                },
+            )
+            eqc_config = EqcLookupConfig(
+                enabled=config.enrichment_enabled,
+                sync_budget=max(config.enrichment_sync_budget, 0),
+                auto_create_provider=config.enrichment_enabled,
+                export_unknown_names=config.export_unknown_names,
+                auto_refresh_token=True,
+            )
+
+        # Guard: if enrichment isn't active, force-disable EQC to prevent any provider init/calls.
+        if not use_enrichment:
+            eqc_config = EqcLookupConfig.disabled()
+        
         # Call service with enrichment metadata support
-        # Note: use_pipeline parameter removed in Story 4.8/4.9 refactoring
+        # Story 6.2-P17: Pass eqc_config instead of sync_lookup_budget
         result = process_with_enrichment(
             excel_rows,
             data_source=file_path,
+            eqc_config=eqc_config,
             enrichment_service=enrichment_service,
-            sync_lookup_budget=config.enrichment_sync_budget,
-            export_unknown_names=config.export_unknown_names,
+            export_unknown_names=eqc_config.export_unknown_names,
         )
 
         # Serialize only the records for downstream compatibility

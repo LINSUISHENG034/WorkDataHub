@@ -19,6 +19,7 @@ import pytest
 
 from work_data_hub.infrastructure.enrichment import (
     CompanyIdResolver,
+    EqcLookupConfig,
     ResolutionStrategy,
 )
 from work_data_hub.infrastructure.enrichment.types import (
@@ -33,12 +34,17 @@ class TestCompanyIdResolverInit:
 
     def test_init_without_dependencies(self):
         """Test resolver can be created without any dependencies."""
-        resolver = CompanyIdResolver()
+        resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
+        )
         assert resolver.enrichment_service is None
 
     def test_init_with_enrichment_service(self, mock_enrichment_service):
         """Test resolver with enrichment service."""
-        resolver = CompanyIdResolver(enrichment_service=mock_enrichment_service)
+        resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
+            enrichment_service=mock_enrichment_service,
+        )
         assert resolver.enrichment_service is mock_enrichment_service
 
 
@@ -168,7 +174,10 @@ class TestExistingColumnPassthrough:
         from work_data_hub.config.mapping_loader import load_company_id_overrides
 
         overrides = load_company_id_overrides(mappings_dir)
-        resolver = CompanyIdResolver(yaml_overrides=overrides)
+        resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
+            yaml_overrides=overrides,
+        )
 
         df = pd.DataFrame({
             "计划代码": ["FP0001"],
@@ -259,7 +268,14 @@ class TestEnrichmentServiceIntegration:
         self, mock_enrichment_service, default_strategy
     ):
         """Test enrichment service is called when enabled."""
-        resolver = CompanyIdResolver(enrichment_service=mock_enrichment_service)
+        resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig(
+                enabled=True,
+                sync_budget=10,
+                auto_create_provider=False,
+            ),
+            enrichment_service=mock_enrichment_service,
+        )
         strategy = ResolutionStrategy(
             use_enrichment_service=True,
             sync_lookup_budget=10,
@@ -299,6 +315,11 @@ class TestEnrichmentServiceIntegration:
         }
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig(
+                enabled=True,
+                sync_budget=3,
+                auto_create_provider=False,
+            ),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             enrichment_service=mock_service,
             mapping_repository=mock_repo,
@@ -325,7 +346,8 @@ class TestEnrichmentServiceIntegration:
         self, mock_enrichment_service, default_strategy
     ):
         """Test enrichment service is not called when disabled."""
-        resolver = CompanyIdResolver(enrichment_service=mock_enrichment_service)
+        resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),enrichment_service=mock_enrichment_service)
         # default_strategy has use_enrichment_service=False
 
         df = pd.DataFrame(
@@ -341,7 +363,14 @@ class TestEnrichmentServiceIntegration:
 
     def test_enrichment_service_respects_budget(self, mock_enrichment_service):
         """Test enrichment service respects sync_lookup_budget."""
-        resolver = CompanyIdResolver(enrichment_service=mock_enrichment_service)
+        resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig(
+                enabled=True,
+                sync_budget=2,  # Only 2 lookups allowed
+                auto_create_provider=False,
+            ),
+            enrichment_service=mock_enrichment_service,
+        )
         strategy = ResolutionStrategy(
             use_enrichment_service=True,
             sync_lookup_budget=2,  # Only 2 lookups allowed
@@ -369,7 +398,14 @@ class TestEnrichmentServiceIntegration:
         mock_service = MagicMock()
         mock_service.resolve_company_id.side_effect = Exception("API Error")
 
-        resolver = CompanyIdResolver(enrichment_service=mock_service)
+        resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig(
+                enabled=True,
+                sync_budget=10,
+                auto_create_provider=False,
+            ),
+            enrichment_service=mock_service,
+        )
         strategy = ResolutionStrategy(
             use_enrichment_service=True,
             sync_lookup_budget=10,
@@ -602,7 +638,8 @@ class TestYamlMultiTierLookup:
             "name": {},
             "account_name": {},
         }
-        resolver = CompanyIdResolver(yaml_overrides=yaml_overrides)
+        resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),yaml_overrides=yaml_overrides)
 
         df = pd.DataFrame({
             "计划代码": ["FP0001"],
@@ -622,7 +659,8 @@ class TestYamlMultiTierLookup:
             "name": {"公司C": "name_company"},
             "account_name": {"账户D": "account_name_company"},
         }
-        resolver = CompanyIdResolver(yaml_overrides=yaml_overrides)
+        resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),yaml_overrides=yaml_overrides)
 
         df = pd.DataFrame({
             "计划代码": ["FP0001", "FP0002", "UNKNOWN", "UNKNOWN", "UNKNOWN"],
@@ -658,7 +696,8 @@ class TestYamlMultiTierLookup:
             "name": {"公司A": "name_loses"},
             "account_name": {},
         }
-        resolver = CompanyIdResolver(yaml_overrides=yaml_overrides)
+        resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),yaml_overrides=yaml_overrides)
 
         df = pd.DataFrame({
             "计划代码": ["FP0001"],
@@ -691,6 +730,7 @@ class TestDatabaseCacheLookup:
         }
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -709,6 +749,7 @@ class TestDatabaseCacheLookup:
     def test_db_cache_lookup_no_repository(self, default_strategy):
         """Test graceful skip when no repository provided."""
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=None,
         )
@@ -741,6 +782,7 @@ class TestBackflowMechanism:
         )
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -771,6 +813,7 @@ class TestBackflowMechanism:
         )
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -806,6 +849,7 @@ class TestBackflowMechanism:
         )
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -832,7 +876,8 @@ class TestStatisticsExtended:
             "name": {"公司B": "name_company"},
             "account_name": {},
         }
-        resolver = CompanyIdResolver(yaml_overrides=yaml_overrides)
+        resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),yaml_overrides=yaml_overrides)
 
         df = pd.DataFrame({
             "计划代码": ["FP0001", "UNKNOWN"],
@@ -857,6 +902,11 @@ class TestStatisticsExtended:
         mock_service.resolve_company_id.return_value = mock_result
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig(
+                enabled=True,
+                sync_budget=5,
+                auto_create_provider=False,
+            ),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             enrichment_service=mock_service,
         )
@@ -894,7 +944,8 @@ class TestPerformanceExtended:
             "name": {},
             "account_name": {},
         }
-        resolver = CompanyIdResolver(yaml_overrides=yaml_overrides)
+        resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),yaml_overrides=yaml_overrides)
 
         plan_codes = [f"FP{random.randint(0, 200):04d}" for _ in range(1000)]
         df = pd.DataFrame({
@@ -931,6 +982,7 @@ class TestAsyncQueueIntegration:
         )
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -956,6 +1008,7 @@ class TestAsyncQueueIntegration:
         mock_repo.lookup_batch.return_value = {}
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -983,6 +1036,7 @@ class TestAsyncQueueIntegration:
         mock_repo.enqueue_for_enrichment.side_effect = Exception("DB Error")
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -1013,6 +1067,7 @@ class TestAsyncQueueIntegration:
         )
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -1045,6 +1100,7 @@ class TestAsyncQueueIntegration:
         )
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -1063,6 +1119,7 @@ class TestAsyncQueueIntegration:
     def test_resolve_batch_no_enqueue_without_repository(self, default_strategy):
         """Test no enqueue when repository not provided."""
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=None,
         )
@@ -1087,6 +1144,7 @@ class TestAsyncQueueIntegration:
         mock_repo.lookup_batch.return_value = {}
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={
                 "plan": {"FP0001": "614810477"},
                 "account": {},
@@ -1123,6 +1181,7 @@ class TestAsyncQueueIntegration:
         )
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -1169,6 +1228,7 @@ class TestEnrichmentIndexDbCache:
         mock_repo.update_hit_count.return_value = True
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -1200,6 +1260,7 @@ class TestEnrichmentIndexDbCache:
         mock_repo.update_hit_count.return_value = True
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -1241,6 +1302,7 @@ class TestEnrichmentIndexDbCache:
         }
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -1270,6 +1332,7 @@ class TestEnrichmentIndexDbCache:
         mock_repo.update_hit_count.return_value = True
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -1300,6 +1363,7 @@ class TestEnrichmentIndexDbCache:
         mock_repo.update_hit_count.return_value = True
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -1342,6 +1406,7 @@ class TestP4NormalizationDbCacheLookup:
         }
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -1377,6 +1442,7 @@ class TestP4NormalizationDbCacheLookup:
         }
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -1409,6 +1475,7 @@ class TestP4NormalizationDbCacheLookup:
         }
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -1441,6 +1508,7 @@ class TestP4NormalizationDbCacheLookup:
         }
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -1475,6 +1543,7 @@ class TestP4NormalizationBackflow:
         )
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -1513,6 +1582,7 @@ class TestP4NormalizationBackflow:
         )
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -1549,6 +1619,7 @@ class TestP4NormalizationBackflow:
         )
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -1585,6 +1656,7 @@ class TestP4NormalizationBackflow:
         )
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -1626,6 +1698,7 @@ class TestP4NormalizationEdgeCases:
         }
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -1659,6 +1732,7 @@ class TestP4NormalizationEdgeCases:
         }
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )
@@ -1686,7 +1760,8 @@ class TestP4NormalizationEdgeCases:
             "name": {},
             "account_name": {},
         }
-        resolver = CompanyIdResolver(yaml_overrides=yaml_overrides)
+        resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),yaml_overrides=yaml_overrides)
 
         df = pd.DataFrame({
             "计划代码": ["FP0001"],  # Exact raw match required
@@ -1722,6 +1797,7 @@ class TestP4NormalizationIntegration:
         )
 
         resolver = CompanyIdResolver(
+            eqc_config=EqcLookupConfig.disabled(),
             yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
             mapping_repository=mock_repo,
         )

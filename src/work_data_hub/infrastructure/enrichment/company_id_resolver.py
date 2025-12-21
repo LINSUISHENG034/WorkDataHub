@@ -26,6 +26,7 @@ import pandas as pd
 from work_data_hub.infrastructure.cleansing import normalize_company_name
 from work_data_hub.utils.logging import get_logger
 
+from .eqc_lookup_config import EqcLookupConfig
 from .normalizer import generate_temp_company_id, normalize_for_temp_id
 from .types import (
     EnrichmentIndexRecord,
@@ -82,7 +83,9 @@ class CompanyIdResolver:
 
     Example:
         >>> from work_data_hub.config import load_company_id_overrides
+        >>> from work_data_hub.infrastructure.enrichment.eqc_lookup_config import EqcLookupConfig
         >>> resolver = CompanyIdResolver(
+        ...     eqc_config=EqcLookupConfig.disabled(),  # Required param (Story 6.2-P17)
         ...     yaml_overrides=load_company_id_overrides()
         ... )
         >>> df = pd.DataFrame({
@@ -96,6 +99,7 @@ class CompanyIdResolver:
 
     def __init__(
         self,
+        eqc_config: EqcLookupConfig,
         enrichment_service: Optional["CompanyEnrichmentService"] = None,
         yaml_overrides: Optional[Dict[str, Dict[str, str]]] = None,
         mapping_repository: Optional["CompanyMappingRepository"] = None,
@@ -104,56 +108,85 @@ class CompanyIdResolver:
         """
         Initialize the CompanyIdResolver.
 
+        Story 6.2-P17: Breaking Change - eqc_config is now REQUIRED parameter.
+        This enforces explicit configuration and prevents hidden auto-creation
+        of EqcProvider that ignores upper-layer intent.
+
         Args:
+            eqc_config: EqcLookupConfig controlling EQC lookup behavior.
+                REQUIRED parameter (no default). Use EqcLookupConfig.disabled()
+                for tests or domains that don't need enrichment.
             enrichment_service: Optional CompanyEnrichmentService for EQC lookup (legacy).
+                Deprecated in favor of eqc_provider + eqc_config.
             yaml_overrides: Dict of priority level -> {alias: company_id} mappings.
                 If not provided, auto-loads from load_company_id_overrides().
             mapping_repository: Optional CompanyMappingRepository for database cache.
                 If not provided, database lookup is skipped.
-            eqc_provider: Optional EqcProvider for EQC sync lookup (Story 6.6).
-                If provided, takes precedence over enrichment_service for EQC lookups.
-                If not provided, will auto-create one with mapping_repository.
+            eqc_provider: Optional EqcProvider for EQC sync lookup.
+                If not provided AND eqc_config.should_auto_create_provider is True,
+                will create one using settings + mapping_repository.
+
+        Example:
+            >>> # For tests - disable EQC
+            >>> resolver = CompanyIdResolver(
+            ...     eqc_config=EqcLookupConfig.disabled(),
+            ...     mapping_repository=repo
+            ... )
+            
+            >>> # For production - explicit config
+            >>> config = EqcLookupConfig(enabled=True, sync_budget=10)
+            >>> resolver = CompanyIdResolver(
+            ...     eqc_config=config,
+            ...     mapping_repository=repo
+            ... )
         """
+        self.eqc_config = eqc_config
         self.enrichment_service = enrichment_service
         self.mapping_repository = mapping_repository
 
-        # Auto-create EqcProvider only when explicitly needed (i.e., no injected enrichment_service),
-        # to keep unit tests deterministic and avoid unexpected network calls.
-        if (
-            eqc_provider is None
-            and mapping_repository is not None
-            and enrichment_service is None
-        ):
-            try:
-                from work_data_hub.config.settings import get_settings
-                from work_data_hub.infrastructure.enrichment.eqc_provider import EqcProvider
-                settings = get_settings()
-                if hasattr(settings, 'eqc_token') and settings.eqc_token:
-                    self.eqc_provider = EqcProvider(
-                        token=settings.eqc_token,
-                        budget=getattr(settings, 'company_sync_lookup_limit', 5),
-                        base_url=getattr(settings, 'eqc_base_url', None),
-                        mapping_repository=mapping_repository,  # 关键：传入 mapping_repository
-                        validate_on_init=False
-                    )
-                    logger.info(
-                        "company_id_resolver.eqc_provider_auto_created",
-                        msg="Auto-created EqcProvider with mapping_repository"
-                    )
-                else:
-                    self.eqc_provider = None
-                    logger.debug(
-                        "company_id_resolver.no_eqc_token",
-                        msg="No EQC token configured, EqcProvider not created"
-                    )
-            except Exception as e:
+        # Only auto-create EqcProvider when EXPLICITLY allowed by config
+        # Story 6.2-P17: Remove "magic" auto-creation that ignores upper-layer intent
+        if eqc_provider is None and eqc_config.should_auto_create_provider:
+            # Config explicitly allows auto-creation
+            if mapping_repository is None:
                 logger.warning(
-                    "company_id_resolver.eqc_provider_creation_failed",
-                    error=str(e),
-                    msg="Failed to create EqcProvider"
+                    "company_id_resolver.cannot_auto_create_eqc_provider",
+                    msg="eqc_config allows auto-creation but mapping_repository is None"
                 )
                 self.eqc_provider = None
+            else:
+                try:
+                    from work_data_hub.config.settings import get_settings
+                    from work_data_hub.infrastructure.enrichment.eqc_provider import EqcProvider
+                    
+                    settings = get_settings()
+                    if hasattr(settings, 'eqc_token') and settings.eqc_token:
+                        self.eqc_provider = EqcProvider(
+                            token=settings.eqc_token,
+                            budget=eqc_config.sync_budget,  # Use config budget
+                            base_url=getattr(settings, 'eqc_base_url', None),
+                            mapping_repository=mapping_repository,
+                            validate_on_init=False
+                        )
+                        logger.info(
+                            "company_id_resolver.eqc_provider_created",
+                            msg="Created EqcProvider per eqc_config.should_auto_create_provider"
+                        )
+                    else:
+                        self.eqc_provider = None
+                        logger.debug(
+                            "company_id_resolver.no_eqc_token",
+                            msg="No EQC token configured, EqcProvider not created"
+                        )
+                except Exception as e:
+                    logger.warning(
+                        "company_id_resolver.eqc_provider_creation_failed",
+                        error=str(e),
+                        msg="Failed to create EqcProvider"
+                    )
+                    self.eqc_provider = None
         else:
+            # Use injected provider or None (no auto-creation)
             self.eqc_provider = eqc_provider
 
             # If eqc_provider is provided but no mapping_repository, try to set it
@@ -163,6 +196,14 @@ class CompanyIdResolver:
                     "company_id_resolver.eqc_provider_repo_set",
                     msg="Set mapping_repository on existing EqcProvider"
                 )
+
+        # Validate consistency: warn if enrichment_service contradicts eqc_config
+        if enrichment_service is not None and not eqc_config.enabled:
+            logger.warning(
+                "company_id_resolver.config_contradiction",
+                msg="enrichment_service provided but eqc_config.enabled=False. "
+                    "enrichment_service will be IGNORED per eqc_config."
+            )
 
         # Initialize YAML overrides
         if yaml_overrides is None:
@@ -249,7 +290,8 @@ class CompanyIdResolver:
         result_df = df.copy()
         stats = ResolutionStatistics(
             total_rows=len(df),
-            budget_remaining=strategy.sync_lookup_budget,
+            # Story 6.2-P17: Budget is controlled by EqcLookupConfig (SSOT), not strategy.
+            budget_remaining=self.eqc_config.sync_budget,
         )
 
         # Initialize output column with NaN
@@ -346,11 +388,12 @@ class CompanyIdResolver:
             stats.backflow_stats = backflow_stats
 
         # Step 4: EQC sync lookup (budgeted, cached)
+        # Story 6.2-P17: Use eqc_config.enabled instead of strategy flag
         mask_missing = result_df[strategy.output_column].isna()
         if (
-            strategy.use_enrichment_service
+            self.eqc_config.enabled  # Config-driven enablement (Story 6.2-P17)
             and mask_missing.any()
-            and strategy.sync_lookup_budget > 0
+            and self.eqc_config.sync_budget > 0  # Use config budget
             and (self.eqc_provider is not None or self.enrichment_service is not None)
         ):
             eqc_resolved, eqc_hits, budget_remaining = self._resolve_via_eqc_sync(
@@ -362,7 +405,7 @@ class CompanyIdResolver:
             ].fillna(eqc_resolved.loc[mask_missing])
 
             stats.eqc_sync_hits = eqc_hits
-            stats.budget_consumed = strategy.sync_lookup_budget - budget_remaining
+            stats.budget_consumed = self.eqc_config.sync_budget - budget_remaining
             stats.budget_remaining = budget_remaining
 
             # Legacy field
@@ -841,18 +884,19 @@ class CompanyIdResolver:
         use_eqc_provider = self.eqc_provider is not None and self.eqc_provider.is_available
         use_enrichment_service = self.enrichment_service is not None and not use_eqc_provider
 
-        if not (use_eqc_provider or use_enrichment_service) or strategy.sync_lookup_budget <= 0:
+        # Story 6.2-P17: Budget is controlled by eqc_config, not strategy.
+        if not (use_eqc_provider or use_enrichment_service) or self.eqc_config.sync_budget <= 0:
             return (
                 pd.Series(pd.NA, index=df.index, dtype=object),
                 0,
-                strategy.sync_lookup_budget,
+                self.eqc_config.sync_budget,
             )
 
         # Story 6.6: Use EqcProvider path if available
         if use_eqc_provider:
             return self._resolve_via_eqc_provider(df, mask_unresolved, strategy)
 
-        budget_remaining = strategy.sync_lookup_budget
+        budget_remaining = self.eqc_config.sync_budget
         resolved = pd.Series(pd.NA, index=df.index, dtype=object)
         eqc_hits = 0
 
@@ -963,10 +1007,10 @@ class CompanyIdResolver:
         eqc_hits = 0
 
         # EqcProvider manages its own budget internally
-        # Set provider budget to match strategy budget
-        if self.eqc_provider.budget != strategy.sync_lookup_budget:
-            self.eqc_provider.budget = strategy.sync_lookup_budget
-            self.eqc_provider.remaining_budget = strategy.sync_lookup_budget
+        # Story 6.2-P17: Set provider budget to match EqcLookupConfig budget (SSOT).
+        if self.eqc_provider.budget != self.eqc_config.sync_budget:
+            self.eqc_provider.budget = self.eqc_config.sync_budget
+            self.eqc_provider.remaining_budget = self.eqc_config.sync_budget
 
         # Deduplicate by normalized customer name so budget is consumed per-unique name
         # (not per-row), and apply a successful hit to all matching rows.
@@ -1270,7 +1314,8 @@ class CompanyIdResolver:
             Number of successful resolutions.
         """
         hits = 0
-        remaining_budget = strategy.sync_lookup_budget
+        # Story 6.2-P17: Budget is controlled by eqc_config, not strategy.
+        remaining_budget = self.eqc_config.sync_budget
 
         for idx in df[mask].index:
             if remaining_budget <= 0:

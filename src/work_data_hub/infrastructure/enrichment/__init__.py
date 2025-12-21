@@ -7,6 +7,13 @@ company information resolution and standardization.
 Components:
 - CompanyIdResolver: Batch-optimized company ID resolution with hierarchical strategy
 - EqcProvider: EQC platform API provider for sync company ID lookup (Story 6.6)
+
+Provides company identification and enrichment services for domains that require
+company information resolution and standardization.
+
+Components:
+- CompanyIdResolver: Batch-optimized company ID resolution with hierarchical strategy
+- EqcProvider: EQC platform API provider for sync company ID lookup (Story 6.6)
 - ResolutionStrategy: Configuration for resolution behavior
 - ResolutionStatistics: Statistics from batch resolution operations
 - normalize_for_temp_id: Legacy-compatible name normalization for temp ID generation
@@ -23,6 +30,7 @@ from typing import Any
 
 __all__ = [
     "CompanyIdResolver",
+    "EqcLookupConfig",
     "CompanyMappingRepository",
     "MatchResult",
     "InsertBatchResult",
@@ -46,6 +54,7 @@ __all__ = [
 
 _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "CompanyIdResolver": (".company_id_resolver", "CompanyIdResolver"),
+    "EqcLookupConfig": (".eqc_lookup_config", "EqcLookupConfig"),
     "CompanyMappingRepository": (".mapping_repository", "CompanyMappingRepository"),
     "MatchResult": (".mapping_repository", "MatchResult"),
     "InsertBatchResult": (".mapping_repository", "InsertBatchResult"),

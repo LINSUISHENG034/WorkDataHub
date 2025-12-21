@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 from work_data_hub.infrastructure.enrichment import (
     CompanyIdResolver,
+    EqcLookupConfig,
     ResolutionStrategy,
 )
 
@@ -41,20 +42,23 @@ def sample_dataframe():
 def resolver_with_overrides(sample_plan_override_mapping):
     """CompanyIdResolver with explicit YAML overrides (plan only)."""
     return CompanyIdResolver(
+        eqc_config=EqcLookupConfig.disabled(),
         yaml_overrides={
             "plan": sample_plan_override_mapping,
             "account": {},
             "hardcode": {},
             "name": {},
             "account_name": {},
-        }
+        },
     )
 
 
 @pytest.fixture
 def resolver_standalone():
     """CompanyIdResolver without any dependencies."""
-    return CompanyIdResolver()
+    return CompanyIdResolver(
+        eqc_config=EqcLookupConfig.disabled(),
+    )
 
 
 @pytest.fixture

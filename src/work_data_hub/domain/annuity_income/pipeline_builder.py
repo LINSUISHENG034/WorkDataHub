@@ -9,6 +9,7 @@ import structlog
 from work_data_hub.domain.pipelines.types import PipelineContext
 from work_data_hub.infrastructure.enrichment import (
     CompanyIdResolver,
+    EqcLookupConfig,
     ResolutionStrategy,
 )
 from work_data_hub.infrastructure.transforms import (
@@ -93,11 +94,19 @@ class CompanyIdResolutionStep(TransformStep):
 
     def __init__(
         self,
+        eqc_config: EqcLookupConfig = None,  # Story 6.2-P17: Accept EqcLookupConfig
         enrichment_service: Optional["CompanyEnrichmentService"] = None,
         plan_override_mapping: Optional[Dict[str, str]] = None,
-        sync_lookup_budget: int = 0,
         generate_temp_ids: bool = True,
     ) -> None:
+        """Initialize CompanyIdResolutionStep.
+        
+        Story 6.2-P17: eqc_config parameter (defaults to disabled for backward compat).
+        """
+        # Default to disabled if not provided
+        if eqc_config is None:
+            eqc_config = EqcLookupConfig.disabled()
+            
         yaml_overrides = None
         if plan_override_mapping is not None:
             yaml_overrides = {
@@ -108,11 +117,10 @@ class CompanyIdResolutionStep(TransformStep):
                 "account_name": {},
             }
         self._resolver = CompanyIdResolver(
+            eqc_config=eqc_config,  # Story 6.2-P17
             enrichment_service=enrichment_service,
             yaml_overrides=yaml_overrides,
         )
-        self._sync_lookup_budget = sync_lookup_budget
-        self._use_enrichment = enrichment_service is not None
         self._generate_temp_ids = generate_temp_ids
 
     @property
@@ -127,8 +135,10 @@ class CompanyIdResolutionStep(TransformStep):
             account_name_column="年金账户名",
             company_id_column=None,  # AnnuityIncome doesn't have 公司代码
             output_column="company_id",
-            use_enrichment_service=self._use_enrichment,
-            sync_lookup_budget=self._sync_lookup_budget,
+            # Story 6.2-P17: Resolver behavior is driven by EqcLookupConfig (SSOT);
+            # these legacy flags are ignored by CompanyIdResolver.
+            use_enrichment_service=True,
+            sync_lookup_budget=0,
             generate_temp_ids=self._generate_temp_ids,
         )
 
@@ -147,9 +157,9 @@ class CompanyIdResolutionStep(TransformStep):
 
 
 def build_bronze_to_silver_pipeline(
+    eqc_config: EqcLookupConfig = None,  # Story 6.2-P17: Accept EqcLookupConfig
     enrichment_service: Optional["CompanyEnrichmentService"] = None,
     plan_override_mapping: Optional[Dict[str, str]] = None,
-    sync_lookup_budget: int = 0,
     generate_temp_ids: bool = True,
 ) -> Pipeline:
     """
@@ -266,11 +276,11 @@ def build_bronze_to_silver_pipeline(
         ),
         # Step 10: Data cleansing via CleansingRegistry (normalizes 客户名称)
         CleansingStep(domain="annuity_income"),
-        # Step 11: Company ID resolution (standard chain, NO ID5 fallback per Tech Spec)
+        # Step 11: Company ID resolution (Story 6.2-P17: Pass eqc_config)
         CompanyIdResolutionStep(
+            eqc_config=eqc_config,
             enrichment_service=enrichment_service,
             plan_override_mapping=plan_override_mapping,
-            sync_lookup_budget=sync_lookup_budget,
             generate_temp_ids=generate_temp_ids,
         ),
         # Step 12: Drop legacy columns

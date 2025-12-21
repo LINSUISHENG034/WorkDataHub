@@ -419,11 +419,18 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
 
     # Add enrichment configuration for annuity_performance domain
     if args.domain == "annuity_performance":
+        from work_data_hub.infrastructure.enrichment import EqcLookupConfig
+
+        # Story 6.2-P17: Build EqcLookupConfig from CLI args (SSOT, semantic enforcement).
+        eqc_config = EqcLookupConfig.from_cli_args(args)
         run_config["ops"]["process_annuity_performance_op"] = {
             "config": {
-                "enrichment_enabled": getattr(args, "enrichment_enabled", False),
-                "enrichment_sync_budget": getattr(args, "enrichment_sync_budget", 0),
-                "export_unknown_names": getattr(args, "export_unknown_names", True),
+                # Legacy fields kept for backward compatibility / logging
+                "enrichment_enabled": eqc_config.enabled,
+                "enrichment_sync_budget": eqc_config.sync_budget,
+                "export_unknown_names": eqc_config.export_unknown_names,
+                # Story 6.2-P17: Preferred config payload
+                "eqc_lookup_config": eqc_config.to_dict(),
                 "plan_only": effective_plan_only,  # Use effective flag
                 "use_pipeline": getattr(
                     args, "use_pipeline", None
