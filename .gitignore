@@ -204,6 +204,7 @@ _bmad/
 .bmad-core/
 .bmad-*/
 .bmad-ephemeral/
+prompts/
 
 # Other AI tools
 .gemini/

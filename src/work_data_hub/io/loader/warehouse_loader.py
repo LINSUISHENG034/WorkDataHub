@@ -611,10 +611,10 @@ def quote_table(table: str) -> str:
     if not table or not isinstance(table, str):
         raise ValueError("Table name must be non-empty string")
 
-    # If already contains quotes, treat as a raw identifier and quote as-is.
-    # (Callers can pass pre-quoted table names for advanced usage.)
+    # If already contains quotes, assume pre-quoted by caller and return as-is.
+    # (Callers can pass pre-quoted table names like '"schema"."table"' for advanced usage.)
     if '"' in table:
-        return quote_ident(table)
+        return table
 
     if "." in table:
         schema, table_name = table.split(".", 1)

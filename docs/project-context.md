@@ -94,3 +94,13 @@ if (Test-Path "file.txt") { Remove-Item "file.txt" }
 
 ---
 
+## File and Function Limits
+
+- **Never create a file longer than 500 lines of code**. If approaching this limit, refactor by splitting into modules.
+- **Functions should be under 50 lines** with a single, clear responsibility.
+- **Classes should be under 100 lines** and represent a single concept or entity.
+- **Organize code into clearly separated modules**, grouped by feature or responsibility.
+- **Line lenght should be max 100 characters** ruff rule in pyproject.toml
+
+---
+

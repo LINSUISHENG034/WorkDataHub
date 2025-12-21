@@ -158,6 +158,7 @@ class OutputConfig(BaseModel):
 
     table: str = Field(..., description="Target database table name")
     schema_name: str = Field("public", description="Target database schema")
+    pk: List[str] = Field(default_factory=list, description="Primary key columns for delete_insert mode")
 
 
 class DomainConfigV2(BaseModel):
