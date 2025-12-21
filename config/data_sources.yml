@@ -81,7 +81,7 @@ domains:
 
     # Output destination configuration
     output:
-      table: "annuity_performance"
+      table: "规模明细"
       # Refresh key for delete_insert mode (Legacy-compatible refresh scope)
       pk:
         - "月度"
@@ -107,7 +107,7 @@ domains:
 
     # Output destination configuration
     output:
-      table: "annuity_income"
+      table: "收入明细"
       # Primary key for delete_insert mode (matches GOLD_COMPOSITE_KEY in schemas.py)
       pk:
         - "月度"

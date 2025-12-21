@@ -1,6 +1,6 @@
 # Story 4.2: Annuity Bronze Layer Validation Schema
 
-Status: review
+Status: done
 
 ## Story
 

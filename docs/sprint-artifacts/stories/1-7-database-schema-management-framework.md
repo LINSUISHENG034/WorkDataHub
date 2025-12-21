@@ -1,6 +1,6 @@
 # Story 1.7: Database Schema Management Framework
 
-Status: review
+Status: done
 
 ## Story
 

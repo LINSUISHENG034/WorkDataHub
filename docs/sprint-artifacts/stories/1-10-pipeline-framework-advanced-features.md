@@ -1,6 +1,6 @@
 # Story 1.10: Pipeline Framework Advanced Features
 
-Status: review
+Status: done
 
 ## Implementation Summary (2025-11-15)
 

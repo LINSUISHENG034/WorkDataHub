@@ -1,6 +1,6 @@
 # Story 4.3: Annuity Transformation Pipeline (Bronze → Silver)
 
-Status: review
+Status: done
 
 ## Story
 

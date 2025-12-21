@@ -1,6 +1,6 @@
 # Story 2.3: Cleansing Registry Framework
 
-Status: review
+Status: done
 
 ## Story
 

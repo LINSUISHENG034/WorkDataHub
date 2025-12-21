@@ -1,6 +1,6 @@
 # Story 4.1: Annuity Domain Data Models (Pydantic)
 
-Status: review
+Status: done
 
 ## Story
 
