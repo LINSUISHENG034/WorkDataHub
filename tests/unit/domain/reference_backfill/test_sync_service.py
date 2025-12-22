@@ -30,7 +30,7 @@ def mock_adapter():
 def mock_connection():
     """Create a mock database connection."""
     conn = MagicMock()
-    conn.dialect.name = 'postgresql'
+    conn.dialect.name = "postgresql"
     return conn
 
 
@@ -51,11 +51,13 @@ def sample_config():
 @pytest.fixture
 def sample_data():
     """Create sample reference data."""
-    return pd.DataFrame({
-        'id': ['A001', 'A002', 'A003'],
-        'name': ['Test 1', 'Test 2', 'Test 3'],
-        'type': ['Type A', 'Type B', 'Type A'],
-    })
+    return pd.DataFrame(
+        {
+            "id": ["A001", "A002", "A003"],
+            "name": ["Test 1", "Test 2", "Test 3"],
+            "type": ["Type A", "Type B", "Type A"],
+        }
+    )
 
 
 class TestReferenceSyncService:
@@ -73,31 +75,30 @@ class TestReferenceSyncService:
         result_df = service._add_authoritative_tracking_fields(sample_data)
 
         # Check tracking fields are added
-        assert '_source' in result_df.columns
-        assert '_needs_review' in result_df.columns
-        assert '_derived_from_domain' in result_df.columns
-        assert '_derived_at' in result_df.columns
+        assert "_source" in result_df.columns
+        assert "_needs_review" in result_df.columns
+        assert "_derived_from_domain" in result_df.columns
+        assert "_derived_at" in result_df.columns
 
         # Check values are correct
-        assert all(result_df['_source'] == 'authoritative')
-        assert all(result_df['_needs_review'] == False)
-        assert all(result_df['_derived_from_domain'].isna())
-        assert all(result_df['_derived_at'].isna())
+        assert all(result_df["_source"] == "authoritative")
+        assert all(result_df["_needs_review"] == False)
+        assert all(result_df["_derived_from_domain"].isna())
+        assert all(result_df["_derived_at"].isna())
 
         # Check original data is preserved
-        assert all(result_df['id'] == sample_data['id'])
-        assert all(result_df['name'] == sample_data['name'])
+        assert all(result_df["id"] == sample_data["id"])
+        assert all(result_df["name"] == sample_data["name"])
 
-    def test_sync_table_plan_only(self, sample_config, sample_data, mock_adapter, mock_connection):
+    def test_sync_table_plan_only(
+        self, sample_config, sample_data, mock_adapter, mock_connection
+    ):
         """Test sync_table in plan-only mode."""
         service = ReferenceSyncService()
         mock_adapter.fetch_data.return_value = sample_data
 
         result = service.sync_table(
-            sample_config,
-            mock_adapter,
-            mock_connection,
-            plan_only=True
+            sample_config, mock_adapter, mock_connection, plan_only=True
         )
 
         # Verify result
@@ -121,10 +122,7 @@ class TestReferenceSyncService:
         mock_adapter.fetch_data.return_value = pd.DataFrame()
 
         result = service.sync_table(
-            sample_config,
-            mock_adapter,
-            mock_connection,
-            plan_only=False
+            sample_config, mock_adapter, mock_connection, plan_only=False
         )
 
         # Verify result
@@ -135,7 +133,9 @@ class TestReferenceSyncService:
         # Verify no database operations
         mock_connection.execute.assert_not_called()
 
-    def test_sync_all_success(self, sample_config, sample_data, mock_adapter, mock_connection):
+    def test_sync_all_success(
+        self, sample_config, sample_data, mock_adapter, mock_connection
+    ):
         """Test sync_all with successful sync operations."""
         service = ReferenceSyncService()
         mock_adapter.fetch_data.return_value = sample_data
@@ -170,7 +170,9 @@ class TestReferenceSyncService:
         assert results[0].error is not None
         assert "No adapter found" in results[0].error
 
-    def test_sync_all_adapter_exception(self, sample_config, mock_adapter, mock_connection):
+    def test_sync_all_adapter_exception(
+        self, sample_config, mock_adapter, mock_connection
+    ):
         """Test sync_all when adapter raises exception."""
         service = ReferenceSyncService()
         mock_adapter.fetch_data.side_effect = Exception("Connection failed")
@@ -199,7 +201,7 @@ class TestReferenceSyncService:
             sample_data,
             sample_config,
             mock_connection,
-            batch_size=2  # Small batch size to test batching
+            batch_size=2,  # Small batch size to test batching
         )
 
         # Verify result
@@ -216,9 +218,7 @@ class TestReferenceSyncService:
         service = ReferenceSyncService()
 
         rows_inserted = service._batch_insert(
-            pd.DataFrame(),
-            sample_config,
-            mock_connection
+            pd.DataFrame(), sample_config, mock_connection
         )
 
         # Verify no operations
@@ -228,7 +228,7 @@ class TestReferenceSyncService:
     def test_sync_upsert_postgresql(self, sample_config, sample_data, mock_connection):
         """Test upsert sync mode with PostgreSQL."""
         service = ReferenceSyncService()
-        mock_connection.dialect.name = 'postgresql'
+        mock_connection.dialect.name = "postgresql"
 
         # Add tracking fields
         df_with_tracking = service._add_authoritative_tracking_fields(sample_data)
@@ -292,7 +292,9 @@ class TestReferenceSyncService:
         # Verify transaction was committed
         mock_trans.commit.assert_called_once()
 
-    def test_sync_delete_insert_rollback_on_error(self, sample_config, sample_data, mock_connection):
+    def test_sync_delete_insert_rollback_on_error(
+        self, sample_config, sample_data, mock_connection
+    ):
         """Test delete-insert rollback on error."""
         service = ReferenceSyncService()
 
@@ -308,7 +310,7 @@ class TestReferenceSyncService:
         mock_delete_result.rowcount = 5
         mock_connection.execute.side_effect = [
             mock_delete_result,
-            Exception("Insert failed")
+            Exception("Insert failed"),
         ]
 
         # Verify exception is raised

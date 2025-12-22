@@ -13,7 +13,6 @@ Notes:
 from __future__ import annotations
 
 import argparse
-import os
 import re
 import sys
 from dataclasses import dataclass
@@ -142,9 +141,7 @@ def apply_fk(engine: Engine, schema: str, fk: ForeignKeyDef, validate: bool) -> 
         add_sql += f" {clause_sql}"
     add_sql += " NOT VALID"
 
-    validate_sql = (
-        f'ALTER TABLE "{schema}"."{fk.table}" VALIDATE CONSTRAINT "{fk.constraint_name}"'
-    )
+    validate_sql = f'ALTER TABLE "{schema}"."{fk.table}" VALIDATE CONSTRAINT "{fk.constraint_name}"'
 
     with engine.begin() as conn:
         conn.execute(text(add_sql))
@@ -209,7 +206,10 @@ def main() -> int:
             for fk in fks:
                 if fk_exists(engine, db_name, fk.table, fk.constraint_name):
                     logger.info(
-                        "fk.exists", database=db_name, table=fk.table, constraint=fk.constraint_name
+                        "fk.exists",
+                        database=db_name,
+                        table=fk.table,
+                        constraint=fk.constraint_name,
                     )
                     continue
                 try:
@@ -223,9 +223,7 @@ def main() -> int:
                     )
                 except Exception as exc:  # noqa: BLE001
                     summary_fail += 1
-                    failed.append(
-                        f"{db_name}.{fk.table}.{fk.constraint_name}: {exc}"
-                    )
+                    failed.append(f"{db_name}.{fk.table}.{fk.constraint_name}: {exc}")
                     logger.error(
                         "fk.failed",
                         database=db_name,

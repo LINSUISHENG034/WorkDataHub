@@ -161,4 +161,3 @@ def test_adapter_factory_creates_and_caches(monkeypatch):
 
     cfg = AdapterFactory.create("config_file")
     assert fake_config_instances  # created
-

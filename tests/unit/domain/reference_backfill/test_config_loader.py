@@ -11,7 +11,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-from work_data_hub.domain.reference_backfill.config_loader import load_foreign_keys_config
+from work_data_hub.domain.reference_backfill.config_loader import (
+    load_foreign_keys_config,
+)
 
 
 def _write_config(path: Path, content: str) -> Path:
@@ -472,7 +474,9 @@ class TestConfigLoaderPerformance:
                 }
             },
         }
-        config_path.write_text(yaml.safe_dump(payload, allow_unicode=True), encoding="utf-8")
+        config_path.write_text(
+            yaml.safe_dump(payload, allow_unicode=True), encoding="utf-8"
+        )
 
         durations = []
         for _ in range(5):
@@ -500,7 +504,14 @@ class TestConfigLoaderPerformance:
             ],
         }
         # Create 6 FKs to test upper bound of typical config
-        fk_names = ["fk_plan", "fk_portfolio", "fk_policy", "fk_channel", "fk_org", "fk_product"]
+        fk_names = [
+            "fk_plan",
+            "fk_portfolio",
+            "fk_policy",
+            "fk_channel",
+            "fk_org",
+            "fk_product",
+        ]
         payload = {
             "schema_version": "1.0",
             "domains": {
@@ -512,7 +523,9 @@ class TestConfigLoaderPerformance:
                 }
             },
         }
-        config_path.write_text(yaml.safe_dump(payload, allow_unicode=True), encoding="utf-8")
+        config_path.write_text(
+            yaml.safe_dump(payload, allow_unicode=True), encoding="utf-8"
+        )
 
         tracemalloc.start()
         load_foreign_keys_config(config_path, "annuity_performance")

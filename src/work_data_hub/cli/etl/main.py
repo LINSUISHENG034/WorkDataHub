@@ -273,12 +273,20 @@ def main(argv: Optional[List[str]] = None) -> int:
         # Task 2.1: Validate domains based on count
         if len(domains_to_process) > 1:
             # Multi-domain: Only allow configured data domains
-            valid, invalid = etl_module._validate_domains(domains_to_process, allow_special=False)
+            valid, invalid = etl_module._validate_domains(
+                domains_to_process, allow_special=False
+            )
 
             if invalid:
-                print(f"❌ Invalid domains for multi-domain processing: {', '.join(invalid)}")
-                print("   Multi-domain runs only support configured data domains from config/data_sources.yml")
-                print("   Special orchestration domains (company_mapping, company_lookup_queue, reference_sync)")
+                print(
+                    f"❌ Invalid domains for multi-domain processing: {', '.join(invalid)}"
+                )
+                print(
+                    "   Multi-domain runs only support configured data domains from config/data_sources.yml"
+                )
+                print(
+                    "   Special orchestration domains (company_mapping, company_lookup_queue, reference_sync)"
+                )
                 print("   can only be used in single-domain runs")
                 return 1
 
@@ -289,13 +297,17 @@ def main(argv: Optional[List[str]] = None) -> int:
 
         else:
             # Single domain: Allow both configured and special domains
-            valid, invalid = etl_module._validate_domains(domains_to_process, allow_special=True)
+            valid, invalid = etl_module._validate_domains(
+                domains_to_process, allow_special=True
+            )
 
             if invalid:
                 print(f"❌ Unknown domain: {invalid[0]}")
                 configured = etl_module._load_configured_domains()
                 print(f"   Available configured domains: {', '.join(configured)}")
-                print("   Special orchestration domains: company_mapping, company_lookup_queue, reference_sync")
+                print(
+                    "   Special orchestration domains: company_mapping, company_lookup_queue, reference_sync"
+                )
                 return 1
 
             domains_to_process = valid
@@ -331,7 +343,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print(f"✅ Domain {domain} completed successfully")
 
             except KeyboardInterrupt:
-                print(f"\n⚠️  Multi-domain processing interrupted by user at domain {domain}")
+                print(
+                    f"\n⚠️  Multi-domain processing interrupted by user at domain {domain}"
+                )
                 results[domain] = "INTERRUPTED"
                 return 130
 
@@ -361,7 +375,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
         # Return exit code 1 if any domain failed
         if failed_domains:
-            print(f"❌ Multi-domain processing completed with {len(failed_domains)} failure(s)")
+            print(
+                f"❌ Multi-domain processing completed with {len(failed_domains)} failure(s)"
+            )
             return 1
         else:
             print("🎉 Multi-domain processing completed successfully")

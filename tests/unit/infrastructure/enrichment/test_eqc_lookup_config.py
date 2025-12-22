@@ -11,7 +11,7 @@ from work_data_hub.infrastructure.enrichment.eqc_lookup_config import EqcLookupC
 def test_disabled_factory():
     """Test disabled() factory creates safe default state."""
     config = EqcLookupConfig.disabled()
-    
+
     assert not config.enabled
     assert config.sync_budget == 0
     assert not config.auto_create_provider
@@ -29,12 +29,12 @@ def test_from_cli_args_semantic_enforcement():
         export_unknown_names=True,
     )
     config = EqcLookupConfig.from_cli_args(args)
-    
+
     assert not config.enabled
     assert config.sync_budget == 0  # Forced to 0 despite CLI arg
     assert config.export_unknown_names is False  # Disabled forces all features off
     assert config.auto_refresh_token is False
-    
+
     # Case 2: Enrichment enabled
     args2 = argparse.Namespace(
         enrichment_enabled=True,
@@ -43,7 +43,7 @@ def test_from_cli_args_semantic_enforcement():
         no_auto_refresh_token=True,
     )
     config2 = EqcLookupConfig.from_cli_args(args2)
-    
+
     assert config2.enabled
     assert config2.sync_budget == 10
     assert config2.auto_create_provider is True  # Default when enabled
@@ -60,13 +60,13 @@ def test_from_dict_to_dict_roundtrip():
         export_unknown_names=False,
         auto_refresh_token=False,
     )
-    
+
     # Serialize
     data = original.to_dict()
     assert isinstance(data, dict)
     assert data["enabled"] is True
     assert data["sync_budget"] == 5
-    
+
     # Deserialize
     restored = EqcLookupConfig.from_dict(data)
     assert restored.enabled == original.enabled
@@ -81,11 +81,11 @@ def test_should_auto_create_provider_property():
     # Case 1: enabled=False → should_auto_create=False
     config1 = EqcLookupConfig(enabled=False, auto_create_provider=True)
     assert not config1.should_auto_create_provider
-    
+
     # Case 2: enabled=True, auto_create=False → False
     config2 = EqcLookupConfig(enabled=True, auto_create_provider=False)
     assert not config2.should_auto_create_provider
-    
+
     # Case 3: enabled=True, auto_create=True → True
     config3 = EqcLookupConfig(enabled=True, auto_create_provider=True)
     assert config3.should_auto_create_provider
@@ -95,6 +95,6 @@ def test_from_settings_graceful_fallback():
     """Test from_settings() handles missing settings gracefully."""
     # This should not raise even if settings fail to load
     config = EqcLookupConfig.from_settings()
-    
+
     # Should return a config object (may be disabled if settings missing)
     assert isinstance(config, EqcLookupConfig)

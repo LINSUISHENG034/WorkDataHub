@@ -26,4 +26,3 @@ def parse_chinese_date_value(value: Any) -> Any:
 
 
 __all__ = ["parse_chinese_date_value"]
-

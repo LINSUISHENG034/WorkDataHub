@@ -170,7 +170,7 @@ class FileDiscoveryService:
             # Stage 4: Normalization (renaming columns)
             norm_start = time.time()
             renamed_columns = {}
-            columns_config = getattr(domain_config, 'columns', None)
+            columns_config = getattr(domain_config, "columns", None)
             if columns_config:
                 # Apply column mapping (file_col -> domain_col)
                 # Map is configured as: domain_field: file_header_name
@@ -209,7 +209,7 @@ class FileDiscoveryService:
                 stage_durations=stage_durations,
             )
 
-        except DiscoveryError as exc:
+        except DiscoveryError:
             # discover_file already logs error
             raise
         except Exception as exc:
@@ -225,23 +225,23 @@ class FileDiscoveryService:
 
     def _load_domain_config(self, domain: str) -> DomainConfigV2:
         """Load and validate domain configuration.
-        
+
         Supports two configuration sources:
         1. Direct injection: settings.data_sources (DataSourceConfigV2 object)
         2. YAML file: settings.data_sources_config (path to data_sources.yml)
-        
+
         The first approach allows tests to inject configuration directly.
         """
         try:
             # Check for directly injected data_sources (for testing)
-            if hasattr(self.settings, 'data_sources') and isinstance(
+            if hasattr(self.settings, "data_sources") and isinstance(
                 self.settings.data_sources, DataSourceConfigV2
             ):
                 domains = self.settings.data_sources.domains
                 if domain not in domains:
                     raise KeyError(domain)
                 return domains[domain]
-            
+
             # Default: load from YAML file
             config_path = self.settings.data_sources_config
             # Use the helper function that handles V2 validation and defaults merging
@@ -265,12 +265,10 @@ class FileDiscoveryService:
                 domain=domain,
                 failed_stage=DiscoveryStage.CONFIG_VALIDATION,
                 original_error=e,
-                message=f"Invalid settings configuration: missing data_sources or data_sources_config",
+                message="Invalid settings configuration: missing data_sources or data_sources_config",
             )
 
-    def _resolve_template_vars(
-        self, path_template: str, template_vars: dict
-    ) -> Path:
+    def _resolve_template_vars(self, path_template: str, template_vars: dict) -> Path:
         """Resolve template variables in base path."""
         # Security: Check for null byte injection in path template
         if "\x00" in path_template:
@@ -327,16 +325,16 @@ class FileDiscoveryService:
             )
         except (DiscoveryError, Exception) as primary_error:
             # Check if fallback is configured
-            fallback = getattr(config, 'fallback', 'error')
-            if fallback == 'error':
+            fallback = getattr(config, "fallback", "error")
+            if fallback == "error":
                 raise
 
             # Map fallback config to strategy name
             fallback_strategy = None
-            if fallback == 'use_latest_modified':
-                fallback_strategy = 'latest_modified'
-            elif fallback == 'use_oldest_modified':
-                fallback_strategy = 'oldest_modified'
+            if fallback == "use_latest_modified":
+                fallback_strategy = "latest_modified"
+            elif fallback == "use_oldest_modified":
+                fallback_strategy = "oldest_modified"
 
             if fallback_strategy:
                 try:

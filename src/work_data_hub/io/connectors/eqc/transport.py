@@ -12,6 +12,7 @@ from typing import Deque, Optional
 import requests
 
 from work_data_hub.config.settings import get_settings
+
 from .models import (
     EQCAuthenticationError,
     EQCClientError,

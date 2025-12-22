@@ -36,32 +36,80 @@ class TestInstitutionCodeMapping:
     @pytest.fixture
     def sample_df(self):
         """Create sample DataFrame with various institution names."""
-        return pd.DataFrame({
-            "月度": ["202411"] * 10,
-            "机构名称": ["北京", "上海", "深圳", "广东", "江苏",
-                         "浙江", "福建", "海南", "重庆", "不存在的机构"],
-            "计划类型": ["集合计划"] * 10,
-            "计划代码": ["AN001"] * 10,
-            "业务类型": ["企年投资"] * 10,
-            "客户名称": [f"客户{i}" for i in range(10)],  # Required for company_id resolution
-        })
+        return pd.DataFrame(
+            {
+                "月度": ["202411"] * 10,
+                "机构名称": [
+                    "北京",
+                    "上海",
+                    "深圳",
+                    "广东",
+                    "江苏",
+                    "浙江",
+                    "福建",
+                    "海南",
+                    "重庆",
+                    "不存在的机构",
+                ],
+                "计划类型": ["集合计划"] * 10,
+                "计划代码": ["AN001"] * 10,
+                "业务类型": ["企年投资"] * 10,
+                "客户名称": [
+                    f"客户{i}" for i in range(10)
+                ],  # Required for company_id resolution
+            }
+        )
 
     def test_all_legacy_mappings_present(self):
         """Test that all Legacy mappings are present in COMPANY_BRANCH_MAPPING."""
         # Legacy mappings from database + special adjustments
         legacy_mappings = {
             # Database mappings (38)
-            "总部": "G00", "北京": "G01", "上海": "G02", "广东": "G04", "深圳": "G05",
-            "江苏": "G10", "浙江": "G12", "福建": "G13", "海南": "G15", "重庆": "G18",
-            "山东": "G21", "江西": "G22", "新疆": "G23", "安徽": "G25", "宁波": "G29",
-            "甘肃": "G34", "贵州": "G35", "内蒙古": "G31", "青岛": "G11", "大连": "G07",
-            "广西": "G14", "河北": "G24", "河南": "G32", "黑龙江": "G19", "湖北": "G09",
-            "湖南": "G20", "吉林": "G08", "辽宁": "G06", "宁夏": "G28", "青海": "G27",
-            "山西": "G33", "陕西": "G17", "四川": "G26", "天津": "G03", "西藏": "G36",
-            "云南": "G16", "厦门": "G30", "北总": "G37",
+            "总部": "G00",
+            "北京": "G01",
+            "上海": "G02",
+            "广东": "G04",
+            "深圳": "G05",
+            "江苏": "G10",
+            "浙江": "G12",
+            "福建": "G13",
+            "海南": "G15",
+            "重庆": "G18",
+            "山东": "G21",
+            "江西": "G22",
+            "新疆": "G23",
+            "安徽": "G25",
+            "宁波": "G29",
+            "甘肃": "G34",
+            "贵州": "G35",
+            "内蒙古": "G31",
+            "青岛": "G11",
+            "大连": "G07",
+            "广西": "G14",
+            "河北": "G24",
+            "河南": "G32",
+            "黑龙江": "G19",
+            "湖北": "G09",
+            "湖南": "G20",
+            "吉林": "G08",
+            "辽宁": "G06",
+            "宁夏": "G28",
+            "青海": "G27",
+            "山西": "G33",
+            "陕西": "G17",
+            "四川": "G26",
+            "天津": "G03",
+            "西藏": "G36",
+            "云南": "G16",
+            "厦门": "G30",
+            "北总": "G37",
             # Special adjustments (6)
-            "内蒙": "G31", "战略": "G37", "中国": "G37", "济南": "G21",
-            "北京其他": "G37", "北分": "G37",
+            "内蒙": "G31",
+            "战略": "G37",
+            "中国": "G37",
+            "济南": "G21",
+            "北京其他": "G37",
+            "北分": "G37",
         }
 
         missing_mappings = []
@@ -69,22 +117,30 @@ class TestInstitutionCodeMapping:
             if name not in COMPANY_BRANCH_MAPPING:
                 missing_mappings.append(f"{name}: {code}")
             elif COMPANY_BRANCH_MAPPING[name] != code:
-                missing_mappings.append(f"{name}: Legacy={code}, New={COMPANY_BRANCH_MAPPING[name]}")
+                missing_mappings.append(
+                    f"{name}: Legacy={code}, New={COMPANY_BRANCH_MAPPING[name]}"
+                )
 
         if missing_mappings:
-            pytest.fail(f"Missing or mismatched mappings:\n" + "\n".join(missing_mappings))
+            pytest.fail(
+                f"Missing or mismatched mappings:\n" + "\n".join(missing_mappings)
+            )
 
     def test_additional_mappings(self):
         """Test that new pipeline has additional mappings beyond Legacy."""
         # Additional mappings in New Pipeline
         additional_mappings = {
             "深圳分公司": "G05",  # Same as "深圳"
-            "广州": "G04",      # Same as "广东"
+            "广州": "G04",  # Same as "广东"
         }
 
         for name, code in additional_mappings.items():
-            assert name in COMPANY_BRANCH_MAPPING, f"Additional mapping {name} not found"
-            assert COMPANY_BRANCH_MAPPING[name] == code, f"Additional mapping {name} has wrong code"
+            assert name in COMPANY_BRANCH_MAPPING, (
+                f"Additional mapping {name} not found"
+            )
+            assert COMPANY_BRANCH_MAPPING[name] == code, (
+                f"Additional mapping {name} has wrong code"
+            )
 
     def test_mapping_count(self):
         """Test mapping count matches expected."""
@@ -92,11 +148,15 @@ class TestInstitutionCodeMapping:
         expected_count = 46
         actual_count = len(COMPANY_BRANCH_MAPPING)
 
-        assert actual_count == expected_count, f"Expected {expected_count} mappings, got {actual_count}"
+        assert actual_count == expected_count, (
+            f"Expected {expected_count} mappings, got {actual_count}"
+        )
 
     def test_institution_code_mapping_applied(self, sample_df):
         """Test that institution code mapping is applied correctly."""
-        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
+        pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled()
+        )
         context = make_context("test")
 
         result_df = pipeline.execute(sample_df.copy(), context)
@@ -117,16 +177,20 @@ class TestInstitutionCodeMapping:
 
     def test_special_value_handling(self):
         """Test handling of special values (null, None, empty string)."""
-        df = pd.DataFrame({
-            "月度": ["202411"] * 5,
-            "机构名称": [None, "", "null", "None", "北京"],
-            "计划类型": ["集合计划"] * 5,
-            "计划代码": ["AN001"] * 5,
-            "业务类型": ["企年投资"] * 5,
-            "客户名称": ["客户A"] * 5,  # Required for company_id resolution
-        })
+        df = pd.DataFrame(
+            {
+                "月度": ["202411"] * 5,
+                "机构名称": [None, "", "null", "None", "北京"],
+                "计划类型": ["集合计划"] * 5,
+                "计划代码": ["AN001"] * 5,
+                "业务类型": ["企年投资"] * 5,
+                "客户名称": ["客户A"] * 5,  # Required for company_id resolution
+            }
+        )
 
-        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
+        pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled()
+        )
         context = make_context("test")
 
         result_df = pipeline.execute(df, context)
@@ -140,16 +204,20 @@ class TestInstitutionCodeMapping:
 
     def test_legacy_override_mappings(self):
         """Test legacy special adjustment mappings."""
-        df = pd.DataFrame({
-            "月度": ["202411"] * 6,
-            "机构名称": ["内蒙", "战略", "中国", "济南", "北京其他", "北分"],
-            "计划类型": ["集合计划"] * 6,
-            "计划代码": ["AN001"] * 6,
-            "业务类型": ["企年投资"] * 6,
-            "客户名称": [f"客户{i}" for i in range(6)],
-        })
+        df = pd.DataFrame(
+            {
+                "月度": ["202411"] * 6,
+                "机构名称": ["内蒙", "战略", "中国", "济南", "北京其他", "北分"],
+                "计划类型": ["集合计划"] * 6,
+                "计划代码": ["AN001"] * 6,
+                "业务类型": ["企年投资"] * 6,
+                "客户名称": [f"客户{i}" for i in range(6)],
+            }
+        )
 
-        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
+        pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled()
+        )
         context = make_context("test")
 
         result_df = pipeline.execute(df, context)
@@ -164,16 +232,20 @@ class TestInstitutionCodeMapping:
 
     def test_duplicate_mapping_handling(self):
         """Test handling of "内蒙" vs "内蒙古" (both map to G31)."""
-        df = pd.DataFrame({
-            "月度": ["202411"] * 2,
-            "机构名称": ["内蒙古", "内蒙"],
-            "计划类型": ["集合计划"] * 2,
-            "计划代码": ["AN001"] * 2,
-            "业务类型": ["企年投资"] * 2,
-            "客户名称": ["客户A", "客户B"],
-        })
+        df = pd.DataFrame(
+            {
+                "月度": ["202411"] * 2,
+                "机构名称": ["内蒙古", "内蒙"],
+                "计划类型": ["集合计划"] * 2,
+                "计划代码": ["AN001"] * 2,
+                "业务类型": ["企年投资"] * 2,
+                "客户名称": ["客户A", "客户B"],
+            }
+        )
 
-        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
+        pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled()
+        )
         context = make_context("test")
 
         result_df = pipeline.execute(df, context)
@@ -184,15 +256,19 @@ class TestInstitutionCodeMapping:
 
     def test_no_institution_name_column(self):
         """Test behavior when 机构名称 column doesn't exist."""
-        df = pd.DataFrame({
-            "月度": ["202411"],
-            "计划类型": ["集合计划"],
-            "计划代码": ["AN001"],
-            "业务类型": ["企年投资"],
-            "客户名称": ["客户A"],
-        })
+        df = pd.DataFrame(
+            {
+                "月度": ["202411"],
+                "计划类型": ["集合计划"],
+                "计划代码": ["AN001"],
+                "业务类型": ["企年投资"],
+                "客户名称": ["客户A"],
+            }
+        )
 
-        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
+        pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled()
+        )
         context = make_context("test")
 
         result_df = pipeline.execute(df, context)
@@ -209,45 +285,60 @@ class TestInstitutionCodeLegacyParity:
         """Create comprehensive test data covering all edge cases."""
         institutions = [
             # Standard database mappings
-            "总部", "北京", "上海", "深圳", "广东",
+            "总部",
+            "北京",
+            "上海",
+            "深圳",
+            "广东",
             # Missing mappings (should get G00)
-            "不存在的机构1", "不存在的机构2",
+            "不存在的机构1",
+            "不存在的机构2",
             # Special values (handled as None, which is fine)
-            None, "", "null", "None",
+            None,
+            "",
+            "null",
+            "None",
             # Legacy overrides
-            "内蒙", "战略", "中国",
+            "内蒙",
+            "战略",
+            "中国",
             # New pipeline additions
-            "深圳分公司", "广州",
+            "深圳分公司",
+            "广州",
         ]
 
-        return pd.DataFrame({
-            "月度": ["202411"] * len(institutions),
-            "机构名称": institutions,
-            "计划类型": ["集合计划"] * len(institutions),
-            "计划代码": ["AN001"] * len(institutions),
-            "业务类型": ["企年投资"] * len(institutions),
-            "客户名称": [f"客户{i}" for i in range(len(institutions))],
-        })
+        return pd.DataFrame(
+            {
+                "月度": ["202411"] * len(institutions),
+                "机构名称": institutions,
+                "计划类型": ["集合计划"] * len(institutions),
+                "计划代码": ["AN001"] * len(institutions),
+                "业务类型": ["企年投资"] * len(institutions),
+                "客户名称": [f"客户{i}" for i in range(len(institutions))],
+            }
+        )
 
     def test_legacy_parity_comprehensive(self, comprehensive_test_df):
         """Test comprehensive legacy parity."""
-        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
+        pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled()
+        )
         context = make_context("test")
 
         result_df = pipeline.execute(comprehensive_test_df.copy(), context)
 
         # Expected results based on Legacy behavior
         expected_results = {
-            0: "G00",   # 总部 → G00
-            1: "G01",   # 北京 → G01
-            2: "G02",   # 上海 → G02
-            3: "G05",   # 深圳 → G05
-            4: "G04",   # 广东 → G04
-            5: "G00",   # 不存在的机构1 → G00 (default)
-            6: "G00",   # 不存在的机构2 → G00 (default)
-            7: "G00",   # None → G00
-            8: "G00",   # "" → G00
-            9: "G00",   # "null" → G00 (Legacy converts string "null" to G00)
+            0: "G00",  # 总部 → G00
+            1: "G01",  # 北京 → G01
+            2: "G02",  # 上海 → G02
+            3: "G05",  # 深圳 → G05
+            4: "G04",  # 广东 → G04
+            5: "G00",  # 不存在的机构1 → G00 (default)
+            6: "G00",  # 不存在的机构2 → G00 (default)
+            7: "G00",  # None → G00
+            8: "G00",  # "" → G00
+            9: "G00",  # "null" → G00 (Legacy converts string "null" to G00)
             10: "G00",  # "None" → G00
             11: "G31",  # 内蒙 → G31 (Legacy override)
             12: "G37",  # 战略 → G37 (Legacy override)
@@ -276,4 +367,6 @@ class TestInstitutionCodeLegacyParity:
         if missing_codes:
             # Some codes like G21 might be used by multiple institutions
             # This is informational, not a failure
-            print(f"\nNote: Some institution codes not directly mapped: {sorted(missing_codes)}")
+            print(
+                f"\nNote: Some institution codes not directly mapped: {sorted(missing_codes)}"
+            )

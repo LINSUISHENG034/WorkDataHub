@@ -530,7 +530,7 @@ async def get_auth_token_interactively(
 def run_get_token(
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
     save_to_env: bool = False,
-    env_file: str = ".env"
+    env_file: str = ".env",
 ) -> Optional[str]:
     """
     Synchronous wrapper for async authentication with optional .env save.
@@ -552,7 +552,11 @@ def run_get_token(
 
         if token and save_to_env:
             # Import the update function from the main module
-            from work_data_hub.io.auth.eqc_auth_handler import _update_env_file, EQC_TOKEN_KEY
+            from work_data_hub.io.auth.eqc_auth_handler import (
+                EQC_TOKEN_KEY,
+                _update_env_file,
+            )
+
             success = _update_env_file(env_file, EQC_TOKEN_KEY, token)
             if success:
                 print(f"✅ Token 已自动保存到 {env_file}")

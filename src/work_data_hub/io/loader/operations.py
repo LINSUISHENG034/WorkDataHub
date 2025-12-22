@@ -1,5 +1,3 @@
-import logging
-import time
 from typing import Any, Dict, List, Optional
 
 from work_data_hub.io.loader.insert_builder import (
@@ -355,9 +353,9 @@ def load(
         raise DataWarehouseLoaderError("Primary key required for delete_insert mode")
 
     if not isinstance(rows, list):
-         # Add check for rows type to be safe, though _ensure_list_of_dicts does it
-         pass
-         
+        # Add check for rows type to be safe, though _ensure_list_of_dicts does it
+        pass
+
     rows = _ensure_list_of_dicts(rows)  # Using imported helper
 
     # Early return for empty data

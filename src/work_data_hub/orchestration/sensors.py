@@ -7,7 +7,7 @@ logic here ensures domain modules stay unaware of eventing or infrastructure.
 Story 6.7: Added enrichment_queue_sensor for queue depth monitoring.
 """
 
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Union
 
 import structlog
 import yaml
@@ -310,9 +310,7 @@ def enrichment_queue_sensor(
             queue = LookupQueue(conn, plan_only=False)
             # Only count requests whose backoff window has elapsed to avoid
             # noise from items still waiting for retry (AC2/AC5 alignment)
-            pending_count = queue.get_queue_depth(
-                status="pending", ready_only=True
-            )
+            pending_count = queue.get_queue_depth(status="pending", ready_only=True)
         finally:
             conn.close()
 
@@ -338,9 +336,7 @@ def enrichment_queue_sensor(
                 },
             )
 
-        return SkipReason(
-            f"Queue depth {pending_count} below threshold {threshold}"
-        )
+        return SkipReason(f"Queue depth {pending_count} below threshold {threshold}")
 
     except Exception as e:
         logger.error(

@@ -260,9 +260,7 @@ class TestValidateDataSourcesConfig:
 
     def test_validate_current_data_sources_succeeds(self):
         """Test that current data_sources.yml passes validation."""
-        result = validate_data_sources_config(
-            "config/data_sources.yml"
-        )
+        result = validate_data_sources_config("config/data_sources.yml")
         assert result is True
 
     def test_validate_data_sources_with_custom_path(self, config_file):
@@ -378,9 +376,7 @@ class TestIntegration:
     def test_real_data_sources_yml_validation(self):
         """Test validation of the actual data_sources.yml file in the project."""
         # This should pass if the real file is properly structured
-        result = validate_data_sources_config(
-            "config/data_sources.yml"
-        )
+        result = validate_data_sources_config("config/data_sources.yml")
         assert result is True
 
         # Test getting the sandbox_trustee_performance domain

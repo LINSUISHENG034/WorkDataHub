@@ -363,7 +363,7 @@ class Settings(BaseSettings):
         SQLAlchemy compatibility.
         """
         env_uri = os.getenv("WDH_DATABASE__URI") or os.getenv("WDH_DATABASE_URI")
-        
+
         final_uri = None
         if env_uri:
             final_uri = env_uri
@@ -371,11 +371,11 @@ class Settings(BaseSettings):
             final_uri = self.database_uri
         else:
             final_uri = self.database.get_connection_string()
-            
+
         # Fix for SQLAlchemy compatibility (postgres:// is deprecated/unsupported in newer versions)
         if final_uri and final_uri.startswith("postgres://"):
             final_uri = final_uri.replace("postgres://", "postgresql://", 1)
-            
+
         return final_uri
 
     @model_validator(mode="before")
@@ -391,7 +391,11 @@ class Settings(BaseSettings):
         """
         env_uri = os.getenv("WDH_DATABASE__URI") or os.getenv("WDH_DATABASE_URI")
 
-        if not env_uri and isinstance(SETTINGS_ENV_FILE, Path) and SETTINGS_ENV_FILE.exists():
+        if (
+            not env_uri
+            and isinstance(SETTINGS_ENV_FILE, Path)
+            and SETTINGS_ENV_FILE.exists()
+        ):
             for line in SETTINGS_ENV_FILE.read_text(encoding="utf-8").splitlines():
                 line = line.strip()
                 if not line or line.startswith("#"):

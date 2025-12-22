@@ -11,7 +11,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 # Add legacy path for MySqlDBManager import (fallback only)
 sys.path.append(str(Path(__file__).parent.parent.parent.parent.parent / "legacy"))
@@ -24,6 +24,8 @@ except ImportError:
 
 
 from work_data_hub.domain.company_enrichment.models import CompanyMappingRecord
+from work_data_hub.domain.reference_backfill.sync_models import ReferenceSyncTableConfig
+from work_data_hub.io.connectors.postgres_source_adapter import PostgresSourceAdapter
 from work_data_hub.io.loader.warehouse_loader import (
     DataWarehouseLoaderError,
     _get_column_order,
@@ -32,8 +34,6 @@ from work_data_hub.io.loader.warehouse_loader import (
     build_insert_sql_with_conflict,
     quote_qualified,
 )
-from work_data_hub.io.connectors.postgres_source_adapter import PostgresSourceAdapter
-from work_data_hub.domain.reference_backfill.sync_models import ReferenceSyncTableConfig
 
 logger = logging.getLogger(__name__)
 
@@ -346,7 +346,15 @@ def _extract_company_id2_mapping() -> Dict[str, str]:
             finally:
                 cursor.close()
 
-    return {row["年金账户号"] if isinstance(row, dict) else row[0]: row["company_id"] if isinstance(row, dict) else row[1] for row in rows if row and (row["年金账户号"] if isinstance(row, dict) else row[0]) and (row["company_id"] if isinstance(row, dict) else row[1])}
+    return {
+        row["年金账户号"] if isinstance(row, dict) else row[0]: row["company_id"]
+        if isinstance(row, dict)
+        else row[1]
+        for row in rows
+        if row
+        and (row["年金账户号"] if isinstance(row, dict) else row[0])
+        and (row["company_id"] if isinstance(row, dict) else row[1])
+    }
 
 
 def _extract_company_id4_mapping() -> Dict[str, str]:
@@ -372,7 +380,15 @@ def _extract_company_id4_mapping() -> Dict[str, str]:
             finally:
                 cursor.close()
 
-    return {row["company_name"] if isinstance(row, dict) else row[0]: row["company_id"] if isinstance(row, dict) else row[1] for row in rows if row and (row["company_name"] if isinstance(row, dict) else row[0]) and (row["company_id"] if isinstance(row, dict) else row[1])}
+    return {
+        row["company_name"] if isinstance(row, dict) else row[0]: row["company_id"]
+        if isinstance(row, dict)
+        else row[1]
+        for row in rows
+        if row
+        and (row["company_name"] if isinstance(row, dict) else row[0])
+        and (row["company_id"] if isinstance(row, dict) else row[1])
+    }
 
 
 def _extract_company_id5_mapping() -> Dict[str, str]:
@@ -399,7 +415,15 @@ def _extract_company_id5_mapping() -> Dict[str, str]:
             finally:
                 cursor.close()
 
-    return {row["年金账户名"] if isinstance(row, dict) else row[0]: row["company_id"] if isinstance(row, dict) else row[1] for row in rows if row and (row["年金账户名"] if isinstance(row, dict) else row[0]) and (row["company_id"] if isinstance(row, dict) else row[1])}
+    return {
+        row["年金账户名"] if isinstance(row, dict) else row[0]: row["company_id"]
+        if isinstance(row, dict)
+        else row[1]
+        for row in rows
+        if row
+        and (row["年金账户名"] if isinstance(row, dict) else row[0])
+        and (row["company_id"] if isinstance(row, dict) else row[1])
+    }
 
 
 def load_company_mappings(

@@ -236,4 +236,3 @@ class TestMonthlyDataSmoke:
 
         yield conn
         conn.close()
-

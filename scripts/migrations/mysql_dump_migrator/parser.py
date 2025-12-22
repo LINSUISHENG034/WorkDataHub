@@ -58,24 +58,22 @@ class MySQLDumpParser:
     """
 
     # Regex patterns for parsing
-    DATABASE_PATTERN = re.compile(
-        r"--\s*Current Database:\s*`([^`]+)`", re.IGNORECASE
-    )
+    DATABASE_PATTERN = re.compile(r"--\s*Current Database:\s*`([^`]+)`", re.IGNORECASE)
     USE_DATABASE_PATTERN = re.compile(r"USE\s+`([^`]+)`\s*;", re.IGNORECASE)
     CREATE_DATABASE_PATTERN = re.compile(
         r"CREATE DATABASE.*?`([^`]+)`.*?;", re.IGNORECASE | re.DOTALL
     )
-    CREATE_TABLE_PATTERN = re.compile(
-        r"CREATE TABLE.*?`([^`]+)`", re.IGNORECASE
-    )
+    CREATE_TABLE_PATTERN = re.compile(r"CREATE TABLE.*?`([^`]+)`", re.IGNORECASE)
     DROP_TABLE_PATTERN = re.compile(
         r"DROP TABLE IF EXISTS\s+`([^`]+)`\s*;", re.IGNORECASE
     )
-    INSERT_PATTERN = re.compile(
-        r"INSERT INTO\s+`([^`]+)`", re.IGNORECASE
-    )
+    INSERT_PATTERN = re.compile(r"INSERT INTO\s+`([^`]+)`", re.IGNORECASE)
 
-    def __init__(self, dump_file_path: str, progress_callback: Optional[Callable[[str], None]] = None):
+    def __init__(
+        self,
+        dump_file_path: str,
+        progress_callback: Optional[Callable[[str], None]] = None,
+    ):
         """
         Initialize parser with dump file path.
 
@@ -120,7 +118,9 @@ class MySQLDumpParser:
         databases: Set[str] = set()
         bytes_read = 0
 
-        self._progress_callback(f"Scanning dump file ({self._format_size(self.file_size)})...")
+        self._progress_callback(
+            f"Scanning dump file ({self._format_size(self.file_size)})..."
+        )
 
         with open(self.dump_file_path, "r", encoding="utf-8", errors="replace") as f:
             for line_num, line in enumerate(f, 1):
@@ -206,7 +206,9 @@ class MySQLDumpParser:
                     found_db = db_match.group(1)
                     if found_db == database_name:
                         in_target_database = True
-                        self._progress_callback(f"  Found database '{database_name}' at line {line_num:,}")
+                        self._progress_callback(
+                            f"  Found database '{database_name}' at line {line_num:,}"
+                        )
                         logger.debug(
                             "parser.entered_database",
                             database=database_name,
@@ -215,7 +217,9 @@ class MySQLDumpParser:
                     elif in_target_database:
                         # Exited target database
                         finalize_insert()
-                        self._progress_callback(f"  Finished extracting at line {line_num:,}")
+                        self._progress_callback(
+                            f"  Finished extracting at line {line_num:,}"
+                        )
                         logger.debug(
                             "parser.exited_database",
                             database=database_name,
@@ -265,7 +269,9 @@ class MySQLDumpParser:
                     if stripped.startswith(")") and stripped.endswith(";"):
                         in_create_statement = False
                         if current_table and current_table in content.tables:
-                            content.tables[current_table].create_statement = "".join(create_buffer)
+                            content.tables[current_table].create_statement = "".join(
+                                create_buffer
+                            )
                         create_buffer = []
                     continue
 
@@ -328,7 +334,9 @@ class MySQLDumpParser:
         Returns:
             Dictionary mapping database names to their table counts.
         """
-        self._progress_callback(f"Gathering database summary ({self._format_size(self.file_size)})...")
+        self._progress_callback(
+            f"Gathering database summary ({self._format_size(self.file_size)})..."
+        )
 
         summary: Dict[str, Dict] = {}
         current_db: Optional[str] = None

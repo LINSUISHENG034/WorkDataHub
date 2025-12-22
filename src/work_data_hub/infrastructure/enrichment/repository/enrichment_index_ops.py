@@ -7,7 +7,7 @@ Story 6.1.1: Enrichment Index Schema Enhancement
 Story 7.3: Infrastructure Layer Decomposition
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import ARRAY, NUMERIC, TEXT

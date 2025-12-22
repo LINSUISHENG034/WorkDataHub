@@ -32,4 +32,3 @@ __all__ = [
     "get_delete_scope_key",
     "generate_create_table_sql",
 ]
-

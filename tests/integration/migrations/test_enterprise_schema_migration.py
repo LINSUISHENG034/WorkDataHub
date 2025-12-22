@@ -48,7 +48,9 @@ def _allow_destructive_db_reset(engine: Engine) -> tuple[bool, str]:
         )
 
     db_name = (engine.url.database or "").lower()
-    if "test" not in db_name and os.getenv(_DB_RESET_ANY_DB_FLAG, "").strip().lower() not in {
+    if "test" not in db_name and os.getenv(
+        _DB_RESET_ANY_DB_FLAG, ""
+    ).strip().lower() not in {
         "1",
         "true",
         "yes",
@@ -117,8 +119,7 @@ class TestEnterpriseSchemaExists:
         assert "base_info" in tables, "base_info table should exist"
 
         columns = {
-            c["name"]
-            for c in inspector.get_columns("base_info", schema=SCHEMA_NAME)
+            c["name"] for c in inspector.get_columns("base_info", schema=SCHEMA_NAME)
         }
 
         # Key canonical columns (should exist and be used)
@@ -136,13 +137,37 @@ class TestEnterpriseSchemaExists:
 
         # Legacy columns from archive_base_info
         legacy_columns = {
-            "name", "name_display", "symbol", "rank_score", "country",
-            "company_en_name", "smdb_code", "is_hk", "coname", "is_list",
-            "company_nature", "_score", "type", "registeredStatus",
-            "organization_code", "le_rep", "reg_cap", "is_pa_relatedparty",
-            "province", "est_date", "company_short_name", "id", "is_debt",
-            "registered_status", "cocode", "default_score", "company_former_name",
-            "is_rank_list", "trade_register_code", "companyId", "is_normal",
+            "name",
+            "name_display",
+            "symbol",
+            "rank_score",
+            "country",
+            "company_en_name",
+            "smdb_code",
+            "is_hk",
+            "coname",
+            "is_list",
+            "company_nature",
+            "_score",
+            "type",
+            "registeredStatus",
+            "organization_code",
+            "le_rep",
+            "reg_cap",
+            "is_pa_relatedparty",
+            "province",
+            "est_date",
+            "company_short_name",
+            "id",
+            "is_debt",
+            "registered_status",
+            "cocode",
+            "default_score",
+            "company_former_name",
+            "is_rank_list",
+            "trade_register_code",
+            "companyId",
+            "is_normal",
             "company_full_name",
         }
 
@@ -172,7 +197,9 @@ class TestEnterpriseSchemaExists:
         ]
 
         for idx_name in expected_indexes:
-            assert idx_name in index_names, f"Index {idx_name} should exist on base_info"
+            assert idx_name in index_names, (
+                f"Index {idx_name} should exist on base_info"
+            )
 
     def test_business_info_table_exists(self, migrated_db: Engine):
         """AC3: Verify business_info table exists with normalized field types."""
@@ -193,9 +220,7 @@ class TestEnterpriseSchemaExists:
         assert column_types.get("start_date") == "DATE", (
             "start_date should be DATE type"
         )
-        assert column_types.get("end_date") == "DATE", (
-            "end_date should be DATE type"
-        )
+        assert column_types.get("end_date") == "DATE", "end_date should be DATE type"
         assert column_types.get("colleagues_num") == "INTEGER", (
             "colleagues_num should be INTEGER type (fixed typo)"
         )
@@ -215,9 +240,7 @@ class TestEnterpriseSchemaExists:
             for fk in fk_constraints
         )
 
-        assert has_base_info_fk, (
-            "business_info should have FK to base_info(company_id)"
-        )
+        assert has_base_info_fk, "business_info should have FK to base_info(company_id)"
 
     def test_biz_label_table_exists(self, migrated_db: Engine):
         """AC4: Verify biz_label table exists with proper structure."""
@@ -226,13 +249,19 @@ class TestEnterpriseSchemaExists:
         assert "biz_label" in tables, "biz_label table should exist"
 
         columns = {
-            c["name"]
-            for c in inspector.get_columns("biz_label", schema=SCHEMA_NAME)
+            c["name"] for c in inspector.get_columns("biz_label", schema=SCHEMA_NAME)
         }
 
         expected_columns = {
-            "id", "company_id", "type", "lv1_name", "lv2_name",
-            "lv3_name", "lv4_name", "created_at", "updated_at"
+            "id",
+            "company_id",
+            "type",
+            "lv1_name",
+            "lv2_name",
+            "lv3_name",
+            "lv4_name",
+            "created_at",
+            "updated_at",
         }
 
         assert expected_columns.issubset(columns), (
@@ -251,9 +280,7 @@ class TestEnterpriseSchemaExists:
             for fk in fk_constraints
         )
 
-        assert has_base_info_fk, (
-            "biz_label should have FK to base_info(company_id)"
-        )
+        assert has_base_info_fk, "biz_label should have FK to base_info(company_id)"
 
     def test_biz_label_indexes(self, migrated_db: Engine):
         """AC9: Verify biz_label has performance indexes."""

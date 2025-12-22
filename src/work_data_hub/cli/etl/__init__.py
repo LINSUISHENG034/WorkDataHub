@@ -32,14 +32,14 @@ Usage:
 """
 
 # Re-export all public symbols for backward compatibility
+# Re-export dependencies needed for test patching (Story 7.4 test compatibility)
+from work_data_hub.config.settings import get_settings
+
 from .config import build_run_config
 from .diagnostics import _check_database_connection
 from .domain_validation import _load_configured_domains, _validate_domains
 from .executors import _execute_single_domain
 from .main import main
-
-# Re-export dependencies needed for test patching (Story 7.4 test compatibility)
-from work_data_hub.config.settings import get_settings
 
 __all__ = [
     "main",

@@ -39,7 +39,9 @@ def quote_identifier(name: str, dialect: str = "postgresql") -> str:
         return f'"{escaped}"'
 
 
-def qualify_table(table: str, schema: Optional[str] = None, dialect: str = "postgresql") -> str:
+def qualify_table(
+    table: str, schema: Optional[str] = None, dialect: str = "postgresql"
+) -> str:
     """
     Create a fully qualified table name with optional schema prefix.
 

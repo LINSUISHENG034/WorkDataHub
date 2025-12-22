@@ -399,9 +399,17 @@ class TestHybridReferenceServiceIntegration:
             call_count["execute"] += 1
 
             # Coverage check queries
-            if "年金计划" in str(query) and "SELECT" in str(query) and "WHERE" in str(query):
+            if (
+                "年金计划" in str(query)
+                and "SELECT" in str(query)
+                and "WHERE" in str(query)
+            ):
                 result.fetchall.return_value = [("PLAN001",)]  # Only 1 exists
-            elif "产品线" in str(query) and "SELECT" in str(query) and "WHERE" in str(query):
+            elif (
+                "产品线" in str(query)
+                and "SELECT" in str(query)
+                and "WHERE" in str(query)
+            ):
                 result.fetchall.return_value = [("LINE001",)]  # Only 1 exists
             # Auto-derived ratio queries
             elif "COUNT" in str(query):
@@ -431,7 +439,12 @@ class TestHybridReferenceServiceIntegration:
         assert result.backfill_result.total_inserted >= 0  # Some records inserted
 
     def test_ensure_references_with_sync_service(
-        self, backfill_service, sync_service, sample_fk_configs, sample_fact_data, mock_conn
+        self,
+        backfill_service,
+        sync_service,
+        sample_fk_configs,
+        sample_fact_data,
+        mock_conn,
     ):
         """Test ensure_references with sync service available."""
         service = HybridReferenceService(
@@ -476,7 +489,11 @@ class TestHybridReferenceServiceIntegration:
         # Mock partial coverage and high auto_derived ratio
         def mock_execute(query, params=None):
             result = Mock()
-            if "SELECT" in str(query) and "WHERE" in str(query) and "COUNT" not in str(query):
+            if (
+                "SELECT" in str(query)
+                and "WHERE" in str(query)
+                and "COUNT" not in str(query)
+            ):
                 result.fetchall.return_value = [("PLAN001",)]
             elif "COUNT" in str(query) and "auto_derived" in str(query):
                 # Mock scalar() to return integer directly
@@ -523,12 +540,18 @@ class TestHybridReferenceServiceIdempotency:
 
         def mock_execute(query, params=None):
             result = Mock()
-            if "SELECT" in str(query) and "WHERE" in str(query) and "COUNT" not in str(query):
+            if (
+                "SELECT" in str(query)
+                and "WHERE" in str(query)
+                and "COUNT" not in str(query)
+            ):
                 call_count["coverage_check"] += 1
                 fk_values = (params or {}).get("fk_values", [])
                 if call_count["coverage_check"] <= 2:  # First call (2 tables)
                     # Partial coverage: only the first requested key exists
-                    result.fetchall.return_value = [(fk_values[0],)] if fk_values else []
+                    result.fetchall.return_value = (
+                        [(fk_values[0],)] if fk_values else []
+                    )
                 else:  # Second call
                     # Full coverage: return exactly what was requested
                     result.fetchall.return_value = [(v,) for v in fk_values]
@@ -582,10 +605,16 @@ class TestHybridReferenceServiceDegradation:
             query_str = str(query)
 
             # First table coverage check fails
-            if "年金计划" in query_str and "SELECT" in query_str and "WHERE" in query_str:
+            if (
+                "年金计划" in query_str
+                and "SELECT" in query_str
+                and "WHERE" in query_str
+            ):
                 raise Exception("Database connection lost")
             # Second table works
-            elif "产品线" in query_str and "SELECT" in query_str and "WHERE" in query_str:
+            elif (
+                "产品线" in query_str and "SELECT" in query_str and "WHERE" in query_str
+            ):
                 result.fetchall.return_value = [("LINE001",), ("LINE002",)]
             elif "COUNT" in query_str:
                 result.scalar.return_value = 5
@@ -627,7 +656,11 @@ class TestHybridReferenceServiceDegradation:
             result = Mock()
             query_str = str(query)
 
-            if "SELECT" in query_str and "WHERE" in query_str and "COUNT" not in query_str:
+            if (
+                "SELECT" in query_str
+                and "WHERE" in query_str
+                and "COUNT" not in query_str
+            ):
                 result.fetchall.return_value = []  # No existing records
             elif "COUNT" in query_str:
                 result.scalar.return_value = 0
@@ -662,9 +695,15 @@ class TestHybridReferenceServiceDegradation:
         # Mock database - everything works
         def mock_execute(query, params=None):
             result = Mock()
-            if "SELECT" in str(query) and "WHERE" in str(query) and "COUNT" not in str(query):
+            if (
+                "SELECT" in str(query)
+                and "WHERE" in str(query)
+                and "COUNT" not in str(query)
+            ):
                 result.fetchall.return_value = [
-                    ("PLAN001",), ("PLAN002",), ("PLAN003",)
+                    ("PLAN001",),
+                    ("PLAN002",),
+                    ("PLAN003",),
                 ]
             elif "COUNT" in str(query):
                 result.scalar.return_value = 10

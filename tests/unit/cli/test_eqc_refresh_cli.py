@@ -23,4 +23,3 @@ class TestEqcRefreshCliParsing:
         parser = build_parser()
         args = parser.parse_args(["--refresh-all"])
         assert args.refresh_all is True
-

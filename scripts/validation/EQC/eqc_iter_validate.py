@@ -20,17 +20,16 @@ import argparse
 import sys
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import List, Optional
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection
 
 from work_data_hub.config.settings import get_settings
 from work_data_hub.io.connectors.eqc_client import (
+    EQCAuthenticationError,
     EQCClient,
     EQCClientError,
-    EQCAuthenticationError,
     EQCNotFoundError,
 )
 from work_data_hub.utils.logging import get_logger
@@ -41,6 +40,7 @@ logger = get_logger(__name__)
 @dataclass
 class ValidationRecord:
     """Record from archive_base_info for validation."""
+
     company_id: str
     search_key_word: str
     company_full_name: Optional[str]
@@ -50,6 +50,7 @@ class ValidationRecord:
 @dataclass
 class ValidationResult:
     """Result of a single validation."""
+
     archive_company_id: str
     search_key_word: str
     archive_company_name: Optional[str]
@@ -76,29 +77,27 @@ class ValidationResult:
             return
 
         # Company ID match
-        self.company_id_match = (
-            self.api_company_id is not None and
-            str(self.archive_company_id) == str(self.api_company_id)
-        )
+        self.company_id_match = self.api_company_id is not None and str(
+            self.archive_company_id
+        ) == str(self.api_company_id)
 
         # Company name match (partial match)
         if self.api_company_name and self.archive_company_name:
             self.company_name_match = (
-                self.archive_company_name in self.api_company_name or
-                self.api_company_name in self.archive_company_name or
-                self.archive_company_name == self.api_company_name
+                self.archive_company_name in self.api_company_name
+                or self.api_company_name in self.archive_company_name
+                or self.archive_company_name == self.api_company_name
             )
 
         # Unite code match (exact)
         if self.api_unite_code and self.archive_unite_code:
-            self.unite_code_match = (
-                self.archive_unite_code == self.api_unite_code
-            )
+            self.unite_code_match = self.archive_unite_code == self.api_unite_code
 
 
 @dataclass
 class ValidationSummary:
     """Summary of batch validation."""
+
     total_records: int = 0
     successful_queries: int = 0
     failed_queries: int = 0
@@ -110,8 +109,7 @@ class ValidationSummary:
 
 
 def fetch_validation_records(
-    connection: Connection,
-    limit: Optional[int] = None
+    connection: Connection, limit: Optional[int] = None
 ) -> List[ValidationRecord]:
     """Fetch records from archive_base_info where for_check=true."""
 
@@ -128,12 +126,14 @@ def fetch_validation_records(
     records = []
 
     for row in result:
-        records.append(ValidationRecord(
-            company_id=row[0],
-            search_key_word=row[1],
-            company_full_name=row[2],
-            unite_code=row[3],
-        ))
+        records.append(
+            ValidationRecord(
+                company_id=row[0],
+                search_key_word=row[1],
+                company_full_name=row[2],
+                unite_code=row[3],
+            )
+        )
 
     return records
 
@@ -162,7 +162,7 @@ def validate_single_record(
             result.api_success = True
             result.api_company_id = top_result.company_id
             result.api_company_name = top_result.official_name
-            result.api_unite_code = getattr(top_result, 'unite_code', None)
+            result.api_unite_code = getattr(top_result, "unite_code", None)
 
             # Analyze matches
             result.analyze_match()
@@ -201,7 +201,9 @@ def print_result(result: ValidationResult, index: int):
         print(f"    API Top: company_id={result.api_company_id}")
         print(f"    API Top: name={result.api_company_name}")
         print(f"    API Top: unite_code={result.api_unite_code}")
-        print(f"    Match: ID={result.company_id_match}, Name={result.company_name_match}, Code={result.unite_code_match}")
+        print(
+            f"    Match: ID={result.company_id_match}, Name={result.company_name_match}, Code={result.unite_code_match}"
+        )
     elif result.error_message:
         print(f"    Error: {result.error_message}")
 
@@ -216,9 +218,15 @@ def print_summary(summary: ValidationSummary):
     print(f"Failed Queries:       {summary.failed_queries}")
     print(f"No Results:           {summary.no_results}")
     print()
-    print(f"Company ID Matches:   {summary.company_id_matches} / {summary.successful_queries}")
-    print(f"Company Name Matches: {summary.company_name_matches} / {summary.successful_queries}")
-    print(f"Unite Code Matches:   {summary.unite_code_matches} / {summary.successful_queries}")
+    print(
+        f"Company ID Matches:   {summary.company_id_matches} / {summary.successful_queries}"
+    )
+    print(
+        f"Company Name Matches: {summary.company_name_matches} / {summary.successful_queries}"
+    )
+    print(
+        f"Unite Code Matches:   {summary.unite_code_matches} / {summary.successful_queries}"
+    )
 
     if summary.errors:
         print("\nErrors:")
@@ -245,7 +253,8 @@ def save_results_to_db(
         return 0
 
     # Create results table if not exists
-    connection.execute(text("""
+    connection.execute(
+        text("""
         CREATE TABLE IF NOT EXISTS enterprise.validation_results (
             id SERIAL PRIMARY KEY,
             validated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -263,12 +272,14 @@ def save_results_to_db(
             unite_code_match BOOLEAN,
             error_message TEXT
         )
-    """))
+    """)
+    )
     connection.commit()
 
     saved = 0
     for r in results:
-        connection.execute(text("""
+        connection.execute(
+            text("""
             INSERT INTO enterprise.validation_results (
                 archive_company_id, search_key_word, archive_company_name, archive_unite_code,
                 api_success, api_company_id, api_company_name, api_unite_code, api_results_count,
@@ -278,21 +289,23 @@ def save_results_to_db(
                 :api_success, :api_company_id, :api_company_name, :api_unite_code, :api_results_count,
                 :company_id_match, :company_name_match, :unite_code_match, :error_message
             )
-        """), {
-            'archive_company_id': r.archive_company_id,
-            'search_key_word': r.search_key_word,
-            'archive_company_name': r.archive_company_name,
-            'archive_unite_code': r.archive_unite_code,
-            'api_success': r.api_success,
-            'api_company_id': r.api_company_id,
-            'api_company_name': r.api_company_name,
-            'api_unite_code': r.api_unite_code,
-            'api_results_count': r.api_results_count,
-            'company_id_match': r.company_id_match,
-            'company_name_match': r.company_name_match,
-            'unite_code_match': r.unite_code_match,
-            'error_message': r.error_message,
-        })
+        """),
+            {
+                "archive_company_id": r.archive_company_id,
+                "search_key_word": r.search_key_word,
+                "archive_company_name": r.archive_company_name,
+                "archive_unite_code": r.archive_unite_code,
+                "api_success": r.api_success,
+                "api_company_id": r.api_company_id,
+                "api_company_name": r.api_company_name,
+                "api_unite_code": r.api_unite_code,
+                "api_results_count": r.api_results_count,
+                "company_id_match": r.company_id_match,
+                "company_name_match": r.company_name_match,
+                "unite_code_match": r.unite_code_match,
+                "error_message": r.error_message,
+            },
+        )
         saved += 1
 
     connection.commit()
@@ -304,24 +317,19 @@ def main(argv=None) -> int:
         description="Batch EQC validation for archive_base_info records"
     )
     parser.add_argument(
-        "--limit", type=int, default=None,
-        help="Limit to first N records"
+        "--limit", type=int, default=None, help="Limit to first N records"
     )
     parser.add_argument(
-        "--batch-size", type=int, default=10,
-        help="Batch size for progress reporting"
+        "--batch-size", type=int, default=10, help="Batch size for progress reporting"
     )
     parser.add_argument(
-        "--delay", type=float, default=1.0,
-        help="Delay between API calls in seconds"
+        "--delay", type=float, default=1.0, help="Delay between API calls in seconds"
     )
     parser.add_argument(
-        "--dry-run", action="store_true",
-        help="Preview only, don't save results"
+        "--dry-run", action="store_true", help="Preview only, don't save results"
     )
     parser.add_argument(
-        "--save-results", action="store_true",
-        help="Save results to database table"
+        "--save-results", action="store_true", help="Save results to database table"
     )
 
     args = parser.parse_args(argv)
@@ -346,7 +354,9 @@ def main(argv=None) -> int:
     except EQCAuthenticationError as e:
         print(f"❌ EQC Authentication Error: {e}")
         print("\nPlease update your EQC token:")
-        print("  PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.io.auth --capture --save")
+        print(
+            "  PYTHONPATH=src uv run --env-file .wdh_env python -m work_data_hub.io.auth --capture --save"
+        )
         return 1
 
     # Run validation
@@ -394,7 +404,9 @@ def main(argv=None) -> int:
                     else:
                         summary.failed_queries += 1
                         if result.error_message:
-                            summary.errors.append(f"{record.search_key_word}: {result.error_message}")
+                            summary.errors.append(
+                                f"{record.search_key_word}: {result.error_message}"
+                            )
 
                     # Print result
                     print_result(result, idx)
@@ -428,7 +440,9 @@ def main(argv=None) -> int:
 
     except Exception as e:
         print(f"\n❌ Unexpected error: {e}")
-        logger.error("batch_validation.error", error=str(e), error_type=type(e).__name__)
+        logger.error(
+            "batch_validation.error", error=str(e), error_type=type(e).__name__
+        )
         return 1
 
 

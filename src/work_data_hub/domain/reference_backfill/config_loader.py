@@ -14,8 +14,8 @@ from pathlib import Path
 from typing import List, Optional
 
 import yaml
-from yaml import YAMLError
 from pydantic import ValidationError
+from yaml import YAMLError
 
 from .models import DomainForeignKeysConfig, ForeignKeyConfig
 
@@ -27,12 +27,15 @@ DEFAULT_FK_CONFIG_RELATIVE_PATH = Path("config") / "foreign_keys.yml"
 
 def _default_fk_config_path() -> Path:
     project_root = os.environ.get("WDH_PROJECT_ROOT")
-    return Path(project_root) / DEFAULT_FK_CONFIG_RELATIVE_PATH if project_root else DEFAULT_FK_CONFIG_RELATIVE_PATH
+    return (
+        Path(project_root) / DEFAULT_FK_CONFIG_RELATIVE_PATH
+        if project_root
+        else DEFAULT_FK_CONFIG_RELATIVE_PATH
+    )
 
 
 def load_foreign_keys_config(
-    config_path: Optional[Path] = None,
-    domain: str = "annuity_performance"
+    config_path: Optional[Path] = None, domain: str = "annuity_performance"
 ) -> List[ForeignKeyConfig]:
     """
     Load foreign key configurations from config/foreign_keys.yml for a specific domain.

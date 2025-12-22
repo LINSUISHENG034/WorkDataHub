@@ -5,7 +5,9 @@ Step 4: 检查清洗结果
 """
 
 from sqlalchemy import create_engine, text
+
 from work_data_hub.config.settings import get_settings
+
 
 def main():
     settings = get_settings()
@@ -16,7 +18,8 @@ def main():
         print("4.1 字段完整性检查")
         print("=" * 80)
 
-        result = conn.execute(text("""
+        result = conn.execute(
+            text("""
             SELECT
                 COUNT(*) AS total,
                 COUNT(company_name) AS has_company_name,
@@ -29,21 +32,35 @@ def main():
             WHERE company_id IN (
                 SELECT company_id FROM enterprise.archive_base_info WHERE for_check = true
             )
-        """)).fetchone()
+        """)
+        ).fetchone()
 
         print(f"Total records: {result[0]}")
-        print(f"  has_company_name:    {result[1]}/{result[0]} ({100*result[1]/result[0]:.0f}%)")
-        print(f"  has_registered_date: {result[2]}/{result[0]} ({100*result[2]/result[0]:.0f}%)")
-        print(f"  has_reg_capital:     {result[3]}/{result[0]} ({100*result[3]/result[0]:.0f}%)")
-        print(f"  has_legal_person:    {result[4]}/{result[0]} ({100*result[4]/result[0]:.0f}%)")
-        print(f"  has_credit_code:     {result[5]}/{result[0]} ({100*result[5]/result[0]:.0f}%)")
-        print(f"  has_industry:        {result[6]}/{result[0]} ({100*result[6]/result[0]:.0f}%)")
+        print(
+            f"  has_company_name:    {result[1]}/{result[0]} ({100 * result[1] / result[0]:.0f}%)"
+        )
+        print(
+            f"  has_registered_date: {result[2]}/{result[0]} ({100 * result[2] / result[0]:.0f}%)"
+        )
+        print(
+            f"  has_reg_capital:     {result[3]}/{result[0]} ({100 * result[3] / result[0]:.0f}%)"
+        )
+        print(
+            f"  has_legal_person:    {result[4]}/{result[0]} ({100 * result[4] / result[0]:.0f}%)"
+        )
+        print(
+            f"  has_credit_code:     {result[5]}/{result[0]} ({100 * result[5] / result[0]:.0f}%)"
+        )
+        print(
+            f"  has_industry:        {result[6]}/{result[0]} ({100 * result[6] / result[0]:.0f}%)"
+        )
 
         print("\n" + "=" * 80)
         print("4.2 数据类型验证")
         print("=" * 80)
 
-        rows = conn.execute(text("""
+        rows = conn.execute(
+            text("""
             SELECT
                 company_id,
                 company_name,
@@ -55,7 +72,8 @@ def main():
             WHERE company_id IN (
                 SELECT company_id FROM enterprise.archive_base_info WHERE for_check = true
             )
-        """)).fetchall()
+        """)
+        ).fetchall()
 
         for row in rows:
             print(f"\ncompany_id: {row[0]}")
@@ -67,7 +85,8 @@ def main():
         print("4.3 清洗状态分析")
         print("=" * 80)
 
-        rows = conn.execute(text("""
+        rows = conn.execute(
+            text("""
             SELECT
                 company_id,
                 company_name,
@@ -78,7 +97,8 @@ def main():
             WHERE company_id IN (
                 SELECT company_id FROM enterprise.archive_base_info WHERE for_check = true
             )
-        """)).fetchall()
+        """)
+        ).fetchall()
 
         for row in rows:
             print(f"\ncompany_id: {row[0]} ({row[1]})")
@@ -89,6 +109,7 @@ def main():
         print("\n" + "=" * 80)
         print("检查完成")
         print("=" * 80)
+
 
 if __name__ == "__main__":
     main()

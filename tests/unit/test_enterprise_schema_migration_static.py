@@ -41,7 +41,9 @@ def _extract_table_columns(text: str, table_name: str) -> list[str]:
 
 def test_migration_module_imports() -> None:
     assert MIGRATION_PATH.exists(), f"Missing migration file: {MIGRATION_PATH}"
-    spec = importlib.util.spec_from_file_location("enterprise_schema_migration", MIGRATION_PATH)
+    spec = importlib.util.spec_from_file_location(
+        "enterprise_schema_migration", MIGRATION_PATH
+    )
     assert spec and spec.loader, "Failed to build import spec for migration file"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -49,7 +51,9 @@ def test_migration_module_imports() -> None:
 
 def test_migration_uses_valid_sqlalchemy_types() -> None:
     text = MIGRATION_PATH.read_text(encoding="utf-8")
-    assert "sa.DoublePrecision" not in text, "Invalid SQLAlchemy type (sa.DoublePrecision) should not be used"
+    assert "sa.DoublePrecision" not in text, (
+        "Invalid SQLAlchemy type (sa.DoublePrecision) should not be used"
+    )
 
 
 def test_enterprise_schema_column_contract() -> None:
@@ -59,9 +63,15 @@ def test_enterprise_schema_column_contract() -> None:
     business_info_cols = _extract_table_columns(text, "business_info")
     biz_label_cols = _extract_table_columns(text, "biz_label")
 
-    assert len(base_info_cols) >= 40, f"base_info expected 37+ legacy columns + new fields, got {len(base_info_cols)}"
-    assert len(business_info_cols) == 43, f"business_info expected 43 columns, got {len(business_info_cols)}"
-    assert len(biz_label_cols) == 9, f"biz_label expected 9 columns, got {len(biz_label_cols)}"
+    assert len(base_info_cols) >= 40, (
+        f"base_info expected 37+ legacy columns + new fields, got {len(base_info_cols)}"
+    )
+    assert len(business_info_cols) == 43, (
+        f"business_info expected 43 columns, got {len(business_info_cols)}"
+    )
+    assert len(biz_label_cols) == 9, (
+        f"biz_label expected 9 columns, got {len(biz_label_cols)}"
+    )
 
     base_info_required = {
         "company_id",
@@ -77,12 +87,25 @@ def test_enterprise_schema_column_contract() -> None:
         f"base_info missing required columns: {base_info_required - set(base_info_cols)}"
     )
 
-    business_info_required = {"company_id", "registered_date", "registered_capital", "created_at", "updated_at"}
+    business_info_required = {
+        "company_id",
+        "registered_date",
+        "registered_capital",
+        "created_at",
+        "updated_at",
+    }
     assert business_info_required.issubset(set(business_info_cols)), (
         f"business_info missing required columns: {business_info_required - set(business_info_cols)}"
     )
 
-    biz_label_required = {"company_id", "type", "lv1_name", "lv2_name", "lv3_name", "lv4_name"}
+    biz_label_required = {
+        "company_id",
+        "type",
+        "lv1_name",
+        "lv2_name",
+        "lv3_name",
+        "lv4_name",
+    }
     assert biz_label_required.issubset(set(biz_label_cols)), (
         f"biz_label missing required columns: {biz_label_required - set(biz_label_cols)}"
     )

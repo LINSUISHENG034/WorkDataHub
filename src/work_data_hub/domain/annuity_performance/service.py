@@ -16,6 +16,7 @@ from work_data_hub.infrastructure.enrichment.mapping_repository import (
 )
 from work_data_hub.infrastructure.validation import export_error_csv
 
+from .constants import DEFAULT_REFRESH_KEYS, DEFAULT_UPSERT_KEYS
 from .helpers import (
     FileDiscoveryProtocol,
     convert_dataframe_to_models,
@@ -29,11 +30,12 @@ from .pipeline_builder import (
     build_bronze_to_silver_pipeline,
     load_plan_override_mapping,
 )
-from .constants import DEFAULT_REFRESH_KEYS, DEFAULT_UPSERT_KEYS
 
 if TYPE_CHECKING:
     from work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
-    from work_data_hub.infrastructure.enrichment.eqc_lookup_config import EqcLookupConfig
+    from work_data_hub.infrastructure.enrichment.eqc_lookup_config import (
+        EqcLookupConfig,
+    )
 
 logger = structlog.get_logger(__name__)
 
@@ -117,7 +119,9 @@ def process_annuity_performance(
     else:
         # REFRESH mode: DELETE + INSERT (for detail tables)
         actual_refresh_keys = (
-            list(refresh_keys) if refresh_keys is not None else list(DEFAULT_REFRESH_KEYS)
+            list(refresh_keys)
+            if refresh_keys is not None
+            else list(DEFAULT_REFRESH_KEYS)
         )
         load_result = warehouse_loader.load_with_refresh(
             dataframe,
@@ -166,7 +170,9 @@ def process_annuity_performance(
 def process_with_enrichment(
     rows: List[Dict[str, Any]],
     data_source: str = "unknown",
-    eqc_config: Optional["EqcLookupConfig"] = None,  # Story 6.2-P17: Accept EqcLookupConfig
+    eqc_config: Optional[
+        "EqcLookupConfig"
+    ] = None,  # Story 6.2-P17: Accept EqcLookupConfig
     enrichment_service: Optional["CompanyEnrichmentService"] = None,
     sync_lookup_budget: int = 0,
     export_unknown_names: bool = True,
@@ -206,7 +212,9 @@ def process_with_enrichment(
     if eqc_config is None:
         from work_data_hub.infrastructure.enrichment import EqcLookupConfig
 
-        logger.bind(domain="annuity_performance", step="process_with_enrichment").warning(
+        logger.bind(
+            domain="annuity_performance", step="process_with_enrichment"
+        ).warning(
             "eqc_config not provided; deriving from legacy sync_lookup_budget",
             legacy_sync_lookup_budget=sync_lookup_budget,
         )
@@ -217,7 +225,7 @@ def process_with_enrichment(
             export_unknown_names=export_unknown_names,
             auto_refresh_token=True,
         )
-        
+
     try:
         pipeline = build_bronze_to_silver_pipeline(
             eqc_config=eqc_config,  # Story 6.2-P17: Pass explicit config

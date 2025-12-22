@@ -87,7 +87,8 @@ def test_legacy_tables(connection: Connection) -> Generator[None, None, None]:
     connection.execute(text("DROP TABLE IF EXISTS legacy_test.eqc_search_result"))
 
     # Create test company_id_mapping table
-    connection.execute(text("""
+    connection.execute(
+        text("""
         CREATE TABLE IF NOT EXISTS legacy_test.company_id_mapping (
             id SERIAL PRIMARY KEY,
             company_name VARCHAR(255) NOT NULL,
@@ -95,10 +96,12 @@ def test_legacy_tables(connection: Connection) -> Generator[None, None, None]:
             unite_code VARCHAR(255),
             type VARCHAR(10)
         )
-    """))
+    """)
+    )
 
     # Create test eqc_search_result table
-    connection.execute(text("""
+    connection.execute(
+        text("""
         CREATE TABLE IF NOT EXISTS legacy_test.eqc_search_result (
             _id VARCHAR(255),
             key_word VARCHAR(255) NOT NULL PRIMARY KEY,
@@ -107,10 +110,12 @@ def test_legacy_tables(connection: Connection) -> Generator[None, None, None]:
             unite_code VARCHAR(255),
             result VARCHAR(255)
         )
-    """))
+    """)
+    )
 
     # Insert sample data into company_id_mapping
-    connection.execute(text("""
+    connection.execute(
+        text("""
         INSERT INTO legacy_test.company_id_mapping (company_name, company_id, type)
         VALUES
             ('中国平安保险集团', '614810477', 'current'),
@@ -120,10 +125,12 @@ def test_legacy_tables(connection: Connection) -> Generator[None, None, None]:
             ('  空格测试公司  ', '100000004', 'current'),
             ('', '100000005', 'current'),
             ('空公司ID', NULL, 'current')
-    """))
+    """)
+    )
 
     # Insert sample data into eqc_search_result
-    connection.execute(text("""
+    connection.execute(
+        text("""
         INSERT INTO legacy_test.eqc_search_result (key_word, company_id, result)
         VALUES
             ('平安集团', '614810477', 'Success'),
@@ -131,7 +138,8 @@ def test_legacy_tables(connection: Connection) -> Generator[None, None, None]:
             ('失败测试', NULL, 'Success'),
             ('错误结果', '100000006', 'Error'),
             ('', '100000007', 'Success')
-    """))
+    """)
+    )
 
     yield
 
@@ -191,7 +199,9 @@ class TestLegacyMigrationIntegration:
         assert report.total_read >= 2
         assert report.inserted >= 2
 
-    def test_normalization_consistency(self, connection: Connection, test_legacy_tables):
+    def test_normalization_consistency(
+        self, connection: Connection, test_legacy_tables
+    ):
         """Test that normalized keys match Layer 2 lookup queries."""
         repo = CompanyMappingRepository(connection)
 
@@ -208,13 +218,16 @@ class TestLegacyMigrationIntegration:
         expected_normalized = normalize_for_temp_id(original_name)
 
         # Query enrichment_index to verify
-        result = connection.execute(text("""
+        result = connection.execute(
+            text("""
             SELECT lookup_key, company_id, confidence
             FROM enterprise.enrichment_index
             WHERE lookup_key = :key
               AND lookup_type = 'customer_name'
               AND source = 'legacy_migration'
-        """), {"key": expected_normalized})
+        """),
+            {"key": expected_normalized},
+        )
 
         row = result.fetchone()
         if row:
@@ -238,18 +251,24 @@ class TestLegacyMigrationIntegration:
 
         # Query for 'current' type record
         current_key = normalize_for_temp_id("中国平安保险集团")
-        result_current = connection.execute(text("""
+        result_current = connection.execute(
+            text("""
             SELECT confidence FROM enterprise.enrichment_index
             WHERE lookup_key = :key AND source = 'legacy_migration'
-        """), {"key": current_key})
+        """),
+            {"key": current_key},
+        )
         row_current = result_current.fetchone()
 
         # Query for 'former' type record
         former_key = normalize_for_temp_id("中国太平洋保险")
-        result_former = connection.execute(text("""
+        result_former = connection.execute(
+            text("""
             SELECT confidence FROM enterprise.enrichment_index
             WHERE lookup_key = :key AND source = 'legacy_migration'
-        """), {"key": former_key})
+        """),
+            {"key": former_key},
+        )
         row_former = result_former.fetchone()
 
         if row_current and row_former:
@@ -263,10 +282,12 @@ class TestLegacyMigrationIntegration:
         repo = CompanyMappingRepository(connection)
 
         # Count existing records
-        before_count = connection.execute(text("""
+        before_count = connection.execute(
+            text("""
             SELECT COUNT(*) FROM enterprise.enrichment_index
             WHERE source = 'legacy_migration'
-        """)).scalar()
+        """)
+        ).scalar()
 
         config = LegacyMigrationConfig(
             batch_size=100,
@@ -277,10 +298,12 @@ class TestLegacyMigrationIntegration:
         report = migrate_company_id_mapping(connection, repo, config)
 
         # Count after dry run
-        after_count = connection.execute(text("""
+        after_count = connection.execute(
+            text("""
             SELECT COUNT(*) FROM enterprise.enrichment_index
             WHERE source = 'legacy_migration'
-        """)).scalar()
+        """)
+        ).scalar()
 
         # Should report records but not actually insert
         assert report.inserted > 0  # Reported as inserted
@@ -301,20 +324,24 @@ class TestLegacyMigrationIntegration:
         migrate_company_id_mapping(connection, repo, config)
 
         # Verify records exist
-        count_before = connection.execute(text("""
+        count_before = connection.execute(
+            text("""
             SELECT COUNT(*) FROM enterprise.enrichment_index
             WHERE source = 'legacy_migration'
-        """)).scalar()
+        """)
+        ).scalar()
         assert count_before > 0
 
         # Run rollback
         deleted = rollback_migration(connection, force=True)
 
         # Verify records deleted
-        count_after = connection.execute(text("""
+        count_after = connection.execute(
+            text("""
             SELECT COUNT(*) FROM enterprise.enrichment_index
             WHERE source = 'legacy_migration'
-        """)).scalar()
+        """)
+        ).scalar()
 
         assert deleted == count_before
         assert count_after == 0
@@ -326,12 +353,14 @@ class TestLegacyMigrationIntegration:
         repo = CompanyMappingRepository(connection)
 
         # Insert same company twice with different confidence
-        connection.execute(text("""
+        connection.execute(
+            text("""
             INSERT INTO legacy_test.company_id_mapping (company_name, company_id, type)
             VALUES
                 ('重复公司', '999999999', 'former'),
                 ('重复公司', '999999999', 'current')
-        """))
+        """)
+        )
 
         config = LegacyMigrationConfig(
             batch_size=100,
@@ -343,10 +372,13 @@ class TestLegacyMigrationIntegration:
 
         # Query the result - should have higher confidence (1.00 from 'current')
         dup_key = normalize_for_temp_id("重复公司")
-        result = connection.execute(text("""
+        result = connection.execute(
+            text("""
             SELECT confidence, hit_count FROM enterprise.enrichment_index
             WHERE lookup_key = :key AND source = 'legacy_migration'
-        """), {"key": dup_key})
+        """),
+            {"key": dup_key},
+        )
         row = result.fetchone()
 
         if row:

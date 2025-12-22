@@ -331,16 +331,20 @@ class TestObservabilityService:
         mock_conn = Mock()
 
         # Mock chunked data
-        chunk1 = pd.DataFrame({
-            "年金计划号": ["P001", "P002"],
-            "_source": ["auto_derived", "auto_derived"],
-            "_needs_review": [True, True],
-        })
-        chunk2 = pd.DataFrame({
-            "年金计划号": ["P003"],
-            "_source": ["auto_derived"],
-            "_needs_review": [True],
-        })
+        chunk1 = pd.DataFrame(
+            {
+                "年金计划号": ["P001", "P002"],
+                "_source": ["auto_derived", "auto_derived"],
+                "_needs_review": [True, True],
+            }
+        )
+        chunk2 = pd.DataFrame(
+            {
+                "年金计划号": ["P003"],
+                "_source": ["auto_derived"],
+                "_needs_review": [True],
+            }
+        )
 
         mock_read_sql.return_value = iter([chunk1, chunk2])
 
@@ -374,12 +378,14 @@ class TestObservabilityService:
         service = ObservabilityService()
         mock_conn = Mock()
 
-        chunk = pd.DataFrame({
-            "年金计划号": ["P001"],
-            "_source": ["auto_derived"],
-            "_needs_review": [True],
-            "_derived_from_domain": ["annuity_performance"],
-        })
+        chunk = pd.DataFrame(
+            {
+                "年金计划号": ["P001"],
+                "_source": ["auto_derived"],
+                "_needs_review": [True],
+                "_derived_from_domain": ["annuity_performance"],
+            }
+        )
 
         mock_read_sql.return_value = iter([chunk])
 
@@ -408,12 +414,14 @@ class TestObservabilityService:
         service = ObservabilityService()
         mock_conn = Mock()
 
-        chunk = pd.DataFrame({
-            "年金计划号": ["P001"],
-            "sensitive_field": ["secret"],
-            "_source": ["auto_derived"],
-            "_needs_review": [True],
-        })
+        chunk = pd.DataFrame(
+            {
+                "年金计划号": ["P001"],
+                "sensitive_field": ["secret"],
+                "_source": ["auto_derived"],
+                "_needs_review": [True],
+            }
+        )
 
         mock_read_sql.return_value = iter([chunk])
 

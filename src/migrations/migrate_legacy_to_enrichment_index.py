@@ -5,7 +5,6 @@ from __future__ import annotations
 # Tests import `migrations.migrate_legacy_to_enrichment_index` and may or may not
 # manipulate `sys.path` to include `scripts/`. Providing this module under `src/`
 # keeps imports deterministic when running with `PYTHONPATH=src`.
-
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Dict, Iterable, Iterator, List, Optional
@@ -83,7 +82,9 @@ def _estimate_conflicts(_connection: Any, _report: MigrationReport) -> int:
     return 0
 
 
-def _fetch_company_id_mapping(connection: Connection, table: str) -> Iterator[Dict[str, Any]]:
+def _fetch_company_id_mapping(
+    connection: Connection, table: str
+) -> Iterator[Dict[str, Any]]:
     result = connection.execute(
         text(
             f"""
@@ -96,7 +97,9 @@ def _fetch_company_id_mapping(connection: Connection, table: str) -> Iterator[Di
         yield dict(row)
 
 
-def _fetch_eqc_search_result(connection: Connection, table: str) -> Iterator[Dict[str, Any]]:
+def _fetch_eqc_search_result(
+    connection: Connection, table: str
+) -> Iterator[Dict[str, Any]]:
     result = connection.execute(
         text(
             f"""
@@ -109,7 +112,9 @@ def _fetch_eqc_search_result(connection: Connection, table: str) -> Iterator[Dic
         yield dict(row)
 
 
-def _iter_batches(items: Iterable[EnrichmentIndexRecord], batch_size: int) -> Iterator[List[EnrichmentIndexRecord]]:
+def _iter_batches(
+    items: Iterable[EnrichmentIndexRecord], batch_size: int
+) -> Iterator[List[EnrichmentIndexRecord]]:
     batch: List[EnrichmentIndexRecord] = []
     for item in items:
         batch.append(item)
@@ -120,7 +125,9 @@ def _iter_batches(items: Iterable[EnrichmentIndexRecord], batch_size: int) -> It
         yield batch
 
 
-def migrate_company_id_mapping(connection: Any, repo: Any, config: LegacyMigrationConfig) -> MigrationReport:
+def migrate_company_id_mapping(
+    connection: Any, repo: Any, config: LegacyMigrationConfig
+) -> MigrationReport:
     report = MigrationReport(source_table=config.company_id_mapping_table)
 
     def to_record(row: Dict[str, Any]) -> Optional[EnrichmentIndexRecord]:
@@ -156,7 +163,9 @@ def migrate_company_id_mapping(connection: Any, repo: Any, config: LegacyMigrati
         if rec is None:
             continue
         if len(report.sample_records) < 10:
-            report.sample_records.append({"lookup_key": rec.lookup_key, "company_id": rec.company_id})
+            report.sample_records.append(
+                {"lookup_key": rec.lookup_key, "company_id": rec.company_id}
+            )
         records.append(rec)
 
     if config.dry_run:
@@ -173,7 +182,9 @@ def migrate_company_id_mapping(connection: Any, repo: Any, config: LegacyMigrati
     return report
 
 
-def migrate_eqc_search_result(connection: Any, repo: Any, config: LegacyMigrationConfig) -> MigrationReport:
+def migrate_eqc_search_result(
+    connection: Any, repo: Any, config: LegacyMigrationConfig
+) -> MigrationReport:
     report = MigrationReport(source_table=config.eqc_search_result_table)
 
     def to_record(row: Dict[str, Any]) -> Optional[EnrichmentIndexRecord]:
@@ -202,7 +213,9 @@ def migrate_eqc_search_result(connection: Any, repo: Any, config: LegacyMigratio
         if rec is None:
             continue
         if len(report.sample_records) < 10:
-            report.sample_records.append({"lookup_key": rec.lookup_key, "company_id": rec.company_id})
+            report.sample_records.append(
+                {"lookup_key": rec.lookup_key, "company_id": rec.company_id}
+            )
         records.append(rec)
 
     if config.dry_run:
@@ -221,9 +234,12 @@ def migrate_eqc_search_result(connection: Any, repo: Any, config: LegacyMigratio
 
 def rollback_migration(connection: Connection, *, force: bool = False) -> int:
     if not force:
-        raise ValueError("rollback_migration requires force=True in non-interactive mode")
+        raise ValueError(
+            "rollback_migration requires force=True in non-interactive mode"
+        )
     result = connection.execute(
-        text("DELETE FROM enterprise.enrichment_index WHERE source = 'legacy_migration'")
+        text(
+            "DELETE FROM enterprise.enrichment_index WHERE source = 'legacy_migration'"
+        )
     )
     return int(getattr(result, "rowcount", 0) or 0)
-

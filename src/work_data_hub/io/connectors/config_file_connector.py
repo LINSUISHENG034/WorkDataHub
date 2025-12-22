@@ -13,8 +13,8 @@ import pandas as pd
 import yaml
 
 from work_data_hub.domain.reference_backfill.sync_models import (
-    ReferenceSyncTableConfig,
     ConfigFileSourceConfig,
+    ReferenceSyncTableConfig,
 )
 
 logger = logging.getLogger(__name__)
@@ -83,23 +83,19 @@ class ConfigFileConnector:
 
         # Load YAML file
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 config_data = yaml.safe_load(f)
         except yaml.YAMLError as e:
             error_msg = f"Invalid YAML in config file: {e}"
-            self.logger.error(
-                f"YAML parse error in {file_path}: {str(e)}"
-            )
+            self.logger.error(f"YAML parse error in {file_path}: {str(e)}")
             raise ValueError(error_msg)
         except Exception as e:
             error_msg = f"Failed to load config file: {e}"
-            self.logger.error(
-                f"Failed to load config file {file_path}: {str(e)}"
-            )
+            self.logger.error(f"Failed to load config file {file_path}: {str(e)}")
             raise
 
         # Validate schema version
-        file_schema_version = config_data.get('schema_version')
+        file_schema_version = config_data.get("schema_version")
         if file_schema_version != source_config.schema_version:
             error_msg = (
                 f"Schema version mismatch: expected {source_config.schema_version}, "
@@ -114,11 +110,9 @@ class ConfigFileConnector:
             return pd.DataFrame()
 
         # Extract data
-        data = config_data.get('data', [])
+        data = config_data.get("data", [])
         if not data:
-            self.logger.warning(
-                f"No data found in config file {file_path}"
-            )
+            self.logger.warning(f"No data found in config file {file_path}")
             return pd.DataFrame()
 
         # Convert to DataFrame

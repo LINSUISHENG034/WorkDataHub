@@ -21,6 +21,11 @@ All public symbols are preserved for backward compatibility.
 """
 
 # Re-export all public symbols from resolver package for backward compatibility
+from work_data_hub.infrastructure.cleansing import normalize_company_name
+
+# Re-export normalize functions for test compatibility
+# Tests monkeypatch these via the facade module path (Story 7.3 AC-4)
+from .normalizer import normalize_for_temp_id
 from .resolver import CompanyIdResolver
 
 # Export constants that may be used externally
@@ -34,11 +39,6 @@ from .resolver.core import (
 # Tests mock company_id_resolver._stdlib_logger (Story 7.3 AC-4)
 from .resolver.db_strategy import _stdlib_logger
 
-# Re-export normalize functions for test compatibility
-# Tests monkeypatch these via the facade module path (Story 7.3 AC-4)
-from .normalizer import normalize_for_temp_id
-from work_data_hub.infrastructure.cleansing import normalize_company_name
-
 __all__ = [
     "CompanyIdResolver",
     "DEFAULT_SALT",
@@ -48,4 +48,3 @@ __all__ = [
     "normalize_for_temp_id",
     "normalize_company_name",
 ]
-

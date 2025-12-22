@@ -121,7 +121,6 @@ GoldAnnuitySchema = pa.DataFrameSchema(
 # See: src/work_data_hub/infrastructure/models/shared.py
 
 
-
 def validate_bronze_dataframe(
     dataframe: pd.DataFrame, failure_threshold: float = 0.10
 ) -> Tuple[pd.DataFrame, BronzeValidationSummary]:

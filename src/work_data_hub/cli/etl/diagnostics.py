@@ -72,7 +72,9 @@ def _check_database_connection() -> int:
                 conn.close()
 
         print("✅ Connected!")
-        print(f"\n📋 PostgreSQL: {version.split(',')[0] if ',' in version else version}")
+        print(
+            f"\n📋 PostgreSQL: {version.split(',')[0] if ',' in version else version}"
+        )
         print("=" * 50)
         print("✅ Database connection successful")
         return 0

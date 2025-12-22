@@ -50,7 +50,9 @@ class BusinessInfoCleanser:
         # registered_capital: "80000.00万元" → float
         # Uses rule chain: remove_currency_symbols → clean_comma_separated_number → convert_chinese_amount_units
         raw_capital = data.get("registerCaptial") or data.get("registered_capital")
-        capital, capital_status = self._cleanse_numeric_field("registerCaptial", raw_capital)
+        capital, capital_status = self._cleanse_numeric_field(
+            "registerCaptial", raw_capital
+        )
         status["registered_capital"] = capital_status
 
         # registered_date: "2015-01-15" or "2015年01月15日" → date
@@ -60,74 +62,103 @@ class BusinessInfoCleanser:
 
         # start_date: Business period start
         raw_start_date = data.get("start_date") or raw.get("startDate")
-        start_date, start_date_status = self._cleanse_date_field("registered_date", raw_start_date)
+        start_date, start_date_status = self._cleanse_date_field(
+            "registered_date", raw_start_date
+        )
         status["start_date"] = start_date_status
 
         # end_date: Business period end
         raw_end_date = data.get("end_date") or raw.get("endDate")
-        end_date, end_date_status = self._cleanse_date_field("registered_date", raw_end_date)
+        end_date, end_date_status = self._cleanse_date_field(
+            "registered_date", raw_end_date
+        )
         status["end_date"] = end_date_status
 
         # actual_capital: Paid-in capital
         raw_actual = data.get("actualCapi") or raw.get("actual_capital")
-        actual_capital, actual_status = self._cleanse_numeric_field("registerCaptial", raw_actual)
+        actual_capital, actual_status = self._cleanse_numeric_field(
+            "registerCaptial", raw_actual
+        )
         status["actual_capital"] = actual_status
 
         # colleagues_num: Employee count
         raw_colleagues = data.get("collegues_num") or raw.get("colleagues_num")
-        
+
         # Handle explicit "not disclosed" as null input
         if raw_colleagues == "企业选择不公示":
             raw_colleagues = None
 
         colleagues_num = self._parse_int(raw_colleagues)
-        status["colleagues_num"] = "cleansed" if colleagues_num is not None else (
-            "null_input" if raw_colleagues is None else "parse_failed"
+        status["colleagues_num"] = (
+            "cleansed"
+            if colleagues_num is not None
+            else ("null_input" if raw_colleagues is None else "parse_failed")
         )
 
         # update_time: EQC data update time
         raw_update_time = data.get("updateTime") or raw.get("update_time")
-        update_time, update_time_status = self._cleanse_date_field("registered_date", raw_update_time)
+        update_time, update_time_status = self._cleanse_date_field(
+            "registered_date", raw_update_time
+        )
         status["update_time"] = update_time_status
 
         # String fields with simple trim_whitespace
         registered_status = self._cleanse_string_field(data.get("registered_status"))
-        legal_person_name = self._cleanse_string_field(data.get("legal_person_name") or data.get("le_rep"))
+        legal_person_name = self._cleanse_string_field(
+            data.get("legal_person_name") or data.get("le_rep")
+        )
         address = self._cleanse_string_field(data.get("address"))
         codename = self._cleanse_string_field(data.get("codename"))
         company_name = self._cleanse_string_field(data.get("company_name"))
         company_en_name = self._cleanse_string_field(data.get("company_en_name"))
         currency = self._cleanse_string_field(data.get("currency"))
-        credit_code = self._cleanse_string_field(data.get("credit_code") or data.get("unite_code"))
+        credit_code = self._cleanse_string_field(
+            data.get("credit_code") or data.get("unite_code")
+        )
         register_code = self._cleanse_string_field(data.get("register_code"))
         organization_code = self._cleanse_string_field(data.get("organization_code"))
         company_type = self._cleanse_string_field(data.get("company_type"))
         industry_name = self._cleanse_string_field(data.get("industry_name"))
-        registration_organ_name = self._cleanse_string_field(data.get("registration_organ_name"))
+        registration_organ_name = self._cleanse_string_field(
+            data.get("registration_organ_name")
+        )
         start_end = self._cleanse_string_field(data.get("start_end"))
         business_scope = self._cleanse_string_field(data.get("business_scope"))
         telephone = self._cleanse_string_field(data.get("telephone"))
         email_address = self._cleanse_string_field(data.get("email_address"))
         website = self._cleanse_string_field(data.get("website"))
-        company_former_name = self._cleanse_string_field(data.get("company_former_name") or raw.get("company_former_name"))
+        company_former_name = self._cleanse_string_field(
+            data.get("company_former_name") or raw.get("company_former_name")
+        )
         control_id = self._cleanse_string_field(data.get("control_id"))
         control_name = self._cleanse_string_field(data.get("control_name"))
         bene_id = self._cleanse_string_field(data.get("bene_id"))
         bene_name = self._cleanse_string_field(data.get("bene_name"))
-        province = self._cleanse_string_field(data.get("province") or raw.get("province"))
+        province = self._cleanse_string_field(
+            data.get("province") or raw.get("province")
+        )
         department = self._cleanse_string_field(data.get("department"))
 
         # snake_case converted from camelCase
-        legal_person_id = self._cleanse_string_field(data.get("legalPersonId") or data.get("legal_person_id"))
-        logo_url = self._cleanse_string_field(data.get("logoUrl") or data.get("logo_url"))
-        type_code = self._cleanse_string_field(data.get("typeCode") or data.get("type_code"))
+        legal_person_id = self._cleanse_string_field(
+            data.get("legalPersonId") or data.get("legal_person_id")
+        )
+        logo_url = self._cleanse_string_field(
+            data.get("logoUrl") or data.get("logo_url")
+        )
+        type_code = self._cleanse_string_field(
+            data.get("typeCode") or data.get("type_code")
+        )
         registered_capital_currency = self._cleanse_string_field(
-            data.get("registeredCapitalCurrency") or data.get("registered_capital_currency")
+            data.get("registeredCapitalCurrency")
+            or data.get("registered_capital_currency")
         )
         full_register_type_desc = self._cleanse_string_field(
             data.get("fullRegisterTypeDesc") or data.get("full_register_type_desc")
         )
-        industry_code = self._cleanse_string_field(data.get("industryCode") or data.get("industry_code"))
+        industry_code = self._cleanse_string_field(
+            data.get("industryCode") or data.get("industry_code")
+        )
 
         return BusinessInfoRecord(
             company_id=company_id,
@@ -172,7 +203,9 @@ class BusinessInfoCleanser:
             cleansing_status=status,
         )
 
-    def _cleanse_numeric_field(self, field: str, value: Any) -> Tuple[Optional[float], str]:
+    def _cleanse_numeric_field(
+        self, field: str, value: Any
+    ) -> Tuple[Optional[float], str]:
         """
         Apply domain rules for numeric field and return (result, status).
 
@@ -203,7 +236,9 @@ class BusinessInfoCleanser:
             )
             return None, f"error:{type(e).__name__}"
 
-    def _cleanse_date_field(self, field: str, value: Any) -> Tuple[Optional[datetime], str]:
+    def _cleanse_date_field(
+        self, field: str, value: Any
+    ) -> Tuple[Optional[datetime], str]:
         """
         Apply domain rules for date field and return (result, status).
 

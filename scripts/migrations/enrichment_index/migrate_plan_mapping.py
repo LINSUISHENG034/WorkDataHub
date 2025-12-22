@@ -19,9 +19,7 @@ Usage:
 import argparse
 import sys
 import time
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Dict, Generator, List, Optional
+from typing import Dict, Generator, List
 
 import structlog
 from sqlalchemy import create_engine, text
@@ -124,6 +122,7 @@ def migrate_plan_mapping(
     # 连接到Legacy PostgreSQL数据库
     try:
         import os
+
         # Prefer explicit legacy DB URI; fall back to target DB (single-DB mode).
         legacy_db_url = (
             os.environ.get("LEGACY_DATABASE__URI")
@@ -139,6 +138,7 @@ def migrate_plan_mapping(
             legacy_db_url = legacy_db_url.replace("postgres://", "postgresql://", 1)
 
         from sqlalchemy import create_engine
+
         legacy_engine = create_engine(legacy_db_url)
 
         with legacy_engine.connect() as legacy_conn:
@@ -328,6 +328,7 @@ def main() -> int:
 
     # 配置日志
     import logging
+
     log_level = logging.INFO
     structlog.configure(
         wrapper_class=structlog.make_filtering_bound_logger(log_level),
@@ -346,22 +347,26 @@ def main() -> int:
             print(f"唯一计划代码数: {results['plan_code_unique']:,}")
             print(f"空company_id记录数: {results['plan_code_null_company_id']:,}")
 
-            if results['sample_records']:
+            if results["sample_records"]:
                 print("\n样本记录:")
-                for i, rec in enumerate(results['sample_records'], 1):
-                    print(f"  {i}. {rec['lookup_key']} -> {rec['company_id']} "
-                          f"(置信度: {rec['confidence']}, 命中次数: {rec['hit_count']})")
+                for i, rec in enumerate(results["sample_records"], 1):
+                    print(
+                        f"  {i}. {rec['lookup_key']} -> {rec['company_id']} "
+                        f"(置信度: {rec['confidence']}, 命中次数: {rec['hit_count']})"
+                    )
 
             # 检查数据完整性
-            if results['plan_code_total'] == results['plan_code_unique']:
+            if results["plan_code_total"] == results["plan_code_unique"]:
                 print("\n✅ 没有重复的计划代码")
             else:
                 print("\n❌ 存在重复的计划代码")
 
-            if results['plan_code_null_company_id'] == 0:
+            if results["plan_code_null_company_id"] == 0:
                 print("✅ 所有记录都有company_id")
             else:
-                print(f"❌ 有 {results['plan_code_null_company_id']} 条记录缺少company_id")
+                print(
+                    f"❌ 有 {results['plan_code_null_company_id']} 条记录缺少company_id"
+                )
 
             return 0
 
@@ -384,7 +389,7 @@ def main() -> int:
         print(f"错误数: {stats['errors']:,}")
         print(f"耗时: {duration:.2f}秒")
 
-        if stats['errors'] > 0:
+        if stats["errors"] > 0:
             return 1
 
         if not args.dry_run:

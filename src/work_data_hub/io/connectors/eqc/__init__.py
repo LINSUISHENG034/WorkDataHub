@@ -4,10 +4,10 @@ EQC Connector package.
 
 from .core import EQCClient
 from .models import (
-    EQCClientError,
     EQCAuthenticationError,
-    EQCRateLimitError,
+    EQCClientError,
     EQCNotFoundError,
+    EQCRateLimitError,
 )
 
 __all__ = [

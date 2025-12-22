@@ -1,6 +1,6 @@
 """Core SQL utilities package."""
 
-from .identifier import quote_identifier, qualify_table
+from .identifier import qualify_table, quote_identifier
 from .parameters import build_indexed_params, remap_records
 
 __all__ = [

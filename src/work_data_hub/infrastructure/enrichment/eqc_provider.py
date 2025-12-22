@@ -26,13 +26,13 @@ from typing import TYPE_CHECKING, Optional, Protocol
 import requests
 
 from work_data_hub.config.settings import get_settings
+from work_data_hub.infrastructure.enrichment.normalizer import normalize_for_temp_id
 from work_data_hub.io.connectors.eqc_client import (
     EQCAuthenticationError,
     EQCClient,
     EQCClientError,
     EQCNotFoundError,
 )
-from work_data_hub.infrastructure.enrichment.normalizer import normalize_for_temp_id
 from work_data_hub.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -59,9 +59,7 @@ class EqcTokenInvalidError(Exception):
         self.message = message
         self.help_command = "uv run python -m work_data_hub.io.auth --capture --save"
         super().__init__(
-            f"{message}\n\n"
-            f"请运行以下命令更新 Token:\n"
-            f"  {self.help_command}"
+            f"{message}\n\n请运行以下命令更新 Token:\n  {self.help_command}"
         )
 
 
@@ -224,7 +222,9 @@ class EqcProvider:
 
         self.token = token or getattr(settings, "eqc_token", "")
         self.base_url = base_url or settings.eqc_base_url
-        self.budget = budget if budget is not None else settings.company_sync_lookup_limit
+        self.budget = (
+            budget if budget is not None else settings.company_sync_lookup_limit
+        )
         self.remaining_budget = self.budget
         self.mapping_repository = mapping_repository
         self._disabled = False
@@ -319,7 +319,9 @@ class EqcProvider:
 
         return result
 
-    def _call_api_with_retry(self, company_name: str) -> tuple[Optional[CompanyInfo], Optional[dict]]:
+    def _call_api_with_retry(
+        self, company_name: str
+    ) -> tuple[Optional[CompanyInfo], Optional[dict]]:
         """
         Call EQC API with retry logic for network timeouts.
 
@@ -355,7 +357,9 @@ class EqcProvider:
             )
             return None, None
 
-    def _call_api(self, company_name: str) -> tuple[Optional[CompanyInfo], Optional[dict]]:
+    def _call_api(
+        self, company_name: str
+    ) -> tuple[Optional[CompanyInfo], Optional[dict]]:
         """
         Make API calls to EQC search, findDepart, and findLabels endpoints.
 
@@ -392,7 +396,9 @@ class EqcProvider:
 
         # Error isolation: Try to get business info, but continue if it fails
         try:
-            _, self._raw_business_info = self.client.get_business_info_with_raw(company_id)
+            _, self._raw_business_info = self.client.get_business_info_with_raw(
+                company_id
+            )
             logger.debug(
                 "eqc_provider.business_info_acquired",
                 company_id=company_id,
@@ -451,7 +457,9 @@ class EqcProvider:
         """
         try:
             from work_data_hub.infrastructure.enrichment.types import (
-                EnrichmentIndexRecord, LookupType, SourceType
+                EnrichmentIndexRecord,
+                LookupType,
+                SourceType,
             )
 
             # Normalize using the same method as Layer 2 lookup for consistency
@@ -464,7 +472,7 @@ class EqcProvider:
                 company_id=result.company_id,
                 confidence=result.confidence,
                 source=SourceType.EQC_API,
-                source_domain="eqc_sync_lookup"
+                source_domain="eqc_sync_lookup",
             )
 
             self.mapping_repository.insert_enrichment_index_batch([record])

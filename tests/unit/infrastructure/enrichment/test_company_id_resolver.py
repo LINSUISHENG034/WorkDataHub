@@ -179,10 +179,12 @@ class TestExistingColumnPassthrough:
             yaml_overrides=overrides,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["FP0001"],
-            "客户名称": ["公司A"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["FP0001"],
+                "客户名称": ["公司A"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
         assert result.data.loc[0, "company_id"] == "614810477"
@@ -301,7 +303,9 @@ class TestEnrichmentServiceIntegration:
     def test_enrichment_service_caches_results_once(self, default_strategy):
         """EQC hits batch cache writes to a single DB call."""
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import MatchResult
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            MatchResult,
+        )
 
         mock_service = MagicMock()
         mock_result = MagicMock()
@@ -320,7 +324,13 @@ class TestEnrichmentServiceIntegration:
                 sync_budget=3,
                 auto_create_provider=False,
             ),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             enrichment_service=mock_service,
             mapping_repository=mock_repo,
         )
@@ -347,7 +357,9 @@ class TestEnrichmentServiceIntegration:
     ):
         """Test enrichment service is not called when disabled."""
         resolver = CompanyIdResolver(
-            eqc_config=EqcLookupConfig.disabled(),enrichment_service=mock_enrichment_service)
+            eqc_config=EqcLookupConfig.disabled(),
+            enrichment_service=mock_enrichment_service,
+        )
         # default_strategy has use_enrichment_service=False
 
         df = pd.DataFrame(
@@ -639,12 +651,15 @@ class TestYamlMultiTierLookup:
             "account_name": {},
         }
         resolver = CompanyIdResolver(
-            eqc_config=EqcLookupConfig.disabled(),yaml_overrides=yaml_overrides)
+            eqc_config=EqcLookupConfig.disabled(), yaml_overrides=yaml_overrides
+        )
 
-        df = pd.DataFrame({
-            "计划代码": ["FP0001"],
-            "客户名称": ["公司A"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["FP0001"],
+                "客户名称": ["公司A"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
         assert result.data.loc[0, "company_id"] == "614810477"
@@ -660,14 +675,17 @@ class TestYamlMultiTierLookup:
             "account_name": {"账户D": "account_name_company"},
         }
         resolver = CompanyIdResolver(
-            eqc_config=EqcLookupConfig.disabled(),yaml_overrides=yaml_overrides)
+            eqc_config=EqcLookupConfig.disabled(), yaml_overrides=yaml_overrides
+        )
 
-        df = pd.DataFrame({
-            "计划代码": ["FP0001", "FP0002", "UNKNOWN", "UNKNOWN", "UNKNOWN"],
-            "客户名称": ["公司A", "公司B", "公司C", "公司D", "公司E"],
-            "年金账户号": ["X", "X", "X", "X", "ACC001"],
-            "年金账户名": ["X", "X", "X", "账户D", "X"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["FP0001", "FP0002", "UNKNOWN", "UNKNOWN", "UNKNOWN"],
+                "客户名称": ["公司A", "公司B", "公司C", "公司D", "公司E"],
+                "年金账户号": ["X", "X", "X", "X", "ACC001"],
+                "年金账户名": ["X", "X", "X", "账户D", "X"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
         stats = result.statistics
@@ -697,12 +715,15 @@ class TestYamlMultiTierLookup:
             "account_name": {},
         }
         resolver = CompanyIdResolver(
-            eqc_config=EqcLookupConfig.disabled(),yaml_overrides=yaml_overrides)
+            eqc_config=EqcLookupConfig.disabled(), yaml_overrides=yaml_overrides
+        )
 
-        df = pd.DataFrame({
-            "计划代码": ["FP0001"],
-            "客户名称": ["公司A"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["FP0001"],
+                "客户名称": ["公司A"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
         # Plan (priority 1) should win over name (priority 4)
@@ -717,7 +738,9 @@ class TestDatabaseCacheLookup:
     def test_db_cache_lookup_batch(self, default_strategy):
         """Test database batch lookup works with mocked repository."""
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import MatchResult
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            MatchResult,
+        )
 
         mock_repo = MagicMock()
         mock_repo.lookup_batch.return_value = {
@@ -731,14 +754,22 @@ class TestDatabaseCacheLookup:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司B"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司B"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
         assert result.data.loc[0, "company_id"] == "db_company_123"
@@ -750,14 +781,22 @@ class TestDatabaseCacheLookup:
         """Test graceful skip when no repository provided."""
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=None,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司A"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司A"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
         # Should fall through to temp ID
@@ -771,7 +810,9 @@ class TestBackflowMechanism:
     def test_backflow_inserts_new_mappings(self, default_strategy):
         """Test new mappings are inserted via backflow."""
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import InsertBatchResult
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            InsertBatchResult,
+        )
 
         mock_repo = MagicMock()
         mock_repo.lookup_batch.return_value = {}
@@ -783,16 +824,24 @@ class TestBackflowMechanism:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司A"],
-            "年金账户名": ["账户A"],
-            "公司代码": ["existing_123"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司A"],
+                "年金账户名": ["账户A"],
+                "公司代码": ["existing_123"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
         assert result.data.loc[0, "company_id"] == "existing_123"
@@ -802,7 +851,9 @@ class TestBackflowMechanism:
     def test_backflow_skips_temp_ids(self, default_strategy):
         """Test temporary IDs are not backflowed."""
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import InsertBatchResult
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            InsertBatchResult,
+        )
 
         mock_repo = MagicMock()
         mock_repo.lookup_batch.return_value = {}
@@ -814,15 +865,23 @@ class TestBackflowMechanism:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司A"],
-            "公司代码": ["IN_TEMPID12345678"],  # Temp ID should be skipped
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司A"],
+                "公司代码": ["IN_TEMPID12345678"],  # Temp ID should be skipped
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
         # Temp ID in existing column should be used but not backflowed
@@ -833,32 +892,44 @@ class TestBackflowMechanism:
     def test_backflow_detects_conflicts(self, default_strategy):
         """Test conflicts are logged as warnings."""
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import InsertBatchResult
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            InsertBatchResult,
+        )
 
         mock_repo = MagicMock()
         mock_repo.lookup_batch.return_value = {}
         mock_repo.insert_batch_with_conflict_check.return_value = InsertBatchResult(
             inserted_count=0,
             skipped_count=1,
-            conflicts=[{
-                "alias_name": "公司A",
-                "match_type": "name",
-                "existing_id": "old_123",
-                "new_id": "new_456",
-            }],
+            conflicts=[
+                {
+                    "alias_name": "公司A",
+                    "match_type": "name",
+                    "existing_id": "old_123",
+                    "new_id": "new_456",
+                }
+            ],
         )
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司A"],
-            "公司代码": ["new_456"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司A"],
+                "公司代码": ["new_456"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
         assert result.statistics.backflow_stats.get("conflicts", 0) == 1
@@ -877,12 +948,15 @@ class TestStatisticsExtended:
             "account_name": {},
         }
         resolver = CompanyIdResolver(
-            eqc_config=EqcLookupConfig.disabled(),yaml_overrides=yaml_overrides)
+            eqc_config=EqcLookupConfig.disabled(), yaml_overrides=yaml_overrides
+        )
 
-        df = pd.DataFrame({
-            "计划代码": ["FP0001", "UNKNOWN"],
-            "客户名称": ["公司A", "公司B"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["FP0001", "UNKNOWN"],
+                "客户名称": ["公司A", "公司B"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
         stats = result.statistics
@@ -907,7 +981,13 @@ class TestStatisticsExtended:
                 sync_budget=5,
                 auto_create_provider=False,
             ),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             enrichment_service=mock_service,
         )
 
@@ -916,10 +996,12 @@ class TestStatisticsExtended:
             sync_lookup_budget=5,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"] * 3,
-            "客户名称": ["公司A", "公司B", "公司C"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"] * 3,
+                "客户名称": ["公司A", "公司B", "公司C"],
+            }
+        )
 
         result = resolver.resolve_batch(df, strategy)
         stats = result.statistics
@@ -945,13 +1027,16 @@ class TestPerformanceExtended:
             "account_name": {},
         }
         resolver = CompanyIdResolver(
-            eqc_config=EqcLookupConfig.disabled(),yaml_overrides=yaml_overrides)
+            eqc_config=EqcLookupConfig.disabled(), yaml_overrides=yaml_overrides
+        )
 
         plan_codes = [f"FP{random.randint(0, 200):04d}" for _ in range(1000)]
-        df = pd.DataFrame({
-            "计划代码": plan_codes,
-            "客户名称": [f"公司{i}" for i in range(1000)],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": plan_codes,
+                "客户名称": [f"公司{i}" for i in range(1000)],
+            }
+        )
 
         start_time = time.time()
         resolver.resolve_batch(df, default_strategy)
@@ -983,14 +1068,22 @@ class TestAsyncQueueIntegration:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN", "UNKNOWN"],
-            "客户名称": ["公司A", "公司B"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN", "UNKNOWN"],
+                "客户名称": ["公司A", "公司B"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
 
@@ -1009,16 +1102,24 @@ class TestAsyncQueueIntegration:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
         strategy = ResolutionStrategy(enable_async_queue=False)
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司A"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司A"],
+            }
+        )
 
         result = resolver.resolve_batch(df, strategy)
 
@@ -1037,14 +1138,22 @@ class TestAsyncQueueIntegration:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司A"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司A"],
+            }
+        )
 
         # Should not raise, should continue with temp ID
         result = resolver.resolve_batch(df, default_strategy)
@@ -1068,15 +1177,23 @@ class TestAsyncQueueIntegration:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
         # Two rows with same normalized name (whitespace variant)
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN", "UNKNOWN"],
-            "客户名称": ["公司A", "公司A "],  # Second has trailing space
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN", "UNKNOWN"],
+                "客户名称": ["公司A", "公司A "],  # Second has trailing space
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
 
@@ -1084,7 +1201,9 @@ class TestAsyncQueueIntegration:
         call_args = mock_repo.enqueue_for_enrichment.call_args[0][0]
         # Only 1 unique normalized name should be enqueued
         assert len(call_args) == 1
-        assert call_args[0]["normalized_name"] == "公司a"  # lowercase after normalization
+        assert (
+            call_args[0]["normalized_name"] == "公司a"
+        )  # lowercase after normalization
 
     def test_statistics_async_queued_in_to_dict(self, default_strategy):
         """Test async_queued is included in statistics to_dict (AC5)."""
@@ -1101,14 +1220,22 @@ class TestAsyncQueueIntegration:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"] * 3,
-            "客户名称": ["公司A", "公司B", "公司C"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"] * 3,
+                "客户名称": ["公司A", "公司B", "公司C"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
         stats_dict = result.statistics.to_dict()
@@ -1120,14 +1247,22 @@ class TestAsyncQueueIntegration:
         """Test no enqueue when repository not provided."""
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=None,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司A"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司A"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
 
@@ -1155,10 +1290,12 @@ class TestAsyncQueueIntegration:
             mapping_repository=mock_repo,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["FP0001"],
-            "客户名称": ["公司A"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["FP0001"],
+                "客户名称": ["公司A"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
 
@@ -1182,14 +1319,22 @@ class TestAsyncQueueIntegration:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司A"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司A"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
 
@@ -1229,14 +1374,22 @@ class TestEnrichmentIndexDbCache:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["PLAN001"],
-            "客户名称": [" Customer_A  "],  # Will normalize to customer_a
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["PLAN001"],
+                "客户名称": [" Customer_A  "],  # Will normalize to customer_a
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
 
@@ -1261,17 +1414,27 @@ class TestEnrichmentIndexDbCache:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["PLAN001"],
-            "客户名称": [" Customer_A  "],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["PLAN001"],
+                "客户名称": [" Customer_A  "],
+            }
+        )
 
         # Patch stdlib logger to avoid flaky cross-test logging configuration.
-        from work_data_hub.infrastructure.enrichment import company_id_resolver as resolver_module
+        from work_data_hub.infrastructure.enrichment import (
+            company_id_resolver as resolver_module,
+        )
         from unittest.mock import patch
 
         with patch.object(resolver_module._stdlib_logger, "debug") as mock_debug:
@@ -1290,7 +1453,9 @@ class TestEnrichmentIndexDbCache:
         mock_repo = MagicMock()
         mock_repo.lookup_enrichment_index_batch.return_value = {}
         # Legacy path result
-        from work_data_hub.infrastructure.enrichment.mapping_repository import MatchResult
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            MatchResult,
+        )
 
         mock_repo.lookup_batch.return_value = {
             "legacy_key": MatchResult(
@@ -1303,14 +1468,22 @@ class TestEnrichmentIndexDbCache:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
-        df = pd.DataFrame({
-            "计划代码": [None],
-            "客户名称": ["legacy_key"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": [None],
+                "客户名称": ["legacy_key"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
 
@@ -1333,14 +1506,22 @@ class TestEnrichmentIndexDbCache:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["PLAN001", "PLAN001"],  # Same key hit twice
-            "客户名称": ["Customer A", "Customer B"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["PLAN001", "PLAN001"],  # Same key hit twice
+                "客户名称": ["Customer A", "Customer B"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
 
@@ -1364,17 +1545,27 @@ class TestEnrichmentIndexDbCache:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["PLAN001"],
-            "客户名称": [" Customer_A  "],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["PLAN001"],
+                "客户名称": [" Customer_A  "],
+            }
+        )
 
         # Patch stdlib logger to avoid flaky cross-test logging configuration.
-        from work_data_hub.infrastructure.enrichment import company_id_resolver as resolver_module
+        from work_data_hub.infrastructure.enrichment import (
+            company_id_resolver as resolver_module,
+        )
         from unittest.mock import patch
 
         with patch.object(resolver_module._stdlib_logger, "info") as mock_info:
@@ -1392,7 +1583,9 @@ class TestP4NormalizationDbCacheLookup:
     def test_db_cache_lookup_normalizes_p4_customer_name(self, default_strategy):
         """P4 (customer_name) should be normalized before DB lookup (AC1)."""
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import MatchResult
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            MatchResult,
+        )
 
         mock_repo = MagicMock()
         # DB has normalized key "公司A" (without brackets/status markers)
@@ -1407,16 +1600,24 @@ class TestP4NormalizationDbCacheLookup:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
         # Input has raw value with bracket content that normalizes to "公司A"
         # normalize_company_name removes leading/trailing bracket content
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["（核心）公司A"],  # Should normalize to "公司A"
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["（核心）公司A"],  # Should normalize to "公司A"
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
 
@@ -1428,7 +1629,9 @@ class TestP4NormalizationDbCacheLookup:
     def test_db_cache_lookup_raw_for_p1_plan_code(self, default_strategy):
         """P1 (plan_code) should use RAW values for DB lookup (AC3)."""
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import MatchResult
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            MatchResult,
+        )
 
         mock_repo = MagicMock()
         # DB has raw key "PLAN001" (exact match required)
@@ -1443,14 +1646,22 @@ class TestP4NormalizationDbCacheLookup:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["PLAN001"],
-            "客户名称": ["公司A"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["PLAN001"],
+                "客户名称": ["公司A"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
 
@@ -1462,7 +1673,9 @@ class TestP4NormalizationDbCacheLookup:
     def test_db_cache_lookup_raw_for_p2_account_number(self, default_strategy):
         """P2 (account_number) should use RAW values for DB lookup (AC3)."""
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import MatchResult
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            MatchResult,
+        )
 
         mock_repo = MagicMock()
         mock_repo.lookup_batch.return_value = {
@@ -1476,15 +1689,23 @@ class TestP4NormalizationDbCacheLookup:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司A"],
-            "年金账户号": ["ACC001"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司A"],
+                "年金账户号": ["ACC001"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
 
@@ -1495,7 +1716,9 @@ class TestP4NormalizationDbCacheLookup:
     def test_db_cache_lookup_raw_for_p5_account_name(self, default_strategy):
         """P5 (account_name) should use RAW values for DB lookup (AC3)."""
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import MatchResult
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            MatchResult,
+        )
 
         mock_repo = MagicMock()
         mock_repo.lookup_batch.return_value = {
@@ -1509,15 +1732,23 @@ class TestP4NormalizationDbCacheLookup:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司A"],
-            "年金账户名": ["账户名A"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司A"],
+                "年金账户名": ["账户名A"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
 
@@ -1532,7 +1763,9 @@ class TestP4NormalizationBackflow:
     def test_backflow_normalizes_p4_customer_name(self, default_strategy):
         """P4 backflow should write normalized value to DB (AC2)."""
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import InsertBatchResult
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            InsertBatchResult,
+        )
 
         mock_repo = MagicMock()
         mock_repo.lookup_batch.return_value = {}
@@ -1544,17 +1777,25 @@ class TestP4NormalizationBackflow:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
         # Input has raw customer_name with bracket content
         # normalize_company_name removes leading/trailing bracket content
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司B（非核心）"],  # Should normalize to "公司B"
-            "公司代码": ["existing_456"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司B（非核心）"],  # Should normalize to "公司B"
+                "公司代码": ["existing_456"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
 
@@ -1571,7 +1812,9 @@ class TestP4NormalizationBackflow:
     def test_backflow_raw_for_p2_account_number(self, default_strategy):
         """P2 backflow should write RAW value to DB (AC3)."""
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import InsertBatchResult
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            InsertBatchResult,
+        )
 
         mock_repo = MagicMock()
         mock_repo.lookup_batch.return_value = {}
@@ -1583,16 +1826,24 @@ class TestP4NormalizationBackflow:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司A"],
-            "年金账户号": ["ACC001"],
-            "公司代码": ["existing_789"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司A"],
+                "年金账户号": ["ACC001"],
+                "公司代码": ["existing_789"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
 
@@ -1608,7 +1859,9 @@ class TestP4NormalizationBackflow:
     def test_backflow_raw_for_p5_account_name(self, default_strategy):
         """P5 backflow should write RAW value to DB (AC3)."""
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import InsertBatchResult
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            InsertBatchResult,
+        )
 
         mock_repo = MagicMock()
         mock_repo.lookup_batch.return_value = {}
@@ -1620,16 +1873,24 @@ class TestP4NormalizationBackflow:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司A"],
-            "年金账户名": ["账户名B"],
-            "公司代码": ["existing_999"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司A"],
+                "年金账户名": ["账户名B"],
+                "公司代码": ["existing_999"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
 
@@ -1637,7 +1898,9 @@ class TestP4NormalizationBackflow:
         call_args = mock_repo.insert_batch_with_conflict_check.call_args[0][0]
 
         # Find the account_name mapping entry
-        account_name_entries = [e for e in call_args if e["match_type"] == "account_name"]
+        account_name_entries = [
+            e for e in call_args if e["match_type"] == "account_name"
+        ]
         assert len(account_name_entries) == 1
         # Should be raw (exact value)
         assert account_name_entries[0]["alias_name"] == "账户名B"
@@ -1645,7 +1908,9 @@ class TestP4NormalizationBackflow:
     def test_backflow_skips_empty_normalized_p4(self, default_strategy):
         """If P4 normalization returns empty string, skip backflow (AC2)."""
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import InsertBatchResult
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            InsertBatchResult,
+        )
 
         mock_repo = MagicMock()
         mock_repo.lookup_batch.return_value = {}
@@ -1657,16 +1922,24 @@ class TestP4NormalizationBackflow:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
         # Customer name that might normalize to empty (edge case)
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["   "],  # Whitespace only - normalizes to empty
-            "公司代码": ["existing_111"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["   "],  # Whitespace only - normalizes to empty
+                "公司代码": ["existing_111"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
 
@@ -1684,7 +1957,9 @@ class TestP4NormalizationEdgeCases:
     def test_p4_normalization_special_characters(self, default_strategy):
         """Test P4 normalization handles special characters correctly."""
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import MatchResult
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            MatchResult,
+        )
 
         mock_repo = MagicMock()
         # DB has normalized key without decorative characters
@@ -1699,15 +1974,23 @@ class TestP4NormalizationEdgeCases:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
         # Input has decorative characters that should be removed
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["「公司C」"],  # Decorative brackets should be removed
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["「公司C」"],  # Decorative brackets should be removed
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
 
@@ -1718,7 +2001,9 @@ class TestP4NormalizationEdgeCases:
     def test_p4_normalization_full_width_conversion(self, default_strategy):
         """Test P4 normalization converts full-width ASCII to half-width."""
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import MatchResult
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            MatchResult,
+        )
 
         mock_repo = MagicMock()
         # DB has half-width version
@@ -1733,15 +2018,23 @@ class TestP4NormalizationEdgeCases:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
         # Input has full-width ASCII
-        df = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["ＡＢＣ公司"],  # Full-width ABC
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["ＡＢＣ公司"],  # Full-width ABC
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
 
@@ -1761,12 +2054,15 @@ class TestP4NormalizationEdgeCases:
             "account_name": {},
         }
         resolver = CompanyIdResolver(
-            eqc_config=EqcLookupConfig.disabled(),yaml_overrides=yaml_overrides)
+            eqc_config=EqcLookupConfig.disabled(), yaml_overrides=yaml_overrides
+        )
 
-        df = pd.DataFrame({
-            "计划代码": ["FP0001"],  # Exact raw match required
-            "客户名称": ["公司A"],
-        })
+        df = pd.DataFrame(
+            {
+                "计划代码": ["FP0001"],  # Exact raw match required
+                "客户名称": ["公司A"],
+            }
+        )
 
         result = resolver.resolve_batch(df, default_strategy)
 
@@ -1798,16 +2094,24 @@ class TestP4NormalizationIntegration:
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=mock_repo,
         )
 
         # First batch: has existing company_id, triggers backflow
-        df1 = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["公司D（核心）"],  # Will normalize to "公司D"
-            "公司代码": ["real_company_789"],
-        })
+        df1 = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["公司D（核心）"],  # Will normalize to "公司D"
+                "公司代码": ["real_company_789"],
+            }
+        )
 
         result1 = resolver.resolve_batch(df1, default_strategy)
         assert result1.data.loc[0, "company_id"] == "real_company_789"
@@ -1830,10 +2134,12 @@ class TestP4NormalizationIntegration:
         }
 
         # Second batch: different raw value that normalizes to same key
-        df2 = pd.DataFrame({
-            "计划代码": ["UNKNOWN"],
-            "客户名称": ["（非核心）公司D"],  # Also normalizes to "公司D"
-        })
+        df2 = pd.DataFrame(
+            {
+                "计划代码": ["UNKNOWN"],
+                "客户名称": ["（非核心）公司D"],  # Also normalizes to "公司D"
+            }
+        )
 
         result2 = resolver.resolve_batch(df2, default_strategy)
 

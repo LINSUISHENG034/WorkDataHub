@@ -168,10 +168,7 @@ domains:
 
     def test_loads_with_defaults_merged(self, sample_config_with_defaults):
         """AC: Domain config should have defaults merged in."""
-        config = get_domain_config_v2(
-            "test_domain",
-            str(sample_config_with_defaults)
-        )
+        config = get_domain_config_v2("test_domain", str(sample_config_with_defaults))
 
         # From defaults
         assert config.version_strategy == "highest_number"
@@ -191,8 +188,7 @@ domains:
     def test_minimal_domain_inherits_all_defaults(self, sample_config_with_defaults):
         """AC: Minimal domain should inherit all defaults."""
         config = get_domain_config_v2(
-            "minimal_domain",
-            str(sample_config_with_defaults)
+            "minimal_domain", str(sample_config_with_defaults)
         )
 
         # All from defaults
@@ -207,18 +203,12 @@ domains:
     def test_missing_domain_raises_error(self, sample_config_with_defaults):
         """AC: Unknown domain should raise clear error."""
         with pytest.raises(DataSourcesValidationError, match="not found"):
-            get_domain_config_v2(
-                "nonexistent_domain",
-                str(sample_config_with_defaults)
-            )
+            get_domain_config_v2("nonexistent_domain", str(sample_config_with_defaults))
 
     def test_missing_file_raises_error(self):
         """AC: Missing config file should raise clear error."""
         with pytest.raises(DataSourcesValidationError, match="not found"):
-            get_domain_config_v2(
-                "any_domain",
-                "/nonexistent/path/config.yml"
-            )
+            get_domain_config_v2("any_domain", "/nonexistent/path/config.yml")
 
     @pytest.fixture
     def config_without_defaults(self, tmp_path: Path) -> Path:
@@ -246,10 +236,7 @@ domains:
 
     def test_works_without_defaults_section(self, config_without_defaults):
         """AC: Should work when defaults section is missing (backward compat)."""
-        config = get_domain_config_v2(
-            "legacy_domain",
-            str(config_without_defaults)
-        )
+        config = get_domain_config_v2("legacy_domain", str(config_without_defaults))
 
         assert config.base_path == "legacy/path"
         assert config.version_strategy == "highest_number"

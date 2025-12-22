@@ -18,6 +18,9 @@ Clean Architecture boundaries.
 
 from __future__ import annotations
 
+# Trigger domain registration by importing definitions package
+from . import definitions  # noqa: F401
+
 # Re-export core types
 from .core import ColumnDef, ColumnType, DomainSchema, IndexDef
 
@@ -32,9 +35,6 @@ from .registry import (
     list_domains,
     register_domain,
 )
-
-# Trigger domain registration by importing definitions package
-from . import definitions  # noqa: F401
 
 __all__ = [
     "ColumnType",

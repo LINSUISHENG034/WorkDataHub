@@ -17,8 +17,8 @@ from pymysql.cursors import DictCursor
 
 from work_data_hub.config.settings import get_settings
 from work_data_hub.domain.reference_backfill.sync_models import (
-    ReferenceSyncTableConfig,
     LegacyMySQLSourceConfig,
+    ReferenceSyncTableConfig,
 )
 
 logger = logging.getLogger(__name__)
@@ -95,7 +95,7 @@ class LegacyMySQLConnector:
                     user=self.settings.legacy_mysql_user,
                     password=self.settings.legacy_mysql_password,
                     database=self.settings.legacy_mysql_database,
-                    charset='utf8mb4',
+                    charset="utf8mb4",
                     cursorclass=DictCursor,
                     connect_timeout=self.connect_timeout,
                     read_timeout=self.read_timeout,
@@ -117,7 +117,7 @@ class LegacyMySQLConnector:
 
                 if attempt < self.max_retries:
                     # Exponential backoff: 2s, 4s, 8s
-                    backoff_time = self.retry_backoff_base ** attempt
+                    backoff_time = self.retry_backoff_base**attempt
                     self.logger.info(
                         f"Retrying Legacy MySQL connection after {backoff_time}s backoff"
                     )
@@ -141,9 +141,7 @@ class LegacyMySQLConnector:
             f"Failed to connect to Legacy MySQL after {self.max_retries} attempts. "
             f"Last error: {last_error}"
         )
-        self.logger.error(
-            f"Legacy MySQL connection failed final: {str(last_error)}"
-        )
+        self.logger.error(f"Legacy MySQL connection failed final: {str(last_error)}")
         raise pymysql.Error(error_msg)
 
     def fetch_data(
@@ -284,7 +282,9 @@ class LegacyMySQLConnector:
                         df = pd.DataFrame(rows)
                     else:
                         # Empty result - create DataFrame with expected columns
-                        df = pd.DataFrame(columns=[m.source for m in source_config.columns])
+                        df = pd.DataFrame(
+                            columns=[m.source for m in source_config.columns]
+                        )
 
                     self.logger.info(
                         f"Query success on attempt {attempt} for table {source_config.table}: {len(df)} rows"
@@ -301,10 +301,8 @@ class LegacyMySQLConnector:
 
                 if attempt < self.max_retries:
                     # Exponential backoff
-                    backoff_time = self.retry_backoff_base ** attempt
-                    self.logger.info(
-                        f"Retrying query after {backoff_time}s backoff"
-                    )
+                    backoff_time = self.retry_backoff_base**attempt
+                    self.logger.info(f"Retrying query after {backoff_time}s backoff")
                     time.sleep(backoff_time)
 
         # All retries exhausted
@@ -351,8 +349,7 @@ class LegacyMySQLConnector:
 
         # Build rename mapping
         rename_map = {
-            mapping.source: mapping.target
-            for mapping in source_config.columns
+            mapping.source: mapping.target for mapping in source_config.columns
         }
 
         # Rename columns

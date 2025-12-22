@@ -433,7 +433,9 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:
             if not args.raise_on_error:
                 for event in result.all_node_events:
                     if event.is_failure:
-                        print(f"   Error in {event.node_name}: {event.event_specific_data}")
+                        print(
+                            f"   Error in {event.node_name}: {event.event_specific_data}"
+                        )
 
         return 0 if result.success else 1
 

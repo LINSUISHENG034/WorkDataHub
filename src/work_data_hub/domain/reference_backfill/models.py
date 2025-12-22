@@ -10,7 +10,7 @@ from datetime import date
 from enum import Enum
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class AggregationType(str, Enum):
@@ -22,6 +22,7 @@ class AggregationType(str, Enum):
     - MAX_BY: Select value from row with maximum order_column value
     - CONCAT_DISTINCT: Concatenate distinct values with separator
     """
+
     FIRST = "first"
     MAX_BY = "max_by"
     CONCAT_DISTINCT = "concat_distinct"
@@ -45,23 +46,20 @@ class AggregationConfig(BaseModel):
           sort: true
     """
 
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
 
     type: AggregationType = Field(
-        ...,
-        description="Aggregation strategy: first, max_by, or concat_distinct"
+        ..., description="Aggregation strategy: first, max_by, or concat_distinct"
     )
     order_column: Optional[str] = Field(
-        default=None,
-        description="Column to order by for max_by aggregation"
+        default=None, description="Column to order by for max_by aggregation"
     )
     separator: str = Field(
-        default="+",
-        description="Separator for concat_distinct aggregation"
+        default="+", description="Separator for concat_distinct aggregation"
     )
     sort: bool = Field(
         default=True,
-        description="Whether to sort values before concatenating (concat_distinct)"
+        description="Whether to sort values before concatenating (concat_distinct)",
     )
 
     @model_validator(mode="after")
@@ -114,6 +112,7 @@ class PortfolioCandidate(BaseModel):
 
 # Generic Backfill Framework Configuration Models
 
+
 class BackfillColumnMapping(BaseModel):
     """
     Configuration for mapping columns from fact data to reference table columns.
@@ -124,17 +123,19 @@ class BackfillColumnMapping(BaseModel):
     Story 6.2-P15: Added optional aggregation field for complex mapping strategies.
     """
 
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
 
     source: str = Field(..., description="Fact data column name to extract from")
     target: str = Field(..., description="Reference table column name to fill")
-    optional: bool = Field(default=False, description="Whether missing source data should be skipped")
+    optional: bool = Field(
+        default=False, description="Whether missing source data should be skipped"
+    )
     aggregation: Optional[AggregationConfig] = Field(
         default=None,
-        description="Aggregation strategy for this column (default: 'first' non-null value)"
+        description="Aggregation strategy for this column (default: 'first' non-null value)",
     )
 
-    @field_validator('source', 'target')
+    @field_validator("source", "target")
     @classmethod
     def validate_column_names(cls, v):
         """Validate column names are non-empty strings."""
@@ -151,33 +152,39 @@ class ForeignKeyConfig(BaseModel):
     including column mappings, dependencies, and processing mode.
     """
 
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
 
-    name: str = Field(..., description="Unique identifier for this foreign key configuration")
-    source_column: str = Field(..., description="Column in fact data containing the foreign key values")
+    name: str = Field(
+        ..., description="Unique identifier for this foreign key configuration"
+    )
+    source_column: str = Field(
+        ..., description="Column in fact data containing the foreign key values"
+    )
     target_table: str = Field(..., description="Reference table name to backfill")
     target_schema: str = Field(
         default="public",
         description="Target schema containing the reference table",
     )
-    target_key: str = Field(..., description="Primary key column in target reference table")
+    target_key: str = Field(
+        ..., description="Primary key column in target reference table"
+    )
     backfill_columns: List[BackfillColumnMapping] = Field(
         ..., description="Column mappings from fact data to reference table"
     )
     mode: Literal["insert_missing", "fill_null_only"] = Field(
         default="insert_missing",
-        description="Processing mode: insert_missing adds new records, fill_null_only updates nulls"
+        description="Processing mode: insert_missing adds new records, fill_null_only updates nulls",
     )
     depends_on: List[str] = Field(
         default_factory=list,
-        description="List of foreign key names that must be processed before this one"
+        description="List of foreign key names that must be processed before this one",
     )
     skip_blank_values: bool = Field(
         default=False,
         description="Skip blank-like FK values (e.g., empty strings, '(空白)') during candidate derivation",
     )
 
-    @field_validator('name')
+    @field_validator("name")
     @classmethod
     def validate_name(cls, v):
         """Validate FK name is a non-empty string."""
@@ -185,12 +192,14 @@ class ForeignKeyConfig(BaseModel):
             raise ValueError("Foreign key name must be a non-empty string")
         return v.strip()
 
-    @field_validator('source_column', 'target_table', 'target_key')
+    @field_validator("source_column", "target_table", "target_key")
     @classmethod
     def validate_identifiers(cls, v):
         """Validate table/column identifiers are non-empty strings."""
         if not isinstance(v, str) or not v.strip():
-            raise ValueError("Source column, target table, and target key must be non-empty strings")
+            raise ValueError(
+                "Source column, target table, and target key must be non-empty strings"
+            )
         return v.strip()
 
     @field_validator("target_schema")
@@ -201,7 +210,7 @@ class ForeignKeyConfig(BaseModel):
             raise ValueError("Target schema must be a non-empty string")
         return v.strip()
 
-    @field_validator('backfill_columns')
+    @field_validator("backfill_columns")
     @classmethod
     def validate_backfill_columns(cls, v):
         """Validate at least one backfill column is provided."""
@@ -218,14 +227,14 @@ class DomainForeignKeysConfig(BaseModel):
     for a specific domain's backfill operations.
     """
 
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
 
     foreign_keys: List[ForeignKeyConfig] = Field(
         default_factory=list,
-        description="List of foreign key configurations for this domain"
+        description="List of foreign key configurations for this domain",
     )
 
-    @field_validator('foreign_keys')
+    @field_validator("foreign_keys")
     @classmethod
     def validate_foreign_keys(cls, v):
         """Validate foreign key names are unique within the domain."""

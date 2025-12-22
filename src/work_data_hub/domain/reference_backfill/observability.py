@@ -16,9 +16,9 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import structlog
+import yaml
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
-import yaml
 
 from .hybrid_service import HybridResult
 
@@ -85,7 +85,9 @@ class ObservabilityService:
             reference_tables: List of reference tables to monitor (default: from config)
             config_path: Path to data_sources.yml config file
         """
-        self.schema = schema or os.environ.get("WDH_REFERENCE_SCHEMA", self.DEFAULT_SCHEMA)
+        self.schema = schema or os.environ.get(
+            "WDH_REFERENCE_SCHEMA", self.DEFAULT_SCHEMA
+        )
         self.alert_config = alert_config or AlertConfig()
         self.logger = structlog.get_logger(__name__)
 
@@ -95,7 +97,9 @@ class ObservabilityService:
         else:
             self.reference_tables = reference_tables
 
-    def _load_reference_tables_from_config(self, config_path: Optional[str]) -> List[str]:
+    def _load_reference_tables_from_config(
+        self, config_path: Optional[str]
+    ) -> List[str]:
         """
         Load reference tables from config files.
 
@@ -117,42 +121,42 @@ class ObservabilityService:
         fk_config_path = Path(project_root) / "config" / "foreign_keys.yml"
         if fk_config_path.exists():
             try:
-                with open(fk_config_path, 'r', encoding='utf-8') as f:
+                with open(fk_config_path, "r", encoding="utf-8") as f:
                     fk_config = yaml.safe_load(f) or {}
 
                 # Story 6.2-P14: New structure is domains.<name>.foreign_keys
-                if 'domains' in fk_config:
-                    for domain_config in fk_config['domains'].values():
-                        if 'foreign_keys' in domain_config:
-                            for fk in domain_config['foreign_keys']:
-                                target = fk.get('target_table')
+                if "domains" in fk_config:
+                    for domain_config in fk_config["domains"].values():
+                        if "foreign_keys" in domain_config:
+                            for fk in domain_config["foreign_keys"]:
+                                target = fk.get("target_table")
                                 if target:
                                     tables.add(target)
             except Exception as e:
                 self.logger.warning(
                     "observability.fk_config_load_failed",
                     config_path=str(fk_config_path),
-                    error=str(e)
+                    error=str(e),
                 )
 
         # Load from reference_sync.yml
         sync_config_path = Path(project_root) / "config" / "reference_sync.yml"
         if sync_config_path.exists():
             try:
-                with open(sync_config_path, 'r', encoding='utf-8') as f:
+                with open(sync_config_path, "r", encoding="utf-8") as f:
                     sync_config = yaml.safe_load(f) or {}
 
                 # Story 6.2-P14: New structure has tables at root level
-                if 'tables' in sync_config:
-                    for table_config in sync_config['tables']:
-                        target = table_config.get('target_table')
+                if "tables" in sync_config:
+                    for table_config in sync_config["tables"]:
+                        target = table_config.get("target_table")
                         if target:
                             tables.add(target)
             except Exception as e:
                 self.logger.warning(
                     "observability.sync_config_load_failed",
                     config_path=str(sync_config_path),
-                    error=str(e)
+                    error=str(e),
                 )
 
         if not tables:
@@ -165,7 +169,7 @@ class ObservabilityService:
             "observability.loaded_tables_from_config",
             fk_config=str(fk_config_path),
             sync_config=str(sync_config_path),
-            tables=resolved
+            tables=resolved,
         )
         return resolved
 
@@ -198,7 +202,9 @@ class ObservabilityService:
             filters.append('"_derived_from_domain" = :domain')
             params["domain"] = domain_filter
         if source_filter:
-            filters.append('"__source_filter__" IN (placeholder)')  # placeholder to be replaced
+            filters.append(
+                '"__source_filter__" IN (placeholder)'
+            )  # placeholder to be replaced
         if start_date:
             filters.append('"_derived_at" >= :start_date')
             params["start_date"] = start_date
@@ -212,7 +218,9 @@ class ObservabilityService:
             if source_filter:
                 filters = [
                     f for f in filters if not f.startswith('"__source_filter__"')
-                ] + [f'"_source" IN ({", ".join([f":source_{i}" for i in range(len(source_filter))])})']
+                ] + [
+                    f'"_source" IN ({", ".join([f":source_{i}" for i in range(len(source_filter))])})'
+                ]
                 for i, src in enumerate(source_filter):
                     params[f"source_{i}"] = src
             where_clause = "WHERE " + " AND ".join(filters)
@@ -241,7 +249,9 @@ class ObservabilityService:
             FROM "{self.schema}"."{table}"
             WHERE "_derived_from_domain" IS NOT NULL
         """)
-        domains_result = conn.execute(domains_query, params if domain_filter else {}).fetchall()
+        domains_result = conn.execute(
+            domains_query, params if domain_filter else {}
+        ).fetchall()
         domains = [row[0] for row in domains_result]
 
         return ReferenceDataMetrics(
@@ -312,8 +322,7 @@ class ObservabilityService:
         for m in metrics:
             # Check auto_derived ratio
             threshold = self.alert_config.per_table_thresholds.get(
-                m.table,
-                self.alert_config.auto_derived_ratio_threshold
+                m.table, self.alert_config.auto_derived_ratio_threshold
             )
             if m.auto_derived_ratio > threshold:
                 alert = AlertResult(
@@ -372,7 +381,10 @@ class ObservabilityService:
         alerts = []
 
         # Check global auto_derived ratio
-        if hybrid_result.auto_derived_ratio > self.alert_config.auto_derived_ratio_threshold:
+        if (
+            hybrid_result.auto_derived_ratio
+            > self.alert_config.auto_derived_ratio_threshold
+        ):
             alert = AlertResult(
                 table="<global>",
                 alert_type="auto_derived_ratio",
@@ -452,7 +464,7 @@ class ObservabilityService:
         query = text(f"""
             SELECT *
             FROM "{self.schema}"."{table}"
-            WHERE {' AND '.join(where_clauses)}
+            WHERE {" AND ".join(where_clauses)}
             ORDER BY "_derived_at" DESC
         """)
 
@@ -460,7 +472,9 @@ class ObservabilityService:
         if output_path is None:
             output_dir = Path("exports")
             output_dir.mkdir(exist_ok=True)
-            output_path = str(output_dir / f"pending_review_{table}_{date.today().isoformat()}.csv")
+            output_path = str(
+                output_dir / f"pending_review_{table}_{date.today().isoformat()}.csv"
+            )
 
         # Use chunksize for memory efficiency (10K rows per chunk)
         chunks = pd.read_sql(query, conn, params=params, chunksize=10000)
@@ -472,7 +486,7 @@ class ObservabilityService:
             if sensitive_columns:
                 chunk = chunk.drop(
                     columns=[c for c in sensitive_columns if c in chunk.columns],
-                    errors='ignore'
+                    errors="ignore",
                 )
 
             # Enforce backpressure: limit rows per file to avoid disk churn
@@ -481,13 +495,15 @@ class ObservabilityService:
                     "observability.export_row_limit_reached",
                     table=table,
                     current_rows=total_rows,
-                    remaining_rows=len(chunk)
+                    remaining_rows=len(chunk),
                 )
                 break
 
-            mode = 'w' if first_chunk else 'a'
+            mode = "w" if first_chunk else "a"
             header = first_chunk
-            chunk.to_csv(output_path, mode=mode, header=header, index=False, encoding="utf-8-sig")
+            chunk.to_csv(
+                output_path, mode=mode, header=header, index=False, encoding="utf-8-sig"
+            )
             first_chunk = False
             total_rows += len(chunk)
 
@@ -501,7 +517,9 @@ class ObservabilityService:
 
         return str(output_path)
 
-    def _load_sensitive_columns_from_config(self, table: str, config_path: Optional[str]) -> set:
+    def _load_sensitive_columns_from_config(
+        self, table: str, config_path: Optional[str]
+    ) -> set:
         """
         Load sensitive columns for a table from config.
 
@@ -531,13 +549,13 @@ class ObservabilityService:
             )
 
         try:
-            with open(sync_config_path, 'r', encoding='utf-8') as f:
+            with open(sync_config_path, "r", encoding="utf-8") as f:
                 config = yaml.safe_load(f) or {}
 
             # Story 6.2-P14 (Zero Legacy): tables are at root level in reference_sync.yml
             for table_config in config.get("tables", []) or []:
-                if table_config.get('target_table') == table:
-                    sensitive_fields = table_config.get('sensitive_fields', [])
+                if table_config.get("target_table") == table:
+                    sensitive_fields = table_config.get("sensitive_fields", [])
                     sensitive_columns.update(sensitive_fields)
 
             if not sensitive_columns:

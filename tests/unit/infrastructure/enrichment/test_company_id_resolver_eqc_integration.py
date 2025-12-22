@@ -43,17 +43,27 @@ class InMemoryMappingRepo:
     def update_hit_count(self, lookup_key, lookup_type):  # noqa: ANN001
         return False
 
-    def insert_company_name_index_batch(self, rows: List[Dict[str, Any]]) -> InsertBatchResult:
+    def insert_company_name_index_batch(
+        self, rows: List[Dict[str, Any]]
+    ) -> InsertBatchResult:
         self.name_index_payloads.append(rows)
-        return InsertBatchResult(inserted_count=len(rows), skipped_count=0, conflicts=[])
+        return InsertBatchResult(
+            inserted_count=len(rows), skipped_count=0, conflicts=[]
+        )
 
     def insert_enrichment_index_batch(self, records: List[Any]) -> InsertBatchResult:
         self.enrichment_index_payloads.append(records)
-        return InsertBatchResult(inserted_count=len(records), skipped_count=0, conflicts=[])
+        return InsertBatchResult(
+            inserted_count=len(records), skipped_count=0, conflicts=[]
+        )
 
-    def insert_batch_with_conflict_check(self, mappings: List[Dict[str, Any]]) -> InsertBatchResult:
+    def insert_batch_with_conflict_check(
+        self, mappings: List[Dict[str, Any]]
+    ) -> InsertBatchResult:
         self.backflow_payloads.append(mappings)
-        return InsertBatchResult(inserted_count=len(mappings), skipped_count=0, conflicts=[])
+        return InsertBatchResult(
+            inserted_count=len(mappings), skipped_count=0, conflicts=[]
+        )
 
     def enqueue_for_enrichment(self, requests: List[Dict[str, str]]) -> EnqueueResult:
         self.async_enqueue_payloads.append(requests)
@@ -64,7 +74,9 @@ class InMemoryMappingRepo:
 def eqc_provider_with_client() -> EqcProvider:
     """Create EqcProvider with mocked settings and in-memory repo."""
     repo = InMemoryMappingRepo()
-    with patch("work_data_hub.infrastructure.enrichment.eqc_provider.get_settings") as mock_settings:
+    with patch(
+        "work_data_hub.infrastructure.enrichment.eqc_provider.get_settings"
+    ) as mock_settings:
         mock_settings.return_value.eqc_token = ""
         mock_settings.return_value.eqc_base_url = "https://eqc.test.com"
         mock_settings.return_value.company_sync_lookup_limit = 2
@@ -95,14 +107,24 @@ def eqc_provider_with_client() -> EqcProvider:
     return provider
 
 
-def test_resolver_uses_eqc_provider_and_caches(eqc_provider_with_client: EqcProvider) -> None:
+def test_resolver_uses_eqc_provider_and_caches(
+    eqc_provider_with_client: EqcProvider,
+) -> None:
     """Resolver should call EqcProvider when provided, set output, and write cache."""
     repo = eqc_provider_with_client.mapping_repository  # type: ignore[assignment]
     assert isinstance(repo, InMemoryMappingRepo)
 
     resolver = CompanyIdResolver(
-        eqc_config=EqcLookupConfig(enabled=True, sync_budget=1, auto_create_provider=False),
-        yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+        eqc_config=EqcLookupConfig(
+            enabled=True, sync_budget=1, auto_create_provider=False
+        ),
+        yaml_overrides={
+            "plan": {},
+            "account": {},
+            "hardcode": {},
+            "name": {},
+            "account_name": {},
+        },
         mapping_repository=repo,
         eqc_provider=eqc_provider_with_client,
     )
@@ -141,7 +163,13 @@ def test_resolver_backflow_existing_column(monkeypatch) -> None:
 
     resolver = CompanyIdResolver(
         eqc_config=EqcLookupConfig.disabled(),
-        yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+        yaml_overrides={
+            "plan": {},
+            "account": {},
+            "hardcode": {},
+            "name": {},
+            "account_name": {},
+        },
         mapping_repository=repo,
         eqc_provider=None,
     )
@@ -187,7 +215,13 @@ def test_resolver_async_enqueue_temp_ids(monkeypatch) -> None:
 
     resolver = CompanyIdResolver(
         eqc_config=EqcLookupConfig.disabled(),
-        yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+        yaml_overrides={
+            "plan": {},
+            "account": {},
+            "hardcode": {},
+            "name": {},
+            "account_name": {},
+        },
         mapping_repository=repo,
         eqc_provider=None,
     )
@@ -213,10 +247,18 @@ def test_resolver_async_enqueue_temp_ids(monkeypatch) -> None:
 def test_no_enrichment_does_not_create_eqc_provider() -> None:
     """Story 6.2-P17 AC-5: --no-enrichment should result in zero EQC provider init."""
     repo = InMemoryMappingRepo()
-    with patch("work_data_hub.infrastructure.enrichment.eqc_provider.EqcProvider") as mock_provider:
+    with patch(
+        "work_data_hub.infrastructure.enrichment.eqc_provider.EqcProvider"
+    ) as mock_provider:
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
-            yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+            yaml_overrides={
+                "plan": {},
+                "account": {},
+                "hardcode": {},
+                "name": {},
+                "account_name": {},
+            },
             mapping_repository=repo,
             eqc_provider=None,
         )

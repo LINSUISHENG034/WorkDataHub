@@ -93,7 +93,7 @@ def discover_source_file(month: str, domain: str) -> tuple:
     import re
 
     # Validate month format
-    if not re.match(r'^\d{6}$', month):
+    if not re.match(r"^\d{6}$", month):
         print(f"❌ Invalid month format: {month}")
         print("   Expected format: YYYYMM (e.g., 202311)")
         sys.exit(1)
@@ -101,7 +101,9 @@ def discover_source_file(month: str, domain: str) -> tuple:
     try:
         from work_data_hub.io.connectors.file_connector import FileDiscoveryService
 
-        print(f"🔍 Auto-discovering source file for domain '{domain}', month {month}...")
+        print(
+            f"🔍 Auto-discovering source file for domain '{domain}', month {month}..."
+        )
         discovery_service = FileDiscoveryService()
         result = discovery_service.discover_file(
             domain=domain,
@@ -116,8 +118,10 @@ def discover_source_file(month: str, domain: str) -> tuple:
 
     except Exception as e:
         print(f"❌ Auto-discovery failed: {e}")
-        print(f"\n💡 Please specify the file path manually:")
-        print(f"   python cleaner_compare.py --domain {domain} <excel_path> --limit 100")
+        print("\n💡 Please specify the file path manually:")
+        print(
+            f"   python cleaner_compare.py --domain {domain} <excel_path> --limit 100"
+        )
         sys.exit(1)
 
 
@@ -136,7 +140,6 @@ def _validate_and_refresh_token(auto_refresh: bool = True) -> bool:
     Returns:
         True if token is valid (or was successfully refreshed), False otherwise.
     """
-    import os
 
     from work_data_hub.config.settings import get_settings
     from work_data_hub.infrastructure.enrichment.eqc_provider import validate_eqc_token
@@ -234,12 +237,14 @@ def run_legacy_cleaner(
     except ModuleNotFoundError as e:
         missing_module = str(e).split("'")[1] if "'" in str(e) else str(e)
         print(f"\n❌ Legacy Cleaner Import Error: {e}")
-        print(f"\n📦 The Legacy system requires additional dependencies.")
+        print("\n📦 The Legacy system requires additional dependencies.")
         print(f"   Missing module: {missing_module}")
-        print(f"\n💡 Options:")
-        print(f"   1. Install legacy dependencies")
-        print(f"   2. Use --new-only mode to run only the New Pipeline:")
-        print(f"      python cleaner_compare.py --domain {config.domain_name} <excel_path> --new-only")
+        print("\n💡 Options:")
+        print("   1. Install legacy dependencies")
+        print("   2. Use --new-only mode to run only the New Pipeline:")
+        print(
+            f"      python cleaner_compare.py --domain {config.domain_name} <excel_path> --new-only"
+        )
         print("")
         raise ImportError(f"Legacy dependencies not available: {missing_module}") from e
 
@@ -248,11 +253,11 @@ def run_legacy_cleaner(
 
     # Validate that Legacy cleaner returned data
     if len(df) == 0:
-        print(f"\n❌ Legacy Cleaner returned 0 rows!")
-        print(f"   This usually indicates an internal cleaner error.")
-        print(f"\n💡 Options:")
-        print(f"   1. Check if the Excel file contains the expected columns")
-        print(f"   2. Use --new-only mode to skip Legacy comparison")
+        print("\n❌ Legacy Cleaner returned 0 rows!")
+        print("   This usually indicates an internal cleaner error.")
+        print("\n💡 Options:")
+        print("   1. Check if the Excel file contains the expected columns")
+        print("   2. Use --new-only mode to skip Legacy comparison")
         print("")
         raise RuntimeError("Legacy cleaner returned empty DataFrame - internal error")
 
@@ -403,7 +408,9 @@ def compare_numeric_fields(
                 invalid_examples.append(
                     {
                         "row": idx + EXCEL_ROW_OFFSET,
-                        "legacy_raw": "" if _is_blank_value(legacy_raw) else str(legacy_raw),
+                        "legacy_raw": ""
+                        if _is_blank_value(legacy_raw)
+                        else str(legacy_raw),
                         "new_raw": "" if _is_blank_value(new_raw) else str(new_raw),
                     }
                 )
@@ -507,7 +514,9 @@ def classify_company_id_diff(legacy_val: str, new_val: str) -> str:
 
     legacy_is_temp = legacy_val.startswith("IN")
     legacy_is_invalid = legacy_val in INVALID_COMPANY_ID_VALUES or legacy_val == ""
-    legacy_is_empty_or_invalid = legacy_is_temp or legacy_is_invalid or not legacy_is_numeric
+    legacy_is_empty_or_invalid = (
+        legacy_is_temp or legacy_is_invalid or not legacy_is_numeric
+    )
 
     new_is_temp = new_val.startswith("IN")
 
@@ -574,7 +583,11 @@ def compare_upgrade_fields(
                 new_val = "" if pd.isna(new_raw) else str(new_raw)
 
                 if legacy_val != new_val:
-                    classification = CLASSIFICATION_UPGRADE_NAME_CLEANING if new_val else CLASSIFICATION_NEEDS_REVIEW
+                    classification = (
+                        CLASSIFICATION_UPGRADE_NAME_CLEANING
+                        if new_val
+                        else CLASSIFICATION_NEEDS_REVIEW
+                    )
                     diffs.append(
                         UpgradeDiff(
                             field="客户名称",
@@ -614,10 +627,10 @@ def run_comparison(
     if run_id is None:
         run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
-    print(f"🔄 Running Legacy cleaner...")
+    print("🔄 Running Legacy cleaner...")
     legacy_df = run_legacy_cleaner(config, excel_path, sheet_name, row_limit)
 
-    print(f"🔄 Running New Pipeline...")
+    print("🔄 Running New Pipeline...")
     new_df = run_new_pipeline(
         config, excel_path, sheet_name, row_limit, enable_enrichment, sync_lookup_budget
     )
@@ -625,13 +638,13 @@ def run_comparison(
     if save_debug:
         save_debug_snapshots(legacy_df, new_df, run_id=run_id)
 
-    print(f"🔍 Comparing numeric fields...")
+    print("🔍 Comparing numeric fields...")
     numeric_diffs = compare_numeric_fields(config, legacy_df, new_df)
 
-    print(f"🔍 Comparing derived fields...")
+    print("🔍 Comparing derived fields...")
     derived_diffs = compare_derived_fields(config, legacy_df, new_df)
 
-    print(f"🔍 Comparing upgrade fields...")
+    print("🔍 Comparing upgrade fields...")
     upgrade_diffs = compare_upgrade_fields(config, legacy_df, new_df)
 
     execution_time_ms = int((time.perf_counter() - start_time) * 1000)
@@ -682,7 +695,7 @@ Examples:
   # New Pipeline only (no Legacy dependencies needed)
   python cleaner_compare.py --domain annuity_performance --month 202311 --new-only --debug
 
-Available domains: {', '.join(available_domains)}
+Available domains: {", ".join(available_domains)}
         """,
     )
     parser.add_argument(
@@ -764,7 +777,9 @@ Available domains: {', '.join(available_domains)}
     # Determine file source: auto-discovery or manual path
     if args.month:
         # Auto-discovery mode
-        excel_path_str, discovered_sheet = discover_source_file(args.month, config.domain_name)
+        excel_path_str, discovered_sheet = discover_source_file(
+            args.month, config.domain_name
+        )
         excel_path = Path(excel_path_str)
         # Use discovered sheet unless user explicitly specified one
         if not args.sheet:
@@ -777,13 +792,17 @@ Available domains: {', '.join(available_domains)}
             sys.exit(1)
     else:
         print("❌ Error: Either --month or excel_path is required")
-        print(f"   Usage: python cleaner_compare.py --domain {args.domain} --month 202311")
+        print(
+            f"   Usage: python cleaner_compare.py --domain {args.domain} --month 202311"
+        )
         print(f"   Or:    python cleaner_compare.py --domain {args.domain} <file_path>")
         sys.exit(1)
 
     # Performance warning for full dataset (Hard Constraint #4)
     if args.limit == 0:
-        print("⚠️  Warning: --limit 0 runs on full dataset. This may be slow and memory-intensive.")
+        print(
+            "⚠️  Warning: --limit 0 runs on full dataset. This may be slow and memory-intensive."
+        )
 
     # Token validation: only when --enrichment is requested
     if args.enrichment:
@@ -791,11 +810,15 @@ Available domains: {', '.join(available_domains)}
         _validate_and_refresh_token(auto_refresh=auto_refresh)
 
     # Use provided run_id or generate one
-    run_id = args.run_id if args.run_id else datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    run_id = (
+        args.run_id
+        if args.run_id
+        else datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    )
 
     # New-only mode: just run and display New Pipeline output
     if args.new_only:
-        print(f"🔄 Running New Pipeline only (--new-only mode)...")
+        print("🔄 Running New Pipeline only (--new-only mode)...")
         new_df = run_new_pipeline(
             config=config,
             excel_path=str(excel_path),
@@ -804,7 +827,7 @@ Available domains: {', '.join(available_domains)}
             enable_enrichment=args.enrichment,
             sync_lookup_budget=args.sync_budget,
         )
-        print(f"\n✅ New Pipeline completed:")
+        print("\n✅ New Pipeline completed:")
         print(f"   Rows: {len(new_df)}")
         print(f"   Columns: {len(new_df.columns)}")
         print(f"   Columns: {list(new_df.columns)}")

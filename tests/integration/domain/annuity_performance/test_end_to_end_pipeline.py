@@ -86,7 +86,9 @@ class StubWarehouseLoader:
         refresh_keys: Optional[List[str]] = None,
     ) -> LoadResult:
         """Alias to mirror refresh-mode loader contract used by the pipeline."""
-        return self.load_dataframe(df, table=table, schema=schema, upsert_keys=refresh_keys)
+        return self.load_dataframe(
+            df, table=table, schema=schema, upsert_keys=refresh_keys
+        )
 
 
 def _build_source_dataframe(valid: int = 4, invalid: int = 1) -> pd.DataFrame:

@@ -1,8 +1,10 @@
 from dataclasses import dataclass, field
 from typing import List
 
+
 class DataWarehouseLoaderError(Exception):
     """Raised when data warehouse loader encounters an error."""
+
 
 @dataclass
 class LoadResult:

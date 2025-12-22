@@ -14,10 +14,10 @@ import pandas as pd
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
-from .generic_service import GenericBackfillService, BackfillResult
-from .sync_service import ReferenceSyncService, SyncResult
+from .generic_service import BackfillResult, GenericBackfillService
 from .models import ForeignKeyConfig
 from .sync_models import ReferenceSyncTableConfig
+from .sync_service import ReferenceSyncService
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +149,9 @@ class HybridReferenceService:
 
         for config in fk_configs:
             try:
-                metrics, missing_values = self._check_coverage_for_config(df, config, conn)
+                metrics, missing_values = self._check_coverage_for_config(
+                    df, config, conn
+                )
                 if metrics:
                     coverage_metrics.append(metrics)
                     missing_by_table[config.target_table] = missing_values
@@ -171,13 +173,15 @@ class HybridReferenceService:
                     if config.source_column in df.columns
                     else set()
                 )
-                coverage_metrics.append(CoverageMetrics(
-                    table=config.target_table,
-                    total_fk_values=len(fk_values),
-                    covered_values=0,
-                    missing_values=len(fk_values),
-                    coverage_rate=0.0,
-                ))
+                coverage_metrics.append(
+                    CoverageMetrics(
+                        table=config.target_table,
+                        total_fk_values=len(fk_values),
+                        covered_values=0,
+                        missing_values=len(fk_values),
+                        coverage_rate=0.0,
+                    )
+                )
                 missing_by_table[config.target_table] = fk_values
 
         # Set degradation status if any tables failed
@@ -233,7 +237,9 @@ class HybridReferenceService:
         self._check_per_table_thresholds(fk_configs, conn)
 
         # Combine degradation reasons
-        degradation_reason = "; ".join(degradation_reasons) if degradation_reasons else None
+        degradation_reason = (
+            "; ".join(degradation_reasons) if degradation_reasons else None
+        )
 
         result = HybridResult(
             domain=domain,
@@ -419,7 +425,9 @@ class HybridReferenceService:
             """
             params = {"fk_values": list(fk_values)}
         else:
-            placeholders = ", ".join([f":v{i}" for i, _ in enumerate(fk_values)]) or ":v0"
+            placeholders = (
+                ", ".join([f":v{i}" for i, _ in enumerate(fk_values)]) or ":v0"
+            )
             existing_query = f"""
                 SELECT "{config.target_key}"
                 FROM "{config.target_table}"
@@ -537,8 +545,6 @@ class HybridReferenceService:
 
         # Calculate ratio
         total_records = total_auto_derived + total_authoritative
-        ratio = (
-            total_auto_derived / total_records if total_records > 0 else 0.0
-        )
+        ratio = total_auto_derived / total_records if total_records > 0 else 0.0
 
         return total_auto_derived, total_authoritative, ratio

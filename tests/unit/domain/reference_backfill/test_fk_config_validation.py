@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from work_data_hub.domain.reference_backfill.models import (
     BackfillColumnMapping,
     ForeignKeyConfig,
-    DomainForeignKeysConfig
+    DomainForeignKeysConfig,
 )
 
 
@@ -22,9 +22,7 @@ class TestBackfillColumnMapping:
     def test_valid_backfill_column_mapping(self):
         """Test valid backfill column mapping creation."""
         mapping = BackfillColumnMapping(
-            source="计划代码",
-            target="年金计划号",
-            optional=False
+            source="计划代码", target="年金计划号", optional=False
         )
         assert mapping.source == "计划代码"
         assert mapping.target == "年金计划号"
@@ -33,36 +31,25 @@ class TestBackfillColumnMapping:
     def test_optional_backfill_column_mapping(self):
         """Test backfill column mapping with optional field."""
         mapping = BackfillColumnMapping(
-            source="计划名称",
-            target="计划名称",
-            optional=True
+            source="计划名称", target="计划名称", optional=True
         )
         assert mapping.optional is True
 
     def test_empty_source_column(self):
         """Test validation fails for empty source column."""
         with pytest.raises(ValidationError) as exc_info:
-            BackfillColumnMapping(
-                source="",
-                target="目标列"
-            )
+            BackfillColumnMapping(source="", target="目标列")
         assert "Column names must be non-empty strings" in str(exc_info.value)
 
     def test_empty_target_column(self):
         """Test validation fails for empty target column."""
         with pytest.raises(ValidationError) as exc_info:
-            BackfillColumnMapping(
-                source="源列",
-                target="  "
-            )
+            BackfillColumnMapping(source="源列", target="  ")
         assert "Column names must be non-empty strings" in str(exc_info.value)
 
     def test_whitespace_column_names(self):
         """Test whitespace in column names is trimmed."""
-        mapping = BackfillColumnMapping(
-            source="  计划代码  ",
-            target="  年金计划号  "
-        )
+        mapping = BackfillColumnMapping(source="  计划代码  ", target="  年金计划号  ")
         assert mapping.source == "计划代码"
         assert mapping.target == "年金计划号"
 
@@ -79,8 +66,10 @@ class TestForeignKeyConfig:
             target_key="年金计划号",
             backfill_columns=[
                 BackfillColumnMapping(source="计划代码", target="年金计划号"),
-                BackfillColumnMapping(source="计划名称", target="计划名称", optional=True)
-            ]
+                BackfillColumnMapping(
+                    source="计划名称", target="计划名称", optional=True
+                ),
+            ],
         )
         assert fk_config.name == "fk_plan"
         assert fk_config.source_column == "计划代码"
@@ -101,8 +90,8 @@ class TestForeignKeyConfig:
             depends_on=["fk_plan"],
             backfill_columns=[
                 BackfillColumnMapping(source="组合代码", target="组合代码"),
-                BackfillColumnMapping(source="计划代码", target="年金计划号")
-            ]
+                BackfillColumnMapping(source="计划代码", target="年金计划号"),
+            ],
         )
         assert fk_config.mode == "fill_null_only"
         assert fk_config.depends_on == ["fk_plan"]
@@ -115,7 +104,7 @@ class TestForeignKeyConfig:
                 source_column="源列",
                 target_table="目标表",
                 target_key="主键",
-                backfill_columns=[BackfillColumnMapping(source="a", target="b")]
+                backfill_columns=[BackfillColumnMapping(source="a", target="b")],
             )
         assert "Foreign key name must be a non-empty string" in str(exc_info.value)
 
@@ -127,9 +116,12 @@ class TestForeignKeyConfig:
                 source_column="  ",
                 target_table="目标表",
                 target_key="主键",
-                backfill_columns=[BackfillColumnMapping(source="a", target="b")]
+                backfill_columns=[BackfillColumnMapping(source="a", target="b")],
             )
-        assert "Source column, target table, and target key must be non-empty strings" in str(exc_info.value)
+        assert (
+            "Source column, target table, and target key must be non-empty strings"
+            in str(exc_info.value)
+        )
 
     def test_empty_target_table(self):
         """Test validation fails for empty target table."""
@@ -139,9 +131,12 @@ class TestForeignKeyConfig:
                 source_column="源列",
                 target_table="",
                 target_key="主键",
-                backfill_columns=[BackfillColumnMapping(source="a", target="b")]
+                backfill_columns=[BackfillColumnMapping(source="a", target="b")],
             )
-        assert "Source column, target table, and target key must be non-empty strings" in str(exc_info.value)
+        assert (
+            "Source column, target table, and target key must be non-empty strings"
+            in str(exc_info.value)
+        )
 
     def test_empty_target_key(self):
         """Test validation fails for empty target key."""
@@ -152,7 +147,7 @@ class TestForeignKeyConfig:
                 source_column="源列",
                 target_table="目标表",
                 target_key=None,
-                backfill_columns=[BackfillColumnMapping(source="a", target="b")]
+                backfill_columns=[BackfillColumnMapping(source="a", target="b")],
             )
         assert "target_key" in str(exc_info.value)
 
@@ -163,9 +158,12 @@ class TestForeignKeyConfig:
                 source_column="源列",
                 target_table="目标表",
                 target_key="",
-                backfill_columns=[BackfillColumnMapping(source="a", target="b")]
+                backfill_columns=[BackfillColumnMapping(source="a", target="b")],
             )
-        assert "Source column, target table, and target key must be non-empty strings" in str(exc_info.value)
+        assert (
+            "Source column, target table, and target key must be non-empty strings"
+            in str(exc_info.value)
+        )
 
     def test_empty_backfill_columns(self):
         """Test validation fails for empty backfill columns."""
@@ -175,9 +173,11 @@ class TestForeignKeyConfig:
                 source_column="源列",
                 target_table="目标表",
                 target_key="主键",
-                backfill_columns=[]
+                backfill_columns=[],
             )
-        assert "At least one backfill column mapping must be provided" in str(exc_info.value)
+        assert "At least one backfill column mapping must be provided" in str(
+            exc_info.value
+        )
 
     def test_invalid_mode(self):
         """Test validation fails for invalid mode."""
@@ -188,7 +188,7 @@ class TestForeignKeyConfig:
                 target_table="目标表",
                 target_key="主键",
                 mode="invalid_mode",
-                backfill_columns=[BackfillColumnMapping(source="a", target="b")]
+                backfill_columns=[BackfillColumnMapping(source="a", target="b")],
             )
         assert "Input should be" in str(exc_info.value)  # Pydantic v2 error message
 
@@ -199,7 +199,7 @@ class TestForeignKeyConfig:
             source_column="  源列  ",
             target_table="  目标表  ",
             target_key="  主键  ",
-            backfill_columns=[BackfillColumnMapping(source="a", target="b")]
+            backfill_columns=[BackfillColumnMapping(source="a", target="b")],
         )
         assert fk_config.name == "test_fk"
         assert fk_config.source_column == "源列"
@@ -222,7 +222,9 @@ class TestDomainForeignKeysConfig:
             source_column="计划代码",
             target_table="年金计划",
             target_key="年金计划号",
-            backfill_columns=[BackfillColumnMapping(source="计划代码", target="年金计划号")]
+            backfill_columns=[
+                BackfillColumnMapping(source="计划代码", target="年金计划号")
+            ],
         )
 
         fk_portfolio = ForeignKeyConfig(
@@ -233,8 +235,8 @@ class TestDomainForeignKeysConfig:
             depends_on=["fk_plan"],
             backfill_columns=[
                 BackfillColumnMapping(source="组合代码", target="组合代码"),
-                BackfillColumnMapping(source="计划代码", target="年金计划号")
-            ]
+                BackfillColumnMapping(source="计划代码", target="年金计划号"),
+            ],
         )
 
         config = DomainForeignKeysConfig(foreign_keys=[fk_plan, fk_portfolio])
@@ -249,7 +251,7 @@ class TestDomainForeignKeysConfig:
             source_column="源列1",
             target_table="目标表1",
             target_key="主键1",
-            backfill_columns=[BackfillColumnMapping(source="a", target="b")]
+            backfill_columns=[BackfillColumnMapping(source="a", target="b")],
         )
 
         fk2 = ForeignKeyConfig(
@@ -257,7 +259,7 @@ class TestDomainForeignKeysConfig:
             source_column="源列2",
             target_table="目标表2",
             target_key="主键2",
-            backfill_columns=[BackfillColumnMapping(source="c", target="d")]
+            backfill_columns=[BackfillColumnMapping(source="c", target="d")],
         )
 
         with pytest.raises(ValidationError) as exc_info:
@@ -278,16 +280,9 @@ class TestDomainForeignKeysConfig:
                     "mode": "insert_missing",
                     "depends_on": [],
                     "backfill_columns": [
-                        {
-                            "source": "计划代码",
-                            "target": "年金计划号"
-                        },
-                        {
-                            "source": "计划名称",
-                            "target": "计划名称",
-                            "optional": True
-                        }
-                    ]
+                        {"source": "计划代码", "target": "年金计划号"},
+                        {"source": "计划名称", "target": "计划名称", "optional": True},
+                    ],
                 }
             ]
         }
@@ -303,10 +298,6 @@ class TestDomainForeignKeysConfig:
         """Test that extra fields are forbidden in configuration."""
         with pytest.raises(ValidationError) as exc_info:
             BackfillColumnMapping(
-                source="源列",
-                target="目标列",
-                extra_field="not_allowed"
+                source="源列", target="目标列", extra_field="not_allowed"
             )
         assert "Extra inputs are not permitted" in str(exc_info.value)
-
-

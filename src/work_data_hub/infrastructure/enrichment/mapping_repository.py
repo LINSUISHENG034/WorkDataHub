@@ -21,9 +21,9 @@ All public symbols are preserved for backward compatibility.
 # Re-export all public symbols from repository package for backward compatibility
 from .repository import (
     CompanyMappingRepository,
-    MatchResult,
-    InsertBatchResult,
     EnqueueResult,
+    InsertBatchResult,
+    MatchResult,
 )
 
 __all__ = [

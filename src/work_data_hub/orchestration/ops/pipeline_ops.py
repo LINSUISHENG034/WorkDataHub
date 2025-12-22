@@ -14,11 +14,11 @@ from dagster import Config, OpExecutionContext, op
 from pydantic import field_validator
 
 from work_data_hub.config.settings import get_settings
-from work_data_hub.domain.annuity_performance.service import (
-    process_with_enrichment,
-)
 from work_data_hub.domain.annuity_income.service import (
     process_with_enrichment as process_annuity_income_with_enrichment,
+)
+from work_data_hub.domain.annuity_performance.service import (
+    process_with_enrichment,
 )
 from work_data_hub.domain.sandbox_trustee_performance.service import process
 from work_data_hub.io.loader.warehouse_loader import DataWarehouseLoaderError
@@ -143,18 +143,18 @@ def process_annuity_performance_op(
         if use_enrichment:
             # Import enrichment components (lazy import to avoid circular dependencies)
             from work_data_hub.domain.company_enrichment.lookup_queue import LookupQueue
+            from work_data_hub.domain.company_enrichment.observability import (
+                EnrichmentObserver,
+            )
             from work_data_hub.domain.company_enrichment.service import (
                 CompanyEnrichmentService,
+            )
+            from work_data_hub.infrastructure.enrichment.csv_exporter import (
+                export_unknown_companies,
             )
             from work_data_hub.io.connectors.eqc_client import EQCClient
             from work_data_hub.io.loader.company_enrichment_loader import (
                 CompanyEnrichmentLoader,
-            )
-            from work_data_hub.domain.company_enrichment.observability import (
-                EnrichmentObserver,
-            )
-            from work_data_hub.infrastructure.enrichment.csv_exporter import (
-                export_unknown_companies,
             )
 
             # Lazy import psycopg2 for database connection
@@ -273,7 +273,7 @@ def process_annuity_performance_op(
         # Guard: if enrichment isn't active, force-disable EQC to prevent any provider init/calls.
         if not use_enrichment:
             eqc_config = EqcLookupConfig.disabled()
-        
+
         # Call service with enrichment metadata support
         # Story 6.2-P17: Pass eqc_config instead of sync_lookup_budget
         result = process_with_enrichment(
@@ -311,15 +311,13 @@ def process_annuity_performance_op(
             from work_data_hub.infrastructure.enrichment.csv_exporter import (
                 export_unknown_companies,
             )
+
             enrichment_stats = observer.get_stats()
             context.log.info(
                 "Enrichment stats",
                 extra={"enrichment_stats": enrichment_stats.to_dict()},
             )
-            if (
-                observer.has_unknown_companies()
-                and settings.enrichment_export_unknowns
-            ):
+            if observer.has_unknown_companies() and settings.enrichment_export_unknowns:
                 try:
                     csv_path = export_unknown_companies(
                         observer, output_dir=settings.observability_log_dir
@@ -413,5 +411,3 @@ def process_annuity_income_op(
     except Exception as e:
         context.log.error(f"Domain processing failed: {e}")
         raise
-
-

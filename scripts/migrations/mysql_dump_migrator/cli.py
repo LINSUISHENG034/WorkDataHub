@@ -25,11 +25,10 @@ Usage:
 import argparse
 import logging
 import sys
-from pathlib import Path
 
 import structlog
 
-from .migrator import MigrationConfig, MigrationReport, PostgreSQLMigrator
+from .migrator import MigrationConfig, PostgreSQLMigrator
 from .parser import MySQLDumpParser
 
 
@@ -120,6 +119,7 @@ def cmd_migrate(args: argparse.Namespace) -> int:
         print(f"\nMigration failed: {e}", file=sys.stderr)
         if args.verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -152,7 +152,7 @@ def cmd_preview(args: argparse.Namespace) -> int:
         print("\n" + "-" * 60)
 
         # Show sample conversions
-        for table_name, table_content in list(db_content.tables.items())[:args.limit]:
+        for table_name, table_content in list(db_content.tables.items())[: args.limit]:
             print(f"\n-- Table: {table_name}")
             print(f"-- Rows: {table_content.row_count:,}")
 
@@ -189,7 +189,10 @@ def main() -> int:
     )
     scan_parser.add_argument("dump_file", help="Path to MySQL dump file")
     scan_parser.add_argument(
-        "--summary", "-s", action="store_true", help="Show table counts for each database"
+        "--summary",
+        "-s",
+        action="store_true",
+        help="Show table counts for each database",
     )
 
     # Migrate command

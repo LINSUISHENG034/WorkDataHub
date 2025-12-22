@@ -46,7 +46,9 @@ class TestEtlCheckDbDiagnostics:
             raise Exception("boom")
 
         monkeypatch.setattr(diagnostics_module, "get_settings", lambda: Settings())
-        monkeypatch.setitem(sys.modules, "psycopg2", types.SimpleNamespace(connect=connect))
+        monkeypatch.setitem(
+            sys.modules, "psycopg2", types.SimpleNamespace(connect=connect)
+        )
 
         rc = etl_module._check_database_connection()
         out = capsys.readouterr().out
@@ -54,4 +56,3 @@ class TestEtlCheckDbDiagnostics:
         assert rc == 1
         assert "Connection error" in out
         assert "Troubleshooting hints" in out
-

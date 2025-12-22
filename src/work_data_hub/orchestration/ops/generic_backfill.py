@@ -14,7 +14,6 @@ from dagster import Config, OpExecutionContext, op
 from work_data_hub.config.settings import get_settings
 from work_data_hub.domain.reference_backfill import (
     GenericBackfillService,
-    BackfillResult,
     load_foreign_keys_config,
 )
 from work_data_hub.io.loader.warehouse_loader import DataWarehouseLoaderError
@@ -53,11 +52,17 @@ def generic_backfill_refs_op(
     """
     # Convert processed rows to DataFrame for the service
     import pandas as pd
+
     df = pd.DataFrame(processed_rows)
 
     if df.empty:
         context.log.info("No processed rows provided for backfill")
-        return {"processing_order": [], "tables_processed": [], "total_inserted": 0, "plan_only": config.plan_only}
+        return {
+            "processing_order": [],
+            "tables_processed": [],
+            "total_inserted": 0,
+            "plan_only": config.plan_only,
+        }
 
     settings = get_settings()
 
@@ -67,14 +72,21 @@ def generic_backfill_refs_op(
         fk_configs = load_foreign_keys_config(domain=config.domain)
 
         if not fk_configs:
-            context.log.info(f"No foreign_keys configuration found for domain '{config.domain}'")
-            return {"processing_order": [], "tables_processed": [], "total_inserted": 0, "plan_only": config.plan_only}
+            context.log.info(
+                f"No foreign_keys configuration found for domain '{config.domain}'"
+            )
+            return {
+                "processing_order": [],
+                "tables_processed": [],
+                "total_inserted": 0,
+                "plan_only": config.plan_only,
+            }
 
         # Create database connection if not in plan_only mode
         if not config.plan_only:
             # Use SQLAlchemy connection for GenericBackfillService
-            from sqlalchemy import create_engine
             import psycopg2
+            from sqlalchemy import create_engine
 
             dsn = settings.get_database_connection_string()
             if not dsn:
@@ -82,7 +94,9 @@ def generic_backfill_refs_op(
                     "Database connection failed: invalid DSN resolved from settings"
                 )
 
-            context.log.info(f"Connecting to database for generic backfill (domain: {config.domain})")
+            context.log.info(
+                f"Connecting to database for generic backfill (domain: {config.domain})"
+            )
 
             # Create SQLAlchemy engine with explicit psycopg2 module
             engine = create_engine(dsn, module=psycopg2)
@@ -108,7 +122,7 @@ def generic_backfill_refs_op(
             "rows_per_second": result.rows_per_second,
             "plan_only": config.plan_only,
             "domain": config.domain,
-            "tracking_fields_enabled": config.add_tracking_fields
+            "tracking_fields_enabled": config.add_tracking_fields,
         }
 
         # Enhanced logging
@@ -128,7 +142,9 @@ def generic_backfill_refs_op(
 
         # Performance logging
         if result.rows_per_second:
-            context.log.info(f"Backfill performance: {result.rows_per_second:.0f} rows/sec")
+            context.log.info(
+                f"Backfill performance: {result.rows_per_second:.0f} rows/sec"
+            )
 
         return result_dict
 

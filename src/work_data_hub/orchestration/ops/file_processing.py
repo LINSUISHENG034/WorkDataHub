@@ -85,7 +85,9 @@ def discover_files_op(
         domain_config = data_sources.get("domains", {}).get(config.domain, {})
 
         # Detect schema type based on keys present
-        is_epic3_schema = "base_path" in domain_config and "file_patterns" in domain_config
+        is_epic3_schema = (
+            "base_path" in domain_config and "file_patterns" in domain_config
+        )
         is_legacy_schema = "pattern" in domain_config and "select" in domain_config
 
         if is_epic3_schema:
@@ -116,16 +118,13 @@ def discover_files_op(
                 from work_data_hub.io.connectors.file_pattern_matcher import (
                     SelectionStrategy,
                 )
+
                 strategy = SelectionStrategy(config.selection_strategy)
 
-                context.log.info(
-                    f"Discovery with selection_strategy={strategy.value}"
-                )
+                context.log.info(f"Discovery with selection_strategy={strategy.value}")
 
                 match_result = file_discovery.discover_file(
-                    domain=config.domain,
-                    selection_strategy=strategy,
-                    **template_vars
+                    domain=config.domain, selection_strategy=strategy, **template_vars
                 )
 
                 context.log.info(
@@ -141,19 +140,21 @@ def discover_files_op(
             except Exception as e:
                 # Use str(e) for message, e.to_dict() for structured logging (AC6)
                 error_msg = str(e)
-                error_details = e.to_dict() if hasattr(e, 'to_dict') else {"error": error_msg}
+                error_details = (
+                    e.to_dict() if hasattr(e, "to_dict") else {"error": error_msg}
+                )
                 context.log.error(
                     f"Epic 3 discovery failed for domain '{config.domain}': {error_msg}",
-                    extra={"discovery_error": error_details}
+                    extra={"discovery_error": error_details},
                 )
                 raise
 
         else:
-             # Route to Epic 3 FileDiscoveryService even for legacy config structure if possible,
-             # but strictly speaking we only support Epic 3 schema now.
-             # However, existing domains might not have been fully migrated in config.
-             # Since User enforces "Zero Legacy Policy" for CODE, we assume config matches or we fail.
-             raise ValueError(
+            # Route to Epic 3 FileDiscoveryService even for legacy config structure if possible,
+            # but strictly speaking we only support Epic 3 schema now.
+            # However, existing domains might not have been fully migrated in config.
+            # Since User enforces "Zero Legacy Policy" for CODE, we assume config matches or we fail.
+            raise ValueError(
                 f"Domain '{config.domain}' configuration does not match Epic 3 schema (base_path, file_patterns). "
                 f"Legacy DataSourceConnector support has been removed."
             )

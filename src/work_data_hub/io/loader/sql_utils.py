@@ -1,5 +1,6 @@
 from typing import Optional
 
+
 def quote_ident(name: str) -> str:
     """
     Quote PostgreSQL identifier with double quotes and escape internal quotes.

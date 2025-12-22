@@ -30,7 +30,8 @@ def test_db_connection():
     conn = engine.connect()
 
     # Create test reference tables with tracking fields
-    conn.execute(text("""
+    conn.execute(
+        text("""
         CREATE TABLE 年金计划 (
             年金计划号 TEXT PRIMARY KEY,
             计划名称 TEXT,
@@ -41,9 +42,11 @@ def test_db_connection():
             _derived_from_domain TEXT,
             _derived_at TEXT
         )
-    """))
+    """)
+    )
 
-    conn.execute(text("""
+    conn.execute(
+        text("""
         CREATE TABLE 组合计划 (
             组合代码 TEXT PRIMARY KEY,
             年金计划号 TEXT,
@@ -54,7 +57,8 @@ def test_db_connection():
             _derived_from_domain TEXT,
             _derived_at TEXT
         )
-    """))
+    """)
+    )
 
     # Insert test data
     test_data = [
@@ -199,7 +203,7 @@ class TestObservabilityServiceIntegration:
         assert metrics.authoritative_count == 1
         assert metrics.auto_derived_count == 2
         assert metrics.needs_review_count == 2
-        assert metrics.auto_derived_ratio == 2/3
+        assert metrics.auto_derived_ratio == 2 / 3
         assert len(metrics.domains_contributing) == 2
         assert "annuity_performance" in metrics.domains_contributing
         assert "annuity_income" in metrics.domains_contributing
@@ -207,7 +211,9 @@ class TestObservabilityServiceIntegration:
     def test_get_all_metrics_with_multiple_tables(self, test_db_connection):
         """Test getting metrics for all configured tables."""
         # Mock table list to avoid loading from config
-        with patch.object(ObservabilityService, '_load_reference_tables_from_config') as mock_load:
+        with patch.object(
+            ObservabilityService, "_load_reference_tables_from_config"
+        ) as mock_load:
             mock_load.return_value = ["年金计划", "组合计划"]
             service = ObservabilityService(schema="main")
 
@@ -223,12 +229,14 @@ class TestObservabilityServiceIntegration:
             schema="main",
             alert_config=AlertConfig(
                 auto_derived_ratio_threshold=0.5,  # 50%
-                needs_review_count_threshold=1    # 1 record
-            )
+                needs_review_count_threshold=1,  # 1 record
+            ),
         )
 
         # Mock table list
-        with patch.object(ObservabilityService, '_load_reference_tables_from_config') as mock_load:
+        with patch.object(
+            ObservabilityService, "_load_reference_tables_from_config"
+        ) as mock_load:
             mock_load.return_value = ["年金计划"]
             metrics = service.get_all_metrics(test_db_connection)
             alerts = service.check_thresholds(metrics)
@@ -239,15 +247,19 @@ class TestObservabilityServiceIntegration:
             assert "auto_derived_ratio" in alert_types
             assert "needs_review_count" in alert_types
 
-    def test_csv_export_with_real_data(self, test_db_connection, mock_project_root, tmp_path: Path):
+    def test_csv_export_with_real_data(
+        self, test_db_connection, mock_project_root, tmp_path: Path
+    ):
         """Test CSV export with actual database data."""
         # Mock pandas DataFrame
-        mock_df = pd.DataFrame({
-            "年金计划号": ["P002", "P003"],
-            "计划名称": ["测试计划2", "测试计划3"],
-            "_source": ["auto_derived", "auto_derived"],
-            "_needs_review": [True, True]
-        })
+        mock_df = pd.DataFrame(
+            {
+                "年金计划号": ["P002", "P003"],
+                "计划名称": ["测试计划2", "测试计划3"],
+                "_source": ["auto_derived", "auto_derived"],
+                "_needs_review": [True, True],
+            }
+        )
 
         policy_path = tmp_path / "export_policy.yml"
         policy_path.write_text("retention: 30d\nacl: restricted\n", encoding="utf-8")
@@ -257,7 +269,9 @@ class TestObservabilityServiceIntegration:
             output = service.export_pending_review(
                 table="年金计划",
                 conn=test_db_connection,
-                config_path=str(Path(mock_project_root) / "config" / "reference_sync.yml"),
+                config_path=str(
+                    Path(mock_project_root) / "config" / "reference_sync.yml"
+                ),
                 export_policy_path=str(policy_path),
             )
 
@@ -299,7 +313,9 @@ class TestReferenceDataAuditLoggerIntegration:
 
     def test_audit_logger_with_real_service(self):
         """Test audit logging integration with actual services."""
-        with patch("work_data_hub.domain.reference_backfill.observability.structlog.get_logger") as mock_get_logger:
+        with patch(
+            "work_data_hub.domain.reference_backfill.observability.structlog.get_logger"
+        ) as mock_get_logger:
             mock_logger = mock_get_logger.return_value
             audit_logger = ReferenceDataAuditLogger()
 
@@ -308,7 +324,7 @@ class TestReferenceDataAuditLoggerIntegration:
                 record_key="P001",
                 source="authoritative",
                 domain=None,
-                actor="sync_service.reference_sync"
+                actor="sync_service.reference_sync",
             )
 
             # Verify audit event was logged

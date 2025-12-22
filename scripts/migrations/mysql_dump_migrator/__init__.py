@@ -5,9 +5,9 @@ This module provides tools to migrate MySQL dump files to PostgreSQL,
 supporting multi-database dumps with schema-based organization.
 """
 
-from .parser import MySQLDumpParser, DatabaseContent
 from .converter import MySQLToPostgreSQLConverter
-from .migrator import PostgreSQLMigrator, MigrationConfig, MigrationReport
+from .migrator import MigrationConfig, MigrationReport, PostgreSQLMigrator
+from .parser import DatabaseContent, MySQLDumpParser
 
 __all__ = [
     "MySQLDumpParser",

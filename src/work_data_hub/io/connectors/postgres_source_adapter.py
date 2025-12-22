@@ -16,8 +16,8 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 from work_data_hub.domain.reference_backfill.sync_models import (
-    ReferenceSyncTableConfig,
     PostgresSourceConfig,
+    ReferenceSyncTableConfig,
 )
 
 logger = logging.getLogger(__name__)
@@ -133,7 +133,7 @@ class PostgresSourceAdapter:
 
                 if attempt < self.max_retries:
                     # Exponential backoff: 2s, 4s, 8s
-                    backoff_time = self.retry_backoff_base ** attempt
+                    backoff_time = self.retry_backoff_base**attempt
                     self.logger.info(
                         f"Retrying PostgreSQL connection after {backoff_time}s backoff"
                     )
@@ -148,9 +148,7 @@ class PostgresSourceAdapter:
             f"Failed to connect to PostgreSQL after {self.max_retries} attempts. "
             f"Last error: {last_error}"
         )
-        self.logger.error(
-            f"PostgreSQL connection failed final: {str(last_error)}"
-        )
+        self.logger.error(f"PostgreSQL connection failed final: {str(last_error)}")
         raise psycopg2.Error(error_msg)
 
     def fetch_data(
@@ -296,7 +294,9 @@ class PostgresSourceAdapter:
                         df = pd.DataFrame(rows)
                     else:
                         # Empty result - create DataFrame with expected columns
-                        df = pd.DataFrame(columns=[m.source for m in source_config.columns])
+                        df = pd.DataFrame(
+                            columns=[m.source for m in source_config.columns]
+                        )
 
                     self.logger.info(
                         f"Query success on attempt {attempt} for table {source_config.table}: {len(df)} rows"
@@ -313,10 +313,8 @@ class PostgresSourceAdapter:
 
                 if attempt < self.max_retries:
                     # Exponential backoff
-                    backoff_time = self.retry_backoff_base ** attempt
-                    self.logger.info(
-                        f"Retrying query after {backoff_time}s backoff"
-                    )
+                    backoff_time = self.retry_backoff_base**attempt
+                    self.logger.info(f"Retrying query after {backoff_time}s backoff")
                     time.sleep(backoff_time)
 
         # All retries exhausted
@@ -334,8 +332,10 @@ class PostgresSourceAdapter:
         """Detect missing column errors to allow graceful full-refresh fallback."""
         message = str(err).lower()
         # PostgreSQL error code 42703 = undefined_column
-        pgcode = getattr(err, 'pgcode', None)
-        return (pgcode == '42703') or ("column" in message and "does not exist" in message)
+        pgcode = getattr(err, "pgcode", None)
+        return (pgcode == "42703") or (
+            "column" in message and "does not exist" in message
+        )
 
     def _apply_column_mappings(
         self,
@@ -359,8 +359,7 @@ class PostgresSourceAdapter:
 
         # Build rename mapping
         rename_map = {
-            mapping.source: mapping.target
-            for mapping in source_config.columns
+            mapping.source: mapping.target for mapping in source_config.columns
         }
 
         # Rename columns

@@ -11,13 +11,17 @@ from work_data_hub.infrastructure.cleansing.rule_engine import CleansingRuleEngi
 class TestCleansingRuleEngine:
     def test_cleanse_field_parses_chinese_date(self):
         engine = CleansingRuleEngine()
-        result = engine.cleanse_field("eqc_business_info", "registered_date", "2024年11月")
+        result = engine.cleanse_field(
+            "eqc_business_info", "registered_date", "2024年11月"
+        )
         assert result.success is True
         assert result.cleansed_value == date(2024, 11, 1)
 
     def test_cleanse_field_converts_register_capital_units(self):
         engine = CleansingRuleEngine()
-        result = engine.cleanse_field("eqc_business_info", "registerCaptial", "1,000万元")
+        result = engine.cleanse_field(
+            "eqc_business_info", "registerCaptial", "1,000万元"
+        )
         assert result.success is True
         assert result.cleansed_value == 1000 * 10_000.0
 

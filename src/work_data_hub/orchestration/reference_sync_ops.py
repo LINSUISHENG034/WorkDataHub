@@ -5,16 +5,19 @@ Story 6.2.4: Pre-load reference data from authoritative sources.
 Story 6.2-p4: Incremental state persistence for reference sync.
 """
 
-import structlog
 from datetime import datetime, timezone
 from typing import Optional
+
+import structlog
 from dagster import Config, OpExecutionContext, op
 from pydantic import Field
 from sqlalchemy import create_engine
 
 from work_data_hub.config.settings import get_settings
+from work_data_hub.domain.reference_backfill.sync_config_loader import (
+    load_reference_sync_config,
+)
 from work_data_hub.domain.reference_backfill.sync_service import ReferenceSyncService
-from work_data_hub.domain.reference_backfill.sync_config_loader import load_reference_sync_config
 from work_data_hub.io.connectors.adapter_factory import AdapterFactory
 from work_data_hub.io.repositories.sync_state_repository import SyncStateRepository
 
@@ -27,8 +30,7 @@ class ReferenceSyncOpConfig(Config):
     """Configuration for reference_sync_op."""
 
     plan_only: bool = Field(
-        default=False,
-        description="If True, only plan sync without executing"
+        default=False, description="If True, only plan sync without executing"
     )
     state: Optional[dict] = Field(
         default=None,
@@ -46,7 +48,9 @@ class ReferenceSyncOpConfig(Config):
 
 
 @op
-def reference_sync_op(context: OpExecutionContext, config: ReferenceSyncOpConfig) -> dict:
+def reference_sync_op(
+    context: OpExecutionContext, config: ReferenceSyncOpConfig
+) -> dict:
     """
     Sync reference data from authoritative sources.
 
@@ -81,7 +85,10 @@ def reference_sync_op(context: OpExecutionContext, config: ReferenceSyncOpConfig
         raise
 
     if sync_config is None:
-        logger.info("reference_sync_op.no_config", message="No reference_sync configuration found")
+        logger.info(
+            "reference_sync_op.no_config",
+            message="No reference_sync configuration found",
+        )
         return {"status": "skipped", "reason": "no_config"}
 
     if not sync_config.enabled:
@@ -97,6 +104,7 @@ def reference_sync_op(context: OpExecutionContext, config: ReferenceSyncOpConfig
     # Get database connection
     db_url = settings.get_database_connection_string()
     import psycopg2
+
     engine = create_engine(db_url, module=psycopg2)
 
     try:
@@ -204,7 +212,9 @@ def _resolve_sync_state(
     """
     # Force full sync - ignore all state
     if config.force_full_sync:
-        logger.info("reference_sync_op.force_full_sync", message="Ignoring persisted state")
+        logger.info(
+            "reference_sync_op.force_full_sync", message="Ignoring persisted state"
+        )
         return None
 
     # Explicit state provided - use it directly

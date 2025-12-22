@@ -7,7 +7,6 @@ browsing to the QR code login section, reducing manual user steps.
 import asyncio
 import logging
 import multiprocessing
-import os
 import sys
 import tkinter as tk
 from datetime import datetime
@@ -25,15 +24,15 @@ from playwright.async_api import Page, Route, ViewportSize, async_playwright
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright_stealth import Stealth
 
-from work_data_hub.io.auth.models import AuthTimeoutError, BrowserError
 from work_data_hub.io.auth.eqc_auth_handler import (
+    DEFAULT_ENV_FILE,
+    DEFAULT_TIMEOUT_SECONDS,
+    EQC_TOKEN_KEY,
     LOGIN_URL,
     TARGET_API_PATH,
-    DEFAULT_TIMEOUT_SECONDS,
-    DEFAULT_ENV_FILE,
-    EQC_TOKEN_KEY,
-    _update_env_file
+    _update_env_file,
 )
+from work_data_hub.io.auth.models import AuthTimeoutError, BrowserError
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +46,7 @@ def _show_qr_ui(image_path: str, status_queue: multiprocessing.Queue):
         # Enable High DPI support for Windows (fixes blurry text)
         try:
             from ctypes import windll
+
             windll.shcore.SetProcessDpiAwareness(1)
         except Exception:
             pass
@@ -56,14 +56,14 @@ def _show_qr_ui(image_path: str, status_queue: multiprocessing.Queue):
 
         # --- Theme Config ---
         THEME = {
-            "primary": "#FF6400",        # Ping An Orange
-            "primary_bg": "#FFF0E6",     # Very light orange background
-            "bg": "#F5F7FA",             # Window background
-            "card": "#FFFFFF",           # Card background
+            "primary": "#FF6400",  # Ping An Orange
+            "primary_bg": "#FFF0E6",  # Very light orange background
+            "bg": "#F5F7FA",  # Window background
+            "card": "#FFFFFF",  # Card background
             "text_main": "#1F2329",
             "text_sub": "#8F959E",
             "border": "#E4E7ED",
-            "success": "#52C41A"
+            "success": "#52C41A",
         }
 
         # Callback for manual close
@@ -81,10 +81,10 @@ def _show_qr_ui(image_path: str, status_queue: multiprocessing.Queue):
         center_x = int(screen_width / 2 - window_width / 2)
         center_y = int(screen_height / 2 - window_height / 2)
 
-        root.geometry(f'{window_width}x{window_height}+{center_x}+{center_y}')
+        root.geometry(f"{window_width}x{window_height}+{center_x}+{center_y}")
         root.resizable(False, False)
         root.configure(bg=THEME["bg"])
-        root.attributes('-topmost', True)
+        root.attributes("-topmost", True)
 
         # Main Card Container
         main_frame = tk.Frame(root, bg=THEME["card"], padx=20, pady=20)
@@ -99,7 +99,7 @@ def _show_qr_ui(image_path: str, status_queue: multiprocessing.Queue):
             text="扫码安全登录",
             font=("Microsoft YaHei UI", 16, "bold"),
             bg=THEME["card"],
-            fg=THEME["text_main"]
+            fg=THEME["text_main"],
         )
         title_label.pack()
 
@@ -108,7 +108,7 @@ def _show_qr_ui(image_path: str, status_queue: multiprocessing.Queue):
             text="请使用「快乐平安」APP 扫一扫",
             font=("Microsoft YaHei UI", 9),
             bg=THEME["card"],
-            fg=THEME["text_sub"]
+            fg=THEME["text_sub"],
         )
         subtitle_label.pack(pady=(5, 0))
 
@@ -124,7 +124,7 @@ def _show_qr_ui(image_path: str, status_queue: multiprocessing.Queue):
             height=canvas_size,
             bg=THEME["card"],
             highlightthickness=0,
-            bd=0
+            bd=0,
         )
         qr_canvas.pack()
 
@@ -147,24 +147,36 @@ def _show_qr_ui(image_path: str, status_queue: multiprocessing.Queue):
             qr_canvas.create_line(pad, pad, pad, pad + length, fill=color, width=width)
 
             # Top-Right
-            qr_canvas.create_line(w - pad, pad, w - pad - length, pad, fill=color, width=width)
-            qr_canvas.create_line(w - pad, pad, w - pad, pad + length, fill=color, width=width)
+            qr_canvas.create_line(
+                w - pad, pad, w - pad - length, pad, fill=color, width=width
+            )
+            qr_canvas.create_line(
+                w - pad, pad, w - pad, pad + length, fill=color, width=width
+            )
 
             # Bottom-Left
-            qr_canvas.create_line(pad, h - pad, pad + length, h - pad, fill=color, width=width)
-            qr_canvas.create_line(pad, h - pad, pad, h - pad - length, fill=color, width=width)
+            qr_canvas.create_line(
+                pad, h - pad, pad + length, h - pad, fill=color, width=width
+            )
+            qr_canvas.create_line(
+                pad, h - pad, pad, h - pad - length, fill=color, width=width
+            )
 
             # Bottom-Right
-            qr_canvas.create_line(w - pad, h - pad, w - pad - length, h - pad, fill=color, width=width)
-            qr_canvas.create_line(w - pad, h - pad, w - pad, h - pad - length, fill=color, width=width)
+            qr_canvas.create_line(
+                w - pad, h - pad, w - pad - length, h - pad, fill=color, width=width
+            )
+            qr_canvas.create_line(
+                w - pad, h - pad, w - pad, h - pad - length, fill=color, width=width
+            )
 
-        except Exception as e:
+        except Exception:
             qr_canvas.create_text(
                 canvas_size // 2,
                 canvas_size // 2,
                 text="二维码加载失败",
                 fill="red",
-                font=("Microsoft YaHei UI", 10)
+                font=("Microsoft YaHei UI", 10),
             )
 
         # --- Instructions Pill ---
@@ -179,7 +191,7 @@ def _show_qr_ui(image_path: str, status_queue: multiprocessing.Queue):
             text="打开APP  >  右上角 + 号  >  扫一扫",
             font=("Microsoft YaHei UI", 9, "bold"),
             bg=THEME["primary_bg"],
-            fg=THEME["primary"]
+            fg=THEME["primary"],
         )
         instr_label.pack()
 
@@ -192,7 +204,7 @@ def _show_qr_ui(image_path: str, status_queue: multiprocessing.Queue):
             text="等待扫码中...",
             font=("Microsoft YaHei UI", 9),
             bg=THEME["card"],
-            fg=THEME["text_sub"]
+            fg=THEME["text_sub"],
         )
         status_label.pack()
 
@@ -217,7 +229,7 @@ async def _take_debug_screenshot(page: Page, name_suffix: str) -> None:
         filename = f"debug_eqc_{timestamp}_{name_suffix}.png"
         screenshot_path = Path("debug_screenshots") / filename
         screenshot_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         await page.screenshot(path=str(screenshot_path), full_page=True)
         logger.info(f"Saved debug screenshot to: {screenshot_path}")
     except Exception as e:
@@ -237,7 +249,7 @@ async def get_auth_token_auto_qr(
         Captured authentication token string, or None
     """
     logger.info("Starting auto-QR EQC authentication...")
-    
+
     # Store process reference to cleanup later
     qr_ui_process: Optional[multiprocessing.Process] = None
     qr_image_path: Optional[Path] = None
@@ -269,7 +281,7 @@ async def get_auth_token_auto_qr(
 
                 stealth = Stealth()
                 await stealth.apply_stealth_async(page)
-                
+
                 js_stealth = """
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => false,
@@ -286,7 +298,9 @@ async def get_auth_token_auto_qr(
                         if TARGET_API_PATH in request.url:
                             token = request.headers.get("token")
                             if token and not token_future.done():
-                                logger.info("Successfully captured authentication token")
+                                logger.info(
+                                    "Successfully captured authentication token"
+                                )
                                 token_future.set_result(token)
                         await route.continue_()
                     except Exception as e:
@@ -305,13 +319,17 @@ async def get_auth_token_auto_qr(
                 logger.info("Verifying page state...")
                 await page.wait_for_timeout(2000)
                 current_url = page.url
-                
-                if "login" not in current_url and ("index" in current_url or current_url.endswith("/")):
-                    logger.info("Detected Index page. Attempting to navigate to Login...")
+
+                if "login" not in current_url and (
+                    "index" in current_url or current_url.endswith("/")
+                ):
+                    logger.info(
+                        "Detected Index page. Attempting to navigate to Login..."
+                    )
                     try:
                         experience_btn = page.locator("text=立即体验").first
                         login_btn = page.locator("text=登录").first
-                        
+
                         if await experience_btn.is_visible(timeout=5000):
                             logger.info("Clicking '立即体验'...")
                             await experience_btn.click()
@@ -319,9 +337,11 @@ async def get_auth_token_auto_qr(
                             logger.info("Clicking '登录'...")
                             await login_btn.click()
                         else:
-                            logger.warning("No navigation buttons found. Forcing URL navigation.")
+                            logger.warning(
+                                "No navigation buttons found. Forcing URL navigation."
+                            )
                             await page.goto(f"{LOGIN_URL.rstrip('/')}/#/login")
-                        
+
                         try:
                             await page.wait_for_url("**/login", timeout=10000)
                         except Exception:
@@ -331,20 +351,32 @@ async def get_auth_token_auto_qr(
                         await page.goto(f"{LOGIN_URL.rstrip('/')}/#/login")
 
                 # --- 2. Ensure Login Page Loaded ---
-                user_provided_xpath = "xpath=/html/body/div[1]/div/div[3]/div[2]/div[1]/img"
-                
+                user_provided_xpath = (
+                    "xpath=/html/body/div[1]/div/div[3]/div[2]/div[1]/img"
+                )
+
                 try:
-                    await page.wait_for_selector(".login_box", state="visible", timeout=5000)
+                    await page.wait_for_selector(
+                        ".login_box", state="visible", timeout=5000
+                    )
                     logger.info("Login box detected.")
                 except Exception:
-                    logger.info("Standard '.login_box' not found, checking user-provided XPath...")
+                    logger.info(
+                        "Standard '.login_box' not found, checking user-provided XPath..."
+                    )
                     try:
-                        if await page.locator(user_provided_xpath).is_visible(timeout=5000):
-                             logger.info("Login page element detected via user XPath.")
+                        if await page.locator(user_provided_xpath).is_visible(
+                            timeout=5000
+                        ):
+                            logger.info("Login page element detected via user XPath.")
                         else:
-                             await page.wait_for_selector(".login_box", state="visible", timeout=5000)
+                            await page.wait_for_selector(
+                                ".login_box", state="visible", timeout=5000
+                            )
                     except Exception:
-                        logger.warning("Login page elements check failed (might still work if partially loaded).")
+                        logger.warning(
+                            "Login page elements check failed (might still work if partially loaded)."
+                        )
 
                 # --- 3. Auto-Switch to QR Code ---
                 logger.info("Attempting to switch to QR code login view...")
@@ -358,21 +390,33 @@ async def get_auth_token_auto_qr(
                             ".login_box div > img",
                             ".login_box .login_switch",
                             "img[src*='qr']",
-                            "img[src*='code']"
+                            "img[src*='code']",
                         ]
-                        
+
                         switch_found = False
                         for selector in potential_selectors:
                             elements = await page.locator(selector).all()
                             for el in elements:
                                 if await el.is_visible():
                                     box = await el.bounding_box()
-                                    if box and box['width'] < 100 and box['height'] < 100:
+                                    if (
+                                        box
+                                        and box["width"] < 100
+                                        and box["height"] < 100
+                                    ):
                                         await el.click()
                                         await page.wait_for_timeout(1000)
-                                        if await page.locator("text=扫描二维码").is_visible() or \
-                                           await page.locator("text=微信").is_visible():
-                                            logger.info("Successfully switched to QR mode.")
+                                        if (
+                                            await page.locator(
+                                                "text=扫描二维码"
+                                            ).is_visible()
+                                            or await page.locator(
+                                                "text=微信"
+                                            ).is_visible()
+                                        ):
+                                            logger.info(
+                                                "Successfully switched to QR mode."
+                                            )
                                             switch_found = True
                                             break
                             if switch_found:
@@ -395,34 +439,33 @@ async def get_auth_token_auto_qr(
                     """
                     clicked = await page.evaluate(js_click)
                     if clicked:
-                         logger.info("Clicked Agreement checkbox via JS.")
+                        logger.info("Clicked Agreement checkbox via JS.")
                     else:
-                         logger.warning("Could not find checkbox via JS selector")
+                        logger.warning("Could not find checkbox via JS selector")
                 except Exception as e:
                     logger.warning(f"Failed to handle agreement: {e}")
 
                 # --- 5. Capture and Show QR Code (Unified UI) ---
                 logger.info("Capturing QR code...")
-                status_queue = multiprocessing.Queue() # Create queue for UI status
+                status_queue = multiprocessing.Queue()  # Create queue for UI status
 
                 try:
                     qr_box = page.locator(".qrcode-box")
                     await qr_box.wait_for(state="visible", timeout=10000)
-                    
+
                     # Save temporary screenshot
                     timestamp = datetime.now().strftime("%H%M%S")
                     qr_image_path = Path(f"temp_qr_{timestamp}.png").resolve()
                     await qr_box.screenshot(path=str(qr_image_path))
-                    logger.info(f"QR Code captured.")
-                    
+                    logger.info("QR Code captured.")
+
                     # Launch Unified UI in separate process
                     qr_ui_process = multiprocessing.Process(
-                        target=_show_qr_ui, 
-                        args=(str(qr_image_path), status_queue)
+                        target=_show_qr_ui, args=(str(qr_image_path), status_queue)
                     )
                     qr_ui_process.start()
                     logger.info("Popup opened. Waiting for scan...")
-                    
+
                 except Exception as e:
                     logger.error(f"Failed to capture/show QR code: {e}")
                     pass
@@ -437,19 +480,19 @@ async def get_auth_token_auto_qr(
                             if msg == "USER_CLOSED":
                                 return "USER_CLOSED"
                         await asyncio.sleep(0.5)
-                
+
                 ui_task = asyncio.create_task(check_ui_close())
-                
+
                 done, pending = await asyncio.wait(
                     [token_future, ui_task],
                     return_when=asyncio.FIRST_COMPLETED,
-                    timeout=timeout_seconds
+                    timeout=timeout_seconds,
                 )
 
                 # Cancel pending tasks
                 for task in pending:
                     task.cancel()
-                
+
                 # Check results
                 if ui_task in done:
                     try:
@@ -458,14 +501,16 @@ async def get_auth_token_auto_qr(
                             return None
                     except asyncio.CancelledError:
                         pass
-                
+
                 if token_future in done:
                     token = token_future.result()
                     logger.info("Authentication completed successfully")
                     return token
-                
+
                 # If neither is done, it means timeout occurred (asyncio.wait timeout)
-                raise AuthTimeoutError(f"Authentication timed out after {timeout_seconds} seconds")
+                raise AuthTimeoutError(
+                    f"Authentication timed out after {timeout_seconds} seconds"
+                )
 
             except AuthTimeoutError:
                 raise
@@ -482,20 +527,22 @@ async def get_auth_token_auto_qr(
                         await browser.close()
                     except Exception:
                         pass
-                
+
                 # 2. Close UI Popup
                 if qr_ui_process and qr_ui_process.is_alive():
                     logger.debug("Closing QR Code window...")
                     qr_ui_process.terminate()
                     qr_ui_process.join(timeout=1)
-                
+
                 # 3. Clean up temp file
                 if qr_image_path and qr_image_path.exists():
                     try:
                         qr_image_path.unlink()
                         logger.debug(f"Cleaned up temp QR file: {qr_image_path}")
                     except Exception as e:
-                        logger.warning(f"Failed to delete temp file {qr_image_path}: {e}")
+                        logger.warning(
+                            f"Failed to delete temp file {qr_image_path}: {e}"
+                        )
 
     except BrowserError:
         raise
@@ -510,6 +557,7 @@ def run_get_token_auto_qr(
     env_file: str = DEFAULT_ENV_FILE,
 ) -> Optional[str]:
     """Sync wrapper for auto_eqc_auth."""
+
     def _mask_token(value: str) -> str:
         if not value:
             return "<empty>"
@@ -519,35 +567,36 @@ def run_get_token_auto_qr(
 
     try:
         token = asyncio.run(get_auth_token_auto_qr(timeout_seconds))
-        
+
         if token and save_to_env:
             # Add timestamp comment to the token value
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             token_with_comment = f"{token} # Updated: {timestamp}"
-            
+
             success = _update_env_file(env_file, EQC_TOKEN_KEY, token_with_comment)
             if success:
                 print(f"✅ Token 已自动保存到 {env_file}")
             else:
                 print(f"⚠️ Token 保存失败，请手动更新 {env_file}")
                 print(f"   {EQC_TOKEN_KEY}={_mask_token(token)}  # redacted")
-        
+
         return token
     except Exception as exc:
         logger.error("Synchronous wrapper failed: %s", exc)
         return None
 
+
 if __name__ == "__main__":
     # Needed for multiprocessing on Windows
     multiprocessing.freeze_support()
-    
+
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
     print("Running Auto-QR Auth Script...")
     token = run_get_token_auto_qr(save_to_env=True)
     if token:
-        print(f"Success! Token captured.")
+        print("Success! Token captured.")
     else:
         print("Failed to get token.")

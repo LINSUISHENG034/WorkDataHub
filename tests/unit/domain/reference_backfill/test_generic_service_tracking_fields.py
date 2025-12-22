@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import pandas as pd
 
-from work_data_hub.domain.reference_backfill.generic_service import GenericBackfillService
+from work_data_hub.domain.reference_backfill.generic_service import (
+    GenericBackfillService,
+)
 
 
 def test_add_tracking_fields_plan_only_smoke():
@@ -19,9 +21,9 @@ def test_add_tracking_fields_plan_only_smoke():
 
     enriched = service._add_tracking_fields(df)  # noqa: SLF001 (smoke-level access)
 
-    assert set(["_source", "_needs_review", "_derived_from_domain", "_derived_at"]).issubset(
-        set(enriched.columns)
-    )
+    assert set(
+        ["_source", "_needs_review", "_derived_from_domain", "_derived_at"]
+    ).issubset(set(enriched.columns))
     assert enriched.loc[0, "_source"] == "auto_derived"
     assert bool(enriched.loc[0, "_needs_review"]) is True
     assert enriched.loc[0, "_derived_from_domain"] == "annuity_performance"

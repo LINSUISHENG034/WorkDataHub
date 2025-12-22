@@ -2,6 +2,7 @@
 EQC Connector Models and Exceptions.
 """
 
+
 class EQCClientError(Exception):
     """Base exception for EQC client errors."""
 

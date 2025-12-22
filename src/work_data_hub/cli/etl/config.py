@@ -62,14 +62,20 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:
 
     try:
         # Story 6.2-P14: Use get_domain_config_v2 for proper defaults inheritance
-        domain_cfg = get_domain_config_v2(domain, config_path=str(settings.data_sources_config))
+        domain_cfg = get_domain_config_v2(
+            domain, config_path=str(settings.data_sources_config)
+        )
 
         # Extract table/schema/pk from validated config with inheritance
         if domain_cfg.output:
             table_name = domain_cfg.output.table
-            schema_name = domain_cfg.output.schema_name  # ✅ Now inherits from defaults!
+            schema_name = (
+                domain_cfg.output.schema_name
+            )  # ✅ Now inherits from defaults!
             # Use schema-qualified table name with proper SQL identifier quoting
-            table = f'"{schema_name}"."{table_name}"' if schema_name else f'"{table_name}"'
+            table = (
+                f'"{schema_name}"."{table_name}"' if schema_name else f'"{table_name}"'
+            )
 
             # Try to get pk from output config (may not exist in all configs)
             pk = getattr(domain_cfg.output, "pk", [])

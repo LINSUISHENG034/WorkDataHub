@@ -21,14 +21,23 @@ def _reset_fetch(monkeypatch):
 def _mock_fetch(records: List[Dict[str, Any]]):
     """Helper to mock _fetch_from_postgres to return given records."""
 
-    def _fake(table: str, schema: str, columns: List[str], description: str, connection_env_prefix: str = "WDH_LEGACY"):
+    def _fake(
+        table: str,
+        schema: str,
+        columns: List[str],
+        description: str,
+        connection_env_prefix: str = "WDH_LEGACY",
+    ):
         return records
 
     return _fake
 
 
 def test_extract_company_id2_mapping_prefers_postgres(monkeypatch):
-    records = [{"年金账户号": "ACC1", "company_id": "C1"}, {"年金账户号": "ACC2", "company_id": "C2"}]
+    records = [
+        {"年金账户号": "ACC1", "company_id": "C1"},
+        {"年金账户号": "ACC2", "company_id": "C2"},
+    ]
     monkeypatch.setattr(loader, "_fetch_from_postgres", _mock_fetch(records))
     # Guard MySqlDBManager use
     monkeypatch.setattr(loader, "MySqlDBManager", None)
@@ -91,4 +100,3 @@ def test_extract_company_id5_mapping_falls_back_to_mysql(monkeypatch):
     result = loader._extract_company_id5_mapping()
 
     assert result == {"acct": "CID"}
-

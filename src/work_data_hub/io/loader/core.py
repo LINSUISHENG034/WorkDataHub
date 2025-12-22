@@ -1,14 +1,15 @@
 import logging
+import sys
 import time
 import uuid
-import sys
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
 
 # Static imports for compilation/linting, dynamic in methods for test patching
 if TYPE_CHECKING:
     from psycopg2.pool import ThreadedConnectionPool
 
 from functools import lru_cache
+
 import pandas as pd
 
 from work_data_hub.config import get_settings
@@ -34,7 +35,9 @@ class WarehouseLoader:
         connect_timeout: int = 5,
     ):
         settings = get_settings()
-        self.connection_url = connection_url or settings.get_database_connection_string()
+        self.connection_url = (
+            connection_url or settings.get_database_connection_string()
+        )
         self.pool_size = pool_size or settings.DB_POOL_SIZE
         # Allow override but default to sensible batch size if not configured
         self.batch_size = batch_size or getattr(settings, "DB_BATCH_SIZE", 5000)
@@ -77,7 +80,10 @@ class WarehouseLoader:
         Returns:
             The imported attribute
         """
-        for name in ["src.work_data_hub.io.loader.warehouse_loader", "work_data_hub.io.loader.warehouse_loader"]:
+        for name in [
+            "src.work_data_hub.io.loader.warehouse_loader",
+            "work_data_hub.io.loader.warehouse_loader",
+        ]:
             if name in sys.modules:
                 mod = sys.modules[name]
                 if hasattr(mod, attr_name):
@@ -89,7 +95,9 @@ class WarehouseLoader:
         # Dynamic import to allow tests to patch ThreadedConnectionPool via the facade
         ThreadedConnectionPool = self._get_dynamic_import(
             "ThreadedConnectionPool",
-            lambda: __import__("psycopg2.pool", fromlist=["ThreadedConnectionPool"]).ThreadedConnectionPool
+            lambda: __import__(
+                "psycopg2.pool", fromlist=["ThreadedConnectionPool"]
+            ).ThreadedConnectionPool,
         )
 
         if self._pool is None or self._pool.closed:
@@ -253,7 +261,9 @@ class WarehouseLoader:
             # Dynamic import to allow tests to patch execute_values via the facade
             execute_values_func = self._get_dynamic_import(
                 "execute_values",
-                lambda: __import__("psycopg2.extras", fromlist=["execute_values"]).execute_values
+                lambda: __import__(
+                    "psycopg2.extras", fromlist=["execute_values"]
+                ).execute_values,
             )
 
             with conn.cursor() as cursor:
@@ -431,7 +441,9 @@ class WarehouseLoader:
                 # Dynamic import for test compatibility
                 execute_values_func = self._get_dynamic_import(
                     "execute_values",
-                    lambda: __import__("psycopg2.extras", fromlist=["execute_values"]).execute_values
+                    lambda: __import__(
+                        "psycopg2.extras", fromlist=["execute_values"]
+                    ).execute_values,
                 )
 
                 for batch in self._chunk_dataframe(projected_df):

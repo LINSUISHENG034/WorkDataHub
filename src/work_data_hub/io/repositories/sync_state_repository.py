@@ -79,9 +79,7 @@ class SyncStateRepository:
             self._table_verified = True
         return exists
 
-    def get_state(
-        self, job_name: str, table_name: str
-    ) -> Optional[Dict[str, Any]]:
+    def get_state(self, job_name: str, table_name: str) -> Optional[Dict[str, Any]]:
         """
         Get the sync state for a specific job/table combination.
 

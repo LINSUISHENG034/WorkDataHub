@@ -22,7 +22,6 @@ Usage:
 """
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
@@ -131,7 +130,6 @@ Examples:
         cmd_migrate,
         cmd_preview,
         cmd_scan,
-        configure_logging,
     )
 
     # Create namespace for CLI commands

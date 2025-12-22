@@ -422,4 +422,3 @@ class TestSelectionStrategy:
 
         # Should select first alphabetically (containing A)
         assert result.matched_file.name == "报表A2024.xlsx"
-

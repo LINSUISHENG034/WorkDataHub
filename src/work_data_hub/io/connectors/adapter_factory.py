@@ -88,11 +88,14 @@ class AdapterFactory:
             from work_data_hub.io.connectors.postgres_source_adapter import (
                 PostgresSourceAdapter,
             )
+
             adapter = PostgresSourceAdapter(
                 connection_env_prefix=connection_env_prefix or "WDH_LEGACY_PG",
                 **kwargs,
             )
-            logger.info(f"Created PostgresSourceAdapter with prefix {connection_env_prefix or 'WDH_LEGACY_PG'}")
+            logger.info(
+                f"Created PostgresSourceAdapter with prefix {connection_env_prefix or 'WDH_LEGACY_PG'}"
+            )
 
         elif source_type in ("legacy_mysql", "mysql"):
             from work_data_hub.io.connectors.mysql_source_adapter import (
@@ -106,6 +109,7 @@ class AdapterFactory:
             from work_data_hub.io.connectors.config_file_connector import (
                 ConfigFileConnector,
             )
+
             adapter = ConfigFileConnector(**kwargs)
             logger.info("Created ConfigFileConnector")
 
@@ -148,7 +152,10 @@ class AdapterFactory:
 
             # Extract connection_env_prefix if available
             connection_env_prefix = None
-            if source_type == "postgres" and "connection_env_prefix" in config.source_config:
+            if (
+                source_type == "postgres"
+                and "connection_env_prefix" in config.source_config
+            ):
                 connection_env_prefix = config.source_config["connection_env_prefix"]
 
             # Create adapter
@@ -157,7 +164,9 @@ class AdapterFactory:
                 connection_env_prefix=connection_env_prefix,
             )
 
-        logger.info(f"Created {len(adapters)} adapters for source types: {list(adapters.keys())}")
+        logger.info(
+            f"Created {len(adapters)} adapters for source types: {list(adapters.keys())}"
+        )
 
         return adapters
 

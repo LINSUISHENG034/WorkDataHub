@@ -26,21 +26,15 @@ def config_with_output(tmp_path):
                 "base_path": "reference/monthly/{YYYYMM}/数据采集",
                 "file_patterns": ["*.xlsx"],
                 "sheet_name": "Sheet1",
-                "output": {
-                    "table": "annuity_performance",
-                    "schema_name": "public"
-                }
+                "output": {"table": "annuity_performance", "schema_name": "public"},
             },
             "annuity_income": {
                 "base_path": "reference/monthly/{YYYYMM}/数据采集",
                 "file_patterns": ["*.xlsx"],
                 "sheet_name": "Sheet1",
-                "output": {
-                    "table": "annuity_income",
-                    "schema_name": "analytics"
-                }
-            }
-        }
+                "output": {"table": "annuity_income", "schema_name": "analytics"},
+            },
+        },
     }
 
     config_path = tmp_path / "data_sources.yml"
@@ -62,7 +56,7 @@ def config_without_output(tmp_path):
                 "sheet_name": "Sheet1",
                 # No output configuration
             }
-        }
+        },
     }
 
     config_path = tmp_path / "data_sources.yml"
@@ -113,7 +107,7 @@ class TestGetDomainOutputConfig:
         # Mock datetime to get predictable timestamp
         mock_datetime = datetime(2025, 12, 12, 14, 30, 22)
 
-        with patch('src.work_data_hub.config.output_config.datetime') as mock_dt:
+        with patch("src.work_data_hub.config.output_config.datetime") as mock_dt:
             mock_dt.now.return_value = mock_datetime
 
             table_name, schema_name = get_domain_output_config(
@@ -129,7 +123,7 @@ class TestGetDomainOutputConfig:
         """Test that fallback tables don't get _NEW suffix (already temp)."""
         mock_datetime = datetime(2025, 12, 12, 14, 30, 22)
 
-        with patch('src.work_data_hub.config.output_config.datetime') as mock_dt:
+        with patch("src.work_data_hub.config.output_config.datetime") as mock_dt:
             mock_dt.now.return_value = mock_datetime
 
             # With validation mode

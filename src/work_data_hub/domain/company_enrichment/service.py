@@ -503,7 +503,9 @@ class CompanyEnrichmentService:
                 )
                 # Story 6.8: Record cache hit (AC1)
                 if observer:
-                    observer.record_cache_hit(match_type=internal_result.match_type or "unknown")
+                    observer.record_cache_hit(
+                        match_type=internal_result.match_type or "unknown"
+                    )
                 return CompanyIdResult(
                     company_id=internal_result.company_id,
                     status=ResolutionStatus.SUCCESS_INTERNAL,

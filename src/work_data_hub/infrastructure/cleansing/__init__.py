@@ -50,17 +50,19 @@ from work_data_hub.infrastructure.cleansing.registry import (
     registry,
     rule,
 )
+from work_data_hub.infrastructure.cleansing.rules.date_rules import (
+    parse_chinese_date_value,
+)
 from work_data_hub.infrastructure.cleansing.rules.numeric_rules import (
     annuity_decimal_cleaner,
     comprehensive_decimal_cleaning,
-    decimal_quantization,
     convert_chinese_amount_units,
+    decimal_quantization,
     handle_percentage_conversion,
     remove_currency_symbols,
     standardize_null_values,
     trustee_decimal_cleaner,
 )
-from work_data_hub.infrastructure.cleansing.rules.date_rules import parse_chinese_date_value
 from work_data_hub.infrastructure.cleansing.rules.string_rules import (
     normalize_company_name,
     trim_whitespace,

@@ -5,7 +5,7 @@ Provides functions for creating indexed parameter names to avoid issues
 with Chinese column names in psycopg2 parameter binding.
 """
 
-from typing import Dict, List, Tuple, Any
+from typing import Any, Dict, List, Tuple
 
 
 def build_indexed_params(columns: List[str]) -> Tuple[Dict[str, str], List[str]]:
@@ -33,7 +33,9 @@ def build_indexed_params(columns: List[str]) -> Tuple[Dict[str, str], List[str]]
     return col_param_map, placeholders
 
 
-def remap_records(records: List[Dict[str, Any]], param_map: Dict[str, str]) -> List[Dict[str, Any]]:
+def remap_records(
+    records: List[Dict[str, Any]], param_map: Dict[str, str]
+) -> List[Dict[str, Any]]:
     """
     Remap record keys to indexed parameter names.
 
@@ -52,8 +54,6 @@ def remap_records(records: List[Dict[str, Any]], param_map: Dict[str, str]) -> L
     """
     remapped = []
     for record in records:
-        remapped_record = {
-            param_map[k]: v for k, v in record.items() if k in param_map
-        }
+        remapped_record = {param_map[k]: v for k, v in record.items() if k in param_map}
         remapped.append(remapped_record)
     return remapped

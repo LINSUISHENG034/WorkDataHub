@@ -62,7 +62,7 @@ def sample_mysql_data():
 class TestLegacyMySQLConnector:
     """Test suite for LegacyMySQLConnector."""
 
-    @patch('work_data_hub.io.connectors.legacy_mysql_connector.get_settings')
+    @patch("work_data_hub.io.connectors.legacy_mysql_connector.get_settings")
     def test_init(self, mock_get_settings, mock_settings):
         """Test connector initialization."""
         mock_get_settings.return_value = mock_settings
@@ -80,9 +80,11 @@ class TestLegacyMySQLConnector:
         assert connector.max_retries == 3
         assert connector.retry_backoff_base == 2.0
 
-    @patch('work_data_hub.io.connectors.legacy_mysql_connector.get_settings')
-    @patch('work_data_hub.io.connectors.legacy_mysql_connector.pymysql.connect')
-    def test_get_connection_success(self, mock_connect, mock_get_settings, mock_settings):
+    @patch("work_data_hub.io.connectors.legacy_mysql_connector.get_settings")
+    @patch("work_data_hub.io.connectors.legacy_mysql_connector.pymysql.connect")
+    def test_get_connection_success(
+        self, mock_connect, mock_get_settings, mock_settings
+    ):
         """Test successful connection establishment."""
         mock_get_settings.return_value = mock_settings
         mock_conn = MagicMock()
@@ -96,17 +98,17 @@ class TestLegacyMySQLConnector:
         # Verify connection was established with correct parameters
         mock_connect.assert_called_once()
         call_kwargs = mock_connect.call_args[1]
-        assert call_kwargs['host'] == "test-host"
-        assert call_kwargs['port'] == 3306
-        assert call_kwargs['user'] == "test_user"
-        assert call_kwargs['database'] == "test_db"
+        assert call_kwargs["host"] == "test-host"
+        assert call_kwargs["port"] == 3306
+        assert call_kwargs["user"] == "test_user"
+        assert call_kwargs["database"] == "test_db"
 
         # Verify connection was closed
         mock_conn.close.assert_called_once()
 
-    @patch('work_data_hub.io.connectors.legacy_mysql_connector.get_settings')
-    @patch('work_data_hub.io.connectors.legacy_mysql_connector.pymysql.connect')
-    @patch('work_data_hub.io.connectors.legacy_mysql_connector.time.sleep')
+    @patch("work_data_hub.io.connectors.legacy_mysql_connector.get_settings")
+    @patch("work_data_hub.io.connectors.legacy_mysql_connector.pymysql.connect")
+    @patch("work_data_hub.io.connectors.legacy_mysql_connector.time.sleep")
     def test_get_connection_retry_success(
         self, mock_sleep, mock_connect, mock_get_settings, mock_settings
     ):
@@ -131,9 +133,9 @@ class TestLegacyMySQLConnector:
         # Verify backoff was applied (2^1 = 2 seconds)
         mock_sleep.assert_called_once_with(2.0)
 
-    @patch('work_data_hub.io.connectors.legacy_mysql_connector.get_settings')
-    @patch('work_data_hub.io.connectors.legacy_mysql_connector.pymysql.connect')
-    @patch('work_data_hub.io.connectors.legacy_mysql_connector.time.sleep')
+    @patch("work_data_hub.io.connectors.legacy_mysql_connector.get_settings")
+    @patch("work_data_hub.io.connectors.legacy_mysql_connector.pymysql.connect")
+    @patch("work_data_hub.io.connectors.legacy_mysql_connector.time.sleep")
     def test_get_connection_retry_exhausted(
         self, mock_sleep, mock_connect, mock_get_settings, mock_settings
     ):
@@ -156,8 +158,8 @@ class TestLegacyMySQLConnector:
         assert mock_sleep.call_count == 2
         mock_sleep.assert_has_calls([call(2.0), call(4.0)])
 
-    @patch('work_data_hub.io.connectors.legacy_mysql_connector.get_settings')
-    @patch.object(LegacyMySQLConnector, 'get_connection')
+    @patch("work_data_hub.io.connectors.legacy_mysql_connector.get_settings")
+    @patch.object(LegacyMySQLConnector, "get_connection")
     def test_fetch_data_success(
         self,
         mock_get_connection,
@@ -198,8 +200,8 @@ class TestLegacyMySQLConnector:
         assert df["计划号"].tolist() == ["A001", "A002", "A003"]
         assert df["计划名称"].tolist() == ["Plan 1", "Plan 2", "Plan 3"]
 
-    @patch('work_data_hub.io.connectors.legacy_mysql_connector.get_settings')
-    @patch.object(LegacyMySQLConnector, 'get_connection')
+    @patch("work_data_hub.io.connectors.legacy_mysql_connector.get_settings")
+    @patch.object(LegacyMySQLConnector, "get_connection")
     def test_fetch_data_empty_result(
         self,
         mock_get_connection,
@@ -233,7 +235,7 @@ class TestLegacyMySQLConnector:
         assert "计划名称" in df.columns
         assert "计划类型" in df.columns
 
-    @patch('work_data_hub.io.connectors.legacy_mysql_connector.get_settings')
+    @patch("work_data_hub.io.connectors.legacy_mysql_connector.get_settings")
     def test_fetch_data_invalid_config(self, mock_get_settings, mock_settings):
         """Test fetch with invalid source configuration."""
         mock_get_settings.return_value = mock_settings
@@ -244,9 +246,7 @@ class TestLegacyMySQLConnector:
             target_table="target_table",
             target_schema="business",
             source_type="legacy_mysql",
-            source_config={
-                "invalid_field": "value"
-            },
+            source_config={"invalid_field": "value"},
             sync_mode="upsert",
             primary_key="id",
         )
@@ -256,9 +256,9 @@ class TestLegacyMySQLConnector:
         with pytest.raises(ValueError, match="Invalid Legacy MySQL source config"):
             connector.fetch_data(invalid_config)
 
-    @patch('work_data_hub.io.connectors.legacy_mysql_connector.get_settings')
-    @patch.object(LegacyMySQLConnector, 'get_connection')
-    @patch('work_data_hub.io.connectors.legacy_mysql_connector.time.sleep')
+    @patch("work_data_hub.io.connectors.legacy_mysql_connector.get_settings")
+    @patch.object(LegacyMySQLConnector, "get_connection")
+    @patch("work_data_hub.io.connectors.legacy_mysql_connector.time.sleep")
     def test_fetch_data_query_retry(
         self,
         mock_sleep,
@@ -303,7 +303,7 @@ class TestLegacyMySQLConnector:
         # Verify backoff was applied
         mock_sleep.assert_called_once_with(2.0)
 
-    @patch('work_data_hub.io.connectors.legacy_mysql_connector.get_settings')
+    @patch("work_data_hub.io.connectors.legacy_mysql_connector.get_settings")
     def test_apply_column_mappings(self, mock_get_settings, mock_settings):
         """Test column mapping application."""
         mock_get_settings.return_value = mock_settings
@@ -311,14 +311,19 @@ class TestLegacyMySQLConnector:
         connector = LegacyMySQLConnector()
 
         # Create test DataFrame
-        df = pd.DataFrame({
-            'id': ['A001', 'A002'],
-            'name': ['Plan 1', 'Plan 2'],
-            'type': ['Type A', 'Type B'],
-        })
+        df = pd.DataFrame(
+            {
+                "id": ["A001", "A002"],
+                "name": ["Plan 1", "Plan 2"],
+                "type": ["Type A", "Type B"],
+            }
+        )
 
         # Create source config with mappings
-        from work_data_hub.domain.reference_backfill.sync_models import LegacyMySQLSourceConfig
+        from work_data_hub.domain.reference_backfill.sync_models import (
+            LegacyMySQLSourceConfig,
+        )
+
         source_config = LegacyMySQLSourceConfig(
             table="source_table",
             columns=[
@@ -342,11 +347,13 @@ class TestLegacyMySQLConnector:
         assert "type" not in result_df.columns
 
         # Verify data is preserved
-        assert result_df["计划号"].tolist() == ['A001', 'A002']
-        assert result_df["计划名称"].tolist() == ['Plan 1', 'Plan 2']
+        assert result_df["计划号"].tolist() == ["A001", "A002"]
+        assert result_df["计划名称"].tolist() == ["Plan 1", "Plan 2"]
 
-    @patch('work_data_hub.io.connectors.legacy_mysql_connector.get_settings')
-    def test_apply_column_mappings_empty_dataframe(self, mock_get_settings, mock_settings):
+    @patch("work_data_hub.io.connectors.legacy_mysql_connector.get_settings")
+    def test_apply_column_mappings_empty_dataframe(
+        self, mock_get_settings, mock_settings
+    ):
         """Test column mapping with empty DataFrame."""
         mock_get_settings.return_value = mock_settings
 
@@ -356,7 +363,10 @@ class TestLegacyMySQLConnector:
         df = pd.DataFrame()
 
         # Create source config with mappings
-        from work_data_hub.domain.reference_backfill.sync_models import LegacyMySQLSourceConfig
+        from work_data_hub.domain.reference_backfill.sync_models import (
+            LegacyMySQLSourceConfig,
+        )
+
         source_config = LegacyMySQLSourceConfig(
             table="source_table",
             columns=[

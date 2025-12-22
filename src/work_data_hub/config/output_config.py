@@ -105,4 +105,6 @@ def get_domain_output_config(
             domain=domain_name,
             error=str(e),
         )
-        raise ValueError(f"Failed to load configuration for domain '{domain_name}': {e}")
+        raise ValueError(
+            f"Failed to load configuration for domain '{domain_name}': {e}"
+        )

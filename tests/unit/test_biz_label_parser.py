@@ -18,7 +18,10 @@ class TestBizLabelParser:
     @pytest.fixture
     def parser(self):
         """Create a parser instance."""
-        from work_data_hub.infrastructure.cleansing.biz_label_parser import BizLabelParser
+        from work_data_hub.infrastructure.cleansing.biz_label_parser import (
+            BizLabelParser,
+        )
+
         return BizLabelParser()
 
     def test_parse_complete_labels_structure(self, parser):
@@ -55,7 +58,7 @@ class TestBizLabelParser:
         result = parser.parse(raw, "fallback_id")
 
         assert len(result) == 2
-        
+
         # First label
         assert result[0].company_id == "company_123"
         assert result[0].type == "行业分类"
@@ -156,14 +159,32 @@ class TestBizLabelParser:
                 {
                     "type": "行业分类",
                     "labels": [
-                        {"companyId": "c1", "lv1Name": "行业A", "lv2Name": None, "lv3Name": None, "lv4Name": None},
-                        {"companyId": "c1", "lv1Name": "行业B", "lv2Name": None, "lv3Name": None, "lv4Name": None},
+                        {
+                            "companyId": "c1",
+                            "lv1Name": "行业A",
+                            "lv2Name": None,
+                            "lv3Name": None,
+                            "lv4Name": None,
+                        },
+                        {
+                            "companyId": "c1",
+                            "lv1Name": "行业B",
+                            "lv2Name": None,
+                            "lv3Name": None,
+                            "lv4Name": None,
+                        },
                     ],
                 },
                 {
                     "type": "资质认证",
                     "labels": [
-                        {"companyId": "c1", "lv1Name": "ISO9001", "lv2Name": None, "lv3Name": None, "lv4Name": None},
+                        {
+                            "companyId": "c1",
+                            "lv1Name": "ISO9001",
+                            "lv2Name": None,
+                            "lv3Name": None,
+                            "lv4Name": None,
+                        },
                     ],
                 },
             ],
@@ -234,7 +255,13 @@ class TestBizLabelParser:
                 {
                     "type": "行业分类",
                     "labels": [
-                        {"companyId": "c1", "lv1Name": "Valid", "lv2Name": None, "lv3Name": None, "lv4Name": None},
+                        {
+                            "companyId": "c1",
+                            "lv1Name": "Valid",
+                            "lv2Name": None,
+                            "lv3Name": None,
+                            "lv4Name": None,
+                        },
                         "not_a_dict",  # Should be skipped
                         123,  # Should be skipped
                     ],

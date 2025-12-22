@@ -36,4 +36,3 @@ def test_pipeline_handles_missing_month_column() -> None:
     result = pipeline.execute(df, context)
     assert "月度" in result.columns
     assert result["月度"].isna().all()
-

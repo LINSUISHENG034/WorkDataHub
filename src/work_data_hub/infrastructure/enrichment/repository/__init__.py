@@ -18,8 +18,8 @@ Story 7.3: This is a refactored module - all public exports are re-exported
 here for backward compatibility.
 """
 
-from .models import MatchResult, InsertBatchResult, EnqueueResult
 from .core import CompanyMappingRepository
+from .models import EnqueueResult, InsertBatchResult, MatchResult
 
 __all__ = [
     "CompanyMappingRepository",

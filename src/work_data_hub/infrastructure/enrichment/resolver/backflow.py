@@ -54,8 +54,8 @@ def backflow_new_mappings(
     new_mappings: List[Dict[str, Any]] = []
     # Story 6.4.1: P4 (customer_name) needs normalization, others use RAW values
     backflow_fields = [
-        (strategy.account_number_column, "account", 2, False),     # P2: RAW
-        (strategy.customer_name_column, "name", 4, True),          # P4: NORMALIZED
+        (strategy.account_number_column, "account", 2, False),  # P2: RAW
+        (strategy.customer_name_column, "name", 4, True),  # P4: NORMALIZED
         (strategy.account_name_column, "account_name", 5, False),  # P5: RAW
     ]
 
@@ -96,9 +96,7 @@ def backflow_new_mappings(
         return {"inserted": 0, "skipped": 0, "conflicts": 0}
 
     try:
-        result = mapping_repository.insert_batch_with_conflict_check(
-            new_mappings
-        )
+        result = mapping_repository.insert_batch_with_conflict_check(new_mappings)
 
         if result.conflicts:
             logger.warning(
@@ -216,7 +214,11 @@ def generate_temp_id(customer_name: Optional[str], salt: str) -> str:
     Returns:
         Temporary ID in format "IN_<16-char-Base32>".
     """
-    if customer_name is None or pd.isna(customer_name) or not str(customer_name).strip():
+    if (
+        customer_name is None
+        or pd.isna(customer_name)
+        or not str(customer_name).strip()
+    ):
         # For empty names, use a placeholder
         customer_name = "__EMPTY__"
 

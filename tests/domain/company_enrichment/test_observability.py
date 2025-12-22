@@ -64,7 +64,7 @@ class TestEnrichmentStats:
             sync_budget_used=5,
             async_queued=45,
             queue_depth_after=120,
-            hit_type_counts={"exact": 800, "fuzzy": 50}
+            hit_type_counts={"exact": 800, "fuzzy": 50},
         )
         result = stats.to_dict()
 
@@ -97,7 +97,7 @@ class TestEnrichmentStats:
             sync_budget_used=5,
             async_queued=5,
             queue_depth_after=50,
-            hit_type_counts={"plan": 60, "name": 20}
+            hit_type_counts={"plan": 60, "name": 20},
         )
         stats2 = EnrichmentStats(
             total_lookups=50,
@@ -107,7 +107,7 @@ class TestEnrichmentStats:
             sync_budget_used=2,
             async_queued=3,
             queue_depth_after=60,
-            hit_type_counts={"plan": 30, "account": 10}
+            hit_type_counts={"plan": 30, "account": 10},
         )
 
         merged = stats1.merge(stats2)
@@ -143,7 +143,12 @@ class TestUnknownCompanyRecord:
     def test_csv_headers(self) -> None:
         """Test CSV header generation (AC2)."""
         headers = UnknownCompanyRecord.csv_headers()
-        assert headers == ["company_name", "temporary_id", "first_seen", "occurrence_count"]
+        assert headers == [
+            "company_name",
+            "temporary_id",
+            "first_seen",
+            "occurrence_count",
+        ]
 
     def test_to_csv_row(self) -> None:
         """Test CSV row generation (AC2)."""
@@ -328,8 +333,7 @@ class TestEnrichmentObserver:
                 observer.record_cache_hit()
 
         threads = [
-            threading.Thread(target=record_operations)
-            for _ in range(num_threads)
+            threading.Thread(target=record_operations) for _ in range(num_threads)
         ]
 
         for t in threads:
@@ -389,7 +393,7 @@ class TestEnrichmentStatsJsonFormat:
             sync_budget_used=5,
             async_queued=45,
             queue_depth_after=120,
-            hit_type_counts={"exact": 850}
+            hit_type_counts={"exact": 850},
         )
         result = stats.to_dict()
 

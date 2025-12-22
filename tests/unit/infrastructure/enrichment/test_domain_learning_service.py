@@ -64,14 +64,16 @@ def sample_dataframe():
             "计划代码": ["FP0001", "FP0002", "FP0003", "FP0001", "FP0002"] * 2,
             "年金账户名": ["账户A", "账户B", "账户C", "账户A", "账户B"] * 2,
             "年金账户号": ["ACC001", "ACC002", "ACC003", "ACC001", "ACC002"] * 2,
-            "客户名称": ["中国平安", "中国人寿", "太平洋保险", "中国平安", "中国人寿"] * 2,
+            "客户名称": ["中国平安", "中国人寿", "太平洋保险", "中国平安", "中国人寿"]
+            * 2,
             "company_id": [
                 "614810477",
                 "614810478",
                 "614810479",
                 "614810477",
                 "614810478",
-            ] * 2,
+            ]
+            * 2,
         }
     )
 
@@ -256,7 +258,9 @@ class TestLearnFromDomain:
         assert result.inserted == 5  # Mock returns 5
         mock_repository.insert_enrichment_index_batch.assert_called_once()
 
-    def test_extracts_all_lookup_types(self, service, mock_repository, sample_dataframe):
+    def test_extracts_all_lookup_types(
+        self, service, mock_repository, sample_dataframe
+    ):
         """Test extraction of all 5 lookup types (AC2)."""
         service.learn_from_domain(
             domain_name="annuity_performance",
@@ -593,7 +597,8 @@ class TestStatisticsTracking:
     def test_statistics_accurate(self, mock_repository):
         """Test that statistics are accurately tracked."""
         mock_repository.insert_enrichment_index_batch.return_value = InsertBatchResult(
-            inserted_count=10, skipped_count=5  # 5 updates
+            inserted_count=10,
+            skipped_count=5,  # 5 updates
         )
 
         config = DomainLearningConfig()

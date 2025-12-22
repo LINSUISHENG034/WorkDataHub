@@ -31,7 +31,9 @@ from work_data_hub.io.connectors.eqc_client import EQCClient
 @pytest.mark.eqc_integration
 def test_eqc_full_acquisition_persists_raw_responses() -> None:
     if os.environ.get("RUN_EQC_INTEGRATION_TESTS") != "1":
-        pytest.skip("Set RUN_EQC_INTEGRATION_TESTS=1 to enable live EQC integration test")
+        pytest.skip(
+            "Set RUN_EQC_INTEGRATION_TESTS=1 to enable live EQC integration test"
+        )
 
     token = os.environ.get("WDH_EQC_TOKEN")
     if not token:
@@ -60,7 +62,9 @@ def test_eqc_full_acquisition_persists_raw_responses() -> None:
         conn_ctx = engine.connect()
     except OperationalError:
         parsed = urlparse(url)
-        redacted = f"{parsed.scheme}://[REDACTED]@{parsed.hostname}:{parsed.port}{parsed.path}"
+        redacted = (
+            f"{parsed.scheme}://[REDACTED]@{parsed.hostname}:{parsed.port}{parsed.path}"
+        )
         pytest.skip(f"PostgreSQL not reachable: {redacted}")
 
     with conn_ctx as conn:
@@ -77,28 +81,44 @@ def test_eqc_full_acquisition_persists_raw_responses() -> None:
             )
         )
         conn.execute(
-            text("ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS search_key_word VARCHAR(255)")
+            text(
+                "ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS search_key_word VARCHAR(255)"
+            )
         )
         conn.execute(
-            text('ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS "companyFullName" VARCHAR(255)')
+            text(
+                'ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS "companyFullName" VARCHAR(255)'
+            )
         )
         conn.execute(
-            text("ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS unite_code VARCHAR(255)")
+            text(
+                "ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS unite_code VARCHAR(255)"
+            )
         )
         conn.execute(
-            text("ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS raw_data JSONB")
+            text(
+                "ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS raw_data JSONB"
+            )
         )
         conn.execute(
-            text("ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS raw_business_info JSONB")
+            text(
+                "ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS raw_business_info JSONB"
+            )
         )
         conn.execute(
-            text("ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS raw_biz_label JSONB")
+            text(
+                "ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS raw_biz_label JSONB"
+            )
         )
         conn.execute(
-            text("ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS api_fetched_at TIMESTAMPTZ")
+            text(
+                "ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS api_fetched_at TIMESTAMPTZ"
+            )
         )
         conn.execute(
-            text("ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ")
+            text(
+                "ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ"
+            )
         )
         conn.commit()
 
@@ -113,11 +133,17 @@ def test_eqc_full_acquisition_persists_raw_responses() -> None:
 
         business_info, raw_business = client.get_business_info_with_raw(company_id)
         assert business_info.company_id, "Expected parsed business_info with company_id"
-        assert isinstance(raw_business, dict) and raw_business, "Expected raw business JSON dict"
-        assert "businessInfodto" in raw_business, "Expected findDepart raw to contain businessInfodto"
+        assert isinstance(raw_business, dict) and raw_business, (
+            "Expected raw business JSON dict"
+        )
+        assert "businessInfodto" in raw_business, (
+            "Expected findDepart raw to contain businessInfodto"
+        )
 
         labels, raw_labels = client.get_label_info_with_raw(company_id)
-        assert isinstance(raw_labels, dict) and raw_labels, "Expected raw labels JSON dict"
+        assert isinstance(raw_labels, dict) and raw_labels, (
+            "Expected raw labels JSON dict"
+        )
         assert "labels" in raw_labels, "Expected findLabels raw to contain labels"
 
         repo = CompanyMappingRepository(conn)

@@ -81,6 +81,7 @@ def _table_exists(conn, table_name: str, schema: str) -> bool:
     )
     return result.scalar()
 
+
 def _resolve_reference_schema(conn) -> str:
     """
     Resolve the reference-table schema for this migration.

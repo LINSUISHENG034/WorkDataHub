@@ -17,7 +17,11 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from work_data_hub.infrastructure.cleansing.registry import CleansingRegistry
-from work_data_hub.infrastructure.cleansing.rules import date_rules, numeric_rules, string_rules  # noqa: F401
+from work_data_hub.infrastructure.cleansing.rules import (  # noqa: F401
+    date_rules,
+    numeric_rules,
+    string_rules,
+)
 from work_data_hub.utils.logging import get_logger
 
 logger = get_logger(__name__)

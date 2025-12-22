@@ -80,7 +80,9 @@ def db_engine():
     """
     engine = get_test_engine()
     if engine is None:
-        pytest.skip("PostgreSQL database not available or not accessible for migration tests")
+        pytest.skip(
+            "PostgreSQL database not available or not accessible for migration tests"
+        )
     return engine
 
 
@@ -406,7 +408,9 @@ class TestSchemaValidation:
                 c["name"]
                 for c in inspector.get_columns(table_name, schema=reference_schema)
             }
-            assert "_source" in columns, f"Table {table_name} should have _source column"
+            assert "_source" in columns, (
+                f"Table {table_name} should have _source column"
+            )
 
         # Cleanup
         migration_runner.downgrade(url, DOWN_REVISION)

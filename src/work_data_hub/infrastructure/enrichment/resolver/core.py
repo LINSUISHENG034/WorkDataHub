@@ -8,9 +8,9 @@ split across sibling modules for maintainability.
 Story 7.3: Infrastructure Layer Decomposition
 """
 
-import os
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+import os
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 import pandas as pd
 
@@ -119,7 +119,7 @@ class CompanyIdResolver:
             ...     eqc_config=EqcLookupConfig.disabled(),
             ...     mapping_repository=repo
             ... )
-            
+
             >>> # For production - explicit config
             >>> config = EqcLookupConfig(enabled=True, sync_budget=10)
             >>> resolver = CompanyIdResolver(
@@ -138,38 +138,40 @@ class CompanyIdResolver:
             if mapping_repository is None:
                 logger.warning(
                     "company_id_resolver.cannot_auto_create_eqc_provider",
-                    msg="eqc_config allows auto-creation but mapping_repository is None"
+                    msg="eqc_config allows auto-creation but mapping_repository is None",
                 )
                 self.eqc_provider = None
             else:
                 try:
                     from work_data_hub.config.settings import get_settings
-                    from work_data_hub.infrastructure.enrichment.eqc_provider import EqcProvider
-                    
+                    from work_data_hub.infrastructure.enrichment.eqc_provider import (
+                        EqcProvider,
+                    )
+
                     settings = get_settings()
-                    if hasattr(settings, 'eqc_token') and settings.eqc_token:
+                    if hasattr(settings, "eqc_token") and settings.eqc_token:
                         self.eqc_provider = EqcProvider(
                             token=settings.eqc_token,
                             budget=eqc_config.sync_budget,  # Use config budget
-                            base_url=getattr(settings, 'eqc_base_url', None),
+                            base_url=getattr(settings, "eqc_base_url", None),
                             mapping_repository=mapping_repository,
-                            validate_on_init=False
+                            validate_on_init=False,
                         )
                         logger.info(
                             "company_id_resolver.eqc_provider_created",
-                            msg="Created EqcProvider per eqc_config.should_auto_create_provider"
+                            msg="Created EqcProvider per eqc_config.should_auto_create_provider",
                         )
                     else:
                         self.eqc_provider = None
                         logger.debug(
                             "company_id_resolver.no_eqc_token",
-                            msg="No EQC token configured, EqcProvider not created"
+                            msg="No EQC token configured, EqcProvider not created",
                         )
                 except Exception as e:
                     logger.warning(
                         "company_id_resolver.eqc_provider_creation_failed",
                         error=str(e),
-                        msg="Failed to create EqcProvider"
+                        msg="Failed to create EqcProvider",
                     )
                     self.eqc_provider = None
         else:
@@ -177,11 +179,15 @@ class CompanyIdResolver:
             self.eqc_provider = eqc_provider
 
             # If eqc_provider is provided but no mapping_repository, try to set it
-            if self.eqc_provider and self.mapping_repository and not getattr(self.eqc_provider, 'mapping_repository', None):
+            if (
+                self.eqc_provider
+                and self.mapping_repository
+                and not getattr(self.eqc_provider, "mapping_repository", None)
+            ):
                 self.eqc_provider.mapping_repository = self.mapping_repository
                 logger.info(
                     "company_id_resolver.eqc_provider_repo_set",
-                    msg="Set mapping_repository on existing EqcProvider"
+                    msg="Set mapping_repository on existing EqcProvider",
                 )
 
         # Validate consistency: warn if enrichment_service contradicts eqc_config
@@ -189,7 +195,7 @@ class CompanyIdResolver:
             logger.warning(
                 "company_id_resolver.config_contradiction",
                 msg="enrichment_service provided but eqc_config.enabled=False. "
-                    "enrichment_service will be IGNORED per eqc_config."
+                "enrichment_service will be IGNORED per eqc_config.",
             )
 
         # Initialize YAML overrides
@@ -267,14 +273,14 @@ class CompanyIdResolver:
             - Memory usage <100MB for 10K rows
         """
         # Import strategy modules here to avoid circular imports
-        from .yaml_strategy import resolve_via_yaml_overrides
-        from .db_strategy import resolve_via_db_cache
-        from .eqc_strategy import resolve_via_eqc_sync
         from .backflow import (
             backflow_new_mappings,
             enqueue_for_async_enrichment,
             generate_temp_id,
         )
+        from .db_strategy import resolve_via_db_cache
+        from .eqc_strategy import resolve_via_eqc_sync
+        from .yaml_strategy import resolve_via_yaml_overrides
 
         # Validate required columns
         required_cols = {strategy.customer_name_column}
@@ -362,9 +368,7 @@ class CompanyIdResolver:
             resolution_mask |= existing_hits
 
             # Track indices for backflow
-            existing_column_resolved_indices = list(
-                result_df[existing_hits].index
-            )
+            existing_column_resolved_indices = list(result_df[existing_hits].index)
 
             logger.debug(
                 "company_id_resolver.existing_column_passthrough_complete",
@@ -395,8 +399,13 @@ class CompanyIdResolver:
             and (self.eqc_provider is not None or self.enrichment_service is not None)
         ):
             eqc_resolved, eqc_hits, budget_remaining = resolve_via_eqc_sync(
-                result_df, mask_missing, strategy, self.eqc_config,
-                self.eqc_provider, self.enrichment_service, self.mapping_repository
+                result_df,
+                mask_missing,
+                strategy,
+                self.eqc_config,
+                self.eqc_provider,
+                self.enrichment_service,
+                self.mapping_repository,
             )
             # Fill in EQC results for unresolved rows
             result_df.loc[mask_missing, strategy.output_column] = result_df.loc[
@@ -437,11 +446,7 @@ class CompanyIdResolver:
             )
 
         # Step 5b: Enqueue for async enrichment (Story 6.5)
-        if (
-            strategy.enable_async_queue
-            and self.mapping_repository
-            and temp_id_indices
-        ):
+        if strategy.enable_async_queue and self.mapping_repository and temp_id_indices:
             async_queued = enqueue_for_async_enrichment(
                 result_df,
                 temp_id_indices,

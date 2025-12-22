@@ -94,10 +94,7 @@ class TestDomainConfigV2:
             base_path="reference/monthly/{YYYYMM}/数据采集",
             file_patterns=["*.xlsx"],
             sheet_name="Sheet1",
-            output={
-                "table": "target_table",
-                "schema_name": "target_schema"
-            }
+            output={"table": "target_table", "schema_name": "target_schema"},
         )
 
         assert config.output is not None

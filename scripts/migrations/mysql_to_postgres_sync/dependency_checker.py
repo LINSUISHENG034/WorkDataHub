@@ -4,9 +4,9 @@
 用于检查外键引用的表是否存在于PostgreSQL数据库中。
 """
 
-import os
-from typing import Dict, List, Set, Tuple, Optional
 import logging
+import os
+from typing import Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,7 @@ class DependencyChecker:
         """建立数据库连接"""
         try:
             import psycopg2
+
             self._connection = psycopg2.connect(self.connection_string)
             self._connection.autocommit = True
             logger.debug("数据库连接成功")
@@ -58,12 +59,15 @@ class DependencyChecker:
 
         try:
             cursor = self._connection.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT EXISTS (
                     SELECT 1 FROM information_schema.tables
                     WHERE table_schema = %s AND table_name = %s
                 )
-            """, (schema, table_name))
+            """,
+                (schema, table_name),
+            )
 
             exists = cursor.fetchone()[0]
             cursor.close()
@@ -87,7 +91,7 @@ class DependencyChecker:
             self.connect()
 
         # 常见的schema列表，按优先级排序
-        schemas_to_check = ['mapping', 'business', 'public', 'wdh_dev']
+        schemas_to_check = ["mapping", "business", "public", "wdh_dev"]
 
         for schema in schemas_to_check:
             if self.check_table_exists(schema, table_name):
@@ -116,18 +120,18 @@ class DependencyChecker:
 
         for table_name in ref_tables:
             table_info = {
-                'table_name': table_name,
-                'exists': False,
-                'schema': None,
-                'can_create_fk': False
+                "table_name": table_name,
+                "exists": False,
+                "schema": None,
+                "can_create_fk": False,
             }
 
             # 查找表位置
             schema = self.find_table_location(table_name)
             if schema:
-                table_info['exists'] = True
-                table_info['schema'] = schema
-                table_info['can_create_fk'] = True
+                table_info["exists"] = True
+                table_info["schema"] = schema
+                table_info["can_create_fk"] = True
                 logger.info(f"依赖表 {table_name} 存在于 schema {schema}")
             else:
                 logger.warning(f"依赖表 {table_name} 不存在，相关外键将被跳过")
@@ -152,10 +156,13 @@ class DependencyChecker:
 
         try:
             cursor = self._connection.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT indexname FROM pg_indexes
                 WHERE schemaname = %s AND tablename = %s
-            """, (schema, table_name))
+            """,
+                (schema, table_name),
+            )
 
             existing_indexes = {row[0] for row in cursor.fetchall()}
             cursor.close()
@@ -181,10 +188,13 @@ class DependencyChecker:
 
         try:
             cursor = self._connection.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT conname FROM pg_constraint
                 WHERE conrelid = %s.%s::regclass AND contype = 'f'
-            """, (schema, table_name))
+            """,
+                (schema, table_name),
+            )
 
             existing_fks = {row[0] for row in cursor.fetchall()}
             cursor.close()
@@ -194,7 +204,9 @@ class DependencyChecker:
             logger.error(f"查询现有外键失败 {schema}.{table_name}: {e}")
             return set()
 
-    def get_dependency_report(self, schema: str, table_name: str, indexes: List, foreign_keys: List) -> Dict:
+    def get_dependency_report(
+        self, schema: str, table_name: str, indexes: List, foreign_keys: List
+    ) -> Dict:
         """
         生成完整的依赖报告
 
@@ -208,19 +220,23 @@ class DependencyChecker:
             依赖报告
         """
         report = {
-            'target_table': f'{schema}.{table_name}',
-            'target_exists': self.check_table_exists(schema, table_name),
-            'existing_indexes': self.check_existing_indexes(schema, table_name),
-            'existing_foreign_keys': self.check_existing_foreign_keys(schema, table_name),
-            'foreign_key_dependencies': self.check_foreign_key_dependencies(foreign_keys),
-            'can_create_indexes': True,
-            'can_create_foreign_keys': True
+            "target_table": f"{schema}.{table_name}",
+            "target_exists": self.check_table_exists(schema, table_name),
+            "existing_indexes": self.check_existing_indexes(schema, table_name),
+            "existing_foreign_keys": self.check_existing_foreign_keys(
+                schema, table_name
+            ),
+            "foreign_key_dependencies": self.check_foreign_key_dependencies(
+                foreign_keys
+            ),
+            "can_create_indexes": True,
+            "can_create_foreign_keys": True,
         }
 
         # 检查是否可以创建外键
-        for table_name, dep_info in report['foreign_key_dependencies'].items():
-            if not dep_info['exists']:
-                report['can_create_foreign_keys'] = False
+        for table_name, dep_info in report["foreign_key_dependencies"].items():
+            if not dep_info["exists"]:
+                report["can_create_foreign_keys"] = False
                 break
 
         return report
@@ -229,7 +245,7 @@ class DependencyChecker:
 def main():
     """测试函数"""
     # 从环境变量获取数据库连接
-    db_uri = os.getenv('WDH_DATABASE__URI') or os.getenv('DATABASE_URL')
+    db_uri = os.getenv("WDH_DATABASE__URI") or os.getenv("DATABASE_URL")
     if not db_uri:
         print("错误：未设置数据库连接环境变量")
         return
@@ -239,7 +255,9 @@ def main():
     try:
         # 测试表存在检查
         print("=== 表存在检查 ===")
-        print(f"business.规模明细: {checker.check_table_exists('business', '规模明细')}")
+        print(
+            f"business.规模明细: {checker.check_table_exists('business', '规模明细')}"
+        )
         print(f"mapping.产品线: {checker.check_table_exists('mapping', '产品线')}")
         print(f"unknown.table: {checker.check_table_exists('unknown', 'table')}")
 

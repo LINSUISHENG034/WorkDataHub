@@ -7,7 +7,7 @@ from authoritative sources (Legacy MySQL, config files, etc.).
 
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ColumnMapping(BaseModel):
@@ -18,12 +18,12 @@ class ColumnMapping(BaseModel):
     and target columns in the reference table.
     """
 
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
 
     source: str = Field(..., description="Source column name to extract from")
     target: str = Field(..., description="Target table column name to fill")
 
-    @field_validator('source', 'target')
+    @field_validator("source", "target")
     @classmethod
     def validate_column_names(cls, v: str) -> str:
         """Validate column names are non-empty strings."""
@@ -39,18 +39,17 @@ class IncrementalConfig(BaseModel):
     Defines how to perform incremental updates based on timestamp columns.
     """
 
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
 
     where: str = Field(
         ...,
-        description="WHERE clause for incremental sync (e.g., 'updated_at >= :last_synced_at')"
+        description="WHERE clause for incremental sync (e.g., 'updated_at >= :last_synced_at')",
     )
     updated_at_column: str = Field(
-        ...,
-        description="Column name containing update timestamp"
+        ..., description="Column name containing update timestamp"
     )
 
-    @field_validator('where', 'updated_at_column')
+    @field_validator("where", "updated_at_column")
     @classmethod
     def validate_non_empty(cls, v: str) -> str:
         """Validate fields are non-empty strings."""
@@ -66,16 +65,14 @@ class LegacyMySQLSourceConfig(BaseModel):
     Defines table name, column mappings, and optional incremental sync settings.
     """
 
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
 
     table: str = Field(..., description="Source table name in Legacy MySQL")
     columns: List[ColumnMapping] = Field(
-        ...,
-        description="Column mappings from source to target"
+        ..., description="Column mappings from source to target"
     )
     incremental: Optional[IncrementalConfig] = Field(
-        None,
-        description="Optional incremental sync configuration"
+        None, description="Optional incremental sync configuration"
     )
 
 
@@ -87,7 +84,7 @@ class PostgresSourceConfig(BaseModel):
     Supports connecting to PostgreSQL databases where legacy data has been migrated.
     """
 
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
 
     source_schema: str = Field(
         default="public",
@@ -96,12 +93,10 @@ class PostgresSourceConfig(BaseModel):
     )
     table: str = Field(..., description="Source table name in PostgreSQL")
     columns: List[ColumnMapping] = Field(
-        ...,
-        description="Column mappings from source to target"
+        ..., description="Column mappings from source to target"
     )
     incremental: Optional[IncrementalConfig] = Field(
-        None,
-        description="Optional incremental sync configuration"
+        None, description="Optional incremental sync configuration"
     )
     connection_env_prefix: str = Field(
         default="WDH_LEGACY",
@@ -109,7 +104,7 @@ class PostgresSourceConfig(BaseModel):
         alias="connection_env_prefix",
     )
 
-    @field_validator('table')
+    @field_validator("table")
     @classmethod
     def validate_table(cls, v: str) -> str:
         """Validate table name is non-empty."""
@@ -117,7 +112,7 @@ class PostgresSourceConfig(BaseModel):
             raise ValueError("Table name must be a non-empty string")
         return v.strip()
 
-    @field_validator('columns')
+    @field_validator("columns")
     @classmethod
     def validate_columns(cls, v: List[ColumnMapping]) -> List[ColumnMapping]:
         """Validate at least one column mapping is provided."""
@@ -133,12 +128,12 @@ class ConfigFileSourceConfig(BaseModel):
     Defines file path and expected schema version.
     """
 
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
 
     file_path: str = Field(..., description="Path to YAML config file")
     schema_version: str = Field(..., description="Expected schema version")
 
-    @field_validator('file_path', 'schema_version')
+    @field_validator("file_path", "schema_version")
     @classmethod
     def validate_non_empty(cls, v: str) -> str:
         """Validate fields are non-empty strings."""
@@ -154,25 +149,20 @@ class ReferenceSyncTableConfig(BaseModel):
     Defines source type, target table, sync mode, and source-specific configuration.
     """
 
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
 
     name: str = Field(..., description="Human-readable name for this sync operation")
     target_table: str = Field(..., description="Target reference table name")
-    target_schema: str = Field(
-        default="business",
-        description="Target schema name"
-    )
+    target_schema: str = Field(default="business", description="Target schema name")
     source_type: Literal["legacy_mysql", "mysql", "postgres", "config_file"] = Field(
         ...,
-        description="Type of data source: legacy_mysql/mysql, postgres, or config_file"
+        description="Type of data source: legacy_mysql/mysql, postgres, or config_file",
     )
     source_config: Dict[str, Any] = Field(
-        ...,
-        description="Source-specific configuration"
+        ..., description="Source-specific configuration"
     )
     sync_mode: Literal["upsert", "delete_insert"] = Field(
-        default="upsert",
-        description="Sync mode: upsert or delete_insert"
+        default="upsert", description="Sync mode: upsert or delete_insert"
     )
     primary_key: str = Field(..., description="Primary key column name")
     batch_size: Optional[int] = Field(
@@ -182,7 +172,7 @@ class ReferenceSyncTableConfig(BaseModel):
         description="Optional batch size override for this table (falls back to global batch_size)",
     )
 
-    @field_validator('name', 'target_table', 'primary_key')
+    @field_validator("name", "target_table", "primary_key")
     @classmethod
     def validate_identifiers(cls, v: str) -> str:
         """Validate identifiers are non-empty strings."""
@@ -198,35 +188,29 @@ class ReferenceSyncConfig(BaseModel):
     Container for all reference table sync configurations.
     """
 
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
 
     enabled: bool = Field(default=True, description="Whether reference sync is enabled")
     schedule: str = Field(
-        default="0 1 * * *",
-        description="Cron schedule for sync operations"
+        default="0 1 * * *", description="Cron schedule for sync operations"
     )
     tables: List[ReferenceSyncTableConfig] = Field(
-        default_factory=list,
-        description="List of table sync configurations"
+        default_factory=list, description="List of table sync configurations"
     )
 
     # Configurable defaults
     concurrency: int = Field(
-        default=1,
-        ge=1,
-        le=10,
-        description="Number of concurrent sync operations"
+        default=1, ge=1, le=10, description="Number of concurrent sync operations"
     )
     batch_size: int = Field(
-        default=5000,
-        ge=100,
-        le=50000,
-        description="Batch size for bulk operations"
+        default=5000, ge=100, le=50000, description="Batch size for bulk operations"
     )
 
-    @field_validator('tables')
+    @field_validator("tables")
     @classmethod
-    def validate_tables(cls, v: List[ReferenceSyncTableConfig]) -> List[ReferenceSyncTableConfig]:
+    def validate_tables(
+        cls, v: List[ReferenceSyncTableConfig]
+    ) -> List[ReferenceSyncTableConfig]:
         """Validate table names are unique."""
         if v:
             names = [table.name for table in v]

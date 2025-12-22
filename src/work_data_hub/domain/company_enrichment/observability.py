@@ -10,7 +10,7 @@ Story 6.8: Enrichment Observability and Export
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 
 @dataclass

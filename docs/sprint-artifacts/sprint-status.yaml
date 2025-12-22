@@ -282,13 +282,13 @@ development_status:
   # Added 2025-12-21 via Correct-Course workflow
   # Focused on reducing technical debt by refactoring files > 800 lines
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-21-file-length-refactoring.md
-  epic-7: in-progress
+  epic-7: done  # All 6 stories complete, Code Review PASSED 2025-12-22
   7-1-ops-py-decomposition: done
   7-2-io-layer-modularization: done  # Code Review #2 PASSED 2025-12-22: Fixed Story 7.1 遗留问题, core.py 重构
   7-3-infrastructure-layer-decomposition: done  # Code Review PASSED 2025-12-22
   7-4-cli-modularization: done  # Code Review PASSED 2025-12-22: cli/etl.py → cli/etl/ package
   7-5-domain-registry-pre-modularization: done  # Code Review PASSED 2025-12-22: All ACs verified, line counts corrected
-  7-6-ci-integration-code-quality-tooling: backlog
+  7-6-ci-integration-code-quality-tooling: done  # Code Review PASSED 2025-12-22: Unit tests added, all ACs verified
   epic-7-retrospective: optional
 
   # Epic 8: Testing & Validation Infrastructure

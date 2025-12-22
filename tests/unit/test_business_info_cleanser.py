@@ -19,7 +19,10 @@ class TestBusinessInfoCleanser:
     @pytest.fixture
     def cleanser(self):
         """Create a cleanser instance."""
-        from work_data_hub.infrastructure.cleansing.business_info_cleanser import BusinessInfoCleanser
+        from work_data_hub.infrastructure.cleansing.business_info_cleanser import (
+            BusinessInfoCleanser,
+        )
+
         return BusinessInfoCleanser()
 
     def test_transform_complete_record(self, cleanser):
@@ -83,7 +86,11 @@ class TestBusinessInfoCleanser:
             result = cleanser.transform(raw, "test_company")
             # Result is datetime, extract date for comparison
             if result.registered_date is not None:
-                actual_date = result.registered_date.date() if isinstance(result.registered_date, datetime) else result.registered_date
+                actual_date = (
+                    result.registered_date.date()
+                    if isinstance(result.registered_date, datetime)
+                    else result.registered_date
+                )
                 assert actual_date == expected, f"Failed for {raw_value}"
 
     def test_transform_null_values(self, cleanser):
@@ -194,4 +201,6 @@ class TestBusinessInfoCleanser:
         result = cleanser.transform(raw, "company_123")
 
         # Invalid value should result in None or parse_failed status
-        assert result.registered_capital is None or result.cleansing_status["registered_capital"] in ("parse_failed", "error:ValueError")
+        assert result.registered_capital is None or result.cleansing_status[
+            "registered_capital"
+        ] in ("parse_failed", "error:ValueError")

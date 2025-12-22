@@ -74,7 +74,12 @@ def resolve_via_eqc_sync(
 
     # Legacy path using enrichment_service
     return _resolve_via_enrichment_service(
-        df, mask_unresolved, strategy, eqc_config, enrichment_service, mapping_repository
+        df,
+        mask_unresolved,
+        strategy,
+        eqc_config,
+        enrichment_service,
+        mapping_repository,
     )
 
 
@@ -255,9 +260,7 @@ def _resolve_via_enrichment_service(
             deduped.setdefault(key, payload)
 
         try:
-            mapping_repository.insert_batch_with_conflict_check(
-                list(deduped.values())
-            )
+            mapping_repository.insert_batch_with_conflict_check(list(deduped.values()))
         except Exception as cache_err:
             logger.warning(
                 "company_id_resolver.eqc_cache_failed",

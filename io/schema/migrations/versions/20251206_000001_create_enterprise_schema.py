@@ -95,20 +95,34 @@ def upgrade() -> None:
                 nullable=True,
                 comment="Original search keyword",
             ),
-
             # Legacy archive_base_info alignment (37 columns)
             sa.Column("name", sa.String(255), nullable=True, comment="Legacy field"),
-            sa.Column("name_display", sa.String(255), nullable=True, comment="Legacy field"),
+            sa.Column(
+                "name_display", sa.String(255), nullable=True, comment="Legacy field"
+            ),
             sa.Column("symbol", sa.String(255), nullable=True, comment="Legacy field"),
-            sa.Column("rank_score", sa.Float(precision=53), nullable=True, comment="Legacy field"),
+            sa.Column(
+                "rank_score",
+                sa.Float(precision=53),
+                nullable=True,
+                comment="Legacy field",
+            ),
             sa.Column("country", sa.String(255), nullable=True, comment="Legacy field"),
-            sa.Column("company_en_name", sa.String(255), nullable=True, comment="Legacy field"),
-            sa.Column("smdb_code", sa.String(255), nullable=True, comment="Legacy field"),
+            sa.Column(
+                "company_en_name", sa.String(255), nullable=True, comment="Legacy field"
+            ),
+            sa.Column(
+                "smdb_code", sa.String(255), nullable=True, comment="Legacy field"
+            ),
             sa.Column("is_hk", sa.Integer, nullable=True, comment="Legacy field"),
             sa.Column("coname", sa.String(255), nullable=True, comment="Legacy field"),
             sa.Column("is_list", sa.Integer, nullable=True, comment="Legacy field"),
-            sa.Column("company_nature", sa.String(255), nullable=True, comment="Legacy field"),
-            sa.Column("_score", sa.Float(precision=53), nullable=True, comment="Legacy field"),
+            sa.Column(
+                "company_nature", sa.String(255), nullable=True, comment="Legacy field"
+            ),
+            sa.Column(
+                "_score", sa.Float(precision=53), nullable=True, comment="Legacy field"
+            ),
             sa.Column("type", sa.String(255), nullable=True, comment="Legacy field"),
             sa.Column(
                 "registeredStatus",
@@ -116,28 +130,76 @@ def upgrade() -> None:
                 nullable=True,
                 comment="Legacy field (compatibility-only)",
             ),
-            sa.Column("organization_code", sa.String(255), nullable=True, comment="Legacy field"),
+            sa.Column(
+                "organization_code",
+                sa.String(255),
+                nullable=True,
+                comment="Legacy field",
+            ),
             sa.Column("le_rep", sa.Text, nullable=True, comment="Legacy field"),
-            sa.Column("reg_cap", sa.Float(precision=53), nullable=True, comment="Legacy field"),
-            sa.Column("is_pa_relatedparty", sa.Integer, nullable=True, comment="Legacy field"),
-            sa.Column("province", sa.String(255), nullable=True, comment="Legacy field"),
+            sa.Column(
+                "reg_cap", sa.Float(precision=53), nullable=True, comment="Legacy field"
+            ),
+            sa.Column(
+                "is_pa_relatedparty", sa.Integer, nullable=True, comment="Legacy field"
+            ),
+            sa.Column(
+                "province", sa.String(255), nullable=True, comment="Legacy field"
+            ),
             sa.Column(
                 "companyFullName",
                 sa.String(255),
                 nullable=True,
                 comment="Canonical full name (quoted identifier)",
             ),
-            sa.Column("est_date", sa.String(255), nullable=True, comment="Legacy field (raw string)"),
-            sa.Column("company_short_name", sa.String(255), nullable=True, comment="Legacy field"),
+            sa.Column(
+                "est_date",
+                sa.String(255),
+                nullable=True,
+                comment="Legacy field (raw string)",
+            ),
+            sa.Column(
+                "company_short_name",
+                sa.String(255),
+                nullable=True,
+                comment="Legacy field",
+            ),
             sa.Column("id", sa.String(255), nullable=True, comment="Legacy field"),
             sa.Column("is_debt", sa.Integer, nullable=True, comment="Legacy field"),
-            sa.Column("unite_code", sa.String(255), nullable=True, comment="Canonical credit code"),
-            sa.Column("registered_status", sa.String(255), nullable=True, comment="Canonical status"),
+            sa.Column(
+                "unite_code",
+                sa.String(255),
+                nullable=True,
+                comment="Canonical credit code",
+            ),
+            sa.Column(
+                "registered_status",
+                sa.String(255),
+                nullable=True,
+                comment="Canonical status",
+            ),
             sa.Column("cocode", sa.String(255), nullable=True, comment="Legacy field"),
-            sa.Column("default_score", sa.Float(precision=53), nullable=True, comment="Legacy field"),
-            sa.Column("company_former_name", sa.String(255), nullable=True, comment="Legacy field"),
-            sa.Column("is_rank_list", sa.Integer, nullable=True, comment="Legacy field"),
-            sa.Column("trade_register_code", sa.String(255), nullable=True, comment="Legacy field"),
+            sa.Column(
+                "default_score",
+                sa.Float(precision=53),
+                nullable=True,
+                comment="Legacy field",
+            ),
+            sa.Column(
+                "company_former_name",
+                sa.String(255),
+                nullable=True,
+                comment="Legacy field",
+            ),
+            sa.Column(
+                "is_rank_list", sa.Integer, nullable=True, comment="Legacy field"
+            ),
+            sa.Column(
+                "trade_register_code",
+                sa.String(255),
+                nullable=True,
+                comment="Legacy field",
+            ),
             sa.Column(
                 "companyId",
                 sa.String(255),
@@ -151,7 +213,6 @@ def upgrade() -> None:
                 nullable=True,
                 comment="Legacy field (compatibility-only)",
             ),
-
             # Raw API response storage
             sa.Column(
                 "raw_data",
@@ -171,7 +232,6 @@ def upgrade() -> None:
                 nullable=True,
                 comment="findLabels API response payload",
             ),
-
             # Timestamps
             sa.Column(
                 "api_fetched_at",
@@ -228,7 +288,6 @@ def upgrade() -> None:
                 autoincrement=True,
                 comment="Auto-increment primary key",
             ),
-
             # Foreign Key to base_info
             sa.Column(
                 "company_id",
@@ -236,7 +295,6 @@ def upgrade() -> None:
                 nullable=False,
                 comment="Foreign key to base_info",
             ),
-
             # Normalized fields (require cleansing from raw strings)
             sa.Column(
                 "registered_date",
@@ -274,7 +332,6 @@ def upgrade() -> None:
                 nullable=True,
                 comment="Actual paid-in capital",
             ),
-
             # Retained fields (VARCHAR/TEXT, no type change)
             sa.Column("registered_status", sa.String(100), nullable=True),
             sa.Column("legal_person_name", sa.String(255), nullable=True),
@@ -283,9 +340,24 @@ def upgrade() -> None:
             sa.Column("company_name", sa.String(255), nullable=True),
             sa.Column("company_en_name", sa.Text, nullable=True),
             sa.Column("currency", sa.String(50), nullable=True),
-            sa.Column("credit_code", sa.String(50), nullable=True, comment="Unified social credit code"),
-            sa.Column("register_code", sa.String(50), nullable=True, comment="Registration number"),
-            sa.Column("organization_code", sa.String(50), nullable=True, comment="Organization code"),
+            sa.Column(
+                "credit_code",
+                sa.String(50),
+                nullable=True,
+                comment="Unified social credit code",
+            ),
+            sa.Column(
+                "register_code",
+                sa.String(50),
+                nullable=True,
+                comment="Registration number",
+            ),
+            sa.Column(
+                "organization_code",
+                sa.String(50),
+                nullable=True,
+                comment="Organization code",
+            ),
             sa.Column("company_type", sa.String(100), nullable=True),
             sa.Column("industry_name", sa.String(255), nullable=True),
             sa.Column(
@@ -294,24 +366,53 @@ def upgrade() -> None:
                 nullable=True,
                 comment="Registration authority",
             ),
-            sa.Column("start_end", sa.String(100), nullable=True, comment="Business period (combined)"),
-            sa.Column("business_scope", sa.Text, nullable=True, comment="Business scope"),
+            sa.Column(
+                "start_end",
+                sa.String(100),
+                nullable=True,
+                comment="Business period (combined)",
+            ),
+            sa.Column(
+                "business_scope", sa.Text, nullable=True, comment="Business scope"
+            ),
             sa.Column("telephone", sa.String(100), nullable=True),
             sa.Column("email_address", sa.String(255), nullable=True),
             sa.Column("website", sa.String(500), nullable=True),
-            sa.Column("company_former_name", sa.Text, nullable=True, comment="Former name"),
-            sa.Column("control_id", sa.String(100), nullable=True, comment="Actual controller ID"),
-            sa.Column("control_name", sa.String(255), nullable=True, comment="Actual controller name"),
-            sa.Column("bene_id", sa.String(100), nullable=True, comment="Beneficiary ID"),
-            sa.Column("bene_name", sa.String(255), nullable=True, comment="Beneficiary name"),
+            sa.Column(
+                "company_former_name", sa.Text, nullable=True, comment="Former name"
+            ),
+            sa.Column(
+                "control_id",
+                sa.String(100),
+                nullable=True,
+                comment="Actual controller ID",
+            ),
+            sa.Column(
+                "control_name",
+                sa.String(255),
+                nullable=True,
+                comment="Actual controller name",
+            ),
+            sa.Column(
+                "bene_id", sa.String(100), nullable=True, comment="Beneficiary ID"
+            ),
+            sa.Column(
+                "bene_name", sa.String(255), nullable=True, comment="Beneficiary name"
+            ),
             sa.Column("province", sa.String(100), nullable=True),
             sa.Column("department", sa.String(255), nullable=True),
-
             # snake_case converted from camelCase
-            sa.Column("legal_person_id", sa.String(100), nullable=True, comment="Legal person ID"),
+            sa.Column(
+                "legal_person_id",
+                sa.String(100),
+                nullable=True,
+                comment="Legal person ID",
+            ),
             sa.Column("logo_url", sa.Text, nullable=True),
             sa.Column("type_code", sa.String(50), nullable=True),
-            sa.Column("update_time", sa.Date, nullable=True, comment="EQC data update time"),
+            sa.Column(
+                "update_time", sa.Date, nullable=True, comment="EQC data update time"
+            ),
             sa.Column(
                 "registered_capital_currency",
                 sa.String(50),
@@ -319,7 +420,6 @@ def upgrade() -> None:
             ),
             sa.Column("full_register_type_desc", sa.String(255), nullable=True),
             sa.Column("industry_code", sa.String(50), nullable=True),
-
             # New fields
             sa.Column(
                 "_cleansing_status",
@@ -340,7 +440,6 @@ def upgrade() -> None:
                 onupdate=func.now(),
                 nullable=False,
             ),
-
             # Foreign Key constraint
             sa.ForeignKeyConstraint(
                 ["company_id"],
@@ -372,7 +471,6 @@ def upgrade() -> None:
                 autoincrement=True,
                 comment="Auto-increment primary key",
             ),
-
             # Foreign Key to base_info (snake_case from companyId)
             sa.Column(
                 "company_id",
@@ -380,16 +478,21 @@ def upgrade() -> None:
                 nullable=False,
                 comment="Foreign key to base_info",
             ),
-
             # Retained field
             sa.Column("type", sa.String(100), nullable=True, comment="Label type"),
-
             # snake_case converted from camelCase
-            sa.Column("lv1_name", sa.String(255), nullable=True, comment="Level 1 label"),
-            sa.Column("lv2_name", sa.String(255), nullable=True, comment="Level 2 label"),
-            sa.Column("lv3_name", sa.String(255), nullable=True, comment="Level 3 label"),
-            sa.Column("lv4_name", sa.String(255), nullable=True, comment="Level 4 label"),
-
+            sa.Column(
+                "lv1_name", sa.String(255), nullable=True, comment="Level 1 label"
+            ),
+            sa.Column(
+                "lv2_name", sa.String(255), nullable=True, comment="Level 2 label"
+            ),
+            sa.Column(
+                "lv3_name", sa.String(255), nullable=True, comment="Level 3 label"
+            ),
+            sa.Column(
+                "lv4_name", sa.String(255), nullable=True, comment="Level 4 label"
+            ),
             # New fields
             sa.Column(
                 "created_at",
@@ -404,7 +507,6 @@ def upgrade() -> None:
                 onupdate=func.now(),
                 nullable=False,
             ),
-
             # Foreign Key constraint
             sa.ForeignKeyConstraint(
                 ["company_id"],
@@ -633,7 +735,9 @@ def downgrade() -> None:
 
     # === Step 1: Drop indexes (with IF EXISTS for safety) ===
     conn.execute(
-        sa.text(f"DROP INDEX IF EXISTS {SCHEMA_NAME}.idx_enrichment_requests_normalized")
+        sa.text(
+            f"DROP INDEX IF EXISTS {SCHEMA_NAME}.idx_enrichment_requests_normalized"
+        )
     )
     conn.execute(
         sa.text(f"DROP INDEX IF EXISTS {SCHEMA_NAME}.idx_enrichment_requests_status")
@@ -641,9 +745,7 @@ def downgrade() -> None:
     conn.execute(
         sa.text(f"DROP INDEX IF EXISTS {SCHEMA_NAME}.idx_company_mapping_lookup")
     )
-    conn.execute(
-        sa.text(f"DROP INDEX IF EXISTS {SCHEMA_NAME}.idx_biz_label_hierarchy")
-    )
+    conn.execute(sa.text(f"DROP INDEX IF EXISTS {SCHEMA_NAME}.idx_biz_label_hierarchy"))
     conn.execute(
         sa.text(f"DROP INDEX IF EXISTS {SCHEMA_NAME}.idx_biz_label_company_id")
     )

@@ -13,8 +13,14 @@ import pandas as pd
 from unittest.mock import Mock, MagicMock, patch
 from sqlalchemy.engine import Connection
 
-from work_data_hub.domain.reference_backfill.generic_service import GenericBackfillService, BackfillResult
-from work_data_hub.domain.reference_backfill.models import ForeignKeyConfig, BackfillColumnMapping
+from work_data_hub.domain.reference_backfill.generic_service import (
+    GenericBackfillService,
+    BackfillResult,
+)
+from work_data_hub.domain.reference_backfill.models import (
+    ForeignKeyConfig,
+    BackfillColumnMapping,
+)
 
 
 class TestTopologicalSort:
@@ -30,15 +36,15 @@ class TestTopologicalSort:
                 source_column="col_a",
                 target_table="table_a",
                 target_key="key_a",
-                backfill_columns=[BackfillColumnMapping(source="a", target="a")]
+                backfill_columns=[BackfillColumnMapping(source="a", target="a")],
             ),
             ForeignKeyConfig(
                 name="fk_b",
                 source_column="col_b",
                 target_table="table_b",
                 target_key="key_b",
-                backfill_columns=[BackfillColumnMapping(source="b", target="b")]
-            )
+                backfill_columns=[BackfillColumnMapping(source="b", target="b")],
+            ),
         ]
 
         sorted_configs = service._topological_sort(configs)
@@ -57,15 +63,15 @@ class TestTopologicalSort:
                 target_table="portfolio",
                 target_key="portfolio_key",
                 depends_on=["fk_plan"],
-                backfill_columns=[BackfillColumnMapping(source="p", target="p")]
+                backfill_columns=[BackfillColumnMapping(source="p", target="p")],
             ),
             ForeignKeyConfig(
                 name="fk_plan",
                 source_column="plan_code",
                 target_table="plan",
                 target_key="plan_key",
-                backfill_columns=[BackfillColumnMapping(source="pl", target="pl")]
-            )
+                backfill_columns=[BackfillColumnMapping(source="pl", target="pl")],
+            ),
         ]
 
         sorted_configs = service._topological_sort(configs)
@@ -84,7 +90,7 @@ class TestTopologicalSort:
                 target_table="table_c",
                 target_key="key_c",
                 depends_on=["fk_a", "fk_b"],
-                backfill_columns=[BackfillColumnMapping(source="c", target="c")]
+                backfill_columns=[BackfillColumnMapping(source="c", target="c")],
             ),
             ForeignKeyConfig(
                 name="fk_b",
@@ -92,15 +98,15 @@ class TestTopologicalSort:
                 target_table="table_b",
                 target_key="key_b",
                 depends_on=["fk_a"],
-                backfill_columns=[BackfillColumnMapping(source="b", target="b")]
+                backfill_columns=[BackfillColumnMapping(source="b", target="b")],
             ),
             ForeignKeyConfig(
                 name="fk_a",
                 source_column="col_a",
                 target_table="table_a",
                 target_key="key_a",
-                backfill_columns=[BackfillColumnMapping(source="a", target="a")]
-            )
+                backfill_columns=[BackfillColumnMapping(source="a", target="a")],
+            ),
         ]
 
         sorted_configs = service._topological_sort(configs)
@@ -119,7 +125,7 @@ class TestTopologicalSort:
                 target_table="table_a",
                 target_key="key_a",
                 depends_on=["fk_b"],
-                backfill_columns=[BackfillColumnMapping(source="a", target="a")]
+                backfill_columns=[BackfillColumnMapping(source="a", target="a")],
             ),
             ForeignKeyConfig(
                 name="fk_b",
@@ -127,8 +133,8 @@ class TestTopologicalSort:
                 target_table="table_b",
                 target_key="key_b",
                 depends_on=["fk_a"],
-                backfill_columns=[BackfillColumnMapping(source="b", target="b")]
-            )
+                backfill_columns=[BackfillColumnMapping(source="b", target="b")],
+            ),
         ]
 
         with pytest.raises(ValueError) as exc_info:
@@ -147,7 +153,7 @@ class TestTopologicalSort:
                 target_table="table_a",
                 target_key="key_a",
                 depends_on=["fk_nonexistent"],
-                backfill_columns=[BackfillColumnMapping(source="a", target="a")]
+                backfill_columns=[BackfillColumnMapping(source="a", target="a")],
             )
         ]
 
@@ -171,15 +177,21 @@ class TestDeriveCandidates:
             target_key="年金计划号",
             backfill_columns=[
                 BackfillColumnMapping(source="计划代码", target="年金计划号"),
-                BackfillColumnMapping(source="计划名称", target="计划名称")
-            ]
+                BackfillColumnMapping(source="计划名称", target="计划名称"),
+            ],
         )
 
-        df = pd.DataFrame([
-            {"计划代码": "P001", "计划名称": "Plan A", "其他列": "value1"},
-            {"计划代码": "P002", "计划名称": "Plan B", "其他列": "value2"},
-            {"计划代码": "P001", "计划名称": "Plan A", "其他列": "value3"},  # Duplicate
-        ])
+        df = pd.DataFrame(
+            [
+                {"计划代码": "P001", "计划名称": "Plan A", "其他列": "value1"},
+                {"计划代码": "P002", "计划名称": "Plan B", "其他列": "value2"},
+                {
+                    "计划代码": "P001",
+                    "计划名称": "Plan A",
+                    "其他列": "value3",
+                },  # Duplicate
+            ]
+        )
 
         candidates_df = service.derive_candidates(df, config)
 
@@ -198,20 +210,29 @@ class TestDeriveCandidates:
             target_key="年金计划号",
             backfill_columns=[
                 BackfillColumnMapping(source="计划代码", target="年金计划号"),
-                BackfillColumnMapping(source="可选列", target="可选目标列", optional=True)
-            ]
+                BackfillColumnMapping(
+                    source="可选列", target="可选目标列", optional=True
+                ),
+            ],
         )
 
-        df = pd.DataFrame([
-            {"计划代码": "P001"},
-            {"计划代码": "P002", "可选列": "value"},
-        ])
+        df = pd.DataFrame(
+            [
+                {"计划代码": "P001"},
+                {"计划代码": "P002", "可选列": "value"},
+            ]
+        )
 
         candidates_df = service.derive_candidates(df, config)
 
         assert len(candidates_df) == 2
         # Optional column should be None for records where it's missing
-        assert candidates_df.loc[candidates_df["年金计划号"] == "P001", "可选目标列"].iloc[0] is None
+        assert (
+            candidates_df.loc[candidates_df["年金计划号"] == "P001", "可选目标列"].iloc[
+                0
+            ]
+            is None
+        )
 
     def test_missing_source_column(self):
         """Test handling when source column is missing."""
@@ -222,7 +243,7 @@ class TestDeriveCandidates:
             source_column="不存在的列",
             target_table="年金计划",
             target_key="年金计划号",
-            backfill_columns=[BackfillColumnMapping(source="a", target="a")]
+            backfill_columns=[BackfillColumnMapping(source="a", target="a")],
         )
 
         df = pd.DataFrame([{"存在的列": "value"}])
@@ -240,15 +261,19 @@ class TestDeriveCandidates:
             source_column="计划代码",
             target_table="年金计划",
             target_key="年金计划号",
-            backfill_columns=[BackfillColumnMapping(source="计划代码", target="年金计划号")]
+            backfill_columns=[
+                BackfillColumnMapping(source="计划代码", target="年金计划号")
+            ],
         )
 
-        df = pd.DataFrame([
-            {"计划代码": None},
-            {"计划代码": "P001"},
-            {"计划代码": pd.NA},
-            {"计划代码": "P002"},
-        ])
+        df = pd.DataFrame(
+            [
+                {"计划代码": None},
+                {"计划代码": "P001"},
+                {"计划代码": pd.NA},
+                {"计划代码": "P002"},
+            ]
+        )
 
         candidates_df = service.derive_candidates(df, config)
 
@@ -259,7 +284,7 @@ class TestDeriveCandidates:
 class TestBackfillTable:
     """Test table backfill operations."""
 
-    @patch('work_data_hub.domain.reference_backfill.generic_service.datetime')
+    @patch("work_data_hub.domain.reference_backfill.generic_service.datetime")
     def test_add_tracking_fields(self, mock_datetime):
         """Test tracking field addition."""
         from datetime import datetime, timezone
@@ -270,10 +295,7 @@ class TestBackfillTable:
 
         service = GenericBackfillService("test_domain")
 
-        df = pd.DataFrame([
-            {"key": "value1"},
-            {"key": "value2"}
-        ])
+        df = pd.DataFrame([{"key": "value1"}, {"key": "value2"}])
 
         result_df = service._add_tracking_fields(df)
 
@@ -297,8 +319,8 @@ class TestBackfillTable:
             target_key="primary_key",
             backfill_columns=[
                 BackfillColumnMapping(source="source_col", target="primary_key"),
-                BackfillColumnMapping(source="value_col", target="value")
-            ]
+                BackfillColumnMapping(source="value_col", target="value"),
+            ],
         )
 
         # Mock connection - use MagicMock to allow dialect attribute
@@ -311,18 +333,24 @@ class TestBackfillTable:
         mock_insert_result.rowcount = 2
         mock_conn.execute.side_effect = [mock_existing_result, mock_insert_result]
 
-        candidates_df = pd.DataFrame([
-            {"primary_key": "key1", "value": "value1", "_source": "auto_derived"},
-            {"primary_key": "key2", "value": "value2", "_source": "auto_derived"}
-        ])
+        candidates_df = pd.DataFrame(
+            [
+                {"primary_key": "key1", "value": "value1", "_source": "auto_derived"},
+                {"primary_key": "key2", "value": "value2", "_source": "auto_derived"},
+            ]
+        )
 
-        inserted = service.backfill_table(candidates_df, config, mock_conn, add_tracking_fields=False)
+        inserted = service.backfill_table(
+            candidates_df, config, mock_conn, add_tracking_fields=False
+        )
 
         assert inserted == 2
         assert mock_conn.execute.call_count == 2
         # Second call should be the INSERT
         call_args = mock_conn.execute.call_args_list[1]
-        assert "ON CONFLICT" in str(call_args[0][0]) and "DO NOTHING" in str(call_args[0][0])
+        assert "ON CONFLICT" in str(call_args[0][0]) and "DO NOTHING" in str(
+            call_args[0][0]
+        )
 
     def test_generic_insert_with_existing_records(self):
         """Test generic insert with existing record filtering."""
@@ -335,8 +363,8 @@ class TestBackfillTable:
             target_key="primary_key",
             backfill_columns=[
                 BackfillColumnMapping(source="source_col", target="primary_key"),
-                BackfillColumnMapping(source="value_col", target="value")
-            ]
+                BackfillColumnMapping(source="value_col", target="value"),
+            ],
         )
 
         # Mock connection for generic database - use MagicMock to allow dialect attribute
@@ -348,15 +376,19 @@ class TestBackfillTable:
             # Second call: check existing keys again (for generic filter)
             Mock(fetchall=lambda: [("key1",)]),
             # Third call: actual insert
-            Mock(rowcount=1)
+            Mock(rowcount=1),
         ]
 
-        candidates_df = pd.DataFrame([
-            {"primary_key": "key1", "value": "value1", "_source": "auto_derived"},
-            {"primary_key": "key2", "value": "value2", "_source": "auto_derived"}
-        ])
+        candidates_df = pd.DataFrame(
+            [
+                {"primary_key": "key1", "value": "value1", "_source": "auto_derived"},
+                {"primary_key": "key2", "value": "value2", "_source": "auto_derived"},
+            ]
+        )
 
-        inserted = service.backfill_table(candidates_df, config, mock_conn, add_tracking_fields=False)
+        inserted = service.backfill_table(
+            candidates_df, config, mock_conn, add_tracking_fields=False
+        )
 
         assert inserted == 1  # Only key2 should be inserted
         assert mock_conn.execute.call_count == 3
@@ -377,7 +409,12 @@ class TestGenericBackfillServiceIntegration:
         mock_existing.fetchall.return_value = []
         mock_insert = Mock()
         mock_insert.rowcount = 1
-        mock_conn.execute.side_effect = [mock_existing, mock_insert, mock_existing, mock_insert]
+        mock_conn.execute.side_effect = [
+            mock_existing,
+            mock_insert,
+            mock_existing,
+            mock_insert,
+        ]
 
         # Create configurations with dependencies
         fk_plan = ForeignKeyConfig(
@@ -387,8 +424,10 @@ class TestGenericBackfillServiceIntegration:
             target_key="年金计划号",
             backfill_columns=[
                 BackfillColumnMapping(source="计划代码", target="年金计划号"),
-                BackfillColumnMapping(source="计划名称", target="计划名称", optional=True)
-            ]
+                BackfillColumnMapping(
+                    source="计划名称", target="计划名称", optional=True
+                ),
+            ],
         )
 
         fk_portfolio = ForeignKeyConfig(
@@ -399,15 +438,17 @@ class TestGenericBackfillServiceIntegration:
             depends_on=["fk_plan"],
             backfill_columns=[
                 BackfillColumnMapping(source="组合代码", target="组合代码"),
-                BackfillColumnMapping(source="计划代码", target="年金计划号")
-            ]
+                BackfillColumnMapping(source="计划代码", target="年金计划号"),
+            ],
         )
 
         # Create test data
-        df = pd.DataFrame([
-            {"计划代码": "P001", "计划名称": "Plan A", "组合代码": "PF001"},
-            {"计划代码": "P002", "计划名称": "Plan B", "组合代码": "PF002"},
-        ])
+        df = pd.DataFrame(
+            [
+                {"计划代码": "P001", "计划名称": "Plan A", "组合代码": "PF001"},
+                {"计划代码": "P002", "计划名称": "Plan B", "组合代码": "PF002"},
+            ]
+        )
 
         result = service.run(df, [fk_portfolio, fk_plan], mock_conn)
 
@@ -496,7 +537,9 @@ class TestGenericBackfillServiceIntegration:
             source_column="计划代码",
             target_table="年金计划",
             target_key="年金计划号",
-            backfill_columns=[BackfillColumnMapping(source="计划代码", target="年金计划号")],
+            backfill_columns=[
+                BackfillColumnMapping(source="计划代码", target="年金计划号")
+            ],
         )
 
         df = pd.DataFrame(
@@ -514,7 +557,10 @@ class TestGenericBackfillServiceIntegration:
 
 
 # Story 6.2-P15: Complex Mapping Backfill Enhancement Tests
-from work_data_hub.domain.reference_backfill.models import AggregationType, AggregationConfig
+from work_data_hub.domain.reference_backfill.models import (
+    AggregationType,
+    AggregationConfig,
+)
 
 
 class TestAggregationConfigValidation:
@@ -564,16 +610,24 @@ class TestMaxByAggregation:
                     source="机构代码",
                     target="主拓代码",
                     optional=True,
-                    aggregation=AggregationConfig(type="max_by", order_column="期末资产规模")
+                    aggregation=AggregationConfig(
+                        type="max_by", order_column="期末资产规模"
+                    ),
                 ),
-            ]
+            ],
         )
 
-        df = pd.DataFrame([
-            {"计划代码": "P001", "机构代码": "ORG-A", "期末资产规模": 1000.0},
-            {"计划代码": "P001", "机构代码": "ORG-B", "期末资产规模": 5000.0},  # MAX
-            {"计划代码": "P001", "机构代码": "ORG-C", "期末资产规模": 2000.0},
-        ])
+        df = pd.DataFrame(
+            [
+                {"计划代码": "P001", "机构代码": "ORG-A", "期末资产规模": 1000.0},
+                {
+                    "计划代码": "P001",
+                    "机构代码": "ORG-B",
+                    "期末资产规模": 5000.0,
+                },  # MAX
+                {"计划代码": "P001", "机构代码": "ORG-C", "期末资产规模": 2000.0},
+            ]
+        )
 
         candidates = service.derive_candidates(df, config)
         assert candidates.iloc[0]["主拓代码"] == "ORG-B"
@@ -593,15 +647,19 @@ class TestMaxByAggregation:
                     source="机构代码",
                     target="主拓代码",
                     optional=True,
-                    aggregation=AggregationConfig(type="max_by", order_column="期末资产规模")
+                    aggregation=AggregationConfig(
+                        type="max_by", order_column="期末资产规模"
+                    ),
                 ),
-            ]
+            ],
         )
 
-        df = pd.DataFrame([
-            {"计划代码": "P001", "机构代码": "ORG-A", "期末资产规模": None},
-            {"计划代码": "P001", "机构代码": "ORG-B", "期末资产规模": None},
-        ])
+        df = pd.DataFrame(
+            [
+                {"计划代码": "P001", "机构代码": "ORG-A", "期末资产规模": None},
+                {"计划代码": "P001", "机构代码": "ORG-B", "期末资产规模": None},
+            ]
+        )
 
         candidates = service.derive_candidates(df, config)
         # Should fallback to first value (ORG-A)
@@ -622,14 +680,18 @@ class TestMaxByAggregation:
                     source="机构代码",
                     target="主拓代码",
                     optional=True,
-                    aggregation=AggregationConfig(type="max_by", order_column="不存在的列")
+                    aggregation=AggregationConfig(
+                        type="max_by", order_column="不存在的列"
+                    ),
                 ),
-            ]
+            ],
         )
 
-        df = pd.DataFrame([
-            {"计划代码": "P001", "机构代码": "ORG-X"},
-        ])
+        df = pd.DataFrame(
+            [
+                {"计划代码": "P001", "机构代码": "ORG-X"},
+            ]
+        )
 
         candidates = service.derive_candidates(df, config)
         assert candidates.iloc[0]["主拓代码"] == "ORG-X"
@@ -649,16 +711,24 @@ class TestMaxByAggregation:
                     source="机构代码",
                     target="主拓代码",
                     optional=True,
-                    aggregation=AggregationConfig(type="max_by", order_column="期末资产规模")
+                    aggregation=AggregationConfig(
+                        type="max_by", order_column="期末资产规模"
+                    ),
                 ),
-            ]
+            ],
         )
 
-        df = pd.DataFrame([
-            {"计划代码": "P001", "机构代码": "ORG-A", "期末资产规模": None},
-            {"计划代码": "P001", "机构代码": "ORG-B", "期末资产规模": 5000.0},  # Only non-NULL
-            {"计划代码": "P001", "机构代码": "ORG-C", "期末资产规模": None},
-        ])
+        df = pd.DataFrame(
+            [
+                {"计划代码": "P001", "机构代码": "ORG-A", "期末资产规模": None},
+                {
+                    "计划代码": "P001",
+                    "机构代码": "ORG-B",
+                    "期末资产规模": 5000.0,
+                },  # Only non-NULL
+                {"计划代码": "P001", "机构代码": "ORG-C", "期末资产规模": None},
+            ]
+        )
 
         candidates = service.derive_candidates(df, config)
         assert candidates.iloc[0]["主拓代码"] == "ORG-B"
@@ -678,16 +748,20 @@ class TestMaxByAggregation:
                     source="机构代码",
                     target="主拓代码",
                     optional=True,
-                    aggregation=AggregationConfig(type="max_by", order_column="期末资产规模")
+                    aggregation=AggregationConfig(
+                        type="max_by", order_column="期末资产规模"
+                    ),
                 ),
-            ]
+            ],
         )
 
-        df = pd.DataFrame([
-            {"计划代码": "P001", "机构代码": "ORG-A", "期末资产规模": "N/A"},
-            {"计划代码": "P001", "机构代码": "ORG-B", "期末资产规模": 2000.0},
-            {"计划代码": "P001", "机构代码": "ORG-C", "期末资产规模": "5000"},
-        ])
+        df = pd.DataFrame(
+            [
+                {"计划代码": "P001", "机构代码": "ORG-A", "期末资产规模": "N/A"},
+                {"计划代码": "P001", "机构代码": "ORG-B", "期末资产规模": 2000.0},
+                {"计划代码": "P001", "机构代码": "ORG-C", "期末资产规模": "5000"},
+            ]
+        )
 
         candidates = service.derive_candidates(df, config)
         assert candidates.iloc[0]["主拓代码"] == "ORG-C"
@@ -711,16 +785,20 @@ class TestConcatDistinctAggregation:
                     source="业务类型",
                     target="管理资格",
                     optional=True,
-                    aggregation=AggregationConfig(type="concat_distinct", separator="+", sort=True)
+                    aggregation=AggregationConfig(
+                        type="concat_distinct", separator="+", sort=True
+                    ),
                 ),
-            ]
+            ],
         )
 
-        df = pd.DataFrame([
-            {"计划代码": "P001", "业务类型": "受托"},
-            {"计划代码": "P001", "业务类型": "账管"},
-            {"计划代码": "P001", "业务类型": "投管"},
-        ])
+        df = pd.DataFrame(
+            [
+                {"计划代码": "P001", "业务类型": "受托"},
+                {"计划代码": "P001", "业务类型": "账管"},
+                {"计划代码": "P001", "业务类型": "投管"},
+            ]
+        )
 
         candidates = service.derive_candidates(df, config)
         # Sorted: 受托 < 投管 < 账管 (by Chinese character order)
@@ -741,17 +819,21 @@ class TestConcatDistinctAggregation:
                     source="业务类型",
                     target="管理资格",
                     optional=True,
-                    aggregation=AggregationConfig(type="concat_distinct", separator="+")
+                    aggregation=AggregationConfig(
+                        type="concat_distinct", separator="+"
+                    ),
                 ),
-            ]
+            ],
         )
 
-        df = pd.DataFrame([
-            {"计划代码": "P001", "业务类型": "受托"},
-            {"计划代码": "P001", "业务类型": "受托"},  # Duplicate
-            {"计划代码": "P001", "业务类型": "账管"},
-            {"计划代码": "P001", "业务类型": "受托"},  # Duplicate
-        ])
+        df = pd.DataFrame(
+            [
+                {"计划代码": "P001", "业务类型": "受托"},
+                {"计划代码": "P001", "业务类型": "受托"},  # Duplicate
+                {"计划代码": "P001", "业务类型": "账管"},
+                {"计划代码": "P001", "业务类型": "受托"},  # Duplicate
+            ]
+        )
 
         candidates = service.derive_candidates(df, config)
         result = candidates.iloc[0]["管理资格"]
@@ -774,19 +856,26 @@ class TestConcatDistinctAggregation:
                     source="业务类型",
                     target="管理资格",
                     optional=True,
-                    aggregation=AggregationConfig(type="concat_distinct", separator="+")
+                    aggregation=AggregationConfig(
+                        type="concat_distinct", separator="+"
+                    ),
                 ),
+            ],
+        )
+
+        df = pd.DataFrame(
+            [
+                {"计划代码": "P001", "业务类型": None},
+                {"计划代码": "P001", "业务类型": None},
             ]
         )
 
-        df = pd.DataFrame([
-            {"计划代码": "P001", "业务类型": None},
-            {"计划代码": "P001", "业务类型": None},
-        ])
-
         candidates = service.derive_candidates(df, config)
         # optional=True means None is used for empty result after post-processing
-        assert candidates.iloc[0]["管理资格"] is None or candidates.iloc[0]["管理资格"] == ""
+        assert (
+            candidates.iloc[0]["管理资格"] is None
+            or candidates.iloc[0]["管理资格"] == ""
+        )
 
     def test_concat_distinct_custom_separator(self):
         """concat_distinct should use custom separator."""
@@ -803,15 +892,19 @@ class TestConcatDistinctAggregation:
                     source="业务类型",
                     target="管理资格",
                     optional=True,
-                    aggregation=AggregationConfig(type="concat_distinct", separator=",", sort=False)
+                    aggregation=AggregationConfig(
+                        type="concat_distinct", separator=",", sort=False
+                    ),
                 ),
-            ]
+            ],
         )
 
-        df = pd.DataFrame([
-            {"计划代码": "P001", "业务类型": "A"},
-            {"计划代码": "P001", "业务类型": "B"},
-        ])
+        df = pd.DataFrame(
+            [
+                {"计划代码": "P001", "业务类型": "A"},
+                {"计划代码": "P001", "业务类型": "B"},
+            ]
+        )
 
         candidates = service.derive_candidates(df, config)
         result = candidates.iloc[0]["管理资格"]
@@ -837,9 +930,11 @@ class TestAggregationEdgeCases:
                 BackfillColumnMapping(
                     source="机构代码",
                     target="主拓代码",
-                    aggregation=AggregationConfig(type="max_by", order_column="期末资产规模")
+                    aggregation=AggregationConfig(
+                        type="max_by", order_column="期末资产规模"
+                    ),
                 ),
-            ]
+            ],
         )
 
         df = pd.DataFrame(columns=["计划代码", "机构代码", "期末资产规模"])
@@ -861,25 +956,51 @@ class TestAggregationEdgeCases:
                     source="机构代码",
                     target="主拓代码",
                     optional=True,
-                    aggregation=AggregationConfig(type="max_by", order_column="期末资产规模")
+                    aggregation=AggregationConfig(
+                        type="max_by", order_column="期末资产规模"
+                    ),
                 ),
                 BackfillColumnMapping(
                     source="业务类型",
                     target="管理资格",
                     optional=True,
-                    aggregation=AggregationConfig(type="concat_distinct", separator="+", sort=True)
+                    aggregation=AggregationConfig(
+                        type="concat_distinct", separator="+", sort=True
+                    ),
                 ),
-            ]
+            ],
         )
 
-        df = pd.DataFrame([
-            # Plan P001
-            {"计划代码": "P001", "机构代码": "ORG-A", "业务类型": "受托", "期末资产规模": 1000.0},
-            {"计划代码": "P001", "机构代码": "ORG-B", "业务类型": "账管", "期末资产规模": 5000.0},
-            {"计划代码": "P001", "机构代码": "ORG-C", "业务类型": "投管", "期末资产规模": 2000.0},
-            # Plan P002
-            {"计划代码": "P002", "机构代码": "ORG-X", "业务类型": "托管", "期末资产规模": 3000.0},
-        ])
+        df = pd.DataFrame(
+            [
+                # Plan P001
+                {
+                    "计划代码": "P001",
+                    "机构代码": "ORG-A",
+                    "业务类型": "受托",
+                    "期末资产规模": 1000.0,
+                },
+                {
+                    "计划代码": "P001",
+                    "机构代码": "ORG-B",
+                    "业务类型": "账管",
+                    "期末资产规模": 5000.0,
+                },
+                {
+                    "计划代码": "P001",
+                    "机构代码": "ORG-C",
+                    "业务类型": "投管",
+                    "期末资产规模": 2000.0,
+                },
+                # Plan P002
+                {
+                    "计划代码": "P002",
+                    "机构代码": "ORG-X",
+                    "业务类型": "托管",
+                    "期末资产规模": 3000.0,
+                },
+            ]
+        )
 
         candidates = service.derive_candidates(df, config)
 
@@ -906,14 +1027,18 @@ class TestAggregationEdgeCases:
             target_key="年金计划号",
             backfill_columns=[
                 BackfillColumnMapping(source="计划代码", target="年金计划号"),
-                BackfillColumnMapping(source="计划名称", target="计划名称"),  # No aggregation
-            ]
+                BackfillColumnMapping(
+                    source="计划名称", target="计划名称"
+                ),  # No aggregation
+            ],
         )
 
-        df = pd.DataFrame([
-            {"计划代码": "P001", "计划名称": "Plan A"},
-            {"计划代码": "P001", "计划名称": "Plan B"},  # Duplicate plan code
-        ])
+        df = pd.DataFrame(
+            [
+                {"计划代码": "P001", "计划名称": "Plan A"},
+                {"计划代码": "P001", "计划名称": "Plan B"},  # Duplicate plan code
+            ]
+        )
 
         candidates = service.derive_candidates(df, config)
         # Should use first value
@@ -934,19 +1059,27 @@ class TestAggregationEdgeCases:
                     source="机构代码",
                     target="主拓代码",
                     optional=True,
-                    aggregation=AggregationConfig(type="max_by", order_column="期末资产规模")
+                    aggregation=AggregationConfig(
+                        type="max_by", order_column="期末资产规模"
+                    ),
                 ),
-            ]
+            ],
         )
 
-        df = pd.DataFrame([
-            # P001: has valid order_column values
-            {"计划代码": "P001", "机构代码": "ORG-A", "期末资产规模": 1000.0},
-            {"计划代码": "P001", "机构代码": "ORG-B", "期末资产规模": 5000.0},  # MAX
-            # P002: all order_column values are NULL - should fallback to first
-            {"计划代码": "P002", "机构代码": "ORG-X", "期末资产规模": None},
-            {"计划代码": "P002", "机构代码": "ORG-Y", "期末资产规模": None},
-        ])
+        df = pd.DataFrame(
+            [
+                # P001: has valid order_column values
+                {"计划代码": "P001", "机构代码": "ORG-A", "期末资产规模": 1000.0},
+                {
+                    "计划代码": "P001",
+                    "机构代码": "ORG-B",
+                    "期末资产规模": 5000.0,
+                },  # MAX
+                # P002: all order_column values are NULL - should fallback to first
+                {"计划代码": "P002", "机构代码": "ORG-X", "期末资产规模": None},
+                {"计划代码": "P002", "机构代码": "ORG-Y", "期末资产规模": None},
+            ]
+        )
 
         candidates = service.derive_candidates(df, config)
 

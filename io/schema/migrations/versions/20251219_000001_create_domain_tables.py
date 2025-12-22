@@ -68,7 +68,9 @@ def upgrade() -> None:
             # Business columns - from domain_registry annuity_income
             sa.Column("月度", sa.Date(), nullable=False, comment="Report date"),
             sa.Column("计划号", sa.String(255), nullable=False, comment="Plan code"),
-            sa.Column("company_id", sa.String(50), nullable=False, comment="Company ID"),
+            sa.Column(
+                "company_id", sa.String(50), nullable=False, comment="Company ID"
+            ),
             sa.Column("客户名称", sa.String(255), nullable=False),
             sa.Column("年金账户名", sa.String(255), nullable=True),
             sa.Column("业务类型", sa.String(255), nullable=True),
@@ -97,9 +99,7 @@ def upgrade() -> None:
         )
 
         # Indexes for 收入明细
-        op.create_index(
-            "idx_收入明细_月度", "收入明细", ["月度"], schema="business"
-        )
+        op.create_index("idx_收入明细_月度", "收入明细", ["月度"], schema="business")
         op.create_index(
             "idx_收入明细_计划号", "收入明细", ["计划号"], schema="business"
         )

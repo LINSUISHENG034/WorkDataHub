@@ -2,6 +2,7 @@
 Utility functions for EQC connector.
 """
 
+
 def sanitize_url_for_logging(url: str) -> str:
     """
     Sanitize URL for logging by removing token parameters.

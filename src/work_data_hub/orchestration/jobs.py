@@ -8,7 +8,6 @@ respecting the Clean Architecture flow: domain ← io ← orchestration.
 
 import argparse
 import re
-import sys
 from typing import Any, Dict, List, Optional
 
 import yaml
@@ -28,9 +27,6 @@ from work_data_hub.io.loader.company_mapping_loader import (
 from work_data_hub.io.loader.warehouse_loader import WarehouseLoader
 
 from .ops import (
-    backfill_refs_op,  # Legacy - kept for backward compatibility
-    derive_plan_refs_op,  # Legacy - kept for backward compatibility
-    derive_portfolio_refs_op,  # Legacy - kept for backward compatibility
     discover_files_op,
     gate_after_backfill,
     generic_backfill_refs_op,  # Epic 6.2 - configuration-driven backfill
@@ -46,7 +42,6 @@ from .ops import (
     validate_op,
 )
 from .reference_sync_jobs import reference_sync_job
-from .reference_sync_ops import ReferenceSyncOpConfig
 
 
 @job
@@ -331,7 +326,9 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
             domain_config = {}
 
         # Epic 3 schema prefers output.table + output.schema_name
-        output_cfg = domain_config.get("output") if isinstance(domain_config, dict) else None
+        output_cfg = (
+            domain_config.get("output") if isinstance(domain_config, dict) else None
+        )
         if isinstance(output_cfg, dict) and output_cfg.get("table"):
             table_name = str(output_cfg["table"])
             schema_name = output_cfg.get("schema_name")

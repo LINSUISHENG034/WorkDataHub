@@ -10,7 +10,6 @@ from typing import Dict, List
 
 from .core import DomainSchema
 
-
 _DOMAIN_REGISTRY: Dict[str, DomainSchema] = {}
 
 

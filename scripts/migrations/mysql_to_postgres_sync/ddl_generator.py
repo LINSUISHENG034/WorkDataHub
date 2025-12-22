@@ -4,10 +4,10 @@ PostgreSQL DDL生成模块
 用于根据MySQL的索引和外键定义生成PostgreSQL兼容的DDL语句。
 """
 
-from typing import List
 import logging
+from typing import List
 
-from sqlglot_parser import MySQLIndex, MySQLForeignKey
+from sqlglot_parser import MySQLForeignKey, MySQLIndex
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ class PostgreSQLDDLGenerator:
         sql = f"ALTER TABLE {self.quoted_table_name}\n"
         sql += f"    ADD CONSTRAINT {foreign_key.name}\n"
         sql += f"    FOREIGN KEY ({', '.join(columns)})\n"
-        sql += f"    REFERENCES {ref_schema}.\"{foreign_key.ref_table}\"({', '.join(ref_columns)})\n"
+        sql += f'    REFERENCES {ref_schema}."{foreign_key.ref_table}"({", ".join(ref_columns)})\n'
 
         if on_delete:
             sql += f"    ON DELETE {on_delete}\n"
@@ -95,10 +95,10 @@ class PostgreSQLDDLGenerator:
         clean_name = index.name
 
         # 替换不支持的字符
-        clean_name = clean_name.replace('-', '_')
-        clean_name = clean_name.replace(' ', '_')
-        clean_name = clean_name.replace('(', '_')
-        clean_name = clean_name.replace(')', '_')
+        clean_name = clean_name.replace("-", "_")
+        clean_name = clean_name.replace(" ", "_")
+        clean_name = clean_name.replace("(", "_")
+        clean_name = clean_name.replace(")", "_")
 
         # 如果名称过长或为空，生成一个标准名称
         if not clean_name or len(clean_name) > 63:
@@ -127,15 +127,17 @@ class PostgreSQLDDLGenerator:
             PostgreSQL外键动作
         """
         action_map = {
-            'CASCADE': 'CASCADE',
-            'SET_NULL': 'SET NULL',
-            'RESTRICT': 'RESTRICT',
-            'NO_ACTION': 'NO ACTION'
+            "CASCADE": "CASCADE",
+            "SET_NULL": "SET NULL",
+            "RESTRICT": "RESTRICT",
+            "NO_ACTION": "NO ACTION",
         }
 
-        return action_map.get(action.upper(), 'RESTRICT')
+        return action_map.get(action.upper(), "RESTRICT")
 
-    def generate_batch_ddl(self, indexes: List[MySQLIndex], foreign_keys: List[MySQLForeignKey]) -> List[str]:
+    def generate_batch_ddl(
+        self, indexes: List[MySQLIndex], foreign_keys: List[MySQLForeignKey]
+    ) -> List[str]:
         """
         批量生成DDL语句
 
@@ -152,7 +154,7 @@ class PostgreSQLDDLGenerator:
         for index in indexes:
             try:
                 ddl = self.generate_create_index_sql(index)
-                ddl_statements.append(('INDEX', index.name, ddl))
+                ddl_statements.append(("INDEX", index.name, ddl))
                 logger.debug(f"生成索引DDL: {index.name}")
             except Exception as e:
                 logger.error(f"生成索引DDL失败 {index.name}: {e}")
@@ -161,14 +163,16 @@ class PostgreSQLDDLGenerator:
         for fk in foreign_keys:
             try:
                 ddl = self.generate_alter_table_foreign_key_sql(fk)
-                ddl_statements.append(('FOREIGN_KEY', fk.name, ddl))
+                ddl_statements.append(("FOREIGN_KEY", fk.name, ddl))
                 logger.debug(f"生成外键DDL: {fk.name}")
             except Exception as e:
                 logger.error(f"生成外键DDL失败 {fk.name}: {e}")
 
         return ddl_statements
 
-    def generate_dependency_check_sql(self, foreign_keys: List[MySQLForeignKey]) -> List[str]:
+    def generate_dependency_check_sql(
+        self, foreign_keys: List[MySQLForeignKey]
+    ) -> List[str]:
         """
         生成依赖检查SQL
 
@@ -220,7 +224,7 @@ def main():
         "产品线",
         ["产品线代码"],
         "RESTRICT",
-        "CASCADE"
+        "CASCADE",
     )
 
     # 生成DDL

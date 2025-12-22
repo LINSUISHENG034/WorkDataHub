@@ -18,4 +18,3 @@ __all__ = [
     "run_get_token",
     "run_get_token_with_validation",
 ]
-

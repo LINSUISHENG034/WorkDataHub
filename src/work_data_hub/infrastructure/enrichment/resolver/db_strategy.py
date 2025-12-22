@@ -79,7 +79,9 @@ def resolve_via_db_cache(
             )
 
     # Fallback: legacy company_mapping lookup
-    return _resolve_via_company_mapping(df, mask_unresolved, strategy, mapping_repository)
+    return _resolve_via_company_mapping(
+        df, mask_unresolved, strategy, mapping_repository
+    )
 
 
 def _resolve_via_enrichment_index(
@@ -126,9 +128,7 @@ def _resolve_via_enrichment_index(
 
     # Remove empty entry types to avoid unnecessary UNNEST arrays
     keys_by_type = {
-        key_type: list(keys)
-        for key_type, keys in keys_by_type.items()
-        if keys
+        key_type: list(keys) for key_type, keys in keys_by_type.items() if keys
     }
 
     if not keys_by_type:
@@ -155,9 +155,7 @@ def _resolve_via_enrichment_index(
     decision_paths: Dict[int, str] = {}
 
     try:
-        results = mapping_repository.lookup_enrichment_index_batch(
-            keys_by_type
-        )
+        results = mapping_repository.lookup_enrichment_index_batch(keys_by_type)
     except Exception as e:
         logger.warning(
             "company_id_resolver.enrichment_index_query_failed",
@@ -198,9 +196,7 @@ def _resolve_via_enrichment_index(
         account_number = row.get(strategy.account_number_column)
         customer_name = row.get(strategy.customer_name_column)
         normalized_customer = (
-            normalize_for_temp_id(str(customer_name))
-            if pd.notna(customer_name)
-            else ""
+            normalize_for_temp_id(str(customer_name)) if pd.notna(customer_name) else ""
         )
 
         candidate_keys = {
@@ -310,10 +306,10 @@ def _resolve_via_company_mapping(
     """
     # Collect all potential lookup values from unresolved rows
     lookup_columns = [
-        (strategy.plan_code_column, False),       # P1: RAW
+        (strategy.plan_code_column, False),  # P1: RAW
         (strategy.account_number_column, False),  # P2: RAW
-        (strategy.customer_name_column, True),    # P4: NORMALIZED
-        (strategy.account_name_column, False),    # P5: RAW
+        (strategy.customer_name_column, True),  # P4: NORMALIZED
+        (strategy.account_name_column, False),  # P5: RAW
     ]
 
     alias_names: set[str] = set()

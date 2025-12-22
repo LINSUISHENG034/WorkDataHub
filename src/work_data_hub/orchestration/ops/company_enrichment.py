@@ -217,9 +217,7 @@ def process_company_lookup_queue_op(
                 conn.commit()
                 context.log.info("Queue processing transaction committed")
             except Exception as commit_error:
-                context.log.warning(
-                    "Queue processing commit warning: %s", commit_error
-                )
+                context.log.warning("Queue processing commit warning: %s", commit_error)
 
         else:
             # Plan-only: simulate queue processing

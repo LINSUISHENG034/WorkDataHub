@@ -6,8 +6,6 @@
 """
 
 import argparse
-import sys
-from typing import Optional
 
 import structlog
 
@@ -28,6 +26,7 @@ def test_t1_basic_lookup():
     print("=" * 60)
 
     from work_data_hub.config.settings import get_settings
+
     settings = get_settings()
     from work_data_hub.infrastructure.enrichment.eqc_provider import EqcProvider
 
@@ -40,7 +39,7 @@ def test_t1_basic_lookup():
     print(f"\n查询公司: {test_name}")
     result = provider.lookup(test_name)
 
-    print(f"\n--- 结果 ---")
+    print("\n--- 结果 ---")
     if result:
         print(f"✅ Company ID: {result.company_id}")
         print(f"✅ Official Name: {result.official_name}")
@@ -63,6 +62,7 @@ def test_t2_budget_exhaustion():
     print("=" * 60)
 
     from work_data_hub.config.settings import get_settings
+
     settings = get_settings()
     from work_data_hub.infrastructure.enrichment.eqc_provider import EqcProvider
 
@@ -84,7 +84,7 @@ def test_t2_budget_exhaustion():
         print(f"查询结果: {status}")
         print(f"查询后预算: {provider.remaining_budget}")
 
-    print(f"\n--- 最终状态 ---")
+    print("\n--- 最终状态 ---")
     print(f"Provider 可用: {provider.is_available}")
     return provider.remaining_budget == 0
 
@@ -109,7 +109,7 @@ def test_t3_timeout_retry():
 
     result = provider.lookup("测试公司")
 
-    print(f"\n--- 结果 ---")
+    print("\n--- 结果 ---")
     print(f"查询结果: {result}")
     print(f"剩余预算: {provider.remaining_budget}")
 
@@ -125,6 +125,7 @@ def test_t4_cache_write():
     from sqlalchemy import create_engine, text
 
     from work_data_hub.config.settings import get_settings
+
     settings = get_settings()
     from work_data_hub.infrastructure.enrichment.eqc_provider import EqcProvider
     from work_data_hub.infrastructure.enrichment.mapping_repository import (
@@ -158,7 +159,7 @@ def test_t4_cache_write():
             ).fetchone()
 
             if cache_result:
-                print(f"✅ 缓存记录存在")
+                print("✅ 缓存记录存在")
                 print(f"   Company ID: {cache_result[0]}")
                 print(f"   Match Type: {cache_result[1]}")
                 return True
@@ -177,6 +178,7 @@ def test_t5_not_found():
     print("=" * 60)
 
     from work_data_hub.config.settings import get_settings
+
     settings = get_settings()
     from work_data_hub.infrastructure.enrichment.eqc_provider import EqcProvider
 
@@ -190,7 +192,7 @@ def test_t5_not_found():
 
     result = provider.lookup(test_name)
 
-    print(f"\n--- 结果 ---")
+    print("\n--- 结果 ---")
     print(f"查询结果: {result}")
     print(f"Provider 仍可用: {provider.is_available}")
     print(f"剩余预算: {provider.remaining_budget}")
@@ -234,10 +236,11 @@ def test_t7_token_management():
     print("=" * 60)
 
     from work_data_hub.config.settings import get_settings
+
     settings = get_settings()
     from work_data_hub.infrastructure.enrichment.eqc_provider import EqcProvider
 
-    print(f"\n--- Token 配置检查 ---")
+    print("\n--- Token 配置检查 ---")
     print(f"Token 已配置: {bool(settings.eqc_token)}")
     print(f"Token 长度: {len(settings.eqc_token) if settings.eqc_token else 0}")
 
@@ -276,6 +279,7 @@ def test_t8_security():
     )
 
     from work_data_hub.config.settings import get_settings
+
     settings = get_settings()
     from work_data_hub.infrastructure.enrichment.eqc_provider import EqcProvider
 
@@ -291,7 +295,7 @@ def test_t8_security():
     log_output = log_capture.getvalue()
     token_leaked = settings.eqc_token in log_output if settings.eqc_token else False
 
-    print(f"\n--- 安全检查结果 ---")
+    print("\n--- 安全检查结果 ---")
     if token_leaked:
         print("❌ 警告: Token 可能泄露到日志中!")
     else:
@@ -312,6 +316,7 @@ def test_t9_integration():
     from sqlalchemy import create_engine
 
     from work_data_hub.config.settings import get_settings
+
     settings = get_settings()
     from work_data_hub.infrastructure.enrichment.company_id_resolver import (
         CompanyIdResolver,
@@ -344,7 +349,13 @@ def test_t9_integration():
     resolver = CompanyIdResolver(
         eqc_provider=provider,
         mapping_repository=repo,
-        yaml_overrides={"plan": {}, "account": {}, "hardcode": {}, "name": {}, "account_name": {}},
+        yaml_overrides={
+            "plan": {},
+            "account": {},
+            "hardcode": {},
+            "name": {},
+            "account_name": {},
+        },
     )
 
     strategy = ResolutionStrategy(
@@ -360,7 +371,7 @@ def test_t9_integration():
     print("\n--- 解析结果 ---")
     print(result.data[["客户名称", "company_id"]])
 
-    print(f"\n--- 统计信息 ---")
+    print("\n--- 统计信息 ---")
     stats = result.statistics
     print(f"EQC 命中数: {getattr(stats, 'eqc_sync_hits', 'N/A')}")
     print(f"剩余预算: {getattr(stats, 'budget_remaining', 'N/A')}")

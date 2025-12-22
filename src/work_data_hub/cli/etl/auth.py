@@ -5,6 +5,8 @@ Story 7.4: CLI Layer Modularization - Token validation and refresh utilities.
 """
 
 import os
+
+
 def _validate_and_refresh_token(auto_refresh: bool = True) -> bool:
     """
     Validate EQC token at CLI startup and auto-refresh if invalid.

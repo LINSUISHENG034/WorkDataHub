@@ -97,9 +97,7 @@ class TestEnrichmentIndexTableExists:
         """AC1: Verify id is the primary key."""
         inspector = inspect(migrated_db)
         pk = inspector.get_pk_constraint("enrichment_index", schema=SCHEMA_NAME)
-        assert pk["constrained_columns"] == ["id"], (
-            "enrichment_index PK should be id"
-        )
+        assert pk["constrained_columns"] == ["id"], "enrichment_index PK should be id"
 
     def test_column_types(self, migrated_db: Engine):
         """AC1: Verify column types are correct."""
@@ -179,8 +177,7 @@ class TestEnrichmentIndexConstraints:
             "enrichment_index", schema=SCHEMA_NAME
         )
         has_confidence_check = any(
-            "confidence" in (c.get("sqltext", "") or "")
-            for c in check_constraints
+            "confidence" in (c.get("sqltext", "") or "") for c in check_constraints
         )
         assert has_confidence_check, (
             "enrichment_index should have CHECK constraint on confidence"
@@ -342,9 +339,7 @@ class TestEnrichmentIndexDataOperations:
 
             # Cleanup
             conn.execute(
-                text(
-                    "DELETE FROM enterprise.enrichment_index WHERE lookup_key = :key"
-                ),
+                text("DELETE FROM enterprise.enrichment_index WHERE lookup_key = :key"),
                 {"key": "TEST_KEY"},
             )
             conn.commit()
@@ -392,16 +387,15 @@ class TestEnrichmentIndexDataOperations:
                 conn.commit()
 
             # Verify it's a unique constraint violation
-            assert "unique" in str(exc_info.value).lower() or "duplicate" in str(
-                exc_info.value
-            ).lower()
+            assert (
+                "unique" in str(exc_info.value).lower()
+                or "duplicate" in str(exc_info.value).lower()
+            )
 
             # Cleanup (rollback happened due to exception)
             conn.rollback()
             conn.execute(
-                text(
-                    "DELETE FROM enterprise.enrichment_index WHERE lookup_key = :key"
-                ),
+                text("DELETE FROM enterprise.enrichment_index WHERE lookup_key = :key"),
                 {"key": "UNIQUE_TEST"},
             )
             conn.commit()
@@ -473,9 +467,7 @@ class TestEnrichmentIndexDataOperations:
 
             # Cleanup
             conn.execute(
-                text(
-                    "DELETE FROM enterprise.enrichment_index WHERE lookup_key = :key"
-                ),
+                text("DELETE FROM enterprise.enrichment_index WHERE lookup_key = :key"),
                 {"key": "CONFLICT_TEST"},
             )
             conn.commit()

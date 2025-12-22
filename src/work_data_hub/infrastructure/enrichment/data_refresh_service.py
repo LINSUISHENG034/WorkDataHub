@@ -18,10 +18,10 @@ from typing import List, Optional
 from sqlalchemy import Connection, text
 
 from work_data_hub.config.settings import get_settings
-from work_data_hub.io.connectors.eqc_client import EQCClient, EQCClientError
 from work_data_hub.infrastructure.enrichment.mapping_repository import (
     CompanyMappingRepository,
 )
+from work_data_hub.io.connectors.eqc_client import EQCClient, EQCClientError
 from work_data_hub.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -132,7 +132,9 @@ class EqcDataRefreshService:
                 timeout=self.settings.eqc_timeout,
                 retry_max=self.settings.eqc_retry_max,
                 base_url=self.settings.eqc_base_url,
-                rate_limit=int(self.settings.eqc_data_refresh_rate_limit * 60),  # Convert to requests per minute
+                rate_limit=int(
+                    self.settings.eqc_data_refresh_rate_limit * 60
+                ),  # Convert to requests per minute
             )
         else:
             self.eqc_client = eqc_client
@@ -333,7 +335,9 @@ class EqcDataRefreshService:
         This function must never fail the refresh operation.
         """
         try:
-            from work_data_hub.infrastructure.cleansing.rule_engine import CleansingRuleEngine
+            from work_data_hub.infrastructure.cleansing.rule_engine import (
+                CleansingRuleEngine,
+            )
 
             row = self.connection.execute(
                 text("""
@@ -475,7 +479,9 @@ class EqcDataRefreshService:
                 company_name = name_row.company_full_name
 
                 # Call EQC API with raw response
-                results, raw_json = self.eqc_client.search_company_with_raw(company_name)
+                results, raw_json = self.eqc_client.search_company_with_raw(
+                    company_name
+                )
 
                 if not results:
                     logger.warning(

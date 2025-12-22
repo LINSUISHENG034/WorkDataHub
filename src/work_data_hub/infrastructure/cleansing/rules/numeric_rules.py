@@ -5,8 +5,8 @@
 提供统一、可配置的数值字段清洗解决方案。
 """
 
-import unicodedata
 import re
+import unicodedata
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Callable, Dict, List, Optional, Union
 

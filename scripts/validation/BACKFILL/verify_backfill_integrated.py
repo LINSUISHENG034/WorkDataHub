@@ -13,27 +13,27 @@ Created: 2025-12-12
 Enhanced: 2025-12-12 (PM Review)
 """
 
-import yaml
-import pandas as pd
+import logging
 import time
 from datetime import datetime
-from typing import List, Literal, Optional, Set
+from graphlib import CycleError, TopologicalSorter
+from typing import List, Literal
+
+import pandas as pd
 from pydantic import BaseModel, Field, ValidationError
-from sqlalchemy import create_engine, text, MetaData, Table, Column, String, Integer, Boolean, DateTime
-from graphlib import TopologicalSorter, CycleError
-import logging
-from pathlib import Path
+from sqlalchemy import Boolean, Column, DateTime, MetaData, String, Table, create_engine
 
 # 设置日志格式
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - [BackfillVerify] - %(levelname)s - %(message)s'
+    format="%(asctime)s - [BackfillVerify] - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
 # ==========================================
 # PART 1: 配置模型 (Pydantic)
 # ==========================================
+
 
 class BackfillColumnMapping(BaseModel):
     source: str = Field(..., description="Fact data column")
@@ -60,12 +60,15 @@ class DomainForeignKeysConfig(BaseModel):
 # PART 2: 通用回填服务原型 (Enhanced)
 # ==========================================
 
+
 class GenericBackfillServicePrototype:
     def __init__(self, engine, domain: str = "unknown"):
         self.engine = engine
         self.domain = domain
 
-    def _topological_sort(self, configs: List[ForeignKeyConfig]) -> List[ForeignKeyConfig]:
+    def _topological_sort(
+        self, configs: List[ForeignKeyConfig]
+    ) -> List[ForeignKeyConfig]:
         """
         真正的拓扑排序 - 基于 depends_on 字段
         使用 Python 3.9+ graphlib.TopologicalSorter
@@ -81,7 +84,9 @@ class GenericBackfillServicePrototype:
         for name, deps in graph.items():
             for dep in deps:
                 if dep not in name_map:
-                    raise ValueError(f"Foreign key '{name}' depends on unknown key '{dep}'")
+                    raise ValueError(
+                        f"Foreign key '{name}' depends on unknown key '{dep}'"
+                    )
 
         # 拓扑排序 (会自动检测循环依赖)
         sorter = TopologicalSorter(graph)
@@ -92,17 +97,25 @@ class GenericBackfillServicePrototype:
 
         return [name_map[name] for name in sorted_names]
 
-    def derive_candidates(self, df: pd.DataFrame, config: ForeignKeyConfig) -> pd.DataFrame:
+    def derive_candidates(
+        self, df: pd.DataFrame, config: ForeignKeyConfig
+    ) -> pd.DataFrame:
         """从事实表中提取候选数据"""
         mapping = {m.source: m.target for m in config.backfill_columns}
         available_sources = [s for s in mapping.keys() if s in df.columns]
 
         if config.source_column not in df.columns:
-            logger.warning(f"  [Skip] FK column '{config.source_column}' not found in data")
+            logger.warning(
+                f"  [Skip] FK column '{config.source_column}' not found in data"
+            )
             return pd.DataFrame()
 
         # 提取并去重
-        candidates = df[available_sources].drop_duplicates().dropna(subset=[config.source_column])
+        candidates = (
+            df[available_sources]
+            .drop_duplicates()
+            .dropna(subset=[config.source_column])
+        )
         candidates = candidates.rename(columns=mapping)
 
         return candidates
@@ -112,7 +125,7 @@ class GenericBackfillServicePrototype:
         candidates: pd.DataFrame,
         config: ForeignKeyConfig,
         conn,
-        add_tracking_fields: bool = True
+        add_tracking_fields: bool = True,
     ) -> int:
         """
         执行回填操作 (带数据来源追踪)
@@ -137,14 +150,16 @@ class GenericBackfillServicePrototype:
 
         # 3. 添加数据来源追踪字段
         if add_tracking_fields:
-            to_insert['_source'] = 'auto_derived'
-            to_insert['_needs_review'] = True
-            to_insert['_derived_from_domain'] = self.domain
-            to_insert['_derived_at'] = datetime.now()
+            to_insert["_source"] = "auto_derived"
+            to_insert["_needs_review"] = True
+            to_insert["_derived_from_domain"] = self.domain
+            to_insert["_derived_at"] = datetime.now()
 
         # 4. 插入
-        logger.info(f"  [Insert] Inserting {len(to_insert)} new records into {table_name}")
-        to_insert.to_sql(table_name, conn, if_exists='append', index=False)
+        logger.info(
+            f"  [Insert] Inserting {len(to_insert)} new records into {table_name}"
+        )
+        to_insert.to_sql(table_name, conn, if_exists="append", index=False)
 
         return len(to_insert)
 
@@ -153,7 +168,7 @@ class GenericBackfillServicePrototype:
         df: pd.DataFrame,
         configs: List[ForeignKeyConfig],
         conn,
-        add_tracking_fields: bool = True
+        add_tracking_fields: bool = True,
     ) -> dict:
         """
         执行完整的回填流程
@@ -162,20 +177,21 @@ class GenericBackfillServicePrototype:
         sorted_configs = self._topological_sort(configs)
 
         stats = {
-            'total_inserted': 0,
-            'tables_processed': [],
-            'processing_order': [c.name for c in sorted_configs]
+            "total_inserted": 0,
+            "tables_processed": [],
+            "processing_order": [c.name for c in sorted_configs],
         }
 
         for config in sorted_configs:
             logger.info(f"Processing FK config: {config.name} -> {config.target_table}")
             candidates = self.derive_candidates(df, config)
-            inserted = self.backfill_table(candidates, config, conn, add_tracking_fields)
-            stats['total_inserted'] += inserted
-            stats['tables_processed'].append({
-                'table': config.target_table,
-                'inserted': inserted
-            })
+            inserted = self.backfill_table(
+                candidates, config, conn, add_tracking_fields
+            )
+            stats["total_inserted"] += inserted
+            stats["tables_processed"].append(
+                {"table": config.target_table, "inserted": inserted}
+            )
 
         return stats
 
@@ -183,6 +199,7 @@ class GenericBackfillServicePrototype:
 # ==========================================
 # PART 3: 测试用例
 # ==========================================
+
 
 class VerificationResult:
     def __init__(self, name: str):
@@ -209,9 +226,9 @@ def test_config_schema_validation() -> VerificationResult:
             "target_key": "年金计划号",
             "backfill_columns": [
                 {"source": "计划代码", "target": "年金计划号"},
-                {"source": "计划名称", "target": "计划名称", "optional": True}
+                {"source": "计划名称", "target": "计划名称", "optional": True},
             ],
-            "priority": 1
+            "priority": 1,
         },
         {
             "name": "fk_portfolio",
@@ -220,10 +237,10 @@ def test_config_schema_validation() -> VerificationResult:
             "target_key": "组合代码",
             "backfill_columns": [
                 {"source": "组合代码", "target": "组合代码"},
-                {"source": "计划代码", "target": "年金计划号"}
+                {"source": "计划代码", "target": "年金计划号"},
             ],
             "priority": 2,
-            "depends_on": ["fk_plan"]
+            "depends_on": ["fk_plan"],
         },
         {
             "name": "fk_product_line",
@@ -232,9 +249,9 @@ def test_config_schema_validation() -> VerificationResult:
             "target_key": "产品线代码",
             "backfill_columns": [
                 {"source": "产品线代码", "target": "产品线代码"},
-                {"source": "产品线名称", "target": "产品线名称", "optional": True}
+                {"source": "产品线名称", "target": "产品线名称", "optional": True},
             ],
-            "priority": 1
+            "priority": 1,
         },
         {
             "name": "fk_organization",
@@ -243,10 +260,10 @@ def test_config_schema_validation() -> VerificationResult:
             "target_key": "组织代码",
             "backfill_columns": [
                 {"source": "组织代码", "target": "组织代码"},
-                {"source": "组织名称", "target": "组织名称", "optional": True}
+                {"source": "组织名称", "target": "组织名称", "optional": True},
             ],
-            "priority": 1
-        }
+            "priority": 1,
+        },
     ]
 
     try:
@@ -272,7 +289,7 @@ def test_topological_sort() -> VerificationResult:
             target_table="child",
             target_key="id",
             backfill_columns=[BackfillColumnMapping(source="child_id", target="id")],
-            depends_on=["fk_parent"]
+            depends_on=["fk_parent"],
         ),
         ForeignKeyConfig(
             name="fk_parent",
@@ -280,14 +297,14 @@ def test_topological_sort() -> VerificationResult:
             target_table="parent",
             target_key="id",
             backfill_columns=[BackfillColumnMapping(source="parent_id", target="id")],
-            depends_on=["fk_grandparent"]
+            depends_on=["fk_grandparent"],
         ),
         ForeignKeyConfig(
             name="fk_grandparent",
             source_column="gp_id",
             target_table="grandparent",
             target_key="id",
-            backfill_columns=[BackfillColumnMapping(source="gp_id", target="id")]
+            backfill_columns=[BackfillColumnMapping(source="gp_id", target="id")],
         ),
     ]
 
@@ -326,7 +343,7 @@ def test_circular_dependency_detection() -> VerificationResult:
             target_table="table_a",
             target_key="id",
             backfill_columns=[BackfillColumnMapping(source="a_id", target="id")],
-            depends_on=["fk_b"]
+            depends_on=["fk_b"],
         ),
         ForeignKeyConfig(
             name="fk_b",
@@ -334,7 +351,7 @@ def test_circular_dependency_detection() -> VerificationResult:
             target_table="table_b",
             target_key="id",
             backfill_columns=[BackfillColumnMapping(source="b_id", target="id")],
-            depends_on=["fk_a"]  # 循环!
+            depends_on=["fk_a"],  # 循环!
         ),
     ]
 
@@ -370,16 +387,17 @@ def test_all_four_fks() -> VerificationResult:
         ("年金计划", "年金计划号"),
         ("组合计划", "组合代码"),
         ("产品线", "产品线代码"),
-        ("组织架构", "组织代码")
+        ("组织架构", "组织代码"),
     ]:
         Table(
-            table_name, metadata,
+            table_name,
+            metadata,
             Column(key_col, String, primary_key=True),
             Column("名称", String),
             Column("_source", String),
             Column("_needs_review", Boolean),
             Column("_derived_from_domain", String),
-            Column("_derived_at", DateTime)
+            Column("_derived_at", DateTime),
         )
 
     metadata.create_all(engine)
@@ -393,8 +411,8 @@ def test_all_four_fks() -> VerificationResult:
             target_key="年金计划号",
             backfill_columns=[
                 BackfillColumnMapping(source="计划代码", target="年金计划号"),
-                BackfillColumnMapping(source="计划名称", target="名称", optional=True)
-            ]
+                BackfillColumnMapping(source="计划名称", target="名称", optional=True),
+            ],
         ),
         ForeignKeyConfig(
             name="fk_portfolio",
@@ -403,9 +421,9 @@ def test_all_four_fks() -> VerificationResult:
             target_key="组合代码",
             backfill_columns=[
                 BackfillColumnMapping(source="组合代码", target="组合代码"),
-                BackfillColumnMapping(source="组合名称", target="名称", optional=True)
+                BackfillColumnMapping(source="组合名称", target="名称", optional=True),
             ],
-            depends_on=["fk_plan"]
+            depends_on=["fk_plan"],
         ),
         ForeignKeyConfig(
             name="fk_product_line",
@@ -414,8 +432,10 @@ def test_all_four_fks() -> VerificationResult:
             target_key="产品线代码",
             backfill_columns=[
                 BackfillColumnMapping(source="产品线代码", target="产品线代码"),
-                BackfillColumnMapping(source="产品线名称", target="名称", optional=True)
-            ]
+                BackfillColumnMapping(
+                    source="产品线名称", target="名称", optional=True
+                ),
+            ],
         ),
         ForeignKeyConfig(
             name="fk_organization",
@@ -424,22 +444,24 @@ def test_all_four_fks() -> VerificationResult:
             target_key="组织代码",
             backfill_columns=[
                 BackfillColumnMapping(source="组织代码", target="组织代码"),
-                BackfillColumnMapping(source="组织名称", target="名称", optional=True)
-            ]
+                BackfillColumnMapping(source="组织名称", target="名称", optional=True),
+            ],
         ),
     ]
 
     # 测试数据 (包含所有4个FK的值，模拟真实事实表)
-    fact_data = pd.DataFrame({
-        "计划代码": ["PLAN_001", "PLAN_002", "PLAN_001"],
-        "计划名称": ["Plan A", "Plan B", "Plan A"],
-        "组合代码": ["PORT_001", "PORT_002", "PORT_001"],
-        "组合名称": ["Portfolio A", "Portfolio B", "Portfolio A"],
-        "产品线代码": ["PL_001", "PL_001", "PL_002"],
-        "产品线名称": ["Product Line A", "Product Line A", "Product Line B"],
-        "组织代码": ["ORG_001", "ORG_002", "ORG_003"],
-        "组织名称": ["Org A", "Org B", "Org C"]
-    })
+    fact_data = pd.DataFrame(
+        {
+            "计划代码": ["PLAN_001", "PLAN_002", "PLAN_001"],
+            "计划名称": ["Plan A", "Plan B", "Plan A"],
+            "组合代码": ["PORT_001", "PORT_002", "PORT_001"],
+            "组合名称": ["Portfolio A", "Portfolio B", "Portfolio A"],
+            "产品线代码": ["PL_001", "PL_001", "PL_002"],
+            "产品线名称": ["Product Line A", "Product Line A", "Product Line B"],
+            "组织代码": ["ORG_001", "ORG_002", "ORG_003"],
+            "组织名称": ["Org A", "Org B", "Org C"],
+        }
+    )
 
     service = GenericBackfillServicePrototype(engine, domain="annuity_performance")
 
@@ -450,13 +472,17 @@ def test_all_four_fks() -> VerificationResult:
             # 验证每个表都有数据
             tables_with_data = 0
             for table_name in ["年金计划", "组合计划", "产品线", "组织架构"]:
-                count = pd.read_sql(f'SELECT COUNT(*) as cnt FROM "{table_name}"', conn).iloc[0]['cnt']
+                count = pd.read_sql(
+                    f'SELECT COUNT(*) as cnt FROM "{table_name}"', conn
+                ).iloc[0]["cnt"]
                 if count > 0:
                     tables_with_data += 1
 
             if tables_with_data == 4:
                 result.passed = True
-                result.message = f"All 4 tables populated, {stats['total_inserted']} total records"
+                result.message = (
+                    f"All 4 tables populated, {stats['total_inserted']} total records"
+                )
                 result.details = stats
             else:
                 result.message = f"Only {tables_with_data}/4 tables have data"
@@ -464,6 +490,7 @@ def test_all_four_fks() -> VerificationResult:
         except Exception as e:
             result.message = f"Execution failed: {e}"
             import traceback
+
             traceback.print_exc()
 
     return result
@@ -477,12 +504,13 @@ def test_tracking_fields() -> VerificationResult:
     metadata = MetaData()
 
     Table(
-        "test_table", metadata,
+        "test_table",
+        metadata,
         Column("id", String, primary_key=True),
         Column("_source", String),
         Column("_needs_review", Boolean),
         Column("_derived_from_domain", String),
-        Column("_derived_at", DateTime)
+        Column("_derived_at", DateTime),
     )
     metadata.create_all(engine)
 
@@ -491,7 +519,7 @@ def test_tracking_fields() -> VerificationResult:
         source_column="test_id",
         target_table="test_table",
         target_key="id",
-        backfill_columns=[BackfillColumnMapping(source="test_id", target="id")]
+        backfill_columns=[BackfillColumnMapping(source="test_id", target="id")],
     )
 
     fact_data = pd.DataFrame({"test_id": ["TEST_001", "TEST_002"]})
@@ -508,8 +536,10 @@ def test_tracking_fields() -> VerificationResult:
             checks = {
                 "_source": all(records["_source"] == "auto_derived"),
                 "_needs_review": all(records["_needs_review"] == True),
-                "_derived_from_domain": all(records["_derived_from_domain"] == "test_domain"),
-                "_derived_at": all(records["_derived_at"].notna())
+                "_derived_from_domain": all(
+                    records["_derived_from_domain"] == "test_domain"
+                ),
+                "_derived_at": all(records["_derived_at"].notna()),
             }
 
             if all(checks.values()):
@@ -524,6 +554,7 @@ def test_tracking_fields() -> VerificationResult:
         except Exception as e:
             result.message = f"Execution failed: {e}"
             import traceback
+
             traceback.print_exc()
 
     return result
@@ -537,12 +568,13 @@ def test_large_dataset_performance() -> VerificationResult:
     metadata = MetaData()
 
     Table(
-        "perf_table", metadata,
+        "perf_table",
+        metadata,
         Column("id", String, primary_key=True),
         Column("_source", String),
         Column("_needs_review", Boolean),
         Column("_derived_from_domain", String),
-        Column("_derived_at", DateTime)
+        Column("_derived_at", DateTime),
     )
     metadata.create_all(engine)
 
@@ -551,14 +583,12 @@ def test_large_dataset_performance() -> VerificationResult:
         source_column="perf_id",
         target_table="perf_table",
         target_key="id",
-        backfill_columns=[BackfillColumnMapping(source="perf_id", target="id")]
+        backfill_columns=[BackfillColumnMapping(source="perf_id", target="id")],
     )
 
     # 生成10000行测试数据
     row_count = 10000
-    fact_data = pd.DataFrame({
-        "perf_id": [f"PERF_{i:06d}" for i in range(row_count)]
-    })
+    fact_data = pd.DataFrame({"perf_id": [f"PERF_{i:06d}" for i in range(row_count)]})
 
     service = GenericBackfillServicePrototype(engine, domain="perf_test")
 
@@ -571,22 +601,25 @@ def test_large_dataset_performance() -> VerificationResult:
             # 性能基准: 10000行应在5秒内完成
             threshold_seconds = 5.0
 
-            if elapsed < threshold_seconds and stats['total_inserted'] == row_count:
+            if elapsed < threshold_seconds and stats["total_inserted"] == row_count:
                 result.passed = True
-                result.message = f"{row_count} rows in {elapsed:.2f}s ({row_count/elapsed:.0f} rows/sec)"
+                result.message = f"{row_count} rows in {elapsed:.2f}s ({row_count / elapsed:.0f} rows/sec)"
             else:
-                result.message = f"Too slow: {elapsed:.2f}s (threshold: {threshold_seconds}s)"
+                result.message = (
+                    f"Too slow: {elapsed:.2f}s (threshold: {threshold_seconds}s)"
+                )
 
             result.details = {
                 "row_count": row_count,
                 "elapsed_seconds": round(elapsed, 3),
                 "rows_per_second": round(row_count / elapsed, 1),
-                "inserted": stats['total_inserted']
+                "inserted": stats["total_inserted"],
             }
 
         except Exception as e:
             result.message = f"Execution failed: {e}"
             import traceback
+
             traceback.print_exc()
 
     return result
@@ -595,6 +628,7 @@ def test_large_dataset_performance() -> VerificationResult:
 # ==========================================
 # PART 4: 主验证流程
 # ==========================================
+
 
 def verify_integration():
     logger.info("=" * 60)

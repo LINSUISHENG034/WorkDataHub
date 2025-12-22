@@ -28,7 +28,9 @@ def test_async_enrichment_schedule_disabled(monkeypatch):
 def test_async_enrichment_schedule_builds_run_request(monkeypatch):
     """Schedule should emit RunRequest with configured batch size and run key."""
 
-    monkeypatch.setattr(schedules, "get_settings", lambda: DummySettings(enabled=True, batch_size=123))
+    monkeypatch.setattr(
+        schedules, "get_settings", lambda: DummySettings(enabled=True, batch_size=123)
+    )
 
     scheduled_time = datetime(2025, 1, 1, 12, 0, 0)
     ctx = build_schedule_context(scheduled_execution_time=scheduled_time)

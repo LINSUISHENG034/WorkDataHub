@@ -695,9 +695,7 @@ class TestObserverIntegration:
         mock_request = Mock(id=1, name="Test Company", attempts=0)
         mock_queue.dequeue.side_effect = [[mock_request], []]
 
-        processed_count = service.process_lookup_queue(
-            batch_size=5, observer=observer
-        )
+        processed_count = service.process_lookup_queue(batch_size=5, observer=observer)
 
         assert processed_count == 1
         stats = observer.get_stats()

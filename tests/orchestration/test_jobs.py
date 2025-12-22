@@ -41,9 +41,7 @@ class TestSandboxTrusteePerformanceJob:
             yaml.dump(config_data, f)
 
         # Mock settings
-        with patch(
-            "work_data_hub.orchestration.jobs.get_settings"
-        ) as mock_settings:
+        with patch("work_data_hub.orchestration.jobs.get_settings") as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             # Create run config
@@ -151,9 +149,7 @@ class TestBuildRunConfig:
         args.pk = None
         args.backfill_refs = None  # Add missing attribute for new signature
 
-        with patch(
-            "work_data_hub.config.settings.get_settings"
-        ) as mock_settings:
+        with patch("work_data_hub.config.settings.get_settings") as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             result = build_run_config(args, domain="sandbox_trustee_performance")
@@ -195,9 +191,7 @@ class TestBuildRunConfig:
         args.pk = None
         args.backfill_refs = None  # Add missing attribute for new signature
 
-        with patch(
-            "work_data_hub.config.settings.get_settings"
-        ) as mock_settings:
+        with patch("work_data_hub.config.settings.get_settings") as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             result = build_run_config(args, domain="sandbox_trustee_performance")
@@ -229,9 +223,7 @@ class TestBuildRunConfig:
         args.pk = None
         args.backfill_refs = None  # Add missing attribute for new signature
 
-        with patch(
-            "work_data_hub.config.settings.get_settings"
-        ) as mock_settings:
+        with patch("work_data_hub.config.settings.get_settings") as mock_settings:
             mock_settings.return_value.data_sources_config = "nonexistent.yml"
 
             # Should handle error gracefully and use fallbacks
@@ -256,9 +248,7 @@ class TestBuildRunConfig:
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
-        with patch(
-            "work_data_hub.config.settings.get_settings"
-        ) as mock_settings:
+        with patch("work_data_hub.config.settings.get_settings") as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             # Test execute=True -> plan_only=False
@@ -286,9 +276,7 @@ class TestBuildRunConfig:
             assert load_config["plan_only"] is True
 
 
-@pytest.mark.skip(
-    reason="CLI tests depend on deprecated jobs.py CLI - pending Epic 5"
-)
+@pytest.mark.skip(reason="CLI tests depend on deprecated jobs.py CLI - pending Epic 5")
 class TestCLIMain:
     """Test CLI main function."""
 
@@ -594,9 +582,7 @@ class TestFlagNormalization:
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
-        with patch(
-            "work_data_hub.config.settings.get_settings"
-        ) as mock_settings:
+        with patch("work_data_hub.config.settings.get_settings") as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             # Case 1: --execute present -> should execute (plan_only=False)
@@ -659,9 +645,7 @@ class TestFlagNormalization:
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
-        with patch(
-            "work_data_hub.config.settings.get_settings"
-        ) as mock_settings:
+        with patch("work_data_hub.config.settings.get_settings") as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             # Test max_files = 1 -> should configure existing ops
@@ -719,9 +703,7 @@ class TestFlagNormalization:
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
-        with patch(
-            "work_data_hub.config.settings.get_settings"
-        ) as mock_settings:
+        with patch("work_data_hub.config.settings.get_settings") as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             # Args without max_files attribute -> should default to 1
@@ -763,11 +745,14 @@ class TestMultiFileJob:
             yaml.dump(config_data, f)
 
         # Test single-file job selection (Story 6.2-P6: --domains now required)
-        test_args_single = ["--domains", "sandbox_trustee_performance", "--max-files", "1"]
+        test_args_single = [
+            "--domains",
+            "sandbox_trustee_performance",
+            "--max-files",
+            "1",
+        ]
 
-        with patch(
-            "work_data_hub.config.settings.get_settings"
-        ) as mock_settings:
+        with patch("work_data_hub.config.settings.get_settings") as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             with patch(
@@ -797,11 +782,14 @@ class TestMultiFileJob:
                     mock_multi.assert_not_called()
 
         # Test multi-file job selection (Story 6.2-P6: --domains now required)
-        test_args_multi = ["--domains", "sandbox_trustee_performance", "--max-files", "3"]
+        test_args_multi = [
+            "--domains",
+            "sandbox_trustee_performance",
+            "--max-files",
+            "3",
+        ]
 
-        with patch(
-            "work_data_hub.config.settings.get_settings"
-        ) as mock_settings:
+        with patch("work_data_hub.config.settings.get_settings") as mock_settings:
             mock_settings.return_value.data_sources_config = str(config_file)
 
             with patch(

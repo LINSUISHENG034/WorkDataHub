@@ -9,7 +9,6 @@ hybrid reference data strategy (AD-011).
 import logging
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Protocol, Set
 
 import pandas as pd
@@ -67,7 +66,9 @@ class ReferenceSyncService:
     all records as authoritative data.
     """
 
-    def __init__(self, domain: str = "reference_sync", enable_audit_logging: bool = True):
+    def __init__(
+        self, domain: str = "reference_sync", enable_audit_logging: bool = True
+    ):
         """
         Initialize the sync service.
 
@@ -255,9 +256,7 @@ class ReferenceSyncService:
                 )
             else:  # upsert
                 rows_deleted = 0
-                rows_synced = self._sync_upsert(
-                    df, config, conn, batch_size=batch_size
-                )
+                rows_synced = self._sync_upsert(df, config, conn, batch_size=batch_size)
 
             duration = time.time() - start_time
             self.logger.info(
@@ -297,10 +296,10 @@ class ReferenceSyncService:
         df = df.copy()
 
         # Authoritative data tracking fields
-        df['_source'] = 'authoritative'
-        df['_needs_review'] = False
-        df['_derived_from_domain'] = None
-        df['_derived_at'] = None
+        df["_source"] = "authoritative"
+        df["_needs_review"] = False
+        df["_derived_from_domain"] = None
+        df["_derived_at"] = None
 
         return df
 
@@ -358,13 +357,16 @@ class ReferenceSyncService:
         audit_logger = None
         if self.enable_audit_logging:
             from .observability import ReferenceDataAuditLogger
+
             audit_logger = ReferenceDataAuditLogger()
 
         # Capture keys before delete for audit logging
         existing_keys: List[str] = []
         if audit_logger:
             select_keys = text(f'SELECT "{config.primary_key}" FROM {full_table_name}')
-            existing_keys = [str(row[0]) for row in conn.execute(select_keys).fetchall()]
+            existing_keys = [
+                str(row[0]) for row in conn.execute(select_keys).fetchall()
+            ]
 
         # Start transaction
         trans = conn.begin()
@@ -372,7 +374,9 @@ class ReferenceSyncService:
             # Delete all existing records
             delete_query = f"DELETE FROM {full_table_name}"
             delete_result = conn.execute(text(delete_query))
-            rows_deleted = delete_result.rowcount if hasattr(delete_result, 'rowcount') else 0
+            rows_deleted = (
+                delete_result.rowcount if hasattr(delete_result, "rowcount") else 0
+            )
 
             self.logger.debug(
                 f"Deleted {rows_deleted} existing rows from '{config.target_table}'"
@@ -394,14 +398,16 @@ class ReferenceSyncService:
             if audit_logger and rows_inserted > 0:
                 # Re-fetch inserted records for audit logging
                 inserted_query = f'SELECT "{config.primary_key}" FROM {full_table_name}'
-                inserted_keys = [str(row[0]) for row in conn.execute(text(inserted_query)).fetchall()]
+                inserted_keys = [
+                    str(row[0]) for row in conn.execute(text(inserted_query)).fetchall()
+                ]
 
                 for record_key in inserted_keys:
                     audit_logger.log_insert(
                         table=config.target_table,
                         record_key=record_key,
-                        source='authoritative',
-                        actor=f"sync_service.{self.domain}"
+                        source="authoritative",
+                        actor=f"sync_service.{self.domain}",
                     )
 
             # Commit transaction
@@ -443,6 +449,7 @@ class ReferenceSyncService:
         audit_logger = None
         if self.enable_audit_logging:
             from .observability import ReferenceDataAuditLogger
+
             audit_logger = ReferenceDataAuditLogger()
 
         pk_values = df[config.primary_key].tolist()
@@ -455,29 +462,34 @@ class ReferenceSyncService:
             """)
             existing_params = {f"pk_{i}": v for i, v in enumerate(pk_values)}
             existing_keys = {
-                row[0] for row in conn.execute(existing_query, existing_params).fetchall()
+                row[0]
+                for row in conn.execute(existing_query, existing_params).fetchall()
             }
 
         # Build upsert query based on database dialect
-        if conn.dialect.name == 'postgresql':
+        if conn.dialect.name == "postgresql":
             # PostgreSQL: INSERT ... ON CONFLICT DO UPDATE
             update_set = ", ".join(
-                [f'"{col}" = EXCLUDED."{col}"' for col in columns if col != config.primary_key]
+                [
+                    f'"{col}" = EXCLUDED."{col}"'
+                    for col in columns
+                    if col != config.primary_key
+                ]
             )
             query = f"""
-                INSERT INTO {full_table_name} ({', '.join([f'"{col}"' for col in columns])})
-                VALUES ({', '.join(placeholders)})
+                INSERT INTO {full_table_name} ({", ".join([f'"{col}"' for col in columns])})
+                VALUES ({", ".join(placeholders)})
                 ON CONFLICT ("{config.primary_key}") DO UPDATE
                 SET {update_set}
             """
-        elif conn.dialect.name == 'mysql':
+        elif conn.dialect.name == "mysql":
             # MySQL: INSERT ... ON DUPLICATE KEY UPDATE
             update_set = ", ".join(
                 [f"{col}=VALUES({col})" for col in columns if col != config.primary_key]
             )
             query = f"""
-                INSERT INTO {full_table_name} ({', '.join(columns)})
-                VALUES ({', '.join(placeholders)})
+                INSERT INTO {full_table_name} ({", ".join(columns)})
+                VALUES ({", ".join(placeholders)})
                 ON DUPLICATE KEY UPDATE {update_set}
             """
         else:
@@ -485,11 +497,11 @@ class ReferenceSyncService:
             return self._generic_upsert(df, config, conn, batch_size=batch_size)
 
         # Execute batch upsert
-        records = df.to_dict('records')
+        records = df.to_dict("records")
         result = conn.execute(text(query), records)
         conn.commit()
 
-        rows_synced = result.rowcount if hasattr(result, 'rowcount') else len(records)
+        rows_synced = result.rowcount if hasattr(result, "rowcount") else len(records)
 
         # Log audit events for upserted records
         if audit_logger and rows_synced > 0:
@@ -501,19 +513,17 @@ class ReferenceSyncService:
                         record_key=record_key,
                         old_source="authoritative",
                         new_source="authoritative",
-                        actor=f"sync_service.{self.domain}"
+                        actor=f"sync_service.{self.domain}",
                     )
                 else:
                     audit_logger.log_insert(
                         table=config.target_table,
                         record_key=record_key,
-                        source='authoritative',
-                        actor=f"sync_service.{self.domain}"
+                        source="authoritative",
+                        actor=f"sync_service.{self.domain}",
                     )
 
-        self.logger.debug(
-            f"Upserted {rows_synced} rows into '{config.target_table}'"
-        )
+        self.logger.debug(f"Upserted {rows_synced} rows into '{config.target_table}'")
 
         return rows_synced
 
@@ -543,9 +553,9 @@ class ReferenceSyncService:
             return 0
 
         pk_values = df[config.primary_key].tolist()
-        placeholder_list = ", ".join(
-            [f":pk_{i}" for i in range(len(pk_values))]
-        ) or ":pk_0"
+        placeholder_list = (
+            ", ".join([f":pk_{i}" for i in range(len(pk_values))]) or ":pk_0"
+        )
         existing_query = f"""
             SELECT "{config.primary_key}" FROM {full_table_name}
             WHERE "{config.primary_key}" IN ({placeholder_list})
@@ -570,6 +580,7 @@ class ReferenceSyncService:
         audit_logger = None
         if self.enable_audit_logging:
             from .observability import ReferenceDataAuditLogger
+
             audit_logger = ReferenceDataAuditLogger()
 
         # Insert new records
@@ -578,17 +589,17 @@ class ReferenceSyncService:
                 insert_df, config, conn, batch_size=batch_size
             )
             if audit_logger:
-                for record in insert_df.to_dict('records'):
+                for record in insert_df.to_dict("records"):
                     audit_logger.log_insert(
                         table=config.target_table,
                         record_key=str(record[config.primary_key]),
-                        source='authoritative',
-                        actor=f"sync_service.{self.domain}"
+                        source="authoritative",
+                        actor=f"sync_service.{self.domain}",
                     )
 
         # Update existing records
         if not update_df.empty:
-            for record in update_df.to_dict('records'):
+            for record in update_df.to_dict("records"):
                 pk_value = record[config.primary_key]
                 update_fragments = []
                 params: Dict[str, Any] = {"pk": pk_value}
@@ -602,7 +613,7 @@ class ReferenceSyncService:
                     if update_fragments:
                         update_query = f"""
                             UPDATE {full_table_name}
-                            SET {', '.join(update_fragments)}
+                            SET {", ".join(update_fragments)}
                             WHERE "{config.primary_key}" = :pk
                         """
                         conn.execute(text(update_query), params)
@@ -614,7 +625,7 @@ class ReferenceSyncService:
                             record_key=str(pk_value),
                             old_source="authoritative",
                             new_source="authoritative",
-                            actor=f"sync_service.{self.domain}"
+                            actor=f"sync_service.{self.domain}",
                         )
 
             conn.commit()
@@ -648,18 +659,20 @@ class ReferenceSyncService:
         placeholders = [f":{col}" for col in columns]
 
         insert_query = f"""
-            INSERT INTO {full_table_name} ({', '.join([f'"{col}"' for col in columns])})
-            VALUES ({', '.join(placeholders)})
+            INSERT INTO {full_table_name} ({", ".join([f'"{col}"' for col in columns])})
+            VALUES ({", ".join(placeholders)})
         """
 
         total_inserted = 0
-        records = df.to_dict('records')
+        records = df.to_dict("records")
 
         # Insert in batches
         for i in range(0, len(records), batch_size):
-            batch = records[i:i + batch_size]
+            batch = records[i : i + batch_size]
             result = conn.execute(text(insert_query), batch)
-            batch_inserted = result.rowcount if hasattr(result, 'rowcount') else len(batch)
+            batch_inserted = (
+                result.rowcount if hasattr(result, "rowcount") else len(batch)
+            )
             total_inserted += batch_inserted
 
             self.logger.debug(

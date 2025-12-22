@@ -87,7 +87,7 @@ class BizLabelRepository:
                 lv4_name,
                 created_at,
                 updated_at
-            ) VALUES {', '.join(value_placeholders)}
+            ) VALUES {", ".join(value_placeholders)}
         """)
 
         try:

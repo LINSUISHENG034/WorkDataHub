@@ -231,6 +231,7 @@ def validate_bronze_layer(
     if cleaner_override:
         cleaner = cleaner_override
     else:
+
         def cleaner(value: Any, field: str) -> Any:
             return clean_numeric_for_schema(
                 value, field, domain=domain_name, registry=registry
@@ -240,7 +241,8 @@ def validate_bronze_layer(
     # - intersection with domain's numeric_columns
     # - and present in required cols or incoming dataframe
     bronze_numeric = [
-        col for col in domain_config.numeric_columns
+        col
+        for col in domain_config.numeric_columns
         if col in domain_config.bronze_required or col in dataframe.columns
     ]
 
@@ -375,6 +377,7 @@ def validate_gold_layer(
             from work_data_hub.infrastructure.validation.schema_helpers import (
                 raise_schema_error,
             )
+
             failure_cases = pd.DataFrame(duplicate_keys, columns=list(composite_key))
             raise_schema_error(
                 gold_schema,
@@ -396,9 +399,9 @@ def validate_gold_layer(
                 if col not in composite_key:
                     agg_dict[col] = "first"
 
-            working_df = working_df.groupby(
-                list(composite_key), as_index=False
-            ).agg(agg_dict)
+            working_df = working_df.groupby(list(composite_key), as_index=False).agg(
+                agg_dict
+            )
 
     # Final schema validation
     validated_df = apply_schema_with_lazy_mode(gold_schema, working_df)

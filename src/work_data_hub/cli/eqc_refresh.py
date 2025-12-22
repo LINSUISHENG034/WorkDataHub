@@ -212,7 +212,9 @@ def _run_full_refresh_with_checkpoint(
         end = min(start + batch_size, len(company_ids))
         batch = company_ids[start:end]
 
-        result = service.refresh_by_company_ids(company_ids=batch, rate_limit=rate_limit)
+        result = service.refresh_by_company_ids(
+            company_ids=batch, rate_limit=rate_limit
+        )
         connection.commit()
         print_refresh_results(result)
 
@@ -273,7 +275,9 @@ def handle_resume(
         # Backward compatible reconstruction (best-effort)
         checkpoint.company_ids = [c.company_id for c in service.get_all_companies()]
         if checkpoint.next_index <= 0 and checkpoint.processed_companies > 0:
-            checkpoint.next_index = min(checkpoint.processed_companies, len(checkpoint.company_ids))
+            checkpoint.next_index = min(
+                checkpoint.processed_companies, len(checkpoint.company_ids)
+            )
         checkpoint.save(checkpoint_dir)
 
     # Phase 1: retry failures without moving next_index
@@ -282,7 +286,9 @@ def handle_resume(
         retry_ids = list(checkpoint.failed_company_ids)
         for start in range(0, len(retry_ids), batch_size):
             batch = retry_ids[start : start + batch_size]
-            result = service.refresh_by_company_ids(company_ids=batch, rate_limit=rate_limit)
+            result = service.refresh_by_company_ids(
+                company_ids=batch, rate_limit=rate_limit
+            )
             connection.commit()
             print_refresh_results(result)
 
@@ -310,11 +316,15 @@ def handle_resume(
             f"\n📊 Continuing from index {checkpoint.next_index} ({len(remaining)} remaining new companies)"
         )
 
-        for start in range(checkpoint.next_index, len(checkpoint.company_ids), batch_size):
+        for start in range(
+            checkpoint.next_index, len(checkpoint.company_ids), batch_size
+        ):
             end = min(start + batch_size, len(checkpoint.company_ids))
             batch = checkpoint.company_ids[start:end]
 
-            result = service.refresh_by_company_ids(company_ids=batch, rate_limit=rate_limit)
+            result = service.refresh_by_company_ids(
+                company_ids=batch, rate_limit=rate_limit
+            )
             connection.commit()
             print_refresh_results(result)
 
@@ -329,7 +339,10 @@ def handle_resume(
             checkpoint.failed_companies = len(checkpoint.failed_company_ids)
             checkpoint.save(checkpoint_dir)
 
-    if checkpoint.next_index >= len(checkpoint.company_ids) and not checkpoint.failed_company_ids:
+    if (
+        checkpoint.next_index >= len(checkpoint.company_ids)
+        and not checkpoint.failed_company_ids
+    ):
         checkpoint.mark_completed()
 
     checkpoint.verification = _run_post_refresh_verification(connection)
@@ -353,7 +366,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--status", action="store_true", help="Show freshness status report")
+    group.add_argument(
+        "--status", action="store_true", help="Show freshness status report"
+    )
     group.add_argument(
         "--refresh-stale",
         action="store_true",
@@ -374,7 +389,9 @@ def build_parser() -> argparse.ArgumentParser:
         type=str,
         help="Refresh specific companies (comma-separated IDs)",
     )
-    group.add_argument("--resume", action="store_true", help="Resume from last checkpoint (alias)")
+    group.add_argument(
+        "--resume", action="store_true", help="Resume from last checkpoint (alias)"
+    )
     group.add_argument(
         "--resume-from-checkpoint",
         action="store_true",
@@ -463,20 +480,28 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 return 0
 
             if args.company_ids:
-                company_ids = [cid.strip() for cid in args.company_ids.split(",") if cid.strip()]
+                company_ids = [
+                    cid.strip() for cid in args.company_ids.split(",") if cid.strip()
+                ]
                 if not company_ids:
                     print("❌ No valid company IDs provided")
                     return 1
 
                 if args.dry_run:
-                    print(f"\n[DRY RUN] Would refresh {len(company_ids)} companies: {company_ids[:10]}")
+                    print(
+                        f"\n[DRY RUN] Would refresh {len(company_ids)} companies: {company_ids[:10]}"
+                    )
                     return 0
 
-                if not args.yes and not confirm_refresh(len(company_ids), dry_run=False):
+                if not args.yes and not confirm_refresh(
+                    len(company_ids), dry_run=False
+                ):
                     print("❌ Refresh cancelled")
                     return 0
 
-                result = service.refresh_by_company_ids(company_ids=company_ids, rate_limit=args.rate_limit)
+                result = service.refresh_by_company_ids(
+                    company_ids=company_ids, rate_limit=args.rate_limit
+                )
                 connection.commit()
                 print_refresh_results(result)
                 return 0 if result.failed == 0 else 1
@@ -492,10 +517,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     return 0
 
                 if args.dry_run:
-                    print(f"\n[DRY RUN] Would refresh {len(stale_companies)} stale companies")
+                    print(
+                        f"\n[DRY RUN] Would refresh {len(stale_companies)} stale companies"
+                    )
                     print("\nSample (first 10):")
                     for company in stale_companies[:10]:
-                        days_str = f"{company.days_since_update} days" if company.days_since_update else "never"
+                        days_str = (
+                            f"{company.days_since_update} days"
+                            if company.days_since_update
+                            else "never"
+                        )
                         print(
                             f"  - {company.company_id}: {company.company_full_name} (last updated: {days_str})"
                         )
@@ -503,7 +534,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         print(f"  ... and {len(stale_companies) - 10} more companies")
                     return 0
 
-                if not args.yes and not confirm_refresh(len(stale_companies), dry_run=False):
+                if not args.yes and not confirm_refresh(
+                    len(stale_companies), dry_run=False
+                ):
                     print("❌ Refresh cancelled")
                     return 0
 
@@ -534,14 +567,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 if args.dry_run:
                     print(f"\n[DRY RUN] Would refresh all {total_companies} companies")
                     if args.checkpoint:
-                        print(f"[DRY RUN] Checkpoint would be saved to: {args.checkpoint_dir}")
+                        print(
+                            f"[DRY RUN] Checkpoint would be saved to: {args.checkpoint_dir}"
+                        )
                     return 0
 
                 if not args.yes:
-                    print(f"\n⚠️  WARNING: About to refresh ALL {total_companies} companies!")
+                    print(
+                        f"\n⚠️  WARNING: About to refresh ALL {total_companies} companies!"
+                    )
                     print("This is a resource-intensive operation.")
                     if args.checkpoint:
-                        print(f"Checkpoint support enabled. Progress will be saved to: {args.checkpoint_dir}")
+                        print(
+                            f"Checkpoint support enabled. Progress will be saved to: {args.checkpoint_dir}"
+                        )
                     if not confirm_refresh(total_companies, dry_run=False):
                         print("❌ Refresh cancelled")
                         return 0
@@ -549,8 +588,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 batch_size = args.batch_size or settings.eqc_data_refresh_batch_size
 
                 if not args.checkpoint:
-                    print(f"\n🔄 Refreshing all {total_companies} companies (no checkpoints)...")
-                    result = service.refresh_by_company_ids(company_ids=company_ids, rate_limit=args.rate_limit)
+                    print(
+                        f"\n🔄 Refreshing all {total_companies} companies (no checkpoints)..."
+                    )
+                    result = service.refresh_by_company_ids(
+                        company_ids=company_ids, rate_limit=args.rate_limit
+                    )
                     connection.commit()
                     print_refresh_results(result)
                     verification = _run_post_refresh_verification(connection)
@@ -559,7 +602,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         print(f"  - {k}: {v}")
                     return 0 if result.failed == 0 else 1
 
-                print(f"\n🔄 Refreshing all {total_companies} companies with checkpoints...")
+                print(
+                    f"\n🔄 Refreshing all {total_companies} companies with checkpoints..."
+                )
                 checkpoint_dir = Path(args.checkpoint_dir)
                 return _run_full_refresh_with_checkpoint(
                     connection=connection,

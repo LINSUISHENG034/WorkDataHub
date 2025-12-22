@@ -9,11 +9,9 @@ import re
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
-import sqlglot
+import structlog
 from sqlglot import ErrorLevel, exp, parse_one
 from sqlglot.errors import ParseError
-
-import structlog
 
 logger = structlog.get_logger(__name__)
 
@@ -89,8 +87,14 @@ class MySQLToPostgreSQLConverter:
         (r"\s+ON\s+UPDATE\s+CURRENT_TIMESTAMP(?:\(\))?", ""),
         # Remove FOREIGN KEY constraints (data integrity issues in source)
         # Match both backticks (before conversion) and double quotes (after conversion)
-        (r',\s*CONSTRAINT\s+[`"][^`"]*[`"]\s+FOREIGN\s+KEY\s*\([^)]+\)\s+REFERENCES\s+[`"][^`"]*[`"]\s*\([^)]+\)(?:\s+ON\s+DELETE\s+\w+)?(?:\s+ON\s+UPDATE\s+\w+)?', ""),
-        (r',\s*FOREIGN\s+KEY\s*\([^)]+\)\s+REFERENCES\s+[`"][^`"]*[`"]\s*\([^)]+\)(?:\s+ON\s+DELETE\s+\w+)?(?:\s+ON\s+UPDATE\s+\w+)?', ""),
+        (
+            r',\s*CONSTRAINT\s+[`"][^`"]*[`"]\s+FOREIGN\s+KEY\s*\([^)]+\)\s+REFERENCES\s+[`"][^`"]*[`"]\s*\([^)]+\)(?:\s+ON\s+DELETE\s+\w+)?(?:\s+ON\s+UPDATE\s+\w+)?',
+            "",
+        ),
+        (
+            r',\s*FOREIGN\s+KEY\s*\([^)]+\)\s+REFERENCES\s+[`"][^`"]*[`"]\s*\([^)]+\)(?:\s+ON\s+DELETE\s+\w+)?(?:\s+ON\s+UPDATE\s+\w+)?',
+            "",
+        ),
     ]
 
     POSTGRES_CLEANUP_PATTERNS = [
@@ -119,8 +123,7 @@ class MySQLToPostgreSQLConverter:
             for p, r in self.CREATE_TABLE_CLEANUP_PATTERNS
         ]
         self._postgres_cleanup_patterns = [
-            (re.compile(p, re.IGNORECASE), r)
-            for p, r in self.POSTGRES_CLEANUP_PATTERNS
+            (re.compile(p, re.IGNORECASE), r) for p, r in self.POSTGRES_CLEANUP_PATTERNS
         ]
 
     def _preprocess(self, sql: str) -> str:
@@ -248,15 +251,11 @@ class MySQLToPostgreSQLConverter:
 
     def _remove_inline_indexes(self, sql: str) -> str:
         """Remove inline KEY/INDEX definitions (PostgreSQL doesn't support them in CREATE TABLE)."""
-        sql = re.sub(
-            r',\s*KEY\s+"[^"]*"\s*\([^)]+\)', "", sql, flags=re.IGNORECASE
-        )
+        sql = re.sub(r',\s*KEY\s+"[^"]*"\s*\([^)]+\)', "", sql, flags=re.IGNORECASE)
         sql = re.sub(
             r',\s*UNIQUE\s+KEY\s+"[^"]*"\s*\([^)]+\)', "", sql, flags=re.IGNORECASE
         )
-        sql = re.sub(
-            r',\s*INDEX\s+"[^"]*"\s*\([^)]+\)', "", sql, flags=re.IGNORECASE
-        )
+        sql = re.sub(r',\s*INDEX\s+"[^"]*"\s*\([^)]+\)', "", sql, flags=re.IGNORECASE)
         return sql
 
     def _fix_string_escaping(self, sql: str) -> str:
@@ -265,6 +264,7 @@ class MySQLToPostgreSQLConverter:
 
         MySQL uses \' for escaping, PostgreSQL uses ''.
         """
+
         def fix_string(match: re.Match) -> str:
             content = match.group(1)
             # Replace \' with ''
@@ -370,9 +370,7 @@ class MySQLToPostgreSQLConverter:
             sql = self._preprocess(sql)
             if not sql:
                 return ConversionResult(
-                    success=True,
-                    converted_sql="",
-                    original_sql=original
+                    success=True, converted_sql="", original_sql=original
                 )
 
             converted_sql = ""
@@ -387,7 +385,9 @@ class MySQLToPostgreSQLConverter:
                 logger.debug("converter.parse_error", error=str(e), sql=sql[:200])
             except Exception as e:
                 warnings.append(f"SQLGlot conversion skipped: {e}")
-                logger.debug("converter.ast_conversion_error", error=str(e), sql=sql[:200])
+                logger.debug(
+                    "converter.ast_conversion_error", error=str(e), sql=sql[:200]
+                )
 
             # Step 3: Fallback to regex pipeline if SQLGlot failed
             if not converted_sql:
@@ -412,7 +412,7 @@ class MySQLToPostgreSQLConverter:
                 success=False,
                 converted_sql=original,
                 original_sql=original,
-                errors=errors
+                errors=errors,
             )
 
     def convert(self, sql_content: str, schema_name: str = None) -> str:
@@ -435,10 +435,7 @@ class MySQLToPostgreSQLConverter:
         return result.converted_sql
 
     def convert_table(
-        self,
-        create_statement: str,
-        insert_statements: List[str],
-        schema_name: str
+        self, create_statement: str, insert_statements: List[str], schema_name: str
     ) -> Tuple[str, List[str]]:
         """
         Convert a single table's CREATE and INSERT statements.

@@ -616,4 +616,3 @@ class TestTrusteePerformanceE2EIntegration:
 
                 # Verify connection was closed (mock shows close was called)
                 # Note: In real test, db_connection fixture handles cleanup
-

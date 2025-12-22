@@ -95,7 +95,11 @@ class TestHybridReferenceIntegration:
         # Mock coverage check - no existing records
         def mock_execute(query, params=None):
             result = Mock()
-            if "SELECT" in str(query) and "WHERE" in str(query) and "COUNT" not in str(query):
+            if (
+                "SELECT" in str(query)
+                and "WHERE" in str(query)
+                and "COUNT" not in str(query)
+            ):
                 result.fetchall.return_value = []  # No existing records
             elif "COUNT" in str(query):
                 result.scalar.return_value = 0
@@ -151,9 +155,19 @@ class TestHybridReferenceIntegration:
         def mock_execute(query, params=None):
             result = Mock()
             query_str = str(query)
-            if "年金计划" in query_str and "SELECT" in query_str and "WHERE" in query_str and "COUNT" not in query_str:
+            if (
+                "年金计划" in query_str
+                and "SELECT" in query_str
+                and "WHERE" in query_str
+                and "COUNT" not in query_str
+            ):
                 result.fetchall.return_value = [("PLAN001",)]  # 1 exists
-            elif "产品线" in query_str and "SELECT" in query_str and "WHERE" in query_str and "COUNT" not in query_str:
+            elif (
+                "产品线" in query_str
+                and "SELECT" in query_str
+                and "WHERE" in query_str
+                and "COUNT" not in query_str
+            ):
                 result.fetchall.return_value = [("LINE001",)]  # 1 exists
             elif "COUNT" in query_str and "auto_derived" in query_str:
                 result.scalar = Mock(return_value=2)  # 2 auto-derived per table
@@ -202,7 +216,11 @@ class TestHybridReferenceIntegration:
         # Mock coverage check - no existing records
         def mock_execute(query, params=None):
             result = Mock()
-            if "SELECT" in str(query) and "WHERE" in str(query) and "COUNT" not in str(query):
+            if (
+                "SELECT" in str(query)
+                and "WHERE" in str(query)
+                and "COUNT" not in str(query)
+            ):
                 result.fetchall.return_value = []
             elif "COUNT" in str(query):
                 result.scalar.return_value = 0
@@ -258,7 +276,11 @@ class TestHybridReferenceIntegration:
 
         def mock_execute(query, params=None):
             result = Mock()
-            if "SELECT" in str(query) and "WHERE" in str(query) and "COUNT" not in str(query):
+            if (
+                "SELECT" in str(query)
+                and "WHERE" in str(query)
+                and "COUNT" not in str(query)
+            ):
                 call_count["coverage_check"] += 1
                 if call_count["coverage_check"] <= 2:  # First call (2 tables)
                     result.fetchall.return_value = []  # No existing records

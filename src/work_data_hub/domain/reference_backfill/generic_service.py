@@ -8,25 +8,28 @@ idempotent operations.
 
 import logging
 import time
-from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from graphlib import CycleError, TopologicalSorter
 from typing import Any, Dict, List, Optional, Set
 
-from graphlib import TopologicalSorter, CycleError
 import pandas as pd
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
-from .models import ForeignKeyConfig, BackfillColumnMapping, AggregationType, AggregationConfig
-
 # SQL Module (Story 6.2-P10)
 from work_data_hub.infrastructure.sql import (
-    qualify_table,
-    build_indexed_params,
-    remap_records,
-    PostgreSQLDialect,
     InsertBuilder,
+    PostgreSQLDialect,
+    build_indexed_params,
+    qualify_table,
+    remap_records,
+)
+
+from .models import (
+    AggregationType,
+    BackfillColumnMapping,
+    ForeignKeyConfig,
 )
 
 logger = logging.getLogger(__name__)
@@ -105,7 +108,9 @@ class GenericBackfillService:
             raise ValueError("Database connection is required when plan_only is False")
 
         start_time = time.time()
-        self.logger.info(f"Starting backfill for domain '{self.domain}' with {len(configs)} FK configs")
+        self.logger.info(
+            f"Starting backfill for domain '{self.domain}' with {len(configs)} FK configs"
+        )
 
         # Sort configurations by dependency
         sorted_configs = self._topological_sort(configs)
@@ -127,11 +132,9 @@ class GenericBackfillService:
                         f"No candidates derived for FK '{config.name}' "
                         f"(source_column: {config.source_column})"
                     )
-                    tables_processed.append({
-                        "table": config.target_table,
-                        "inserted": 0,
-                        "skipped": 0
-                    })
+                    tables_processed.append(
+                        {"table": config.target_table, "inserted": 0, "skipped": 0}
+                    )
                     continue
 
                 if plan_only:
@@ -143,18 +146,20 @@ class GenericBackfillService:
                         candidates_df,
                         config,
                         conn,
-                        add_tracking_fields=add_tracking_fields
+                        add_tracking_fields=add_tracking_fields,
                     )
 
                     # Calculate skipped records (duplicate primary keys)
                     total_candidates = len(candidates_df)
                     skipped_count = total_candidates - inserted_count
 
-                tables_processed.append({
-                    "table": config.target_table,
-                    "inserted": inserted_count,
-                    "skipped": skipped_count
-                })
+                tables_processed.append(
+                    {
+                        "table": config.target_table,
+                        "inserted": inserted_count,
+                        "skipped": skipped_count,
+                    }
+                )
 
                 total_inserted += inserted_count
                 total_skipped += skipped_count
@@ -169,7 +174,11 @@ class GenericBackfillService:
                 raise
 
         processing_time = time.time() - start_time
-        rows_per_second = total_inserted / processing_time if processing_time > 0 and total_inserted > 0 else None
+        rows_per_second = (
+            total_inserted / processing_time
+            if processing_time > 0 and total_inserted > 0
+            else None
+        )
 
         result = BackfillResult(
             processing_order=processing_order,
@@ -177,7 +186,7 @@ class GenericBackfillService:
             total_inserted=total_inserted,
             total_skipped=total_skipped,
             processing_time_seconds=processing_time,
-            rows_per_second=rows_per_second
+            rows_per_second=rows_per_second,
         )
 
         self.logger.info(
@@ -190,7 +199,9 @@ class GenericBackfillService:
 
         return result
 
-    def _topological_sort(self, configs: List[ForeignKeyConfig]) -> List[ForeignKeyConfig]:
+    def _topological_sort(
+        self, configs: List[ForeignKeyConfig]
+    ) -> List[ForeignKeyConfig]:
         """
         Sort configurations by dependency using topological sorting.
 
@@ -228,7 +239,9 @@ class GenericBackfillService:
         # Return configs in sorted order
         return [name_map[name] for name in sorted_names]
 
-    def derive_candidates(self, df: pd.DataFrame, config: ForeignKeyConfig) -> pd.DataFrame:
+    def derive_candidates(
+        self, df: pd.DataFrame, config: ForeignKeyConfig
+    ) -> pd.DataFrame:
         """
         Derive candidate records for a reference table from fact data.
 
@@ -265,7 +278,9 @@ class GenericBackfillService:
 
         # Vectorized aggregation: "first non-blank per group per column"
         mapping_sources = [
-            m.source for m in config.backfill_columns if m.source != config.source_column
+            m.source
+            for m in config.backfill_columns
+            if m.source != config.source_column
         ]
         present_sources = [c for c in mapping_sources if c in source_df.columns]
 
@@ -282,30 +297,42 @@ class GenericBackfillService:
         candidates_df = pd.DataFrame({config.target_key: grouped_first.index})
         for col_mapping in config.backfill_columns:
             if col_mapping.source == config.source_column:
-                candidates_df[col_mapping.target] = candidates_df[config.target_key].to_numpy()
+                candidates_df[col_mapping.target] = candidates_df[
+                    config.target_key
+                ].to_numpy()
                 continue
 
             # Apply aggregation strategy
             if col_mapping.aggregation is None:
                 # Default: first non-null value
                 if col_mapping.source in grouped_first.columns:
-                    candidates_df[col_mapping.target] = grouped_first[col_mapping.source].to_numpy()
+                    candidates_df[col_mapping.target] = grouped_first[
+                        col_mapping.source
+                    ].to_numpy()
                 else:
                     candidates_df[col_mapping.target] = None
             elif col_mapping.aggregation.type == AggregationType.MAX_BY:
                 # max_by: value from row with maximum order_column
-                candidates_df[col_mapping.target] = self._aggregate_max_by(
-                    source_df, config.source_column, col_mapping
-                ).reindex(grouped_first.index).to_numpy()
+                candidates_df[col_mapping.target] = (
+                    self._aggregate_max_by(source_df, config.source_column, col_mapping)
+                    .reindex(grouped_first.index)
+                    .to_numpy()
+                )
             elif col_mapping.aggregation.type == AggregationType.CONCAT_DISTINCT:
                 # concat_distinct: concatenate unique values
-                candidates_df[col_mapping.target] = self._aggregate_concat_distinct(
-                    source_df, config.source_column, col_mapping
-                ).reindex(grouped_first.index).to_numpy()
+                candidates_df[col_mapping.target] = (
+                    self._aggregate_concat_distinct(
+                        source_df, config.source_column, col_mapping
+                    )
+                    .reindex(grouped_first.index)
+                    .to_numpy()
+                )
             elif col_mapping.aggregation.type == AggregationType.FIRST:
                 # Explicit first: same as default
                 if col_mapping.source in grouped_first.columns:
-                    candidates_df[col_mapping.target] = grouped_first[col_mapping.source].to_numpy()
+                    candidates_df[col_mapping.target] = grouped_first[
+                        col_mapping.source
+                    ].to_numpy()
                 else:
                     candidates_df[col_mapping.target] = None
 
@@ -360,7 +387,7 @@ class GenericBackfillService:
 
         # Story 6.2-P16: Convert order_column to numeric for safe comparison
         # This handles cases where the column has mixed float/str types
-        order_series = pd.to_numeric(df[order_col], errors='coerce')
+        order_series = pd.to_numeric(df[order_col], errors="coerce")
 
         # Per-group max_by with fallback for all-NULL order_column
         def max_by_with_fallback(group: pd.DataFrame) -> Any:
@@ -393,7 +420,6 @@ class GenericBackfillService:
         return df.groupby(group_col, sort=False).apply(
             max_by_with_fallback, include_groups=False
         )
-
 
     def _aggregate_concat_distinct(
         self, df: pd.DataFrame, group_col: str, mapping: BackfillColumnMapping
@@ -465,7 +491,7 @@ class GenericBackfillService:
         conflict_columns = [config.target_key]
 
         # Pre-fetch existing keys for accurate audit logging
-        records = candidates_df.to_dict('records')
+        records = candidates_df.to_dict("records")
         pk_values = [record[config.target_key] for record in records]
         existing_keys: Set[Any] = set()
         qualified_table = _qualified_table_name(config)
@@ -477,13 +503,14 @@ class GenericBackfillService:
             """)
             existing_params = {f"pk_{i}": v for i, v in enumerate(pk_values)}
             existing_keys = {
-                row[0] for row in conn.execute(existing_query, existing_params).fetchall()
+                row[0]
+                for row in conn.execute(existing_query, existing_params).fetchall()
             }
         new_keys = {str(v) for v in pk_values} - {str(v) for v in existing_keys}
 
         # Different syntax for different databases
         # Use InsertBuilder for PostgreSQL (Story 6.2-P10 SQL Module)
-        if conn.dialect.name == 'postgresql':
+        if conn.dialect.name == "postgresql":
             dialect = PostgreSQLDialect()
             builder = InsertBuilder(dialect)
             update_columns = [col for col in columns if col != config.target_key]
@@ -508,24 +535,24 @@ class GenericBackfillService:
                     conflict_columns=conflict_columns,
                     mode="do_nothing",
                 )
-        elif conn.dialect.name == 'mysql':
+        elif conn.dialect.name == "mysql":
             if config.mode == "fill_null_only":
                 update_set = ", ".join(
                     [
-                        f'`{col}`=IF(`{col}` IS NULL, VALUES(`{col}`), `{col}`)'
+                        f"`{col}`=IF(`{col}` IS NULL, VALUES(`{col}`), `{col}`)"
                         for col in columns
                         if col != config.target_key
                     ]
                 )
                 query = f"""
-                    INSERT INTO {qualified_table} ({', '.join(f'"{c}"' for c in columns)})
-                    VALUES ({', '.join(placeholders)})
+                    INSERT INTO {qualified_table} ({", ".join(f'"{c}"' for c in columns)})
+                    VALUES ({", ".join(placeholders)})
                     ON DUPLICATE KEY UPDATE {update_set}
                 """
             else:
                 query = f"""
-                    INSERT INTO {qualified_table} ({', '.join(f'"{c}"' for c in columns)})
-                    VALUES ({', '.join(placeholders)})
+                    INSERT INTO {qualified_table} ({", ".join(f'"{c}"' for c in columns)})
+                    VALUES ({", ".join(placeholders)})
                     ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)
                 """
         else:
@@ -536,9 +563,10 @@ class GenericBackfillService:
                 WHERE "{config.target_key}" IN :primary_keys
             """
             existing_keys = {
-                row[0] for row in conn.execute(
+                row[0]
+                for row in conn.execute(
                     text(existing_query),
-                    {"primary_keys": tuple(candidates_df[config.target_key].tolist())}
+                    {"primary_keys": tuple(candidates_df[config.target_key].tolist())},
                 ).fetchall()
             }
 
@@ -552,18 +580,18 @@ class GenericBackfillService:
                     return 0
 
                 query = f"""
-                    INSERT INTO {qualified_table} ({', '.join(f'"{c}"' for c in columns)})
-                    VALUES ({', '.join(placeholders)})
+                    INSERT INTO {qualified_table} ({", ".join(f'"{c}"' for c in columns)})
+                    VALUES ({", ".join(placeholders)})
                 """
             else:
                 # fill_null_only: insert missing, then update null columns on existing keys
                 inserted = 0
                 if not new_records_df.empty:
                     insert_query = f"""
-                        INSERT INTO {qualified_table} ({', '.join(f'"{c}"' for c in columns)})
-                        VALUES ({', '.join(placeholders)})
+                        INSERT INTO {qualified_table} ({", ".join(f'"{c}"' for c in columns)})
+                        VALUES ({", ".join(placeholders)})
                     """
-                    records = new_records_df.to_dict('records')
+                    records = new_records_df.to_dict("records")
                     insert_result = conn.execute(text(insert_query), records)
                     conn.commit()
                     rowcount = getattr(insert_result, "rowcount", None)
@@ -571,7 +599,7 @@ class GenericBackfillService:
 
                 # Update existing rows where columns are NULL and candidate has value
                 existing_df = candidates_df[~mask]
-                for record in existing_df.to_dict('records'):
+                for record in existing_df.to_dict("records"):
                     pk_value = record[config.target_key]
                     update_fragments = []
                     params: Dict[str, Any] = {"pk": pk_value}
@@ -586,9 +614,9 @@ class GenericBackfillService:
                     if update_fragments:
                         update_query = f"""
                             UPDATE {qualified_table}
-                            SET {', '.join(update_fragments)}
+                            SET {", ".join(update_fragments)}
                             WHERE {config.target_key} = :pk AND (
-                                {" OR ".join([f"{col} IS NULL" for col in params if col != 'pk'])}
+                                {" OR ".join([f"{col} IS NULL" for col in params if col != "pk"])}
                             )
                         """
                         conn.execute(text(update_query), params)
@@ -599,7 +627,7 @@ class GenericBackfillService:
 
         # Remap record keys to indexed parameter names (Story 6.2-P10)
         remapped_records = remap_records(records, col_param_map)
-        
+
         # Execute batch insert
         result = conn.execute(text(query), remapped_records)
         conn.commit()
@@ -629,9 +657,9 @@ class GenericBackfillService:
                         audit_logger.log_insert(
                             table=config.target_table,
                             record_key=pk,
-                            source=record.get('_source', 'auto_derived'),
-                            domain=record.get('_derived_from_domain'),
-                            actor=f"backfill_service.{self.domain}"
+                            source=record.get("_source", "auto_derived"),
+                            domain=record.get("_derived_from_domain"),
+                            actor=f"backfill_service.{self.domain}",
                         )
                     elif config.mode == "fill_null_only":
                         # Existing records updated with new values (fill nulls)
@@ -639,9 +667,9 @@ class GenericBackfillService:
                             table=config.target_table,
                             record_key=pk,
                             old_source="unknown",
-                            new_source=record.get('_source', 'auto_derived'),
-                            domain=record.get('_derived_from_domain'),
-                            actor=f"backfill_service.{self.domain}"
+                            new_source=record.get("_source", "auto_derived"),
+                            domain=record.get("_derived_from_domain"),
+                            actor=f"backfill_service.{self.domain}",
                         )
 
         self.logger.debug(
@@ -674,9 +702,9 @@ class GenericBackfillService:
         df = df.copy()
 
         # Standard tracking fields
-        df['_source'] = 'auto_derived'
-        df['_needs_review'] = True
-        df['_derived_from_domain'] = self.domain
-        df['_derived_at'] = datetime.now(timezone.utc).isoformat()
+        df["_source"] = "auto_derived"
+        df["_needs_review"] = True
+        df["_derived_from_domain"] = self.domain
+        df["_derived_at"] = datetime.now(timezone.utc).isoformat()
 
         return df

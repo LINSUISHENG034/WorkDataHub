@@ -7,7 +7,7 @@ conflict handling, and identifier quoting.
 
 from typing import List, Optional
 
-from ..core.identifier import quote_identifier, qualify_table
+from ..core.identifier import qualify_table, quote_identifier
 
 
 class PostgreSQLDialect:
@@ -104,14 +104,14 @@ class PostgreSQLDialect:
         if null_guard:
             # Only update if existing value is NULL
             update_set = ", ".join(
-                f'{self.quote(col)} = CASE WHEN {qualified_table}.{self.quote(col)} IS NULL '
-                f'THEN EXCLUDED.{self.quote(col)} ELSE {qualified_table}.{self.quote(col)} END'
+                f"{self.quote(col)} = CASE WHEN {qualified_table}.{self.quote(col)} IS NULL "
+                f"THEN EXCLUDED.{self.quote(col)} ELSE {qualified_table}.{self.quote(col)} END"
                 for col in update_columns
             )
         else:
             # Always update
             update_set = ", ".join(
-                f'{self.quote(col)} = EXCLUDED.{self.quote(col)}'
+                f"{self.quote(col)} = EXCLUDED.{self.quote(col)}"
                 for col in update_columns
             )
 

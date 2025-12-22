@@ -100,9 +100,7 @@ def ensure_psycopg2() -> Any:
     global psycopg2
     if psycopg2 is None:
         # Explicitly treated as unavailable (tests may patch to None)
-        raise DataWarehouseLoaderError(
-            "psycopg2 not available for database operations"
-        )
+        raise DataWarehouseLoaderError("psycopg2 not available for database operations")
     if psycopg2 is _PSYCOPG2_NOT_LOADED:
         try:
             import psycopg2 as _psycopg2

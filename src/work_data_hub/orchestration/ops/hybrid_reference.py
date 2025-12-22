@@ -9,8 +9,8 @@ from work_data_hub.config.settings import get_settings
 from work_data_hub.domain.reference_backfill import (
     GenericBackfillService,
     HybridReferenceService,
-    load_foreign_keys_config,
     ReferenceSyncService,
+    load_foreign_keys_config,
 )
 from work_data_hub.domain.reference_backfill.sync_config_loader import (
     load_reference_sync_config,
@@ -183,4 +183,3 @@ def hybrid_reference_op(
     except Exception as e:
         context.log.error(f"Hybrid reference operation failed: {e}")
         raise
-

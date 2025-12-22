@@ -6,7 +6,7 @@ continue to work without modification.
 
 Story 7.1: This monolithic module was decomposed into focused sub-modules:
 - file_processing: File discovery and Excel reading ops
-- pipeline_ops: Domain processing pipeline ops  
+- pipeline_ops: Domain processing pipeline ops
 - loading: Database loading ops
 - reference_backfill: Reference backfill ops
 - company_enrichment: Company enrichment queue ops
@@ -16,50 +16,41 @@ Story 7.1: This monolithic module was decomposed into focused sub-modules:
 # Re-export all public symbols for backward compatibility
 
 # File processing ops and configs
-from .file_processing import (
-    DiscoverFilesConfig,
-    discover_files_op,
-    ReadExcelConfig,
-    read_excel_op,
-    ReadProcessConfig,
-    read_and_process_sandbox_trustee_files_op,
+# ============================================================================
+# Re-exports for test mocking compatibility (Story 7.1)
+# ============================================================================
+# Tests may patch these at work_data_hub.orchestration.ops.<name>
+# so we need to re-export them from the sub-modules where they were imported.
+# From file_processing module
+from work_data_hub.config.settings import get_settings
+from work_data_hub.domain.annuity_income.service import (
+    process_with_enrichment as process_annuity_income_with_enrichment,
 )
 
-# Domain processing ops and configs
-from .pipeline_ops import (
-    ProcessingConfig,
-    process_sandbox_trustee_performance_op,
-    process_annuity_performance_op,
-    process_annuity_income_op,
+# From pipeline_ops module - for test patching compatibility
+from work_data_hub.domain.annuity_performance.service import (
+    process_with_enrichment,
 )
-
-
-# Database loading ops and configs
-from .loading import (
-    LoadConfig,
-    load_op,
+from work_data_hub.domain.reference_backfill.config_loader import (
+    load_foreign_keys_config,
 )
-
-# Reference backfill ops and configs
-from .reference_backfill import (
-    BackfillRefsConfig,
-    derive_plan_refs_op,
-    derive_portfolio_refs_op,
-    backfill_refs_op,
+from work_data_hub.domain.sandbox_trustee_performance.service import process
+from work_data_hub.io.connectors.file_connector import (
+    FileDiscoveryService,
 )
-
-# Generic backfill ops and configs (extracted to separate module for size limits)
-from .generic_backfill import (
-    GenericBackfillConfig,
-    generic_backfill_refs_op,
-    gate_after_backfill,
+from work_data_hub.io.loader.warehouse_loader import (
+    fill_null_only,
+    insert_missing,
+    load,
 )
+from work_data_hub.io.readers.excel_reader import read_excel_rows
 
-# Hybrid reference ops
-from .hybrid_reference import HybridReferenceConfig, hybrid_reference_op
-
-# Demonstration/sample ops
-from .demo_ops import read_csv_op, validate_op, load_to_db_op
+# Internal utilities - only expose for test patching compatibility
+from ._internal import (
+    _PSYCOPG2_NOT_LOADED,
+    _load_valid_domains,
+    psycopg2,
+)
 
 # Company enrichment ops and configs
 from .company_enrichment import (
@@ -67,37 +58,48 @@ from .company_enrichment import (
     process_company_lookup_queue_op,
 )
 
-# Internal utilities - only expose for test patching compatibility
-from ._internal import (
-    _PSYCOPG2_NOT_LOADED,
-    psycopg2,
-    _load_valid_domains,
+# Demonstration/sample ops
+from .demo_ops import load_to_db_op, read_csv_op, validate_op
+from .file_processing import (
+    DiscoverFilesConfig,
+    ReadExcelConfig,
+    ReadProcessConfig,
+    discover_files_op,
+    read_and_process_sandbox_trustee_files_op,
+    read_excel_op,
 )
 
-# ============================================================================
-# Re-exports for test mocking compatibility (Story 7.1)
-# ============================================================================
-# Tests may patch these at work_data_hub.orchestration.ops.<name>
-# so we need to re-export them from the sub-modules where they were imported.
-
-# From file_processing module
-from work_data_hub.config.settings import get_settings
-from work_data_hub.io.connectors.file_connector import (
-    FileDiscoveryService,
-)
-from work_data_hub.io.readers.excel_reader import read_excel_rows
-from work_data_hub.domain.sandbox_trustee_performance.service import process
-from work_data_hub.io.loader.warehouse_loader import load, insert_missing, fill_null_only
-from work_data_hub.domain.reference_backfill.config_loader import load_foreign_keys_config
-
-# From pipeline_ops module - for test patching compatibility
-from work_data_hub.domain.annuity_performance.service import (
-    process_with_enrichment,
-)
-from work_data_hub.domain.annuity_income.service import (
-    process_with_enrichment as process_annuity_income_with_enrichment,
+# Generic backfill ops and configs (extracted to separate module for size limits)
+from .generic_backfill import (
+    GenericBackfillConfig,
+    gate_after_backfill,
+    generic_backfill_refs_op,
 )
 
+# Hybrid reference ops
+from .hybrid_reference import HybridReferenceConfig, hybrid_reference_op
+
+# Database loading ops and configs
+from .loading import (
+    LoadConfig,
+    load_op,
+)
+
+# Domain processing ops and configs
+from .pipeline_ops import (
+    ProcessingConfig,
+    process_annuity_income_op,
+    process_annuity_performance_op,
+    process_sandbox_trustee_performance_op,
+)
+
+# Reference backfill ops and configs
+from .reference_backfill import (
+    BackfillRefsConfig,
+    backfill_refs_op,
+    derive_plan_refs_op,
+    derive_portfolio_refs_op,
+)
 
 __all__ = [
     # File processing

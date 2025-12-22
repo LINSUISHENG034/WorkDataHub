@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Generator, List, Optional
+from typing import Generator, List, Optional
 
 import structlog
 from sqlalchemy import create_engine, text
@@ -68,15 +68,13 @@ class MigrationConfig:
         **kwargs,
     ) -> "MigrationConfig":
         """Create config from environment variables."""
-        database_url = (
-            os.environ.get("LEGACY_DATABASE__URI")
-            or os.environ.get("WDH_DATABASE__URI")
+        database_url = os.environ.get("LEGACY_DATABASE__URI") or os.environ.get(
+            "WDH_DATABASE__URI"
         )
 
         # Allow overriding the target database name specifically for legacy migration
-        db_name = (
-            os.environ.get("LEGACY_DATABASE_DB")
-            or os.environ.get("WDH_DATABASE_DB", "legacy")
+        db_name = os.environ.get("LEGACY_DATABASE_DB") or os.environ.get(
+            "WDH_DATABASE_DB", "legacy"
         )
 
         return cls(
@@ -174,7 +172,9 @@ class MigrationReport:
 
         for db_result in self.databases:
             status = "✓" if db_result.success else "✗"
-            print(f"\n{status} Database: {db_result.database_name} → Schema: {db_result.schema_name}")
+            print(
+                f"\n{status} Database: {db_result.database_name} → Schema: {db_result.schema_name}"
+            )
             print(f"  Tables: {db_result.successful_tables}/{db_result.total_tables}")
             print(f"  Rows: {db_result.total_rows:,}")
             print(f"  Duration: {db_result.duration_seconds:.2f}s")
@@ -277,7 +277,11 @@ class PostgreSQLMigrator:
             return result.rowcount
         except Exception:
             # Add context to the error
-            logger.error("migrator.execute_failed", description=description, sql_snippet=stmt_text[:200])
+            logger.error(
+                "migrator.execute_failed",
+                description=description,
+                sql_snippet=stmt_text[:200],
+            )
             raise
 
     def migrate_table(
@@ -319,7 +323,9 @@ class PostgreSQLMigrator:
             # Convert and execute INSERT statements
             for insert_stmt in insert_statements:
                 converted_insert = self.converter.convert(insert_stmt, schema_name)
-                rows = self.execute_sql(conn, converted_insert, f"INSERT into {table_name}")
+                rows = self.execute_sql(
+                    conn, converted_insert, f"INSERT into {table_name}"
+                )
                 result.rows_migrated += rows
 
             result.success = True
@@ -346,9 +352,7 @@ class PostgreSQLMigrator:
         result.duration_seconds = time.perf_counter() - start_time
         return result
 
-    def migrate_database(
-        self, db_content: DatabaseContent
-    ) -> DatabaseMigrationResult:
+    def migrate_database(self, db_content: DatabaseContent) -> DatabaseMigrationResult:
         """
         Migrate a single database to a PostgreSQL schema.
 
@@ -409,9 +413,7 @@ class PostgreSQLMigrator:
 
         return result
 
-    def save_converted_sql(
-        self, db_content: DatabaseContent, output_dir: Path
-    ) -> Path:
+    def save_converted_sql(self, db_content: DatabaseContent, output_dir: Path) -> Path:
         """
         Save converted SQL to file for review.
 
@@ -448,7 +450,9 @@ class PostgreSQLMigrator:
                 lines.append(converted_insert)
 
             if len(table_content.insert_statements) > 5:
-                lines.append(f"-- ... and {len(table_content.insert_statements) - 5} more INSERT statements")
+                lines.append(
+                    f"-- ... and {len(table_content.insert_statements) - 5} more INSERT statements"
+                )
             lines.append("")
 
         output_file.write_text("\n".join(lines), encoding="utf-8")
@@ -503,9 +507,7 @@ class PostgreSQLMigrator:
 
             # Optionally save converted SQL
             if self.config.save_converted_sql and self.config.output_dir:
-                self.save_converted_sql(
-                    db_content, Path(self.config.output_dir)
-                )
+                self.save_converted_sql(db_content, Path(self.config.output_dir))
 
             # Migrate database
             db_result = self.migrate_database(db_content)

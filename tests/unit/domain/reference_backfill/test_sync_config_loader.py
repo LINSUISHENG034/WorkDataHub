@@ -36,7 +36,7 @@ def sample_config_data():
                     "columns": [
                         {"source": "plan_code", "target": "年金计划号"},
                         {"source": "plan_name", "target": "计划名称"},
-                    ]
+                    ],
                 },
                 "sync_mode": "upsert",
                 "primary_key": "年金计划号",
@@ -66,9 +66,9 @@ class TestReferenceSyncConfigLoader:
         assert loader.config_path == Path("config/reference_sync.yml")
         assert loader.logger is not None
 
-    @patch('work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists')
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('work_data_hub.domain.reference_backfill.sync_config_loader.yaml.safe_load')
+    @patch("work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("work_data_hub.domain.reference_backfill.sync_config_loader.yaml.safe_load")
     def test_load_config_success(
         self,
         mock_yaml_load,
@@ -97,7 +97,7 @@ class TestReferenceSyncConfigLoader:
         assert config.tables[1].name == "产品线"
         assert config.tables[1].source_type == "config_file"
 
-    @patch('work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists')
+    @patch("work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists")
     def test_load_config_file_not_found(self, mock_exists):
         """Test loading with missing config file."""
         mock_exists.return_value = False
@@ -107,9 +107,9 @@ class TestReferenceSyncConfigLoader:
         with pytest.raises(FileNotFoundError, match="Configuration file not found"):
             loader.load_config()
 
-    @patch('work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists')
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('work_data_hub.domain.reference_backfill.sync_config_loader.yaml.safe_load')
+    @patch("work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("work_data_hub.domain.reference_backfill.sync_config_loader.yaml.safe_load")
     def test_load_config_no_tables_key(
         self,
         mock_yaml_load,
@@ -130,9 +130,9 @@ class TestReferenceSyncConfigLoader:
         # Should return None when tables key is missing
         assert config is None
 
-    @patch('work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists')
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('work_data_hub.domain.reference_backfill.sync_config_loader.yaml.safe_load')
+    @patch("work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("work_data_hub.domain.reference_backfill.sync_config_loader.yaml.safe_load")
     def test_load_config_yaml_parse_error(
         self,
         mock_yaml_load,
@@ -148,9 +148,9 @@ class TestReferenceSyncConfigLoader:
         with pytest.raises(ValueError, match="Invalid YAML"):
             loader.load_config()
 
-    @patch('work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists')
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('work_data_hub.domain.reference_backfill.sync_config_loader.yaml.safe_load')
+    @patch("work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("work_data_hub.domain.reference_backfill.sync_config_loader.yaml.safe_load")
     def test_load_config_invalid_schema(
         self,
         mock_yaml_load,
@@ -169,9 +169,9 @@ class TestReferenceSyncConfigLoader:
         with pytest.raises(ValueError, match="Invalid reference sync configuration"):
             loader.load_config()
 
-    @patch('work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists')
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('work_data_hub.domain.reference_backfill.sync_config_loader.yaml.safe_load')
+    @patch("work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("work_data_hub.domain.reference_backfill.sync_config_loader.yaml.safe_load")
     def test_load_config_disabled(
         self,
         mock_yaml_load,
@@ -194,9 +194,9 @@ class TestReferenceSyncConfigLoader:
         assert isinstance(config, ReferenceSyncConfig)
         assert config.enabled is False
 
-    @patch('work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists')
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('work_data_hub.domain.reference_backfill.sync_config_loader.yaml.safe_load')
+    @patch("work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("work_data_hub.domain.reference_backfill.sync_config_loader.yaml.safe_load")
     def test_load_reference_sync_config_convenience_function(
         self,
         mock_yaml_load,
@@ -215,9 +215,9 @@ class TestReferenceSyncConfigLoader:
         assert config.enabled is True
         assert len(config.tables) == 2
 
-    @patch('work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists')
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('work_data_hub.domain.reference_backfill.sync_config_loader.yaml.safe_load')
+    @patch("work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("work_data_hub.domain.reference_backfill.sync_config_loader.yaml.safe_load")
     def test_load_config_empty_tables(
         self,
         mock_yaml_load,

@@ -5,7 +5,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from work_data_hub.infrastructure.enrichment.data_refresh_service import EqcDataRefreshService
+from work_data_hub.infrastructure.enrichment.data_refresh_service import (
+    EqcDataRefreshService,
+)
 
 
 class DummySettings:
@@ -55,4 +57,3 @@ class TestEqcDataRefreshService:
         params = call_args[0][1]
         assert "ORDER BY company_id" in sql_text
         assert params["limit"] == 10
-

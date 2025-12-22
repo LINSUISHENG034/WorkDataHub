@@ -17,7 +17,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, TEXT
 
 from work_data_hub.utils.logging import get_logger
 
-from .models import InsertBatchResult, EnqueueResult
+from .models import EnqueueResult, InsertBatchResult
 
 logger = get_logger(__name__)
 
@@ -246,9 +246,15 @@ class OtherOpsMixin:
                 "search_key_word": search_key_word,
                 "company_full_name": company_full_name,
                 "unite_code": unite_code,
-                "raw_data": json.dumps(raw_data, ensure_ascii=False) if raw_data is not None else None,
-                "raw_business_info": json.dumps(raw_business_info, ensure_ascii=False) if raw_business_info is not None else None,
-                "raw_biz_label": json.dumps(raw_biz_label, ensure_ascii=False) if raw_biz_label is not None else None,
+                "raw_data": json.dumps(raw_data, ensure_ascii=False)
+                if raw_data is not None
+                else None,
+                "raw_business_info": json.dumps(raw_business_info, ensure_ascii=False)
+                if raw_business_info is not None
+                else None,
+                "raw_biz_label": json.dumps(raw_biz_label, ensure_ascii=False)
+                if raw_biz_label is not None
+                else None,
             },
         )
 

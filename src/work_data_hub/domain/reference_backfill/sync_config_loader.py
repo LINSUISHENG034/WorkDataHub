@@ -73,7 +73,7 @@ class ReferenceSyncConfigLoader:
 
         # Load YAML file
         try:
-            with open(self.config_path, 'r', encoding='utf-8') as f:
+            with open(self.config_path, "r", encoding="utf-8") as f:
                 config_data = yaml.safe_load(f) or {}
         except yaml.YAMLError as e:
             error_msg = f"Invalid YAML in configuration file: {e}"
@@ -85,7 +85,9 @@ class ReferenceSyncConfigLoader:
             raise
 
         if not isinstance(config_data, dict):
-            raise ValueError("Invalid reference sync configuration: expected a YAML mapping at root")
+            raise ValueError(
+                "Invalid reference sync configuration: expected a YAML mapping at root"
+            )
 
         # Story 6.2-P14 (Zero Legacy): reference_sync.yml MUST be root-level config.
         # If it's missing the expected structure, treat as no config.
@@ -112,7 +114,7 @@ class ReferenceSyncConfigLoader:
 
 
 def load_reference_sync_config(
-    config_path: str = DEFAULT_SYNC_CONFIG_PATH
+    config_path: str = DEFAULT_SYNC_CONFIG_PATH,
 ) -> Optional[ReferenceSyncConfig]:
     """
     Convenience function to load reference sync configuration.
@@ -133,4 +135,3 @@ def load_reference_sync_config(
     """
     loader = ReferenceSyncConfigLoader(config_path)
     return loader.load_config()
-

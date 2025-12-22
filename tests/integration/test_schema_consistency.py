@@ -160,7 +160,9 @@ def db_engine():
     inspector = inspect(engine)
     tables = {t.lower() for t in inspector.get_table_names()}
     if "annuity_performance_new" not in tables:
-        pytest.skip("Required table annuity_performance_new not present; run migrations to enable schema checks")
+        pytest.skip(
+            "Required table annuity_performance_new not present; run migrations to enable schema checks"
+        )
     return engine
 
 

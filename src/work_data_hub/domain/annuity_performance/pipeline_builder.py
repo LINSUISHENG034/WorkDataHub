@@ -110,7 +110,11 @@ def _clean_portfolio_code(value) -> Optional[str]:
 
     # Handle numeric values - preserve them as strings
     if isinstance(value, (int, float)):
-        return str(int(value)) if isinstance(value, float) and value.is_integer() else str(value)
+        return (
+            str(int(value))
+            if isinstance(value, float) and value.is_integer()
+            else str(value)
+        )
 
     # Handle string values
     if isinstance(value, str):
@@ -122,7 +126,7 @@ def _clean_portfolio_code(value) -> Optional[str]:
             return None
 
         # Remove 'F' or 'f' prefix if present (Legacy behavior, case-insensitive)
-        if cleaned.upper().startswith('F'):
+        if cleaned.upper().startswith("F"):
             cleaned = cleaned[1:]
 
         # Return cleaned value
@@ -143,9 +147,9 @@ class CompanyIdResolutionStep(TransformStep):
         mapping_repository=None,
     ) -> None:
         """Initialize CompanyIdResolutionStep.
-        
+
         Story 6.2-P17: Breaking Change - eqc_config is now REQUIRED parameter.
-        
+
         Args:
             eqc_config: EqcLookupConfig controlling EQC lookup behavior
             enrichment_service: Optional legacy enrichment service
@@ -201,7 +205,7 @@ class CompanyIdResolutionStep(TransformStep):
         )
         logger.bind(domain=domain, step=self.name).info(
             "Company ID resolution complete",
-            **stats.to_dict( ),
+            **stats.to_dict(),
         )
 
         return result.data
@@ -214,7 +218,7 @@ def build_bronze_to_silver_pipeline(
     mapping_repository=None,
 ) -> Pipeline:
     """Compose the Bronze → Silver pipeline using shared infrastructure steps.
-    
+
     Story 6.2-P17: Breaking Change - eqc_config is now REQUIRED parameter.
     """
     steps: list[TransformStep] = [
@@ -281,7 +285,9 @@ def build_bronze_to_silver_pipeline(
         # CRITICAL: Must copy BEFORE Step 13 (DropStep) deletes 集团企业客户号
         CalculationStep(
             {
-                "年金账户号": lambda df: df.get("集团企业客户号", pd.Series([None] * len(df))).copy(),
+                "年金账户号": lambda df: df.get(
+                    "集团企业客户号", pd.Series([None] * len(df))
+                ).copy(),
             }
         ),
         # Step 11: Data cleansing via CleansingRegistry

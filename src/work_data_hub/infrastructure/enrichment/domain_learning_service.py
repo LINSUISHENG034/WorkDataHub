@@ -157,12 +157,7 @@ class DomainLearningService:
         valid_mask = df[company_id_col].notna() & is_numeric_id & ~is_temp_id
         valid_count = int(valid_mask.sum())
         null_count = int(df[company_id_col].isna().sum())
-        temp_id_count = int(
-            (
-                df[company_id_col].notna()
-                & is_temp_id
-            ).sum()
-        )
+        temp_id_count = int((df[company_id_col].notna() & is_temp_id).sum())
         result.valid_records = valid_count
 
         # AC5: Check minimum records threshold based on valid (non-temp) rows
@@ -209,7 +204,9 @@ class DomainLearningService:
         insert_result = self.repository.insert_enrichment_index_batch(records)
 
         result.inserted = insert_result.inserted_count
-        result.updated = insert_result.skipped_count  # skipped_count = updates in UPSERT
+        result.updated = (
+            insert_result.skipped_count
+        )  # skipped_count = updates in UPSERT
         result.skipped = sum(result.skipped_by_reason.values())
 
         # AC7/AC14: Populate resolution statistics when provided

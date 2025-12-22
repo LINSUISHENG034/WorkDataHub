@@ -1,6 +1,7 @@
-from typing import Any, Dict, List, Optional, Tuple, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .sql_utils import quote_ident, quote_table
+
 
 def _ensure_list_of_dicts(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Validate and normalize row data."""
@@ -219,10 +220,10 @@ def build_delete_sql(
             else:
                 pk_values.append(row[col])
 
-    # Fix: Indentation of pk_tuples.append was inside else; moved it to match original if logic
-    # Original:
-    #         if len(pk_values) == len(pk_cols):
-    #             pk_tuples.append(tuple(pk_values))
+        # Fix: Indentation of pk_tuples.append was inside else; moved it to match original if logic
+        # Original:
+        #         if len(pk_values) == len(pk_cols):
+        #             pk_tuples.append(tuple(pk_values))
         if len(pk_values) == len(pk_cols):
             pk_tuples.append(tuple(pk_values))
 

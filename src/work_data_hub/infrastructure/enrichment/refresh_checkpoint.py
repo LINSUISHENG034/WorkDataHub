@@ -226,7 +226,9 @@ class RefreshCheckpoint:
             raise ValueError(f"Invalid checkpoint file: {e}")
 
     @classmethod
-    def find_latest(cls, checkpoint_dir: Path, operation_type: str) -> Optional["RefreshCheckpoint"]:
+    def find_latest(
+        cls, checkpoint_dir: Path, operation_type: str
+    ) -> Optional["RefreshCheckpoint"]:
         """
         Find the latest incomplete checkpoint for given operation type.
 
@@ -244,7 +246,10 @@ class RefreshCheckpoint:
         for checkpoint_file in checkpoint_dir.glob("*.json"):
             try:
                 checkpoint = cls.load(checkpoint_file)
-                if checkpoint.operation_type == operation_type and not checkpoint.is_completed:
+                if (
+                    checkpoint.operation_type == operation_type
+                    and not checkpoint.is_completed
+                ):
                     checkpoints.append(checkpoint)
             except (FileNotFoundError, ValueError):
                 continue

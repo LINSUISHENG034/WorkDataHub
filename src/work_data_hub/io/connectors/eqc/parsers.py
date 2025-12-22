@@ -2,12 +2,12 @@
 Response parsing logic for EQC connector.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 
 from work_data_hub.domain.company_enrichment.models import (
     BusinessInfoResult,
-    LabelInfo,
     CompanySearchResult,
+    LabelInfo,
 )
 
 
@@ -152,20 +152,26 @@ def parse_business_info(
     control_name = first_non_empty_str(business_info, ["control_name"])
     bene_id = first_non_empty_str(business_info, ["bene_id"])
     bene_name = first_non_empty_str(business_info, ["bene_name"])
-    legal_person_id = first_non_empty_str(business_info, ["legalPersonId", "legal_person_id"])
+    legal_person_id = first_non_empty_str(
+        business_info, ["legalPersonId", "legal_person_id"]
+    )
     province = first_non_empty_str(business_info, ["province"])
     logo_url = first_non_empty_str(business_info, ["logoUrl", "logo_url"])
     type_code = first_non_empty_str(business_info, ["typeCode", "type_code"])
     department = first_non_empty_str(business_info, ["department"])
     update_time = first_non_empty_str(business_info, ["updateTime", "update_time"])
-    actual_capital_raw = first_non_empty_str(business_info, ["actualCapi", "actual_capital"])
+    actual_capital_raw = first_non_empty_str(
+        business_info, ["actualCapi", "actual_capital"]
+    )
     registered_capital_currency = first_non_empty_str(
         business_info, ["registeredCapitalCurrency", "registered_capital_currency"]
     )
     full_register_type_desc = first_non_empty_str(
         business_info, ["fullRegisterTypeDesc", "full_register_type_desc"]
     )
-    industry_code = first_non_empty_str(business_info, ["industryCode", "industry_code"])
+    industry_code = first_non_empty_str(
+        business_info, ["industryCode", "industry_code"]
+    )
 
     return BusinessInfoResult(
         company_id=company_id,

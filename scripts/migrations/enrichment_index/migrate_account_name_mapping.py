@@ -22,8 +22,7 @@ Usage:
 import argparse
 import sys
 import time
-from datetime import datetime, timezone
-from typing import Dict, Generator, List, Optional
+from typing import Dict, Generator, List
 
 import structlog
 from sqlalchemy import create_engine, text
@@ -131,8 +130,8 @@ def migrate_account_name_mapping(
         # Prefer explicit legacy DB URI; fall back to best-effort rewrite.
         legacy_db_url = os.environ.get("LEGACY_DATABASE__URI")
         if not legacy_db_url:
-            database_url = (
-                os.environ.get("WDH_DATABASE__URI") or os.environ.get("DATABASE_URL")
+            database_url = os.environ.get("WDH_DATABASE__URI") or os.environ.get(
+                "DATABASE_URL"
             )
             if not database_url:
                 raise ValueError(
@@ -144,6 +143,7 @@ def migrate_account_name_mapping(
             legacy_db_url = legacy_db_url.replace("postgres://", "postgresql://", 1)
 
         from sqlalchemy import create_engine
+
         legacy_engine = create_engine(legacy_db_url)
 
         with legacy_engine.connect() as legacy_conn:
@@ -272,7 +272,7 @@ def verify_migration(pg_connection: Connection) -> Dict[str, int]:
                     "lookup_key": row[0],
                     "company_id": row[1],
                     "confidence": float(row[2]),
-                    "hit_count": row[3]
+                    "hit_count": row[3],
                 }
                 for row in rows
             ]
@@ -379,6 +379,7 @@ def main() -> int:
 
     # 配置日志
     import logging
+
     log_level = logging.INFO
     structlog.configure(
         wrapper_class=structlog.make_filtering_bound_logger(log_level),
@@ -397,22 +398,26 @@ def main() -> int:
             print(f"唯一年金账户名数: {results['account_name_unique']:,}")
             print(f"空company_id记录数: {results['account_name_null_company_id']:,}")
 
-            if results['sample_records']:
+            if results["sample_records"]:
                 print("\n样本记录:")
-                for i, rec in enumerate(results['sample_records'], 1):
-                    print(f"  {i}. {rec['lookup_key']} -> {rec['company_id']} "
-                          f"(置信度: {rec['confidence']}, 命中次数: {rec['hit_count']})")
+                for i, rec in enumerate(results["sample_records"], 1):
+                    print(
+                        f"  {i}. {rec['lookup_key']} -> {rec['company_id']} "
+                        f"(置信度: {rec['confidence']}, 命中次数: {rec['hit_count']})"
+                    )
 
             # 检查数据完整性
-            if results['account_name_total'] == results['account_name_unique']:
+            if results["account_name_total"] == results["account_name_unique"]:
                 print("\n✅ 没有重复的年金账户名")
             else:
                 print("\n❌ 存在重复的年金账户名")
 
-            if results['account_name_null_company_id'] == 0:
+            if results["account_name_null_company_id"] == 0:
                 print("✅ 所有记录都有company_id")
             else:
-                print(f"❌ 有 {results['account_name_null_company_id']} 条记录缺少company_id")
+                print(
+                    f"❌ 有 {results['account_name_null_company_id']} 条记录缺少company_id"
+                )
 
             return 0
 
@@ -435,7 +440,7 @@ def main() -> int:
         print(f"错误数: {stats['errors']:,}")
         print(f"耗时: {duration:.2f}秒")
 
-        if stats['errors'] > 0:
+        if stats["errors"] > 0:
             return 1
 
         if not args.dry_run:

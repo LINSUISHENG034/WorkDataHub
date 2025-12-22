@@ -27,7 +27,9 @@ if TYPE_CHECKING:
 DOMAIN_CONFIGS: Dict[str, Type["DomainComparisonConfig"]] = {}
 
 
-def register_config(config_class: Type["DomainComparisonConfig"]) -> Type["DomainComparisonConfig"]:
+def register_config(
+    config_class: Type["DomainComparisonConfig"],
+) -> Type["DomainComparisonConfig"]:
     """
     Decorator to register a domain configuration class.
 

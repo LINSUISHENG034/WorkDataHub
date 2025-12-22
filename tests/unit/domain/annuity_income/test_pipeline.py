@@ -43,12 +43,16 @@ class TestBuildBronzeToSilverPipeline:
 
     def test_returns_pipeline_instance(self):
         """Pipeline builder returns a Pipeline instance."""
-        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
+        pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled()
+        )
         assert isinstance(pipeline, Pipeline)
 
     def test_pipeline_has_expected_steps(self):
         """Pipeline contains all expected transformation steps."""
-        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
+        pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled()
+        )
 
         # Should have 12 steps as documented in Story 5.5.2 Task 6
         assert len(pipeline.steps) == 12
@@ -301,7 +305,9 @@ class TestPipelineExecution:
 
     def test_pipeline_applies_institution_code_mapping(self, sample_bronze_df, context):
         """Pipeline maps institution names to codes."""
-        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
+        pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled()
+        )
 
         result_df = pipeline.execute(sample_bronze_df, context)
 
@@ -311,7 +317,9 @@ class TestPipelineExecution:
 
     def test_pipeline_applies_product_line_mapping(self, sample_bronze_df, context):
         """Pipeline maps business type to product line code."""
-        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
+        pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled()
+        )
 
         result_df = pipeline.execute(sample_bronze_df, context)
 
@@ -323,7 +331,9 @@ class TestPipelineExecution:
         self, sample_bronze_df, context
     ):
         """Pipeline copies 客户名称 to 年金账户名 before cleansing."""
-        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
+        pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled()
+        )
 
         result_df = pipeline.execute(sample_bronze_df, context)
 
@@ -332,7 +342,9 @@ class TestPipelineExecution:
 
     def test_pipeline_applies_portfolio_code_defaults(self, sample_bronze_df, context):
         """Pipeline applies portfolio code defaults for 职年受托."""
-        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
+        pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled()
+        )
 
         result_df = pipeline.execute(sample_bronze_df, context)
 
@@ -344,7 +356,9 @@ class TestPipelineExecution:
     def test_pipeline_preserves_data_integrity(self, sample_bronze_df, context):
         """Pipeline preserves original data values."""
         # Story 5.5.5: Updated to use four income fields instead of 收入金额
-        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
+        pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled()
+        )
 
         result_df = pipeline.execute(sample_bronze_df, context)
 
@@ -374,7 +388,9 @@ class TestPipelineExecution:
             }
         )
 
-        pipeline = build_bronze_to_silver_pipeline(eqc_config=EqcLookupConfig.disabled())
+        pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled()
+        )
         result_df = pipeline.execute(alias_df, context)
 
         # Aliases should be normalized (both plan columns uppercase and aligned)

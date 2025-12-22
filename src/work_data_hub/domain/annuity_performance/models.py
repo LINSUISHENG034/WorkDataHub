@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union, cast
 
 if TYPE_CHECKING:
-    from work_data_hub.domain.company_enrichment.models import ResolutionStatus
+    pass
 from pydantic import (
     AliasChoices,
     BaseModel,
@@ -16,6 +16,7 @@ from pydantic import (
 )
 
 from work_data_hub.infrastructure.cleansing import get_cleansing_registry
+
 # Story 6.2-P13: Import shared EnrichmentStats from infrastructure layer
 from work_data_hub.infrastructure.models.shared import EnrichmentStats
 from work_data_hub.utils.date_parser import parse_yyyymm_or_chinese
@@ -317,9 +318,7 @@ class AnnuityPerformanceOut(BaseModel):
         try:
             parsed = parse_yyyymm_or_chinese(v)
             if parsed.year < 2000 or parsed.year > 2030:
-                raise ValueError(
-                    f"Cannot parse '{v}': outside valid range (2000-2030)"
-                )
+                raise ValueError(f"Cannot parse '{v}': outside valid range (2000-2030)")
             return parsed
         except ValueError as e:
             raise ValueError(f"Field '月度': {str(e)}")

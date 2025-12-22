@@ -46,7 +46,9 @@ class TestEqcProviderInit:
 
     def test_init_without_token_logs_warning(self) -> None:
         """Provider logs warning when no token configured."""
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.get_settings") as mock_settings:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.eqc_token = ""
             mock_settings.return_value.eqc_base_url = "https://eqc.test.com"
             mock_settings.return_value.company_sync_lookup_limit = 5
@@ -58,7 +60,9 @@ class TestEqcProviderInit:
 
     def test_init_with_validate_on_init_valid_token(self) -> None:
         """Provider validates token on init when validate_on_init=True."""
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.requests.get") as mock_get:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.requests.get"
+        ) as mock_get:
             mock_get.return_value.status_code = 200
 
             provider = EqcProvider(
@@ -69,7 +73,9 @@ class TestEqcProviderInit:
 
     def test_init_with_validate_on_init_invalid_token(self) -> None:
         """Provider raises EqcTokenInvalidError when token is invalid."""
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.requests.get") as mock_get:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.requests.get"
+        ) as mock_get:
             mock_get.return_value.status_code = 401
 
             with pytest.raises(EqcTokenInvalidError) as exc_info:
@@ -88,7 +94,9 @@ class TestEqcProviderLookup:
     @pytest.fixture
     def provider(self) -> EqcProvider:
         """Create a provider with mocked settings."""
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.get_settings") as mock_settings:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.eqc_token = ""
             mock_settings.return_value.eqc_base_url = "https://eqc.test.com"
             mock_settings.return_value.company_sync_lookup_limit = 5
@@ -128,7 +136,9 @@ class TestEqcProviderLookup:
     def test_lookup_not_found_returns_none(self, provider: EqcProvider) -> None:
         """EQC not found returns None."""
         provider.client = MagicMock()
-        provider.client.search_company_with_raw.side_effect = EQCNotFoundError("not found")
+        provider.client.search_company_with_raw.side_effect = EQCNotFoundError(
+            "not found"
+        )
 
         result = provider.lookup("不存在的公司")
 
@@ -147,7 +157,9 @@ class TestEqcProviderLookup:
     def test_lookup_unauthorized_disables_provider(self, provider: EqcProvider) -> None:
         """HTTP 401 disables provider for session."""
         provider.client = MagicMock()
-        provider.client.search_company_with_raw.side_effect = EQCAuthenticationError("unauth")
+        provider.client.search_company_with_raw.side_effect = EQCAuthenticationError(
+            "unauth"
+        )
 
         result = provider.lookup("任意公司")
 
@@ -190,7 +202,9 @@ class TestEqcProviderLookup:
 
     def test_lookup_no_token_returns_none(self) -> None:
         """Returns None when no token configured."""
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.get_settings") as mock_settings:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.eqc_token = ""
             mock_settings.return_value.eqc_base_url = "https://eqc.test.com"
             mock_settings.return_value.company_sync_lookup_limit = 5
@@ -208,7 +222,9 @@ class TestEqcProviderRetry:
     @pytest.fixture
     def provider(self) -> EqcProvider:
         """Create a provider for retry tests."""
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.get_settings") as mock_settings:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.eqc_token = ""
             mock_settings.return_value.eqc_base_url = "https://eqc.test.com"
             mock_settings.return_value.company_sync_lookup_limit = 5
@@ -232,7 +248,9 @@ class TestEqcProviderRetry:
     def test_lookup_no_retry_on_4xx(self, provider: EqcProvider) -> None:
         """Client errors return None without retrying."""
         provider.client = MagicMock()
-        provider.client.search_company_with_raw.side_effect = EQCClientError("bad request")
+        provider.client.search_company_with_raw.side_effect = EQCClientError(
+            "bad request"
+        )
 
         result = provider.lookup("公司A")
 
@@ -257,7 +275,9 @@ class TestEqcProviderCache:
         """Successful lookup caches result to repository."""
         mock_repo = MagicMock()
 
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.get_settings") as mock_settings:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.eqc_token = ""
             mock_settings.return_value.eqc_base_url = "https://eqc.test.com"
             mock_settings.return_value.company_sync_lookup_limit = 5
@@ -283,7 +303,9 @@ class TestEqcProviderCache:
         )
 
         # Mock normalize_for_temp_id at the module where it's imported in _cache_result
-        with patch("work_data_hub.infrastructure.enrichment.normalizer.normalize_for_temp_id") as mock_norm:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.normalizer.normalize_for_temp_id"
+        ) as mock_norm:
             mock_norm.return_value = "中国平安"
 
             provider.lookup("中国平安")
@@ -300,7 +322,9 @@ class TestEqcProviderCache:
         mock_repo = MagicMock()
         mock_repo.insert_enrichment_index_batch.side_effect = Exception("DB error")
 
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.get_settings") as mock_settings:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.eqc_token = ""
             mock_settings.return_value.eqc_base_url = "https://eqc.test.com"
             mock_settings.return_value.company_sync_lookup_limit = 5
@@ -326,7 +350,9 @@ class TestEqcProviderCache:
         )
 
         # Mock normalize_company_name at the module where it's imported in _cache_result
-        with patch("work_data_hub.infrastructure.cleansing.normalize_company_name") as mock_norm:
+        with patch(
+            "work_data_hub.infrastructure.cleansing.normalize_company_name"
+        ) as mock_norm:
             mock_norm.return_value = "中国平安"
 
             # Should not raise, should return result
@@ -341,7 +367,9 @@ class TestEqcProviderHelpers:
 
     def test_is_available_true(self) -> None:
         """is_available returns True when provider is ready."""
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.get_settings") as mock_settings:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.eqc_token = ""
             mock_settings.return_value.eqc_base_url = "https://eqc.test.com"
             mock_settings.return_value.company_sync_lookup_limit = 5
@@ -353,7 +381,9 @@ class TestEqcProviderHelpers:
 
     def test_is_available_false_no_token(self) -> None:
         """is_available returns False when no token."""
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.get_settings") as mock_settings:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.eqc_token = ""
             mock_settings.return_value.eqc_base_url = "https://eqc.test.com"
             mock_settings.return_value.company_sync_lookup_limit = 5
@@ -365,7 +395,9 @@ class TestEqcProviderHelpers:
 
     def test_is_available_false_no_budget(self) -> None:
         """is_available returns False when budget exhausted."""
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.get_settings") as mock_settings:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.eqc_token = ""
             mock_settings.return_value.eqc_base_url = "https://eqc.test.com"
             mock_settings.return_value.company_sync_lookup_limit = 5
@@ -377,7 +409,9 @@ class TestEqcProviderHelpers:
 
     def test_is_available_false_disabled(self) -> None:
         """is_available returns False when disabled."""
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.get_settings") as mock_settings:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.eqc_token = ""
             mock_settings.return_value.eqc_base_url = "https://eqc.test.com"
             mock_settings.return_value.company_sync_lookup_limit = 5
@@ -390,7 +424,9 @@ class TestEqcProviderHelpers:
 
     def test_reset_budget(self) -> None:
         """reset_budget restores budget to initial value."""
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.get_settings") as mock_settings:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.eqc_token = ""
             mock_settings.return_value.eqc_base_url = "https://eqc.test.com"
             mock_settings.return_value.company_sync_lookup_limit = 5
@@ -405,7 +441,9 @@ class TestEqcProviderHelpers:
 
     def test_reset_disabled(self) -> None:
         """reset_disabled re-enables provider."""
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.get_settings") as mock_settings:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.eqc_token = ""
             mock_settings.return_value.eqc_base_url = "https://eqc.test.com"
             mock_settings.return_value.company_sync_lookup_limit = 5
@@ -424,7 +462,9 @@ class TestValidateEqcToken:
 
     def test_validate_token_valid(self) -> None:
         """Returns True for valid token."""
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.requests.get") as mock_get:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.requests.get"
+        ) as mock_get:
             mock_get.return_value.status_code = 200
 
             result = validate_eqc_token("valid_token", "https://eqc.test.com")
@@ -433,7 +473,9 @@ class TestValidateEqcToken:
 
     def test_validate_token_invalid_401(self) -> None:
         """Returns False for 401 response."""
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.requests.get") as mock_get:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.requests.get"
+        ) as mock_get:
             mock_get.return_value.status_code = 401
 
             result = validate_eqc_token("invalid_token", "https://eqc.test.com")
@@ -442,7 +484,9 @@ class TestValidateEqcToken:
 
     def test_validate_token_network_error(self) -> None:
         """Returns True on network error (not token issue)."""
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.requests.get") as mock_get:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.requests.get"
+        ) as mock_get:
             mock_get.side_effect = requests.RequestException("Network error")
 
             result = validate_eqc_token("token", "https://eqc.test.com")
@@ -456,7 +500,9 @@ class TestEqcProviderFullDataAcquisition:
     @pytest.fixture
     def provider(self) -> EqcProvider:
         """Create a provider with mocked settings."""
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.get_settings") as mock_settings:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.get_settings"
+        ) as mock_settings:
             mock_settings.return_value.eqc_token = ""
             mock_settings.return_value.eqc_base_url = "https://eqc.test.com"
             mock_settings.return_value.company_sync_lookup_limit = 5
@@ -506,15 +552,21 @@ class TestEqcProviderFullDataAcquisition:
         )
 
         # Mock normalizer
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.normalize_for_temp_id") as mock_norm:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.normalize_for_temp_id"
+        ) as mock_norm:
             mock_norm.return_value = "中国平安"
 
             result = provider.lookup("中国平安")
 
             # Verify all three endpoints were called
             provider.client.search_company_with_raw.assert_called_once_with("中国平安")
-            provider.client.get_business_info_with_raw.assert_called_once_with("1000065057")
-            provider.client.get_label_info_with_raw.assert_called_once_with("1000065057")
+            provider.client.get_business_info_with_raw.assert_called_once_with(
+                "1000065057"
+            )
+            provider.client.get_label_info_with_raw.assert_called_once_with(
+                "1000065057"
+            )
 
             # Verify result
             assert result is not None
@@ -527,8 +579,12 @@ class TestEqcProviderFullDataAcquisition:
             call_args = mock_repo.upsert_base_info.call_args
             assert call_args[1]["company_id"] == "1000065057"
             assert call_args[1]["raw_data"] == {"list": [{"companyId": "1000065057"}]}
-            assert call_args[1]["raw_business_info"] == {"businessInfodto": {"company_id": "1000065057"}}
-            assert call_args[1]["raw_biz_label"] == {"labels": [{"type": "行业分类", "labels": []}]}
+            assert call_args[1]["raw_business_info"] == {
+                "businessInfodto": {"company_id": "1000065057"}
+            }
+            assert call_args[1]["raw_biz_label"] == {
+                "labels": [{"type": "行业分类", "labels": []}]
+            }
 
     def test_lookup_continues_when_business_info_fails(self, provider) -> None:
         """Test that lookup continues when get_business_info fails (error isolation)."""
@@ -561,7 +617,9 @@ class TestEqcProviderFullDataAcquisition:
         )
 
         # Mock normalizer
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.normalize_for_temp_id") as mock_norm:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.normalize_for_temp_id"
+        ) as mock_norm:
             mock_norm.return_value = "中国平安"
 
             result = provider.lookup("中国平安")
@@ -604,7 +662,9 @@ class TestEqcProviderFullDataAcquisition:
         provider.client.get_label_info_with_raw.side_effect = Exception("API error")
 
         # Mock normalizer
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.normalize_for_temp_id") as mock_norm:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.normalize_for_temp_id"
+        ) as mock_norm:
             mock_norm.return_value = "中国平安"
 
             result = provider.lookup("中国平安")
@@ -637,11 +697,17 @@ class TestEqcProviderFullDataAcquisition:
             ],
             {"list": [{"companyId": "1000065057"}]},
         )
-        provider.client.get_business_info_with_raw.side_effect = Exception("Business API error")
-        provider.client.get_label_info_with_raw.side_effect = Exception("Label API error")
+        provider.client.get_business_info_with_raw.side_effect = Exception(
+            "Business API error"
+        )
+        provider.client.get_label_info_with_raw.side_effect = Exception(
+            "Label API error"
+        )
 
         # Mock normalizer
-        with patch("work_data_hub.infrastructure.enrichment.eqc_provider.normalize_for_temp_id") as mock_norm:
+        with patch(
+            "work_data_hub.infrastructure.enrichment.eqc_provider.normalize_for_temp_id"
+        ) as mock_norm:
             mock_norm.return_value = "中国平安"
 
             result = provider.lookup("中国平安")

@@ -367,4 +367,3 @@ class TestDataQualitySensor:
 
             assert isinstance(result, SkipReason)
             assert "Sensor error: Critical error" in str(result)
-

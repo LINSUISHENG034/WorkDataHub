@@ -38,11 +38,9 @@ from pathlib import Path
 from typing import Dict, Generator, List, Optional
 
 import structlog
-from sqlalchemy import bindparam, text
+from sqlalchemy import bindparam, create_engine, text
 from sqlalchemy.dialects.postgresql import ARRAY, TEXT
 from sqlalchemy.engine import Connection
-
-from sqlalchemy import create_engine
 
 from work_data_hub.infrastructure.enrichment.mapping_repository import (
     CompanyMappingRepository,
@@ -59,7 +57,7 @@ logger = structlog.get_logger(__name__)
 
 def create_engine_from_env():
     """Create SQLAlchemy engine for TARGET database from .wdh_env.
-    
+
     Uses WDH_DATABASE__URI (canonical) from .wdh_env file.
     All database configuration is centralized in .wdh_env.
     """
@@ -79,7 +77,7 @@ def create_engine_from_env():
 
 def create_legacy_engine_from_env():
     """Create SQLAlchemy engine for LEGACY database from .wdh_env.
-    
+
     Uses LEGACY_DATABASE__URI (canonical) from .wdh_env file.
     Falls back to target database if not set (single-DB mode).
     """
@@ -91,7 +89,7 @@ def create_legacy_engine_from_env():
         if legacy_url.startswith("postgres://"):
             legacy_url = legacy_url.replace("postgres://", "postgresql://", 1)
         return create_engine(legacy_url)
-    
+
     # Fall back to target database if legacy URL is not set (single-DB mode)
     return create_engine_from_env()
 
@@ -211,9 +209,11 @@ class FullMigrationReport:
             print(f"  Errors:      {report.errors:,}")
 
             if report.sample_records:
-                print(f"\n  Sample Records (first 5):")
+                print("\n  Sample Records (first 5):")
                 for i, rec in enumerate(report.sample_records[:5], 1):
-                    print(f"    {i}. {rec['lookup_key'][:40]}... -> {rec['company_id']}")
+                    print(
+                        f"    {i}. {rec['lookup_key'][:40]}... -> {rec['company_id']}"
+                    )
 
         print("\n" + "-" * 70)
         print("TOTALS:")
@@ -312,7 +312,9 @@ def _estimate_conflicts(
         bindparam("lookup_keys", type_=ARRAY(TEXT())),
         bindparam("lookup_types", type_=ARRAY(TEXT())),
     )
-    result = connection.execute(conflict_query, {"lookup_keys": lookup_keys, "lookup_types": lookup_types})
+    result = connection.execute(
+        conflict_query, {"lookup_keys": lookup_keys, "lookup_types": lookup_types}
+    )
     return int(result.scalar() or 0)
 
 
@@ -790,7 +792,6 @@ def run_migration(config: LegacyMigrationConfig) -> FullMigrationReport:
     return full_report
 
 
-
 # =============================================================================
 # CLI Interface
 # =============================================================================
@@ -875,6 +876,7 @@ def main() -> int:
 
     # Configure logging
     import logging
+
     log_level = logging.DEBUG if args.verbose else logging.INFO
     structlog.configure(
         wrapper_class=structlog.make_filtering_bound_logger(log_level),

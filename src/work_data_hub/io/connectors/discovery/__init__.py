@@ -2,11 +2,11 @@
 Discovery connectors package.
 """
 
-from .service import FileDiscoveryService
 from .models import (
-    DiscoveryMatch,
     DataDiscoveryResult,
+    DiscoveryMatch,
 )
+from .service import FileDiscoveryService
 
 __all__ = [
     "FileDiscoveryService",

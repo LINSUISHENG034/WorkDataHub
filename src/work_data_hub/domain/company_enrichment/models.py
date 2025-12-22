@@ -316,10 +316,14 @@ class BusinessInfoResult(BaseModel):
     )
 
     company_id: str = Field(..., min_length=1, description="EQC company ID")
-    company_name: Optional[str] = Field(None, max_length=500, description="Company name")
+    company_name: Optional[str] = Field(
+        None, max_length=500, description="Company name"
+    )
 
     # Raw values here are strings; normalization/typing happens in Story 6.2-P9.
-    registered_date: Optional[str] = Field(None, description="Registration date (raw string)")
+    registered_date: Optional[str] = Field(
+        None, description="Registration date (raw string)"
+    )
     registered_capital_raw: Optional[str] = Field(
         None, description="Registered capital (raw string, e.g., '80000.00万元')"
     )
@@ -330,36 +334,64 @@ class BusinessInfoResult(BaseModel):
         None, max_length=255, description="Legal representative name"
     )
     address: Optional[str] = Field(None, description="Company address")
-    codename: Optional[str] = Field(None, max_length=100, description="Company code name")
+    codename: Optional[str] = Field(
+        None, max_length=100, description="Company code name"
+    )
     company_en_name: Optional[str] = Field(None, description="English company name")
     currency: Optional[str] = Field(None, max_length=50, description="Currency")
-    credit_code: Optional[str] = Field(None, max_length=50, description="Unified social credit code")
-    register_code: Optional[str] = Field(None, max_length=50, description="Registration code")
+    credit_code: Optional[str] = Field(
+        None, max_length=50, description="Unified social credit code"
+    )
+    register_code: Optional[str] = Field(
+        None, max_length=50, description="Registration code"
+    )
     organization_code: Optional[str] = Field(
         None, max_length=50, description="Organization code"
     )
-    company_type: Optional[str] = Field(None, max_length=100, description="Company type")
-    industry_name: Optional[str] = Field(None, max_length=255, description="Industry classification")
+    company_type: Optional[str] = Field(
+        None, max_length=100, description="Company type"
+    )
+    industry_name: Optional[str] = Field(
+        None, max_length=255, description="Industry classification"
+    )
     registration_organ_name: Optional[str] = Field(
         None, max_length=255, description="Registration authority name"
     )
-    start_date: Optional[str] = Field(None, description="Business period start date (raw string)")
-    end_date: Optional[str] = Field(None, description="Business period end date (raw string)")
-    start_end: Optional[str] = Field(None, max_length=100, description="Business period display string")
+    start_date: Optional[str] = Field(
+        None, description="Business period start date (raw string)"
+    )
+    end_date: Optional[str] = Field(
+        None, description="Business period end date (raw string)"
+    )
+    start_end: Optional[str] = Field(
+        None, max_length=100, description="Business period display string"
+    )
     business_scope: Optional[str] = Field(None, description="Business scope")
     telephone: Optional[str] = Field(None, max_length=100, description="Telephone")
-    email_address: Optional[str] = Field(None, max_length=255, description="Email address")
+    email_address: Optional[str] = Field(
+        None, max_length=255, description="Email address"
+    )
     website: Optional[str] = Field(None, max_length=500, description="Website")
-    colleagues_num: Optional[str] = Field(None, description="Employees count (raw string)")
+    colleagues_num: Optional[str] = Field(
+        None, description="Employees count (raw string)"
+    )
     company_former_name: Optional[str] = Field(None, description="Former company names")
     control_id: Optional[str] = Field(None, max_length=100, description="Controller ID")
-    control_name: Optional[str] = Field(None, max_length=255, description="Controller name")
+    control_name: Optional[str] = Field(
+        None, max_length=255, description="Controller name"
+    )
     bene_id: Optional[str] = Field(None, max_length=100, description="Beneficiary ID")
-    bene_name: Optional[str] = Field(None, max_length=255, description="Beneficiary name")
-    legal_person_id: Optional[str] = Field(None, max_length=100, description="Legal person ID")
+    bene_name: Optional[str] = Field(
+        None, max_length=255, description="Beneficiary name"
+    )
+    legal_person_id: Optional[str] = Field(
+        None, max_length=100, description="Legal person ID"
+    )
     province: Optional[str] = Field(None, max_length=100, description="Province")
     logo_url: Optional[str] = Field(None, description="Logo URL")
-    type_code: Optional[str] = Field(None, max_length=50, description="Company type code")
+    type_code: Optional[str] = Field(
+        None, max_length=50, description="Company type code"
+    )
     department: Optional[str] = Field(None, max_length=255, description="Department")
     update_time: Optional[str] = Field(None, description="EQC update time (raw string)")
     actual_capital_raw: Optional[str] = Field(
@@ -371,7 +403,9 @@ class BusinessInfoResult(BaseModel):
     full_register_type_desc: Optional[str] = Field(
         None, max_length=255, description="Full register type description"
     )
-    industry_code: Optional[str] = Field(None, max_length=50, description="Industry code")
+    industry_code: Optional[str] = Field(
+        None, max_length=50, description="Industry code"
+    )
 
     @field_validator("company_id", mode="before")
     @classmethod
@@ -399,10 +433,18 @@ class LabelInfo(BaseModel):
 
     company_id: str = Field(..., description="Company ID (may need sibling fallback)")
     type: str = Field(..., description="Label category (e.g., '行业分类')")
-    lv1_name: Optional[str] = Field(None, alias="lv1Name", description="Level 1 label name")
-    lv2_name: Optional[str] = Field(None, alias="lv2Name", description="Level 2 label name")
-    lv3_name: Optional[str] = Field(None, alias="lv3Name", description="Level 3 label name")
-    lv4_name: Optional[str] = Field(None, alias="lv4Name", description="Level 4 label name")
+    lv1_name: Optional[str] = Field(
+        None, alias="lv1Name", description="Level 1 label name"
+    )
+    lv2_name: Optional[str] = Field(
+        None, alias="lv2Name", description="Level 2 label name"
+    )
+    lv3_name: Optional[str] = Field(
+        None, alias="lv3Name", description="Level 3 label name"
+    )
+    lv4_name: Optional[str] = Field(
+        None, alias="lv4Name", description="Level 4 label name"
+    )
 
     @field_validator("company_id", mode="before")
     @classmethod
@@ -556,51 +598,101 @@ class BusinessInfoRecord(BaseModel):
         extra="forbid",
     )
 
-    company_id: str = Field(..., min_length=1, max_length=255, description="Company ID (FK to base_info)")
+    company_id: str = Field(
+        ..., min_length=1, max_length=255, description="Company ID (FK to base_info)"
+    )
 
     # Normalized fields (cleansed from raw strings)
-    registered_date: Optional[datetime] = Field(None, description="Registration date (DATE type)")
-    registered_capital: Optional[float] = Field(None, description="Registered capital in yuan (NUMERIC)")
-    start_date: Optional[datetime] = Field(None, description="Business period start date (DATE)")
-    end_date: Optional[datetime] = Field(None, description="Business period end date (DATE)")
+    registered_date: Optional[datetime] = Field(
+        None, description="Registration date (DATE type)"
+    )
+    registered_capital: Optional[float] = Field(
+        None, description="Registered capital in yuan (NUMERIC)"
+    )
+    start_date: Optional[datetime] = Field(
+        None, description="Business period start date (DATE)"
+    )
+    end_date: Optional[datetime] = Field(
+        None, description="Business period end date (DATE)"
+    )
     colleagues_num: Optional[int] = Field(None, description="Employee count (INTEGER)")
-    actual_capital: Optional[float] = Field(None, description="Paid-in capital in yuan (NUMERIC)")
+    actual_capital: Optional[float] = Field(
+        None, description="Paid-in capital in yuan (NUMERIC)"
+    )
 
     # Retained string fields
-    registered_status: Optional[str] = Field(None, max_length=100, description="Registration status")
-    legal_person_name: Optional[str] = Field(None, max_length=255, description="Legal representative name")
+    registered_status: Optional[str] = Field(
+        None, max_length=100, description="Registration status"
+    )
+    legal_person_name: Optional[str] = Field(
+        None, max_length=255, description="Legal representative name"
+    )
     address: Optional[str] = Field(None, description="Company address")
-    codename: Optional[str] = Field(None, max_length=100, description="Company code name")
-    company_name: Optional[str] = Field(None, max_length=255, description="Company name")
+    codename: Optional[str] = Field(
+        None, max_length=100, description="Company code name"
+    )
+    company_name: Optional[str] = Field(
+        None, max_length=255, description="Company name"
+    )
     company_en_name: Optional[str] = Field(None, description="English company name")
     currency: Optional[str] = Field(None, max_length=50, description="Currency")
-    credit_code: Optional[str] = Field(None, max_length=50, description="Unified social credit code")
-    register_code: Optional[str] = Field(None, max_length=50, description="Registration code")
-    organization_code: Optional[str] = Field(None, max_length=50, description="Organization code")
-    company_type: Optional[str] = Field(None, max_length=100, description="Company type")
-    industry_name: Optional[str] = Field(None, max_length=255, description="Industry classification")
-    registration_organ_name: Optional[str] = Field(None, max_length=255, description="Registration authority")
-    start_end: Optional[str] = Field(None, max_length=100, description="Business period display string")
+    credit_code: Optional[str] = Field(
+        None, max_length=50, description="Unified social credit code"
+    )
+    register_code: Optional[str] = Field(
+        None, max_length=50, description="Registration code"
+    )
+    organization_code: Optional[str] = Field(
+        None, max_length=50, description="Organization code"
+    )
+    company_type: Optional[str] = Field(
+        None, max_length=100, description="Company type"
+    )
+    industry_name: Optional[str] = Field(
+        None, max_length=255, description="Industry classification"
+    )
+    registration_organ_name: Optional[str] = Field(
+        None, max_length=255, description="Registration authority"
+    )
+    start_end: Optional[str] = Field(
+        None, max_length=100, description="Business period display string"
+    )
     business_scope: Optional[str] = Field(None, description="Business scope")
     telephone: Optional[str] = Field(None, max_length=100, description="Telephone")
-    email_address: Optional[str] = Field(None, max_length=255, description="Email address")
+    email_address: Optional[str] = Field(
+        None, max_length=255, description="Email address"
+    )
     website: Optional[str] = Field(None, max_length=500, description="Website")
     company_former_name: Optional[str] = Field(None, description="Former company names")
     control_id: Optional[str] = Field(None, max_length=100, description="Controller ID")
-    control_name: Optional[str] = Field(None, max_length=255, description="Controller name")
+    control_name: Optional[str] = Field(
+        None, max_length=255, description="Controller name"
+    )
     bene_id: Optional[str] = Field(None, max_length=100, description="Beneficiary ID")
-    bene_name: Optional[str] = Field(None, max_length=255, description="Beneficiary name")
+    bene_name: Optional[str] = Field(
+        None, max_length=255, description="Beneficiary name"
+    )
     province: Optional[str] = Field(None, max_length=100, description="Province")
     department: Optional[str] = Field(None, max_length=255, description="Department")
 
     # snake_case converted from camelCase
-    legal_person_id: Optional[str] = Field(None, max_length=100, description="Legal person ID")
+    legal_person_id: Optional[str] = Field(
+        None, max_length=100, description="Legal person ID"
+    )
     logo_url: Optional[str] = Field(None, description="Logo URL")
-    type_code: Optional[str] = Field(None, max_length=50, description="Company type code")
+    type_code: Optional[str] = Field(
+        None, max_length=50, description="Company type code"
+    )
     update_time: Optional[datetime] = Field(None, description="EQC data update time")
-    registered_capital_currency: Optional[str] = Field(None, max_length=50, description="Registered capital currency")
-    full_register_type_desc: Optional[str] = Field(None, max_length=255, description="Full register type description")
-    industry_code: Optional[str] = Field(None, max_length=50, description="Industry code")
+    registered_capital_currency: Optional[str] = Field(
+        None, max_length=50, description="Registered capital currency"
+    )
+    full_register_type_desc: Optional[str] = Field(
+        None, max_length=255, description="Full register type description"
+    )
+    industry_code: Optional[str] = Field(
+        None, max_length=50, description="Industry code"
+    )
 
     # Cleansing metadata
     cleansing_status: Optional[dict] = Field(
@@ -631,12 +723,22 @@ class BizLabelRecord(BaseModel):
         extra="forbid",
     )
 
-    company_id: str = Field(..., min_length=1, max_length=255, description="Company ID (FK to base_info)")
+    company_id: str = Field(
+        ..., min_length=1, max_length=255, description="Company ID (FK to base_info)"
+    )
     type: Optional[str] = Field(None, max_length=100, description="Label category type")
-    lv1_name: Optional[str] = Field(None, max_length=255, description="Level 1 label name")
-    lv2_name: Optional[str] = Field(None, max_length=255, description="Level 2 label name")
-    lv3_name: Optional[str] = Field(None, max_length=255, description="Level 3 label name")
-    lv4_name: Optional[str] = Field(None, max_length=255, description="Level 4 label name")
+    lv1_name: Optional[str] = Field(
+        None, max_length=255, description="Level 1 label name"
+    )
+    lv2_name: Optional[str] = Field(
+        None, max_length=255, description="Level 2 label name"
+    )
+    lv3_name: Optional[str] = Field(
+        None, max_length=255, description="Level 3 label name"
+    )
+    lv4_name: Optional[str] = Field(
+        None, max_length=255, description="Level 4 label name"
+    )
 
     @field_validator("company_id", mode="before")
     @classmethod

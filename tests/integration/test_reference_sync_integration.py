@@ -39,20 +39,24 @@ class TestReferenceSyncEndToEnd:
     @pytest.fixture
     def mock_legacy_mysql_data(self):
         """Sample data from Legacy MySQL."""
-        return pd.DataFrame({
-            'plan_code': [f'P{i:04d}' for i in range(100)],
-            'plan_name': [f'Plan {i}' for i in range(100)],
-            'plan_type': ['Type A' if i % 2 == 0 else 'Type B' for i in range(100)],
-            'customer_name': [f'Customer {i}' for i in range(100)],
-        })
+        return pd.DataFrame(
+            {
+                "plan_code": [f"P{i:04d}" for i in range(100)],
+                "plan_name": [f"Plan {i}" for i in range(100)],
+                "plan_type": ["Type A" if i % 2 == 0 else "Type B" for i in range(100)],
+                "customer_name": [f"Customer {i}" for i in range(100)],
+            }
+        )
 
     @pytest.fixture
     def mock_config_file_data(self):
         """Sample data from config file."""
-        return pd.DataFrame({
-            '产品线代码': ['PL001', 'PL002', 'PL003', 'PL004'],
-            '产品线名称': ['企业年金', '职业年金', '养老保障', '个人养老金'],
-        })
+        return pd.DataFrame(
+            {
+                "产品线代码": ["PL001", "PL002", "PL003", "PL004"],
+                "产品线名称": ["企业年金", "职业年金", "养老保障", "个人养老金"],
+            }
+        )
 
     @pytest.fixture
     def sample_sync_config(self):
@@ -75,7 +79,7 @@ class TestReferenceSyncEndToEnd:
                             {"source": "plan_name", "target": "计划名称"},
                             {"source": "plan_type", "target": "计划类型"},
                             {"source": "customer_name", "target": "客户名称"},
-                        ]
+                        ],
                     },
                     sync_mode="upsert",
                     primary_key="年金计划号",
@@ -92,7 +96,7 @@ class TestReferenceSyncEndToEnd:
                     sync_mode="delete_insert",
                     primary_key="产品线代码",
                 ),
-            ]
+            ],
         )
 
     def test_sync_service_with_multiple_sources(
@@ -106,10 +110,10 @@ class TestReferenceSyncEndToEnd:
         mock_mysql_adapter = Mock()
         mock_mysql_adapter.fetch_data.return_value = mock_legacy_mysql_data.rename(
             columns={
-                'plan_code': '年金计划号',
-                'plan_name': '计划名称',
-                'plan_type': '计划类型',
-                'customer_name': '客户名称',
+                "plan_code": "年金计划号",
+                "plan_name": "计划名称",
+                "plan_type": "计划类型",
+                "customer_name": "客户名称",
             }
         )
 
@@ -118,7 +122,7 @@ class TestReferenceSyncEndToEnd:
 
         # Create mock connection
         mock_conn = MagicMock()
-        mock_conn.dialect.name = 'postgresql'
+        mock_conn.dialect.name = "postgresql"
         mock_result = MagicMock()
         mock_result.rowcount = 100
         mock_conn.execute.return_value = mock_result
@@ -156,27 +160,29 @@ class TestReferenceSyncEndToEnd:
         service = ReferenceSyncService()
 
         # Prepare test data
-        df = mock_legacy_mysql_data.rename(columns={
-            'plan_code': '年金计划号',
-            'plan_name': '计划名称',
-            'plan_type': '计划类型',
-            'customer_name': '客户名称',
-        })
+        df = mock_legacy_mysql_data.rename(
+            columns={
+                "plan_code": "年金计划号",
+                "plan_name": "计划名称",
+                "plan_type": "计划类型",
+                "customer_name": "客户名称",
+            }
+        )
 
         # Apply tracking fields
         result_df = service._add_authoritative_tracking_fields(df)
 
         # Verify tracking fields
-        assert '_source' in result_df.columns
-        assert '_needs_review' in result_df.columns
-        assert '_derived_from_domain' in result_df.columns
-        assert '_derived_at' in result_df.columns
+        assert "_source" in result_df.columns
+        assert "_needs_review" in result_df.columns
+        assert "_derived_from_domain" in result_df.columns
+        assert "_derived_at" in result_df.columns
 
         # Verify values
-        assert all(result_df['_source'] == 'authoritative')
-        assert all(result_df['_needs_review'] == False)
-        assert all(result_df['_derived_from_domain'].isna())
-        assert all(result_df['_derived_at'].isna())
+        assert all(result_df["_source"] == "authoritative")
+        assert all(result_df["_needs_review"] == False)
+        assert all(result_df["_derived_from_domain"].isna())
+        assert all(result_df["_derived_at"].isna())
 
     def test_sync_service_handles_partial_failures(self, sample_sync_config):
         """Test sync continues when one source fails."""
@@ -185,14 +191,16 @@ class TestReferenceSyncEndToEnd:
         mock_mysql_adapter.fetch_data.side_effect = Exception("MySQL connection failed")
 
         mock_config_adapter = Mock()
-        mock_config_adapter.fetch_data.return_value = pd.DataFrame({
-            '产品线代码': ['PL001'],
-            '产品线名称': ['企业年金'],
-        })
+        mock_config_adapter.fetch_data.return_value = pd.DataFrame(
+            {
+                "产品线代码": ["PL001"],
+                "产品线名称": ["企业年金"],
+            }
+        )
 
         # Create mock connection
         mock_conn = MagicMock()
-        mock_conn.dialect.name = 'postgresql'
+        mock_conn.dialect.name = "postgresql"
         mock_trans = MagicMock()
         mock_conn.begin.return_value = mock_trans
         mock_result = MagicMock()
@@ -223,11 +231,11 @@ class TestReferenceSyncEndToEnd:
 class TestDagsterJobExecution:
     """Tests for Dagster job and op execution."""
 
-    @patch('work_data_hub.orchestration.reference_sync_ops.get_settings')
-    @patch('work_data_hub.orchestration.reference_sync_ops.load_reference_sync_config')
-    @patch('work_data_hub.orchestration.reference_sync_ops.create_engine')
-    @patch('work_data_hub.orchestration.reference_sync_ops.AdapterFactory')
-    @patch('work_data_hub.orchestration.reference_sync_ops.SyncStateRepository')
+    @patch("work_data_hub.orchestration.reference_sync_ops.get_settings")
+    @patch("work_data_hub.orchestration.reference_sync_ops.load_reference_sync_config")
+    @patch("work_data_hub.orchestration.reference_sync_ops.create_engine")
+    @patch("work_data_hub.orchestration.reference_sync_ops.AdapterFactory")
+    @patch("work_data_hub.orchestration.reference_sync_ops.SyncStateRepository")
     def test_reference_sync_op_execution(
         self,
         mock_state_repo_class,
@@ -273,8 +281,8 @@ class TestDagsterJobExecution:
         assert "failed_count" in result
         assert "states_persisted" in result
 
-    @patch('work_data_hub.orchestration.reference_sync_ops.get_settings')
-    @patch('work_data_hub.orchestration.reference_sync_ops.load_reference_sync_config')
+    @patch("work_data_hub.orchestration.reference_sync_ops.get_settings")
+    @patch("work_data_hub.orchestration.reference_sync_ops.load_reference_sync_config")
     def test_reference_sync_op_disabled(
         self,
         mock_load_config,
@@ -296,8 +304,8 @@ class TestDagsterJobExecution:
         assert result["status"] == "skipped"
         assert result["reason"] == "disabled"
 
-    @patch('work_data_hub.orchestration.reference_sync_ops.get_settings')
-    @patch('work_data_hub.orchestration.reference_sync_ops.load_reference_sync_config')
+    @patch("work_data_hub.orchestration.reference_sync_ops.get_settings")
+    @patch("work_data_hub.orchestration.reference_sync_ops.load_reference_sync_config")
     def test_reference_sync_op_no_config(
         self,
         mock_load_config,
@@ -320,7 +328,7 @@ class TestDagsterJobExecution:
 class TestScheduleTrigger:
     """Tests for schedule triggering."""
 
-    @patch('work_data_hub.orchestration.schedules.get_settings')
+    @patch("work_data_hub.orchestration.schedules.get_settings")
     def test_reference_sync_schedule_enabled(self, mock_get_settings):
         """Test schedule triggers when enabled."""
         from dagster import build_schedule_context
@@ -331,7 +339,9 @@ class TestScheduleTrigger:
 
         # Use Dagster's build_schedule_context for proper testing
         context = build_schedule_context(
-            scheduled_execution_time=datetime(2025, 12, 12, 1, 0, 0, tzinfo=timezone.utc)
+            scheduled_execution_time=datetime(
+                2025, 12, 12, 1, 0, 0, tzinfo=timezone.utc
+            )
         )
 
         result = reference_sync_schedule(context)
@@ -339,9 +349,12 @@ class TestScheduleTrigger:
         # Verify RunRequest is returned
         assert result is not None
         assert "reference_sync_" in result.run_key
-        assert result.run_config["ops"]["reference_sync_op"]["config"]["plan_only"] == False
+        assert (
+            result.run_config["ops"]["reference_sync_op"]["config"]["plan_only"]
+            == False
+        )
 
-    @patch('work_data_hub.orchestration.schedules.get_settings')
+    @patch("work_data_hub.orchestration.schedules.get_settings")
     def test_reference_sync_schedule_disabled(self, mock_get_settings):
         """Test schedule skips when disabled."""
         from dagster import build_schedule_context
@@ -351,7 +364,9 @@ class TestScheduleTrigger:
         mock_get_settings.return_value = mock_settings
 
         context = build_schedule_context(
-            scheduled_execution_time=datetime(2025, 12, 12, 1, 0, 0, tzinfo=timezone.utc)
+            scheduled_execution_time=datetime(
+                2025, 12, 12, 1, 0, 0, tzinfo=timezone.utc
+            )
         )
 
         result = reference_sync_schedule(context)
@@ -359,7 +374,7 @@ class TestScheduleTrigger:
         # Verify no RunRequest when disabled
         assert result is None
 
-    @patch('work_data_hub.orchestration.schedules.get_settings')
+    @patch("work_data_hub.orchestration.schedules.get_settings")
     def test_reference_sync_schedule_run_key_format(self, mock_get_settings):
         """Test run_key follows expected format."""
         from dagster import build_schedule_context
@@ -369,7 +384,9 @@ class TestScheduleTrigger:
         mock_get_settings.return_value = mock_settings
 
         context = build_schedule_context(
-            scheduled_execution_time=datetime(2025, 12, 12, 1, 0, 0, tzinfo=timezone.utc)
+            scheduled_execution_time=datetime(
+                2025, 12, 12, 1, 0, 0, tzinfo=timezone.utc
+            )
         )
 
         result = reference_sync_schedule(context)
@@ -382,9 +399,9 @@ class TestScheduleTrigger:
 class TestConfigLoaderIntegration:
     """Integration tests for config loading."""
 
-    @patch('work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists')
-    @patch('builtins.open')
-    @patch('work_data_hub.domain.reference_backfill.sync_config_loader.yaml.safe_load')
+    @patch("work_data_hub.domain.reference_backfill.sync_config_loader.Path.exists")
+    @patch("builtins.open")
+    @patch("work_data_hub.domain.reference_backfill.sync_config_loader.yaml.safe_load")
     def test_load_full_config_from_data_sources(
         self,
         mock_yaml_load,
@@ -412,7 +429,7 @@ class TestConfigLoaderIntegration:
                         "columns": [
                             {"source": "plan_code", "target": "年金计划号"},
                             {"source": "plan_name", "target": "计划名称"},
-                        ]
+                        ],
                     },
                     "sync_mode": "upsert",
                     "primary_key": "年金计划号",
@@ -427,7 +444,7 @@ class TestConfigLoaderIntegration:
                         "columns": [
                             {"source": "portfolio_code", "target": "组合代码"},
                             {"source": "plan_code", "target": "年金计划号"},
-                        ]
+                        ],
                     },
                     "sync_mode": "upsert",
                     "primary_key": "组合代码",
@@ -446,7 +463,7 @@ class TestConfigLoaderIntegration:
                         "incremental": {
                             "where": "updated_at >= :last_synced_at",
                             "updated_at_column": "updated_at",
-                        }
+                        },
                     },
                     "sync_mode": "upsert",
                     "primary_key": "组织代码",
@@ -493,36 +510,43 @@ class TestLargeDatasetPerformance:
     def test_sync_10k_rows_performance(self):
         """Test sync performance with 10K row dataset."""
         # Create 10K row dataset
-        large_df = pd.DataFrame({
-            'id': [f'ID{i:06d}' for i in range(10000)],
-            'name': [f'Name {i}' for i in range(10000)],
-            'type': ['Type A' if i % 2 == 0 else 'Type B' for i in range(10000)],
-        })
+        large_df = pd.DataFrame(
+            {
+                "id": [f"ID{i:06d}" for i in range(10000)],
+                "name": [f"Name {i}" for i in range(10000)],
+                "type": ["Type A" if i % 2 == 0 else "Type B" for i in range(10000)],
+            }
+        )
 
         service = ReferenceSyncService()
 
         # Add tracking fields
         import time
+
         start = time.time()
         result_df = service._add_authoritative_tracking_fields(large_df)
         duration = time.time() - start
 
         # Verify performance (should be < 1 second for 10K rows)
-        assert duration < 1.0, f"Tracking field addition took {duration:.2f}s for 10K rows"
+        assert duration < 1.0, (
+            f"Tracking field addition took {duration:.2f}s for 10K rows"
+        )
 
         # Verify all rows processed
         assert len(result_df) == 10000
-        assert all(result_df['_source'] == 'authoritative')
+        assert all(result_df["_source"] == "authoritative")
 
     def test_batch_insert_chunking(self):
         """Test batch insert correctly chunks large datasets."""
         service = ReferenceSyncService()
 
         # Create test data
-        df = pd.DataFrame({
-            'id': [f'ID{i:04d}' for i in range(12000)],
-            'name': [f'Name {i}' for i in range(12000)],
-        })
+        df = pd.DataFrame(
+            {
+                "id": [f"ID{i:04d}" for i in range(12000)],
+                "name": [f"Name {i}" for i in range(12000)],
+            }
+        )
 
         # Mock connection
         mock_conn = MagicMock()

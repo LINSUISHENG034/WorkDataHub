@@ -16,21 +16,27 @@ MySQL to PostgreSQL Schema Synchronization Tool
     report = synchronizer.sync_table('business', '规模明细')
 """
 
-from sqlglot_parser import SQLGlotParser, MySQLTableDefinition, MySQLIndex, MySQLForeignKey, find_sql_file_for_table
 from ddl_generator import PostgreSQLDDLGenerator
 from dependency_checker import DependencyChecker
+from sqlglot_parser import (
+    MySQLForeignKey,
+    MySQLIndex,
+    MySQLTableDefinition,
+    SQLGlotParser,
+    find_sql_file_for_table,
+)
 from sync_schema import SchemaSynchronizer
 
 __version__ = "1.0.0"
 __author__ = "WorkDataHub Team"
 
 __all__ = [
-    'SQLGlotParser',
-    'MySQLTableDefinition',
-    'MySQLIndex',
-    'MySQLForeignKey',
-    'find_sql_file_for_table',
-    'PostgreSQLDDLGenerator',
-    'DependencyChecker',
-    'SchemaSynchronizer'
+    "SQLGlotParser",
+    "MySQLTableDefinition",
+    "MySQLIndex",
+    "MySQLForeignKey",
+    "find_sql_file_for_table",
+    "PostgreSQLDDLGenerator",
+    "DependencyChecker",
+    "SchemaSynchronizer",
 ]

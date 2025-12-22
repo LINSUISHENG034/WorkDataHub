@@ -45,8 +45,7 @@ def _load_structure() -> Dict[str, Any]:
         if json_path.exists():
             return json.loads(json_path.read_text(encoding="utf-8"))
     raise FileNotFoundError(
-        "db_structure.json not found. Tried: "
-        + ", ".join(str(p) for p in candidates)
+        "db_structure.json not found. Tried: " + ", ".join(str(p) for p in candidates)
     )
 
 
@@ -214,9 +213,7 @@ def _emit_table_sql(
     # Notices
     lines.append("DO $$")
     lines.append("BEGIN")
-    lines.append(
-        f"    RAISE NOTICE '=== {table_name} Table Creation Complete ===';"
-    )
+    lines.append(f"    RAISE NOTICE '=== {table_name} Table Creation Complete ===';")
     lines.append(
         f"    RAISE NOTICE 'Primary Key: {entity}_id (GENERATED ALWAYS AS IDENTITY)';"
     )

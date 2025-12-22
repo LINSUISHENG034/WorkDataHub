@@ -393,7 +393,7 @@ class TestTempIdGeneration:
 
     def test_get_next_temp_id_successful(self, lookup_queue, mock_connection):
         """Test successful HMAC temp ID generation."""
-        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'test_salt'}):
+        with patch.dict("os.environ", {"WDH_ALIAS_SALT": "test_salt"}):
             temp_id = lookup_queue.get_next_temp_id("Test Company")
 
         # Verify HMAC-based format
@@ -402,7 +402,7 @@ class TestTempIdGeneration:
 
     def test_get_next_temp_id_deterministic(self, lookup_queue, mock_connection):
         """Test temp ID generation is deterministic."""
-        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'test_salt'}):
+        with patch.dict("os.environ", {"WDH_ALIAS_SALT": "test_salt"}):
             temp_id_1 = lookup_queue.get_next_temp_id("Test Company")
             temp_id_2 = lookup_queue.get_next_temp_id("Test Company")
 
@@ -429,7 +429,7 @@ class TestConcurrentAccess:
         def generate_temp_id(company_id):
             return queue.get_next_temp_id(f"Company_{company_id}")
 
-        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'test_salt'}):
+        with patch.dict("os.environ", {"WDH_ALIAS_SALT": "test_salt"}):
             with ThreadPoolExecutor(max_workers=5) as executor:
                 # Submit 10 concurrent temp ID generation requests with different names
                 futures = [executor.submit(generate_temp_id, i) for i in range(10)]
@@ -629,7 +629,7 @@ class TestStory62P1HmacTempId:
         mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
 
         # Mock environment variable
-        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'test_salt_123'}):
+        with patch.dict("os.environ", {"WDH_ALIAS_SALT": "test_salt_123"}):
             temp_id_1 = lookup_queue.get_next_temp_id("新公司XYZ")
             temp_id_2 = lookup_queue.get_next_temp_id("新公司XYZ")
             temp_id_3 = lookup_queue.get_next_temp_id("新公司XYZ")
@@ -641,7 +641,7 @@ class TestStory62P1HmacTempId:
 
     def test_hmac_temp_id_format(self, lookup_queue, mock_connection):
         """AC1: Temp ID format is IN_<16-char-base32>."""
-        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'test_salt_123'}):
+        with patch.dict("os.environ", {"WDH_ALIAS_SALT": "test_salt_123"}):
             temp_id = lookup_queue.get_next_temp_id("Test Company")
 
         # Verify format
@@ -649,11 +649,13 @@ class TestStory62P1HmacTempId:
         assert len(temp_id) == 19  # "IN_" + 16 chars
         # Base32 uses A-Z and 2-7
         base32_part = temp_id[3:]
-        assert all(c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567' for c in base32_part)
+        assert all(c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567" for c in base32_part)
 
-    def test_hmac_temp_id_different_names_different_ids(self, lookup_queue, mock_connection):
+    def test_hmac_temp_id_different_names_different_ids(
+        self, lookup_queue, mock_connection
+    ):
         """Different company names produce different temp IDs."""
-        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'test_salt_123'}):
+        with patch.dict("os.environ", {"WDH_ALIAS_SALT": "test_salt_123"}):
             temp_id_1 = lookup_queue.get_next_temp_id("Company A")
             temp_id_2 = lookup_queue.get_next_temp_id("Company B")
             temp_id_3 = lookup_queue.get_next_temp_id("Company C")
@@ -665,7 +667,7 @@ class TestStory62P1HmacTempId:
 
     def test_hmac_temp_id_normalization(self, lookup_queue, mock_connection):
         """AC2: Normalized names produce same ID."""
-        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'test_salt_123'}):
+        with patch.dict("os.environ", {"WDH_ALIAS_SALT": "test_salt_123"}):
             temp_id_1 = lookup_queue.get_next_temp_id("Company A")
             temp_id_2 = lookup_queue.get_next_temp_id("  company a  ")
             temp_id_3 = lookup_queue.get_next_temp_id("COMPANY A")
@@ -676,10 +678,10 @@ class TestStory62P1HmacTempId:
     def test_hmac_temp_id_environment_consistency(self, lookup_queue, mock_connection):
         """AC3: Same salt produces same ID across environments."""
         # Simulate two environments with same salt
-        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'production_salt'}):
+        with patch.dict("os.environ", {"WDH_ALIAS_SALT": "production_salt"}):
             staging_id = lookup_queue.get_next_temp_id("新公司XYZ")
 
-        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'production_salt'}):
+        with patch.dict("os.environ", {"WDH_ALIAS_SALT": "production_salt"}):
             production_id = lookup_queue.get_next_temp_id("新公司XYZ")
 
         # Same salt should produce identical IDs
@@ -687,7 +689,7 @@ class TestStory62P1HmacTempId:
 
     def test_hmac_temp_id_no_collisions(self, lookup_queue, mock_connection):
         """AC4: 10K unique names produce 10K unique IDs."""
-        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'test_salt_123'}):
+        with patch.dict("os.environ", {"WDH_ALIAS_SALT": "test_salt_123"}):
             temp_ids = set()
             for i in range(10000):
                 company_name = f"Company_{i:05d}"
@@ -699,10 +701,10 @@ class TestStory62P1HmacTempId:
 
     def test_hmac_temp_id_default_salt_warning(self, lookup_queue, mock_connection):
         """AC6: Default salt used with warning when WDH_ALIAS_SALT not set."""
-        with patch.dict('os.environ', {}, clear=True):
+        with patch.dict("os.environ", {}, clear=True):
             # Remove WDH_ALIAS_SALT from environment
-            if 'WDH_ALIAS_SALT' in os.environ:
-                del os.environ['WDH_ALIAS_SALT']
+            if "WDH_ALIAS_SALT" in os.environ:
+                del os.environ["WDH_ALIAS_SALT"]
 
             temp_id = lookup_queue.get_next_temp_id("Test Company")
 
@@ -721,7 +723,7 @@ class TestStory62P1HmacTempId:
     def test_hmac_temp_id_requires_company_name(self, lookup_queue):
         """AC5: Method signature requires company_name parameter."""
         # This test verifies the new signature
-        with patch.dict('os.environ', {'WDH_ALIAS_SALT': 'test_salt_123'}):
+        with patch.dict("os.environ", {"WDH_ALIAS_SALT": "test_salt_123"}):
             # Should work with company_name
             temp_id = lookup_queue.get_next_temp_id("Test Company")
             assert temp_id.startswith("IN_")
@@ -747,7 +749,11 @@ class TestStory67ExponentialBackoff:
 
         # Should be approximately 1 minute in the future
         expected_delay = timedelta(minutes=BACKOFF_SCHEDULE_MINUTES[0])
-        assert before + expected_delay <= result <= after + expected_delay + timedelta(seconds=1)
+        assert (
+            before + expected_delay
+            <= result
+            <= after + expected_delay + timedelta(seconds=1)
+        )
 
     def test_calculate_next_retry_at_second_attempt(self):
         """Test backoff calculation for second retry (5 minutes)."""
@@ -762,7 +768,11 @@ class TestStory67ExponentialBackoff:
 
         # Should be approximately 5 minutes in the future
         expected_delay = timedelta(minutes=BACKOFF_SCHEDULE_MINUTES[1])
-        assert before + expected_delay <= result <= after + expected_delay + timedelta(seconds=1)
+        assert (
+            before + expected_delay
+            <= result
+            <= after + expected_delay + timedelta(seconds=1)
+        )
 
     def test_calculate_next_retry_at_capped_at_max(self):
         """Test backoff calculation caps at maximum delay (15 minutes)."""
@@ -778,7 +788,11 @@ class TestStory67ExponentialBackoff:
 
         # Should be capped at 15 minutes
         expected_delay = timedelta(minutes=BACKOFF_SCHEDULE_MINUTES[-1])
-        assert before + expected_delay <= result <= after + expected_delay + timedelta(seconds=1)
+        assert (
+            before + expected_delay
+            <= result
+            <= after + expected_delay + timedelta(seconds=1)
+        )
 
     def test_get_queue_depth_successful(self, lookup_queue, mock_connection):
         """Test get_queue_depth returns correct count."""
@@ -810,7 +824,9 @@ class TestStory67ExponentialBackoff:
         with pytest.raises(LookupQueueError, match="Failed to get queue depth"):
             lookup_queue.get_queue_depth()
 
-    def test_get_queue_depth_ready_only_filters_backoff(self, lookup_queue, mock_connection):
+    def test_get_queue_depth_ready_only_filters_backoff(
+        self, lookup_queue, mock_connection
+    ):
         """Test ready_only adds backoff clause for pending items."""
         mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
         mock_cursor.fetchone.return_value = (5,)

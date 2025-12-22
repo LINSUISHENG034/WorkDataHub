@@ -8,7 +8,6 @@ Task 3.1: Implement BusinessInfoRepository
 from __future__ import annotations
 
 import json
-from typing import Any, Optional
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
@@ -209,7 +208,9 @@ class BusinessInfoRepository:
             "registered_capital_currency": record.registered_capital_currency,
             "full_register_type_desc": record.full_register_type_desc,
             "industry_code": record.industry_code,
-            "cleansing_status": json.dumps(record.cleansing_status, ensure_ascii=False) if record.cleansing_status else None,
+            "cleansing_status": json.dumps(record.cleansing_status, ensure_ascii=False)
+            if record.cleansing_status
+            else None,
         }
 
         try:

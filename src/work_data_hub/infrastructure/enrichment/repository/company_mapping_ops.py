@@ -12,7 +12,7 @@ from sqlalchemy import text
 
 from work_data_hub.utils.logging import get_logger
 
-from .models import MatchResult, InsertBatchResult
+from .models import InsertBatchResult, MatchResult
 
 logger = get_logger(__name__)
 

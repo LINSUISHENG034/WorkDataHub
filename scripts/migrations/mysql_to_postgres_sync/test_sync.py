@@ -13,8 +13,8 @@ from pathlib import Path
 current_dir = Path(__file__).parent
 sys.path.insert(0, str(current_dir))
 
-from sqlglot_parser import SQLGlotParser
 from ddl_generator import PostgreSQLDDLGenerator
+from sqlglot_parser import SQLGlotParser
 
 
 def test_sql_parsing():
@@ -22,7 +22,13 @@ def test_sql_parsing():
     print("=== 测试SQL解析功能 ===")
 
     # 使用绝对路径
-    sql_dir = Path(__file__).parent.parent.parent.parent / "tests" / "fixtures" / "legacy_db" / "schema"
+    sql_dir = (
+        Path(__file__).parent.parent.parent.parent
+        / "tests"
+        / "fixtures"
+        / "legacy_db"
+        / "schema"
+    )
     sql_file = sql_dir / "business" / "规模明细.sql"
 
     if not sql_file.exists():
@@ -55,13 +61,13 @@ def test_ddl_generation():
     """测试DDL生成功能"""
     print("\n=== 测试DDL生成功能 ===")
 
-    from sqlglot_parser import MySQLIndex, MySQLForeignKey
+    from sqlglot_parser import MySQLForeignKey, MySQLIndex
 
     # 创建测试索引
     test_indexes = [
         MySQLIndex("KY_客户名称", ["客户名称"], "INDEX", False),
         MySQLIndex("FK_组织架构_规模明细", ["机构代码"], "INDEX", False),
-        MySQLIndex("PRIMARY", ["id"], "PRIMARY", True)
+        MySQLIndex("PRIMARY", ["id"], "PRIMARY", True),
     ]
 
     # 创建测试外键
@@ -72,7 +78,7 @@ def test_ddl_generation():
             "产品线",
             ["产品线代码"],
             "RESTRICT",
-            "CASCADE"
+            "CASCADE",
         )
     ]
 
@@ -101,10 +107,7 @@ def main():
     print("=" * 60)
 
     # 测试环境变量
-    db_connection = (
-        os.getenv('WDH_DATABASE__URI') or
-        os.getenv('DATABASE_URL')
-    )
+    db_connection = os.getenv("WDH_DATABASE__URI") or os.getenv("DATABASE_URL")
 
     if db_connection:
         print(f"✅ 数据库连接: {db_connection[:30]}...")

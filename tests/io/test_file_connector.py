@@ -26,7 +26,7 @@ from work_data_hub.infrastructure.settings.data_source_schema import (
 def mock_settings(tmp_path):
     """Mock settings with a temporary config file."""
     config_path = tmp_path / "data_sources.yml"
-    
+
     # Create valid V2 config
     config_data = {
         "version": "2.0",
@@ -37,12 +37,12 @@ def mock_settings(tmp_path):
                 "sheet_name": "Sheet1",
                 "version_strategy": "highest_number",
             }
-        }
+        },
     }
-    
+
     with open(config_path, "w", encoding="utf-8") as f:
         yaml.dump(config_data, f)
-        
+
     mock = MagicMock()
     mock.data_sources_config = str(config_path)
     return mock
@@ -64,13 +64,12 @@ class TestFileDiscoveryService:
         base_dir = tmp_path / "data" / month / "V1"
         base_dir.mkdir(parents=True)
         (base_dir / "test_file.xlsx").touch()
-        
+
         # Execute
         result = file_discovery_service.discover_file(
-            domain="test_domain",
-            YYYYMM=month
+            domain="test_domain", YYYYMM=month
         )
-        
+
         # Verify
         assert isinstance(result, DiscoveryMatch)
         assert result.version == "V1"
@@ -84,14 +83,12 @@ class TestFileDiscoveryService:
         base_dir = tmp_path / "data" / month / "V99"
         base_dir.mkdir(parents=True)
         (base_dir / "test_file.xlsx").touch()
-        
+
         # Execute with override
         result = file_discovery_service.discover_file(
-            domain="test_domain",
-            version_override="V99",
-            YYYYMM=month
+            domain="test_domain", version_override="V99", YYYYMM=month
         )
-        
+
         # Verify
         assert result.version == "V99"
         assert "V99" in str(result.file_path)
@@ -103,27 +100,26 @@ class TestFileDiscoveryService:
         base_dir = tmp_path / "data" / month / "V1"
         base_dir.mkdir(parents=True)
         (base_dir / "other_file.txt").touch()
-        
+
         # Execute and expect error
         with pytest.raises(DiscoveryError) as exc:
-            file_discovery_service.discover_file(
-                domain="test_domain",
-                YYYYMM=month
-            )
+            file_discovery_service.discover_file(domain="test_domain", YYYYMM=month)
         assert exc.value.failed_stage == "file_matching"
 
     def test_discover_file_missing_template_var(self, file_discovery_service):
         """Test error when template variable is missing."""
         with pytest.raises(DiscoveryError) as exc:
             file_discovery_service.discover_file(domain="test_domain")
-        
-        assert exc.value.failed_stage == "config_validation"  # Template resolution falls under validation usually
+
+        assert (
+            exc.value.failed_stage == "config_validation"
+        )  # Template resolution falls under validation usually
         assert "YYYYMM" in str(exc.value)
 
     def test_discover_file_unknown_domain(self, file_discovery_service):
         """Test error when domain is unknown."""
         with pytest.raises(DiscoveryError) as exc:
             file_discovery_service.discover_file(domain="unknown_domain")
-            
+
         assert exc.value.failed_stage == "config_validation"
         assert "not found" in str(exc.value)

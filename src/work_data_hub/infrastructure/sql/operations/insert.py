@@ -16,13 +16,29 @@ class Dialect(Protocol):
     def quote(self, identifier: str) -> str: ...
     def qualify(self, table: str, schema: Optional[str] = None) -> str: ...
     def build_insert(
-        self, table: str, columns: List[str], placeholders: List[str], schema: Optional[str] = None
+        self,
+        table: str,
+        columns: List[str],
+        placeholders: List[str],
+        schema: Optional[str] = None,
     ) -> str: ...
     def build_insert_on_conflict_do_nothing(
-        self, table: str, columns: List[str], placeholders: List[str], conflict_columns: List[str], schema: Optional[str] = None
+        self,
+        table: str,
+        columns: List[str],
+        placeholders: List[str],
+        conflict_columns: List[str],
+        schema: Optional[str] = None,
     ) -> str: ...
     def build_insert_on_conflict_do_update(
-        self, table: str, columns: List[str], placeholders: List[str], conflict_columns: List[str], update_columns: List[str], null_guard: bool = True, schema: Optional[str] = None
+        self,
+        table: str,
+        columns: List[str],
+        placeholders: List[str],
+        conflict_columns: List[str],
+        update_columns: List[str],
+        null_guard: bool = True,
+        schema: Optional[str] = None,
     ) -> str: ...
 
 
@@ -104,5 +120,11 @@ class InsertBuilder:
                 # Default: update all non-conflict columns
                 update_columns = [c for c in columns if c not in conflict_columns]
             return self.dialect.build_insert_on_conflict_do_update(
-                table, columns, placeholders, conflict_columns, update_columns, null_guard, schema
+                table,
+                columns,
+                placeholders,
+                conflict_columns,
+                update_columns,
+                null_guard,
+                schema,
             )

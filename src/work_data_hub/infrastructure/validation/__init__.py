@@ -46,6 +46,13 @@ Usage:
 
 # Types
 # Error handling
+# Domain validators (Story 6.2-P13)
+from work_data_hub.infrastructure.validation.domain_validators import (
+    validate_bronze_dataframe,
+    validate_bronze_layer,
+    validate_gold_dataframe,
+    validate_gold_layer,
+)
 from work_data_hub.infrastructure.validation.error_handler import (
     collect_error_details,
     handle_validation_errors,
@@ -70,14 +77,6 @@ from work_data_hub.infrastructure.validation.types import (
     ValidationThresholdExceeded,
 )
 
-# Domain validators (Story 6.2-P13)
-from work_data_hub.infrastructure.validation.domain_validators import (
-    validate_bronze_dataframe,
-    validate_bronze_layer,
-    validate_gold_dataframe,
-    validate_gold_layer,
-)
-
 __all__ = [
     # Types
     "ValidationErrorDetail",
@@ -100,4 +99,3 @@ __all__ = [
     "validate_gold_dataframe",
     "validate_gold_layer",
 ]
-

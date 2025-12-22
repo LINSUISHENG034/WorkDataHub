@@ -23,9 +23,9 @@ import sys
 from typing import List, Optional
 
 from work_data_hub.io.auth.auto_eqc_auth import (
-    run_get_token_auto_qr,
-    DEFAULT_TIMEOUT_SECONDS,
     DEFAULT_ENV_FILE,
+    DEFAULT_TIMEOUT_SECONDS,
+    run_get_token_auto_qr,
 )
 
 

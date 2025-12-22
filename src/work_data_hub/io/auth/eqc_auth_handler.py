@@ -81,7 +81,11 @@ def _update_env_file(env_file: str, key: str, value: str) -> bool:
 
         logger.info(
             "Updated .env file",
-            extra={"key": key, "env_file": str(env_path), "action": "updated" if key_found else "appended"},
+            extra={
+                "key": key,
+                "env_file": str(env_path),
+                "action": "updated" if key_found else "appended",
+            },
         )
         return True
 

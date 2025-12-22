@@ -28,17 +28,22 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from typing import Any, Dict, List, Optional, Sequence
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection
 
-from work_data_hub.infrastructure.cleansing.business_info_cleanser import BusinessInfoCleanser
 from work_data_hub.infrastructure.cleansing.biz_label_parser import BizLabelParser
-from work_data_hub.infrastructure.enrichment.business_info_repository import BusinessInfoRepository
-from work_data_hub.infrastructure.enrichment.biz_label_repository import BizLabelRepository
+from work_data_hub.infrastructure.cleansing.business_info_cleanser import (
+    BusinessInfoCleanser,
+)
+from work_data_hub.infrastructure.enrichment.biz_label_repository import (
+    BizLabelRepository,
+)
+from work_data_hub.infrastructure.enrichment.business_info_repository import (
+    BusinessInfoRepository,
+)
 from work_data_hub.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -83,9 +88,8 @@ def fetch_raw_records(
                 ORDER BY company_id
                 LIMIT :batch_size OFFSET :offset
             """)
-    else:  # biz_label
-        if incremental:
-            query = text("""
+    elif incremental:
+        query = text("""
                 SELECT b.company_id, b.raw_biz_label
                 FROM enterprise.base_info b
                 WHERE b.raw_biz_label IS NOT NULL
@@ -96,8 +100,8 @@ def fetch_raw_records(
                 ORDER BY b.company_id
                 LIMIT :batch_size OFFSET :offset
             """)
-        else:
-            query = text("""
+    else:
+        query = text("""
                 SELECT company_id, raw_biz_label
                 FROM enterprise.base_info
                 WHERE raw_biz_label IS NOT NULL
@@ -105,7 +109,9 @@ def fetch_raw_records(
                 LIMIT :batch_size OFFSET :offset
             """)
 
-    rows = connection.execute(query, {"batch_size": batch_size, "offset": offset}).fetchall()
+    rows = connection.execute(
+        query, {"batch_size": batch_size, "offset": offset}
+    ).fetchall()
     return [dict(row._mapping) for row in rows]
 
 
@@ -143,8 +149,12 @@ def cleanse_business_info_from_raw(
         if limit and total_processed >= limit:
             break
 
-        effective_batch = min(batch_size, limit - total_processed) if limit else batch_size
-        records = fetch_raw_records(connection, effective_batch, offset, "business_info", incremental)
+        effective_batch = (
+            min(batch_size, limit - total_processed) if limit else batch_size
+        )
+        records = fetch_raw_records(
+            connection, effective_batch, offset, "business_info", incremental
+        )
 
         if not records:
             break
@@ -179,7 +189,9 @@ def cleanse_business_info_from_raw(
                 break
 
         # Progress reporting
-        print(f"  Processed {total_processed} records, {total_success} success, {total_failed} failed")
+        print(
+            f"  Processed {total_processed} records, {total_success} success, {total_failed} failed"
+        )
 
         offset += effective_batch
 
@@ -225,8 +237,12 @@ def cleanse_biz_label_from_raw(
         if limit and total_processed >= limit:
             break
 
-        effective_batch = min(batch_size, limit - total_processed) if limit else batch_size
-        records = fetch_raw_records(connection, effective_batch, offset, "biz_label", incremental)
+        effective_batch = (
+            min(batch_size, limit - total_processed) if limit else batch_size
+        )
+        records = fetch_raw_records(
+            connection, effective_batch, offset, "biz_label", incremental
+        )
 
         if not records:
             break
@@ -264,7 +280,9 @@ def cleanse_biz_label_from_raw(
                 break
 
         # Progress reporting
-        print(f"  Processed {total_processed} records, {total_success} success, {total_labels} labels")
+        print(
+            f"  Processed {total_processed} records, {total_success} success, {total_labels} labels"
+        )
 
         offset += effective_batch
 

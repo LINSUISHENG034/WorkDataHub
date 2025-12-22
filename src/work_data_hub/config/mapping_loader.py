@@ -20,9 +20,8 @@ import os
 from pathlib import Path
 from typing import Dict, Optional
 
-import yaml
-
 import structlog
+import yaml
 
 logger = structlog.get_logger(__name__)
 

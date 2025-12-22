@@ -45,7 +45,9 @@ class DummyMatcher:
         self.raise_error = raise_error
         self.calls = []
 
-    def match_files(self, search_path, include_patterns, exclude_patterns, selection_strategy=None):
+    def match_files(
+        self, search_path, include_patterns, exclude_patterns, selection_strategy=None
+    ):
         self.calls.append(
             {
                 "search_path": search_path,
@@ -230,7 +232,13 @@ def test_multi_domain_independence_and_failure_isolated(tmp_path):
     )
 
     class SelectorMatcher:
-        def match_files(self, search_path, include_patterns, exclude_patterns, selection_strategy=None):
+        def match_files(
+            self,
+            search_path,
+            include_patterns,
+            exclude_patterns,
+            selection_strategy=None,
+        ):
             if "B" in str(search_path):
                 raise FileNotFoundError("no domain B files")
             return FileMatchResult(
@@ -355,7 +363,9 @@ class TestPathTraversalSecurity:
         service = self._make_service("reference/monthly/{YYYYMM}/收集数据")
 
         # Should not raise - path is valid
-        result = service.discover_and_load(domain="annuity_performance", YYYYMM="202501")
+        result = service.discover_and_load(
+            domain="annuity_performance", YYYYMM="202501"
+        )
         assert result is not None
         assert result.version == "V1"
 
@@ -765,4 +775,3 @@ class TestDataDiscoveryResult:
         assert result.duration_ms == 150
         assert result.columns_renamed == {"old": "new"}
         assert result.stage_durations["version_detection"] == 50
-

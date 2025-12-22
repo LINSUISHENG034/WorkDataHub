@@ -156,7 +156,9 @@ class AnnuityPerformanceConfig(DomainComparisonConfig):
 
         with engine.connect() as conn:
             mapping_repository = CompanyMappingRepository(conn)
-            print("   ✓ Database mapping repository enabled (enterprise.enrichment_index)")
+            print(
+                "   ✓ Database mapping repository enabled (enterprise.enrichment_index)"
+            )
 
             pipeline = build_bronze_to_silver_pipeline(
                 enrichment_service=None,
@@ -188,6 +190,7 @@ class AnnuityPerformanceConfig(DomainComparisonConfig):
 # But we also need to update the registry directly here for robustness
 def _register():
     from . import DOMAIN_CONFIGS
+
     DOMAIN_CONFIGS["annuity_performance"] = AnnuityPerformanceConfig
 
 

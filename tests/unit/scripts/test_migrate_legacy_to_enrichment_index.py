@@ -184,8 +184,13 @@ class TestBatchProcessing:
         config = LegacyMigrationConfig()
         assert config.progress_interval == 5000
 
-    @patch("work_data_hub.scripts.migrate_legacy_to_enrichment_index._estimate_conflicts", return_value=0)
-    @patch("work_data_hub.scripts.migrate_legacy_to_enrichment_index._fetch_company_id_mapping")
+    @patch(
+        "work_data_hub.scripts.migrate_legacy_to_enrichment_index._estimate_conflicts",
+        return_value=0,
+    )
+    @patch(
+        "work_data_hub.scripts.migrate_legacy_to_enrichment_index._fetch_company_id_mapping"
+    )
     def test_batch_insert_called_at_batch_size(self, mock_fetch, mock_conflicts):
         """Test that batch insert is called when batch size is reached."""
         # Setup mock data - 2500 records to trigger 2 batch inserts + 1 final
@@ -210,7 +215,9 @@ class TestBatchProcessing:
         assert mock_repo.insert_enrichment_index_batch.call_count == 3
         assert report.total_read == 2500
 
-    @patch("work_data_hub.scripts.migrate_legacy_to_enrichment_index._fetch_company_id_mapping")
+    @patch(
+        "work_data_hub.scripts.migrate_legacy_to_enrichment_index._fetch_company_id_mapping"
+    )
     def test_dry_run_does_not_insert(self, mock_fetch):
         """Test that dry run mode does not actually insert."""
         mock_data = [
@@ -230,8 +237,13 @@ class TestBatchProcessing:
         assert report.total_read == 1
         assert report.inserted == 1  # Counted but not actually inserted
 
-    @patch("work_data_hub.scripts.migrate_legacy_to_enrichment_index._estimate_conflicts", return_value=2)
-    @patch("work_data_hub.scripts.migrate_legacy_to_enrichment_index._fetch_company_id_mapping")
+    @patch(
+        "work_data_hub.scripts.migrate_legacy_to_enrichment_index._estimate_conflicts",
+        return_value=2,
+    )
+    @patch(
+        "work_data_hub.scripts.migrate_legacy_to_enrichment_index._fetch_company_id_mapping"
+    )
     def test_conflict_updates_tracked_as_updated(self, mock_fetch, mock_conflicts):
         """Test conflicts increment updated and adjust inserted count."""
         mock_data = [
@@ -281,7 +293,9 @@ class TestReportGeneration:
         report = MigrationReport(source_table="test")
         report.total_read = 100
         report.inserted = 90
-        report.add_skipped("empty_after_normalization")  # This increments skipped, not inserted
+        report.add_skipped(
+            "empty_after_normalization"
+        )  # This increments skipped, not inserted
 
         result = report.to_dict()
 
@@ -327,10 +341,12 @@ class TestReportGeneration:
         # Add sample records
         for i in range(15):
             if len(report.sample_records) < 10:
-                report.sample_records.append({
-                    "lookup_key": f"key{i}",
-                    "company_id": f"id{i}",
-                })
+                report.sample_records.append(
+                    {
+                        "lookup_key": f"key{i}",
+                        "company_id": f"id{i}",
+                    }
+                )
 
         # Should only keep first 10
         assert len(report.sample_records) == 10
@@ -412,13 +428,16 @@ class TestSourceTableConfiguration:
 class TestEqcSearchResultMigration:
     """Test EQC search result migration specifics."""
 
-    @patch("work_data_hub.scripts.migrate_legacy_to_enrichment_index._estimate_conflicts", return_value=0)
-    @patch("work_data_hub.scripts.migrate_legacy_to_enrichment_index._fetch_eqc_search_result")
+    @patch(
+        "work_data_hub.scripts.migrate_legacy_to_enrichment_index._estimate_conflicts",
+        return_value=0,
+    )
+    @patch(
+        "work_data_hub.scripts.migrate_legacy_to_enrichment_index._fetch_eqc_search_result"
+    )
     def test_eqc_migration_uses_key_word(self, mock_fetch, mock_conflicts):
         """Test that EQC migration uses key_word field."""
-        mock_data = [
-            {"key_word": "测试关键词", "company_id": "456"}
-        ]
+        mock_data = [{"key_word": "测试关键词", "company_id": "456"}]
         mock_fetch.return_value = iter(mock_data)
 
         mock_connection = MagicMock()
@@ -441,13 +460,19 @@ class TestEqcSearchResultMigration:
         assert records[0].lookup_key == normalize_for_temp_id("测试关键词")
         assert records[0].confidence == Decimal("1.00")
 
-    @patch("work_data_hub.scripts.migrate_legacy_to_enrichment_index._estimate_conflicts", return_value=0)
-    @patch("work_data_hub.scripts.migrate_legacy_to_enrichment_index._fetch_eqc_search_result")
-    def test_eqc_migration_all_success_confidence_1_00(self, mock_fetch, mock_conflicts):
+    @patch(
+        "work_data_hub.scripts.migrate_legacy_to_enrichment_index._estimate_conflicts",
+        return_value=0,
+    )
+    @patch(
+        "work_data_hub.scripts.migrate_legacy_to_enrichment_index._fetch_eqc_search_result"
+    )
+    def test_eqc_migration_all_success_confidence_1_00(
+        self, mock_fetch, mock_conflicts
+    ):
         """Test that all EQC success records get confidence=1.00."""
         mock_data = [
-            {"key_word": f"关键词{i}", "company_id": f"ID{i}"}
-            for i in range(5)
+            {"key_word": f"关键词{i}", "company_id": f"ID{i}"} for i in range(5)
         ]
         mock_fetch.return_value = iter(mock_data)
 
@@ -476,8 +501,13 @@ class TestEqcSearchResultMigration:
 class TestCompanyIdMappingMigration:
     """Test company_id_mapping migration specifics."""
 
-    @patch("work_data_hub.scripts.migrate_legacy_to_enrichment_index._estimate_conflicts", return_value=0)
-    @patch("work_data_hub.scripts.migrate_legacy_to_enrichment_index._fetch_company_id_mapping")
+    @patch(
+        "work_data_hub.scripts.migrate_legacy_to_enrichment_index._estimate_conflicts",
+        return_value=0,
+    )
+    @patch(
+        "work_data_hub.scripts.migrate_legacy_to_enrichment_index._fetch_company_id_mapping"
+    )
     def test_current_type_gets_higher_confidence(self, mock_fetch, mock_conflicts):
         """Test that type='current' gets confidence=1.00."""
         mock_data = [
@@ -499,8 +529,13 @@ class TestCompanyIdMappingMigration:
         records = call_args[0][0]
         assert records[0].confidence == Decimal("1.00")
 
-    @patch("work_data_hub.scripts.migrate_legacy_to_enrichment_index._estimate_conflicts", return_value=0)
-    @patch("work_data_hub.scripts.migrate_legacy_to_enrichment_index._fetch_company_id_mapping")
+    @patch(
+        "work_data_hub.scripts.migrate_legacy_to_enrichment_index._estimate_conflicts",
+        return_value=0,
+    )
+    @patch(
+        "work_data_hub.scripts.migrate_legacy_to_enrichment_index._fetch_company_id_mapping"
+    )
     def test_former_type_gets_lower_confidence(self, mock_fetch, mock_conflicts):
         """Test that type='former' gets confidence=0.90."""
         mock_data = [
@@ -522,9 +557,16 @@ class TestCompanyIdMappingMigration:
         records = call_args[0][0]
         assert records[0].confidence == Decimal("0.90")
 
-    @patch("work_data_hub.scripts.migrate_legacy_to_enrichment_index._estimate_conflicts", return_value=0)
-    @patch("work_data_hub.scripts.migrate_legacy_to_enrichment_index._fetch_company_id_mapping")
-    def test_unknown_type_defaults_to_former_confidence(self, mock_fetch, mock_conflicts):
+    @patch(
+        "work_data_hub.scripts.migrate_legacy_to_enrichment_index._estimate_conflicts",
+        return_value=0,
+    )
+    @patch(
+        "work_data_hub.scripts.migrate_legacy_to_enrichment_index._fetch_company_id_mapping"
+    )
+    def test_unknown_type_defaults_to_former_confidence(
+        self, mock_fetch, mock_conflicts
+    ):
         """Test that unknown type defaults to former confidence (0.90)."""
         mock_data = [
             {"company_name": "未知类型", "company_id": "789", "type": "unknown"}
@@ -545,13 +587,16 @@ class TestCompanyIdMappingMigration:
         records = call_args[0][0]
         assert records[0].confidence == Decimal("0.90")
 
-    @patch("work_data_hub.scripts.migrate_legacy_to_enrichment_index._estimate_conflicts", return_value=0)
-    @patch("work_data_hub.scripts.migrate_legacy_to_enrichment_index._fetch_company_id_mapping")
+    @patch(
+        "work_data_hub.scripts.migrate_legacy_to_enrichment_index._estimate_conflicts",
+        return_value=0,
+    )
+    @patch(
+        "work_data_hub.scripts.migrate_legacy_to_enrichment_index._fetch_company_id_mapping"
+    )
     def test_null_type_defaults_to_former_confidence(self, mock_fetch, mock_conflicts):
         """Test that null type defaults to former confidence (0.90)."""
-        mock_data = [
-            {"company_name": "空类型", "company_id": "000", "type": None}
-        ]
+        mock_data = [{"company_name": "空类型", "company_id": "000", "type": None}]
         mock_fetch.return_value = iter(mock_data)
 
         mock_connection = MagicMock()

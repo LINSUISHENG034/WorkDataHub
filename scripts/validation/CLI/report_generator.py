@@ -13,16 +13,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
-
 from domain_config import (
     ARTIFACTS_DIR,
     DEBUG_SNAPSHOTS_SUBDIR,
-    MAX_EXAMPLES_PER_DIFF,
     REPORT_DATE_FORMAT,
     REPORT_PREFIX,
     SUMMARY_PREFIX,
 )
-
 
 # =============================================================================
 # Data Classes
@@ -110,8 +107,10 @@ def print_report(report: ComparisonReport) -> None:
     print(f"   Row Limit: {report.row_limit}")
     print(f"   Execution Time: {report.execution_time_ms}ms")
 
-    print(f"\n📊 Output Dimensions:")
-    print(f"   Legacy: {report.legacy_row_count} rows × {report.legacy_column_count} cols")
+    print("\n📊 Output Dimensions:")
+    print(
+        f"   Legacy: {report.legacy_row_count} rows × {report.legacy_column_count} cols"
+    )
     print(f"   New:    {report.new_row_count} rows × {report.new_column_count} cols")
 
     # Numeric fields
@@ -165,7 +164,9 @@ def print_report(report: ComparisonReport) -> None:
         for diff in report.derived_diffs:
             print(f"   ⚠️ {diff.field}: {diff.diff_count} differences")
             for ex in diff.examples[:2]:
-                print(f"      Row {ex['row']}: '{ex['legacy_value']}' → '{ex['new_value']}'")
+                print(
+                    f"      Row {ex['row']}: '{ex['legacy_value']}' → '{ex['new_value']}'"
+                )
     else:
         print("   ✅ All derived fields match")
 
@@ -178,7 +179,13 @@ def print_report(report: ComparisonReport) -> None:
         summary = report.upgrade_classification_summary
         print("   Classification Summary:")
         for cls, count in sorted(summary.items()):
-            emoji = "✅" if cls.startswith("upgrade") else "❌" if cls.startswith("regression") else "❓"
+            emoji = (
+                "✅"
+                if cls.startswith("upgrade")
+                else "❌"
+                if cls.startswith("regression")
+                else "❓"
+            )
             print(f"      {emoji} {cls}: {count}")
     else:
         print("   ✅ No upgrade field differences")
@@ -348,7 +355,11 @@ def generate_markdown_summary(
         lines.append("| Field | Status | Count |")
         lines.append("|-------|--------|-------|")
         for diff in report.numeric_diffs:
-            status = "❌ CRITICAL" if diff.diff_type == "CRITICAL_NUMERIC_MISMATCH" else "⚠️ Warning"
+            status = (
+                "❌ CRITICAL"
+                if diff.diff_type == "CRITICAL_NUMERIC_MISMATCH"
+                else "⚠️ Warning"
+            )
             lines.append(f"| {diff.field} | {status} | {diff.diff_count} |")
     else:
         lines.append("✅ **All numeric fields match exactly**")
@@ -386,7 +397,13 @@ def generate_markdown_summary(
         lines.append("| Classification | Count |")
         lines.append("|----------------|-------|")
         for cls, count in sorted(summary.items()):
-            emoji = "✅" if cls.startswith("upgrade") else "❌" if cls.startswith("regression") else "❓"
+            emoji = (
+                "✅"
+                if cls.startswith("upgrade")
+                else "❌"
+                if cls.startswith("regression")
+                else "❓"
+            )
             lines.append(f"| {emoji} {cls} | {count} |")
     else:
         lines.append("✅ **No upgrade field differences**")

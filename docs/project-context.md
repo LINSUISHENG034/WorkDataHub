@@ -21,9 +21,15 @@
 
 ### Code Smell Prevention
 
-* **Pre-commit Hooks:** All commits must pass `scripts/quality/check_file_length.py` and Ruff checks.
+* **Pre-commit Hooks:** Run `pre-commit install` in project root (one-time setup per clone).
+  * All commits must pass `scripts/quality/check_file_length.py` (max 800 lines) and Ruff checks.
+  * **Bypass Policy:** Use `git commit --no-verify` ONLY for emergency hotfixes.
+  * See [Story 7.6](file:///e:/Projects/WorkDataHub/docs/sprint-artifacts/stories/7-6-ci-integration-code-quality-tooling.md) for setup details.
 * **Domain-Growth Modules:** Modules like `domain_registry.py` should be pre-modularized when domain count increases.
-* **Tooling:** Enable `PLR` (Pylint Refactor) rules in Ruff for complexity checks.
+  * See [Story 7.5](file:///e:/Projects/WorkDataHub/docs/sprint-artifacts/stories/7-5-domain-registry-pre-modularization.md) for modularization pattern.
+* **Complexity Checks:** Ruff PLR rules enforce code complexity limits:
+  * `max-statements = 50` (per function, aligns with MAX 50 lines guideline)
+  * `max-branches = 12` (cyclomatic complexity threshold)
 
 ### Development Philosophy
 

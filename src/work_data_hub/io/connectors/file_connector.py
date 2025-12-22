@@ -7,9 +7,9 @@ import logging
 
 # Re-export from new package structure
 from work_data_hub.io.connectors.discovery import (
-    FileDiscoveryService,
-    DiscoveryMatch,
     DataDiscoveryResult,
+    DiscoveryMatch,
+    FileDiscoveryService,
 )
 
 logger = logging.getLogger(__name__)

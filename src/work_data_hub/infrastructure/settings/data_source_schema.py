@@ -15,8 +15,8 @@ IMPORTANT: This module contains TWO schema versions:
 Migrated from config/schema.py in Story 5.3.
 """
 
-import logging
 import copy
+import logging
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Union
@@ -158,7 +158,9 @@ class OutputConfig(BaseModel):
 
     table: str = Field(..., description="Target database table name")
     schema_name: str = Field("public", description="Target database schema")
-    pk: List[str] = Field(default_factory=list, description="Primary key columns for delete_insert mode")
+    pk: List[str] = Field(
+        default_factory=list, description="Primary key columns for delete_insert mode"
+    )
 
 
 class DomainConfigV2(BaseModel):
@@ -422,8 +424,7 @@ def get_domain_config_v2(
 
 
 def _merge_with_defaults(
-    domain_config: Dict[str, Any],
-    defaults: Dict[str, Any]
+    domain_config: Dict[str, Any], defaults: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
     Merge domain config with defaults using inheritance rules.
@@ -454,18 +455,20 @@ def _merge_with_defaults(
         elif isinstance(value, list):
             # Check for extend pattern (+ prefix)
             extend_items = [
-                v[1:] for v in value
-                if isinstance(v, str) and v.startswith("+")
+                v[1:] for v in value if isinstance(v, str) and v.startswith("+")
             ]
             replace_items = [
-                v for v in value
-                if not (isinstance(v, str) and v.startswith("+"))
+                v for v in value if not (isinstance(v, str) and v.startswith("+"))
             ]
 
             if extend_items and not replace_items:
                 # Extend only: add to defaults
                 base_list = result.get(key, [])
-                result[key] = list(base_list) + extend_items if isinstance(base_list, list) else extend_items
+                result[key] = (
+                    list(base_list) + extend_items
+                    if isinstance(base_list, list)
+                    else extend_items
+                )
             elif replace_items:
                 # Replace mode: use domain value plus any extends
                 result[key] = replace_items + extend_items
@@ -477,4 +480,3 @@ def _merge_with_defaults(
             result[key] = value
 
     return result
-

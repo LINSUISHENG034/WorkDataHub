@@ -1,0 +1,18 @@
+repos:
+  # Custom file length checker
+  - repo: local
+    hooks:
+      - id: check-file-length
+        name: Check Python file length (max 800 lines)
+        entry: uv run python scripts/quality/check_file_length.py --max-lines 800
+        language: system
+        types: [python]
+        exclude: (legacy/|tests/)
+
+  # Ruff linter and formatter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.12
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format

@@ -43,7 +43,7 @@ def sample_yaml_content():
             {"产品线代码": "PL001", "产品线名称": "企业年金"},
             {"产品线代码": "PL002", "产品线名称": "职业年金"},
             {"产品线代码": "PL003", "产品线名称": "养老保障"},
-        ]
+        ],
     }
 
 
@@ -55,9 +55,9 @@ class TestConfigFileConnector:
         connector = ConfigFileConnector()
         assert connector.logger is not None
 
-    @patch('work_data_hub.io.connectors.config_file_connector.Path.exists')
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('work_data_hub.io.connectors.config_file_connector.yaml.safe_load')
+    @patch("work_data_hub.io.connectors.config_file_connector.Path.exists")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("work_data_hub.io.connectors.config_file_connector.yaml.safe_load")
     def test_fetch_data_success(
         self,
         mock_yaml_load,
@@ -88,7 +88,7 @@ class TestConfigFileConnector:
         # Verify file was opened
         mock_file_open.assert_called_once()
 
-    @patch('work_data_hub.io.connectors.config_file_connector.Path.exists')
+    @patch("work_data_hub.io.connectors.config_file_connector.Path.exists")
     def test_fetch_data_file_not_found(
         self,
         mock_exists,
@@ -102,9 +102,9 @@ class TestConfigFileConnector:
         with pytest.raises(FileNotFoundError, match="Config file not found"):
             connector.fetch_data(sample_table_config)
 
-    @patch('work_data_hub.io.connectors.config_file_connector.Path.exists')
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('work_data_hub.io.connectors.config_file_connector.yaml.safe_load')
+    @patch("work_data_hub.io.connectors.config_file_connector.Path.exists")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("work_data_hub.io.connectors.config_file_connector.yaml.safe_load")
     def test_fetch_data_schema_version_mismatch(
         self,
         mock_yaml_load,
@@ -128,9 +128,9 @@ class TestConfigFileConnector:
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 0
 
-    @patch('work_data_hub.io.connectors.config_file_connector.Path.exists')
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('work_data_hub.io.connectors.config_file_connector.yaml.safe_load')
+    @patch("work_data_hub.io.connectors.config_file_connector.Path.exists")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("work_data_hub.io.connectors.config_file_connector.yaml.safe_load")
     def test_fetch_data_empty_data(
         self,
         mock_yaml_load,
@@ -143,7 +143,7 @@ class TestConfigFileConnector:
         mock_yaml_load.return_value = {
             "schema_version": "1.0",
             "description": "Empty data",
-            "data": []
+            "data": [],
         }
 
         connector = ConfigFileConnector()
@@ -153,9 +153,9 @@ class TestConfigFileConnector:
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 0
 
-    @patch('work_data_hub.io.connectors.config_file_connector.Path.exists')
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('work_data_hub.io.connectors.config_file_connector.yaml.safe_load')
+    @patch("work_data_hub.io.connectors.config_file_connector.Path.exists")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("work_data_hub.io.connectors.config_file_connector.yaml.safe_load")
     def test_fetch_data_missing_data_key(
         self,
         mock_yaml_load,
@@ -167,7 +167,7 @@ class TestConfigFileConnector:
         mock_exists.return_value = True
         mock_yaml_load.return_value = {
             "schema_version": "1.0",
-            "description": "No data key"
+            "description": "No data key",
         }
 
         connector = ConfigFileConnector()
@@ -177,9 +177,9 @@ class TestConfigFileConnector:
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 0
 
-    @patch('work_data_hub.io.connectors.config_file_connector.Path.exists')
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('work_data_hub.io.connectors.config_file_connector.yaml.safe_load')
+    @patch("work_data_hub.io.connectors.config_file_connector.Path.exists")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("work_data_hub.io.connectors.config_file_connector.yaml.safe_load")
     def test_fetch_data_yaml_parse_error(
         self,
         mock_yaml_load,
@@ -204,9 +204,7 @@ class TestConfigFileConnector:
             target_table="产品线",
             target_schema="business",
             source_type="config_file",
-            source_config={
-                "invalid_field": "value"
-            },
+            source_config={"invalid_field": "value"},
             sync_mode="delete_insert",
             primary_key="产品线代码",
         )
@@ -216,9 +214,9 @@ class TestConfigFileConnector:
         with pytest.raises(ValueError, match="Invalid config file source config"):
             connector.fetch_data(invalid_config)
 
-    @patch('work_data_hub.io.connectors.config_file_connector.Path.exists')
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('work_data_hub.io.connectors.config_file_connector.yaml.safe_load')
+    @patch("work_data_hub.io.connectors.config_file_connector.Path.exists")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("work_data_hub.io.connectors.config_file_connector.yaml.safe_load")
     def test_fetch_data_with_description(
         self,
         mock_yaml_load,

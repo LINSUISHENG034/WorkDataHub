@@ -547,7 +547,7 @@ class LookupQueue:
 
             logger.debug(
                 "Generated temporary ID",
-                extra={"company_name": company_name, "temp_id": temp_id}
+                extra={"company_name": company_name, "temp_id": temp_id},
             )
 
             return temp_id
@@ -555,7 +555,7 @@ class LookupQueue:
         except Exception as e:
             logger.error(
                 "Error during temp ID generation",
-                extra={"company_name": company_name, "error": str(e)}
+                extra={"company_name": company_name, "error": str(e)},
             )
             raise LookupQueueError(f"Failed to generate temp ID: {e}")
 

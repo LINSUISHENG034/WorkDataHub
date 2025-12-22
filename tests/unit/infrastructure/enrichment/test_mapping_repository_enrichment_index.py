@@ -278,9 +278,7 @@ class TestLookupEnrichmentIndex:
         mock_result.fetchone.return_value = None
         mock_connection.execute.return_value = mock_result
 
-        record = repository.lookup_enrichment_index(
-            "NONEXISTENT", LookupType.PLAN_CODE
-        )
+        record = repository.lookup_enrichment_index("NONEXISTENT", LookupType.PLAN_CODE)
 
         assert record is None
         mock_connection.execute.assert_called_once()
@@ -410,7 +408,9 @@ class TestLookupEnrichmentIndexBatch:
 
         keys_by_type = {
             LookupType.CUSTOMER_NAME: ["  中国 平安  "],  # whitespace, should normalize
-            LookupType.PLAN_CUSTOMER: ["P1| CUSTOMER_A "],  # customer part should normalize/lower
+            LookupType.PLAN_CUSTOMER: [
+                "P1| CUSTOMER_A "
+            ],  # customer part should normalize/lower
         }
 
         repository.lookup_enrichment_index_batch(keys_by_type)

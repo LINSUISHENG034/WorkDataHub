@@ -10,7 +10,9 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
 from work_data_hub.domain.company_enrichment.models import CompanySearchResult
-from work_data_hub.infrastructure.enrichment.data_refresh_service import EqcDataRefreshService
+from work_data_hub.infrastructure.enrichment.data_refresh_service import (
+    EqcDataRefreshService,
+)
 
 
 class FakeEqcClient:
@@ -37,7 +39,9 @@ def test_refresh_updates_base_info_and_cleanses_business_info():
     # Explicit opt-in to avoid accidental runs against non-test databases.
     url = os.environ.get("WDH_TEST_DATABASE_URI")
     if not url or not url.startswith("postgres"):
-        pytest.skip("Set WDH_TEST_DATABASE_URI to run postgres-backed integration tests")
+        pytest.skip(
+            "Set WDH_TEST_DATABASE_URI to run postgres-backed integration tests"
+        )
 
     engine = create_engine(url)
     company_id = "CID_TEST_001"
@@ -53,25 +57,97 @@ def test_refresh_updates_base_info_and_cleanses_business_info():
         conn.execute(text("CREATE SCHEMA IF NOT EXISTS enterprise"))
 
         # Ensure minimal legacy tables/columns exist for this test (idempotent).
-        conn.execute(text("CREATE TABLE IF NOT EXISTS enterprise.base_info (company_id VARCHAR(255) PRIMARY KEY)"))
-        conn.execute(text('ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS search_key_word VARCHAR(255)'))
-        conn.execute(text('ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS "companyFullName" VARCHAR(255)'))
-        conn.execute(text("ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS unite_code VARCHAR(255)"))
-        conn.execute(text("ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS raw_data JSONB"))
-        conn.execute(text("ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ"))
+        conn.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS enterprise.base_info (company_id VARCHAR(255) PRIMARY KEY)"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS search_key_word VARCHAR(255)"
+            )
+        )
+        conn.execute(
+            text(
+                'ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS "companyFullName" VARCHAR(255)'
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS unite_code VARCHAR(255)"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS raw_data JSONB"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE enterprise.base_info ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ"
+            )
+        )
 
-        conn.execute(text("CREATE TABLE IF NOT EXISTS enterprise.business_info (company_id VARCHAR(255) PRIMARY KEY)"))
-        conn.execute(text("ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS registered_date TEXT"))
-        conn.execute(text('ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS "registerCaptial" TEXT'))
-        conn.execute(text("ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS registered_status TEXT"))
-        conn.execute(text("ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS legal_person_name TEXT"))
-        conn.execute(text("ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS address TEXT"))
-        conn.execute(text("ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS company_name TEXT"))
-        conn.execute(text("ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS credit_code TEXT"))
-        conn.execute(text("ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS company_type TEXT"))
-        conn.execute(text("ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS industry_name TEXT"))
-        conn.execute(text("ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS business_scope TEXT"))
-        conn.execute(text("ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS _cleansing_status JSONB"))
+        conn.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS enterprise.business_info (company_id VARCHAR(255) PRIMARY KEY)"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS registered_date TEXT"
+            )
+        )
+        conn.execute(
+            text(
+                'ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS "registerCaptial" TEXT'
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS registered_status TEXT"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS legal_person_name TEXT"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS address TEXT"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS company_name TEXT"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS credit_code TEXT"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS company_type TEXT"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS industry_name TEXT"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS business_scope TEXT"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE enterprise.business_info ADD COLUMN IF NOT EXISTS _cleansing_status JSONB"
+            )
+        )
         conn.commit()
 
         # Seed base_info row (refresh reads companyFullName)

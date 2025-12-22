@@ -385,7 +385,9 @@ class TestInsertBatchWithConflictCheck:
         assert result.conflicts[0]["existing_id"] == "OLD_ID"
         assert result.conflicts[0]["new_id"] == "NEW_ID"
 
-    def test_conflict_detection_uses_positional_pairing(self, repository, mock_connection):
+    def test_conflict_detection_uses_positional_pairing(
+        self, repository, mock_connection
+    ):
         """Ensure conflict lookup pairs alias/match_type by position (ordinality)."""
         mock_existing_result = MagicMock()
         mock_existing_result.fetchall.return_value = []
@@ -396,8 +398,18 @@ class TestInsertBatchWithConflictCheck:
         mock_connection.execute.side_effect = [mock_existing_result, mock_insert_result]
 
         mappings = [
-            {"alias_name": "ALIAS_A", "canonical_id": "ID_A", "match_type": "plan", "priority": 1},
-            {"alias_name": "ALIAS_B", "canonical_id": "ID_B", "match_type": "name", "priority": 4},
+            {
+                "alias_name": "ALIAS_A",
+                "canonical_id": "ID_A",
+                "match_type": "plan",
+                "priority": 1,
+            },
+            {
+                "alias_name": "ALIAS_B",
+                "canonical_id": "ID_B",
+                "match_type": "name",
+                "priority": 4,
+            },
         ]
 
         repository.insert_batch_with_conflict_check(mappings)
@@ -598,7 +610,11 @@ class TestEnqueueForEnrichment:
 
         requests = [
             {"raw_name": "公司A", "normalized_name": "公司a", "temp_id": "IN_ABC123"},
-            {"raw_name": "公司A变体", "normalized_name": "公司a", "temp_id": "IN_ABC123"},
+            {
+                "raw_name": "公司A变体",
+                "normalized_name": "公司a",
+                "temp_id": "IN_ABC123",
+            },
             {"raw_name": "公司B", "normalized_name": "公司b", "temp_id": "IN_DEF456"},
         ]
 
@@ -665,7 +681,10 @@ class TestCompanyMappingRepositoryUpsertBaseInfo:
         mock_result.fetchone.return_value = mock_row
         mock_connection.execute.return_value = mock_result
 
-        raw_data = {"list": [{"companyId": "123", "companyFullName": "Test"}], "total": 1}
+        raw_data = {
+            "list": [{"companyId": "123", "companyFullName": "Test"}],
+            "total": 1,
+        }
 
         inserted = repository.upsert_base_info(
             company_id="1000065057",
@@ -687,9 +706,12 @@ class TestCompanyMappingRepositoryUpsertBaseInfo:
         assert params["unite_code"] == "91440300618698064P"
         # raw_data should be JSON string
         import json
+
         assert json.loads(params["raw_data"]) == raw_data
 
-    def test_upsert_base_info_updates_existing_record(self, repository, mock_connection):
+    def test_upsert_base_info_updates_existing_record(
+        self, repository, mock_connection
+    ):
         """Test upsert_base_info updates existing record."""
         # Mock fetchone to return inserted=False (xmax!=0)
         mock_row = MagicMock()
@@ -711,7 +733,9 @@ class TestCompanyMappingRepositoryUpsertBaseInfo:
         assert inserted is False
         mock_connection.execute.assert_called_once()
 
-    def test_upsert_base_info_handles_null_unite_code(self, repository, mock_connection):
+    def test_upsert_base_info_handles_null_unite_code(
+        self, repository, mock_connection
+    ):
         """Test upsert_base_info handles NULL unite_code."""
         mock_row = MagicMock()
         mock_row.inserted = True
@@ -734,7 +758,9 @@ class TestCompanyMappingRepositoryUpsertBaseInfo:
         params = call_args[0][1]
         assert params["unite_code"] is None
 
-    def test_upsert_base_info_serializes_raw_data_correctly(self, repository, mock_connection):
+    def test_upsert_base_info_serializes_raw_data_correctly(
+        self, repository, mock_connection
+    ):
         """Test upsert_base_info serializes raw_data as JSON string."""
         mock_row = MagicMock()
         mock_row.inserted = True
@@ -768,6 +794,7 @@ class TestCompanyMappingRepositoryUpsertBaseInfo:
 
         # Verify JSON serialization
         import json
+
         serialized = params["raw_data"]
         assert isinstance(serialized, str)
         deserialized = json.loads(serialized)
@@ -794,9 +821,12 @@ class TestCompanyMappingRepositoryUpsertBaseInfo:
         call_args = mock_connection.execute.call_args
         params = call_args[0][1]
         import json
+
         assert json.loads(params["raw_data"]) == {}
 
-    def test_upsert_base_info_uses_on_conflict_do_update(self, repository, mock_connection):
+    def test_upsert_base_info_uses_on_conflict_do_update(
+        self, repository, mock_connection
+    ):
         """Test upsert_base_info uses ON CONFLICT DO UPDATE semantics."""
         mock_row = MagicMock()
         mock_row.inserted = False
