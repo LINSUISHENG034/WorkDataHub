@@ -6,6 +6,7 @@ import types
 import pytest
 
 from work_data_hub.cli import etl as etl_module
+from work_data_hub.cli.etl import diagnostics as diagnostics_module
 
 
 @pytest.mark.unit
@@ -21,7 +22,7 @@ class TestEtlCheckDbDiagnostics:
             def get_database_connection_string(self) -> str:
                 return "dbname=wdh user=user"
 
-        monkeypatch.setattr(etl_module, "get_settings", lambda: Settings())
+        monkeypatch.setattr(diagnostics_module, "get_settings", lambda: Settings())
 
         rc = etl_module._check_database_connection()
         out = capsys.readouterr().out
@@ -44,7 +45,7 @@ class TestEtlCheckDbDiagnostics:
         def connect(_dsn: str):
             raise Exception("boom")
 
-        monkeypatch.setattr(etl_module, "get_settings", lambda: Settings())
+        monkeypatch.setattr(diagnostics_module, "get_settings", lambda: Settings())
         monkeypatch.setitem(sys.modules, "psycopg2", types.SimpleNamespace(connect=connect))
 
         rc = etl_module._check_database_connection()
