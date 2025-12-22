@@ -1,8 +1,8 @@
 """
-Company Mapping Repository for database access layer.
+Company Mapping Repository package.
 
-This module provides the CompanyMappingRepository class for batch-optimized
-database operations on the enterprise.company_mapping table.
+This package provides the CompanyMappingRepository class for batch-optimized
+database operations on the enterprise schema tables.
 
 Story 6.3: Internal Mapping Tables and Database Schema
 Story 6.1.1: Extended with enrichment_index table operations
@@ -14,17 +14,12 @@ Repository Pattern:
 - Always parameterize via text(); no f-strings
 - Log counts only; never log alias/company_id values
 
-Story 7.3: This file is now a facade module re-exporting from the repository package.
-All public symbols are preserved for backward compatibility.
+Story 7.3: This is a refactored module - all public exports are re-exported
+here for backward compatibility.
 """
 
-# Re-export all public symbols from repository package for backward compatibility
-from .repository import (
-    CompanyMappingRepository,
-    MatchResult,
-    InsertBatchResult,
-    EnqueueResult,
-)
+from .models import MatchResult, InsertBatchResult, EnqueueResult
+from .core import CompanyMappingRepository
 
 __all__ = [
     "CompanyMappingRepository",
