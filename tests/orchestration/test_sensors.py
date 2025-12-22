@@ -94,12 +94,12 @@ class TestFileDiscoverySensor:
         # Use Dagster's build_sensor_context for proper context
         context = build_sensor_context()
 
-        # Mock DataSourceConnector to return empty list
+        # Mock FileDiscoveryService to raise (no files found)
         with patch(
-            "src.work_data_hub.orchestration.sensors.DataSourceConnector"
-        ) as mock_connector_class:
-            mock_connector = mock_connector_class.return_value
-            mock_connector.discover.return_value = []
+            "src.work_data_hub.orchestration.sensors.FileDiscoveryService"
+        ) as mock_discovery_class:
+            mock_discovery = mock_discovery_class.return_value
+            mock_discovery.discover.return_value = []
 
             result = trustee_new_files_sensor(context)
 
@@ -118,7 +118,7 @@ class TestFileDiscoverySensor:
         ]
 
         with patch(
-            "src.work_data_hub.orchestration.sensors.DataSourceConnector"
+            "src.work_data_hub.orchestration.sensors.FileDiscoveryService"
         ) as mock_connector_class:
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.return_value = old_files
@@ -157,7 +157,7 @@ class TestFileDiscoverySensor:
 
         with (
             patch(
-                "src.work_data_hub.orchestration.sensors.DataSourceConnector"
+                "src.work_data_hub.orchestration.sensors.FileDiscoveryService"
             ) as mock_connector_class,
             patch(
                 "src.work_data_hub.orchestration.sensors.get_settings"
@@ -206,7 +206,7 @@ class TestFileDiscoverySensor:
 
         with (
             patch(
-                "src.work_data_hub.orchestration.sensors.DataSourceConnector"
+                "src.work_data_hub.orchestration.sensors.FileDiscoveryService"
             ) as mock_connector_class,
             patch(
                 "src.work_data_hub.orchestration.sensors.get_settings"
@@ -222,11 +222,11 @@ class TestFileDiscoverySensor:
             assert isinstance(result, RunRequest)
 
     def test_new_files_sensor_error_handling(self):
-        """Test sensor error handling with DataSourceConnector failures."""
+        """Test sensor error handling with FileDiscoveryService failures."""
         context = build_sensor_context()
 
         with patch(
-            "src.work_data_hub.orchestration.sensors.DataSourceConnector"
+            "src.work_data_hub.orchestration.sensors.FileDiscoveryService"
         ) as mock_connector_class:
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.side_effect = Exception("Connection failed")
@@ -246,7 +246,7 @@ class TestDataQualitySensor:
         context = build_sensor_context()
 
         with patch(
-            "src.work_data_hub.orchestration.sensors.DataSourceConnector"
+            "src.work_data_hub.orchestration.sensors.FileDiscoveryService"
         ) as mock_connector_class:
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.return_value = []
@@ -271,7 +271,7 @@ class TestDataQualitySensor:
 
         with (
             patch(
-                "src.work_data_hub.orchestration.sensors.DataSourceConnector"
+                "src.work_data_hub.orchestration.sensors.FileDiscoveryService"
             ) as mock_connector_class,
             patch("pathlib.Path.exists", return_value=False),
         ):
@@ -298,7 +298,7 @@ class TestDataQualitySensor:
 
         with (
             patch(
-                "src.work_data_hub.orchestration.sensors.DataSourceConnector"
+                "src.work_data_hub.orchestration.sensors.FileDiscoveryService"
             ) as mock_connector_class,
             patch("pathlib.Path.exists", return_value=True),
             patch(
@@ -335,7 +335,7 @@ class TestDataQualitySensor:
 
         with (
             patch(
-                "src.work_data_hub.orchestration.sensors.DataSourceConnector"
+                "src.work_data_hub.orchestration.sensors.FileDiscoveryService"
             ) as mock_connector_class,
             patch("pathlib.Path.exists", return_value=True),
             patch(
@@ -358,7 +358,7 @@ class TestDataQualitySensor:
         context = build_sensor_context()
 
         with patch(
-            "src.work_data_hub.orchestration.sensors.DataSourceConnector"
+            "src.work_data_hub.orchestration.sensors.FileDiscoveryService"
         ) as mock_connector_class:
             mock_connector = mock_connector_class.return_value
             mock_connector.discover.side_effect = Exception("Critical error")
@@ -367,3 +367,4 @@ class TestDataQualitySensor:
 
             assert isinstance(result, SkipReason)
             assert "Sensor error: Critical error" in str(result)
+

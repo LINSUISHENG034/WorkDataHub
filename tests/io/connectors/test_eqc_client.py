@@ -44,7 +44,7 @@ class TestEQCClientInitialization:
     def test_client_initialization_with_env_token(self):
         """Test client reads token from settings (which loads from .env file)."""
         # Mock settings to return a specific token
-        with patch("work_data_hub.io.connectors.eqc_client.get_settings") as mock_get_settings:
+        with patch("work_data_hub.io.connectors.eqc.transport.get_settings") as mock_get_settings:
             from work_data_hub.config.settings import Settings
             mock_settings = Settings()
             mock_settings.eqc_token = "env_token"
@@ -56,7 +56,7 @@ class TestEQCClientInitialization:
 
     def test_client_initialization_no_token_raises_error(self):
         """Test client raises error when no token is provided."""
-        with patch("work_data_hub.io.connectors.eqc_client.get_settings") as mock_get_settings:
+        with patch("work_data_hub.io.connectors.eqc.transport.get_settings") as mock_get_settings:
             from work_data_hub.config.settings import Settings
             mock_settings = Settings()
             mock_settings.eqc_token = ""
@@ -82,7 +82,7 @@ class TestEQCClientInitialization:
         assert len(client.request_times) == 0
         assert client.request_times.maxlen == 20
 
-    @patch("work_data_hub.io.connectors.eqc_client.get_settings")
+    @patch("work_data_hub.io.connectors.eqc.transport.get_settings")
     def test_client_uses_settings_defaults(self, mock_get_settings):
         """Test client uses settings for default configuration."""
         mock_settings = Mock()

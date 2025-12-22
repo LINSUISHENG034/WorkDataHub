@@ -284,8 +284,8 @@ development_status:
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-21-file-length-refactoring.md
   epic-7: in-progress
   7-1-ops-py-decomposition: done
-  7-2-io-layer-modularization: backlog
-  7-3-infrastructure-layer-decomposition: backlog
+  7-2-io-layer-modularization: done  # Code Review #2 PASSED 2025-12-22: Fixed Story 7.1 遗留问题, core.py 重构
+  7-3-infrastructure-layer-decomposition: ready-for-dev  # Story created 2025-12-22
   7-4-cli-modularization: backlog
   7-5-domain-registry-pre-modularization: backlog
   7-6-ci-integration-code-quality-tooling: backlog

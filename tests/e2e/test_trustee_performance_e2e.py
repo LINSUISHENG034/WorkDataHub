@@ -85,9 +85,9 @@ class TestTrusteePerformanceE2E:
         with patch("src.work_data_hub.orchestration.ops.get_settings") as mock_settings:
             mock_settings.return_value.data_sources_config = temp_config_file
 
-            # Mock DataSourceConnector
+            # Mock FileDiscoveryService
             with patch(
-                "src.work_data_hub.orchestration.ops.DataSourceConnector"
+                "src.work_data_hub.orchestration.ops.FileDiscoveryService"
             ) as mock_connector_class:
                 mock_discovered = Mock()
                 mock_discovered.path = temp_excel_file
@@ -616,3 +616,4 @@ class TestTrusteePerformanceE2EIntegration:
 
                 # Verify connection was closed (mock shows close was called)
                 # Note: In real test, db_connection fixture handles cleanup
+

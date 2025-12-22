@@ -40,7 +40,7 @@ try:
     from src.work_data_hub.infrastructure.cleansing.rules.numeric_rules import (
         comprehensive_decimal_cleaning,
     )
-    from src.work_data_hub.io.connectors.file_connector import DataSourceConnector
+    from src.work_data_hub.io.connectors.file_connector import FileDiscoveryService
     from src.work_data_hub.io.readers.excel_reader import ExcelReader
 except ImportError as e:
     print(f"❌ 导入错误: {e}")
@@ -236,7 +236,7 @@ def discover_files(data_dir: str):
         os.environ["WDH_DATA_BASE_DIR"] = data_dir
 
         try:
-            connector = DataSourceConnector()
+            connector = FileDiscoveryService()
             files = connector.discover("annuity_performance")
 
             if files:
@@ -588,3 +588,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

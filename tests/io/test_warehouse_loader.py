@@ -13,7 +13,7 @@ import pandas as pd
 import pytest
 
 
-from src.work_data_hub.io.loader.warehouse_loader import (
+from work_data_hub.io.loader.warehouse_loader import (
     DataWarehouseLoaderError,
     LoadResult,
     WarehouseLoader,
@@ -42,11 +42,11 @@ def _create_loader(monkeypatch, operational_error=Exception):
     pool_instance.putconn.return_value = None
     pool_cls = MagicMock(return_value=pool_instance)
     monkeypatch.setattr(
-        "src.work_data_hub.io.loader.warehouse_loader.ThreadedConnectionPool",
+        "work_data_hub.io.loader.warehouse_loader.ThreadedConnectionPool",
         pool_cls,
     )
     monkeypatch.setattr(
-        "src.work_data_hub.io.loader.warehouse_loader.OperationalError",
+        "work_data_hub.io.loader.warehouse_loader.OperationalError",
         operational_error,
     )
     loader = WarehouseLoader(connection_url="postgresql://user:pass@test/db")
@@ -367,7 +367,7 @@ class TestWarehouseLoaderClass:
 
         mocked_execute_values = MagicMock()
         monkeypatch.setattr(
-            "src.work_data_hub.io.loader.warehouse_loader.execute_values",
+            "work_data_hub.io.loader.warehouse_loader.execute_values",
             mocked_execute_values,
         )
 
@@ -418,7 +418,7 @@ class TestDatabaseSettings:
 
     def test_connection_string_from_parts(self):
         """Test connection string generation."""
-        from src.work_data_hub.config.settings import DatabaseSettings
+        from work_data_hub.config.settings import DatabaseSettings
 
         db_settings = DatabaseSettings(
             host="localhost",
@@ -433,7 +433,7 @@ class TestDatabaseSettings:
 
     def test_connection_string_from_uri(self):
         """Test URI override."""
-        from src.work_data_hub.config.settings import DatabaseSettings
+        from work_data_hub.config.settings import DatabaseSettings
 
         db_settings = DatabaseSettings(
             host="ignored",
@@ -632,7 +632,7 @@ class TestJSONBParameterAdaptation:
         """Test parameter adaptation for JSONB types."""
         from psycopg2.extras import Json
 
-        from src.work_data_hub.io.loader.warehouse_loader import _adapt_param
+        from work_data_hub.io.loader.warehouse_loader import _adapt_param
 
         dict_param = {"key": "value"}
         list_param = ["item1", "item2"]
@@ -648,7 +648,7 @@ class TestJSONBParameterAdaptation:
         """Test adaptation of complex nested dict/list structures."""
         from psycopg2.extras import Json
 
-        from src.work_data_hub.io.loader.warehouse_loader import _adapt_param
+        from work_data_hub.io.loader.warehouse_loader import _adapt_param
 
         complex_dict = {
             "nested": {"key": "value"},
@@ -666,7 +666,7 @@ class TestJSONBParameterAdaptation:
         """Test adaptation of deeply nested dict/list structures from PRP requirements."""
         from psycopg2.extras import Json
 
-        from src.work_data_hub.io.loader.warehouse_loader import _adapt_param
+        from work_data_hub.io.loader.warehouse_loader import _adapt_param
 
         # Test deeply nested structure similar to real validation_warnings
         complex_nested = {
@@ -709,7 +709,7 @@ class TestJSONBParameterAdaptation:
         """Test that JSON types are correctly preserved in adaptation."""
         from psycopg2.extras import Json
 
-        from src.work_data_hub.io.loader.warehouse_loader import _adapt_param
+        from work_data_hub.io.loader.warehouse_loader import _adapt_param
 
         # Test various JSON-compatible types
         test_cases = [
@@ -942,7 +942,7 @@ class TestJSONBParameterAdaptation:
         """Test JSONB adaptation handles Unicode and special characters correctly."""
         from psycopg2.extras import Json
 
-        from src.work_data_hub.io.loader.warehouse_loader import _adapt_param
+        from work_data_hub.io.loader.warehouse_loader import _adapt_param
 
         unicode_data = {
             "chinese_text": "测试数据",
@@ -966,7 +966,7 @@ class TestJSONBParameterAdaptation:
         """Test JSONB adaptation handles null and empty values appropriately."""
         from psycopg2.extras import Json
 
-        from src.work_data_hub.io.loader.warehouse_loader import _adapt_param
+        from work_data_hub.io.loader.warehouse_loader import _adapt_param
 
         test_cases = [
             ({}, Json),  # Empty dict should be wrapped

@@ -19,7 +19,6 @@ from pydantic import field_validator
 from work_data_hub.config.settings import get_settings
 from work_data_hub.domain.sandbox_trustee_performance.service import process
 from work_data_hub.io.connectors.file_connector import (
-    DataSourceConnector,
     FileDiscoveryService,
 )
 from work_data_hub.io.readers.excel_reader import read_excel_rows
@@ -111,7 +110,7 @@ def discover_files_op(
                 # Call discover_file (discovery-only, no Excel loading)
                 template_vars = {}
                 if config.period:
-                    template_vars["month"] = config.period
+                    template_vars["YYYYMM"] = config.period
 
                 # Story 6.2-P16: Convert strategy string to enum
                 from work_data_hub.io.connectors.file_pattern_matcher import (
@@ -149,37 +148,14 @@ def discover_files_op(
                 )
                 raise
 
-        elif is_legacy_schema:
-            # Route to legacy DataSourceConnector
-            context.log.info(
-                f"Using legacy schema discovery for domain '{config.domain}'"
-            )
-
-            connector = DataSourceConnector(settings.data_sources_config)
-
-            try:
-                discovered = connector.discover(config.domain)
-
-                context.log.info(
-                    f"Legacy discovery completed - domain: {config.domain}, "
-                    f"found: {len(discovered)} files, "
-                    f"config: {settings.data_sources_config}"
-                )
-
-                # CRITICAL: Return JSON-serializable paths, not DiscoveredFile objects
-                return [file.path for file in discovered]
-
-            except Exception as e:
-                context.log.error(
-                    f"Legacy discovery failed for domain '{config.domain}': {str(e)}"
-                )
-                raise
-
         else:
-            raise ValueError(
-                f"Domain '{config.domain}' has invalid configuration schema. "
-                f"Must have either Epic 3 schema (base_path, file_patterns) "
-                f"or legacy schema (pattern, select)"
+             # Route to Epic 3 FileDiscoveryService even for legacy config structure if possible,
+             # but strictly speaking we only support Epic 3 schema now.
+             # However, existing domains might not have been fully migrated in config.
+             # Since User enforces "Zero Legacy Policy" for CODE, we assume config matches or we fail.
+             raise ValueError(
+                f"Domain '{config.domain}' configuration does not match Epic 3 schema (base_path, file_patterns). "
+                f"Legacy DataSourceConnector support has been removed."
             )
 
     except Exception as e:

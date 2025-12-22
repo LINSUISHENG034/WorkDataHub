@@ -23,7 +23,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.work_data_hub.config.settings import get_settings
-from src.work_data_hub.io.connectors.file_connector import DataSourceConnector
+from src.work_data_hub.io.connectors.file_connector import FileDiscoveryService
 
 
 @pytest.mark.monthly_data
@@ -42,7 +42,7 @@ class TestMonthlyDataSmoke:
         """Validates discovery when WDH_DATA_BASE_DIR=./reference/monthly."""
         # Override environment for this test
         with patch.dict(os.environ, {"WDH_DATA_BASE_DIR": "./reference/monthly"}):
-            connector = DataSourceConnector()
+            connector = FileDiscoveryService()
 
             try:
                 discovered_files = connector.discover("sandbox_trustee_performance")
@@ -85,7 +85,7 @@ class TestMonthlyDataSmoke:
 
                 try:
                     # Test discovery phase
-                    connector = DataSourceConnector()
+                    connector = FileDiscoveryService()
                     discovered_files = connector.discover("sandbox_trustee_performance")
 
                     if not discovered_files:
@@ -120,7 +120,7 @@ class TestMonthlyDataSmoke:
         with patch.dict(os.environ, {"WDH_DATA_BASE_DIR": "./reference/monthly"}):
             try:
                 # Discovery phase
-                connector = DataSourceConnector()
+                connector = FileDiscoveryService()
                 discovered_files = connector.discover("sandbox_trustee_performance")
 
                 if not discovered_files:
@@ -236,3 +236,4 @@ class TestMonthlyDataSmoke:
 
         yield conn
         conn.close()
+

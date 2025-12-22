@@ -80,15 +80,23 @@ from ._internal import (
 # Tests may patch these at work_data_hub.orchestration.ops.<name>
 # so we need to re-export them from the sub-modules where they were imported.
 
-# From file_processing module  
+# From file_processing module
 from work_data_hub.config.settings import get_settings
 from work_data_hub.io.connectors.file_connector import (
-    DataSourceConnector,
     FileDiscoveryService,
 )
 from work_data_hub.io.readers.excel_reader import read_excel_rows
 from work_data_hub.domain.sandbox_trustee_performance.service import process
-from work_data_hub.io.loader.warehouse_loader import load
+from work_data_hub.io.loader.warehouse_loader import load, insert_missing, fill_null_only
+from work_data_hub.domain.reference_backfill.config_loader import load_foreign_keys_config
+
+# From pipeline_ops module - for test patching compatibility
+from work_data_hub.domain.annuity_performance.service import (
+    process_with_enrichment,
+)
+from work_data_hub.domain.annuity_income.service import (
+    process_with_enrichment as process_annuity_income_with_enrichment,
+)
 
 
 __all__ = [
@@ -129,9 +137,13 @@ __all__ = [
     "_load_valid_domains",
     # Test mocking compatibility re-exports
     "get_settings",
-    "DataSourceConnector",
     "FileDiscoveryService",
     "read_excel_rows",
     "process",
     "load",
+    "insert_missing",
+    "fill_null_only",
+    "load_foreign_keys_config",
+    "process_with_enrichment",
+    "process_annuity_income_with_enrichment",
 ]

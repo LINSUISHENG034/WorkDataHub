@@ -193,8 +193,13 @@ def trustee_data_quality_sensor(context: SensorEvaluationContext):
     """
     try:
         # Check 1: File discovery health
-        connector = DataSourceConnector()
-        files = connector.discover("sandbox_trustee_performance")
+        discovery = FileDiscoveryService()
+        # Just check if we can discover a file
+        try:
+            match = discovery.discover_file(domain="sandbox_trustee_performance")
+            files = [match]
+        except Exception:
+            files = []
 
         if not files:
             context.log.warning(
@@ -205,15 +210,13 @@ def trustee_data_quality_sensor(context: SensorEvaluationContext):
 
         # Check 2: File accessibility
         accessible_files = []
-        for file in files[:1]:  # Check only the first file for lightweight probe
+        for file in files:  # Check found file
             try:
-                from pathlib import Path
-
-                if Path(file.path).exists():
+                if file.file_path.exists():
                     accessible_files.append(file)
                 else:
                     context.log.warning(
-                        f"DATA QUALITY ALERT: File not accessible: {file.path}"
+                        f"DATA QUALITY ALERT: File not accessible: {file.file_path}"
                     )
             except Exception as e:
                 context.log.warning(f"DATA QUALITY ALERT: File access error: {e}")

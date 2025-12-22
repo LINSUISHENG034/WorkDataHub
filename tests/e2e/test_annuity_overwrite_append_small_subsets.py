@@ -39,7 +39,7 @@ class TestAnnuityOverwriteAppendSmallSubsets:
 
     @pytest.fixture
     def mock_connector_for_distinct_file(self, subset_dir):
-        """Mock DataSourceConnector to return distinct_5 subset file."""
+        """Mock FileDiscoveryService to return distinct_5 subset file."""
         distinct_file = os.path.join(
             subset_dir, "2024年11月年金终稿数据_subset_distinct_5.xlsx"
         )
@@ -56,7 +56,7 @@ class TestAnnuityOverwriteAppendSmallSubsets:
 
     @pytest.fixture
     def mock_connector_for_overlap_file(self, subset_dir):
-        """Mock DataSourceConnector to return overlap_pk_6 subset file."""
+        """Mock FileDiscoveryService to return overlap_pk_6 subset file."""
         overlap_file = os.path.join(
             subset_dir, "2024年11月年金终稿数据_subset_overlap_pk_6.xlsx"
         )
@@ -73,7 +73,7 @@ class TestAnnuityOverwriteAppendSmallSubsets:
 
     @pytest.fixture
     def mock_connector_for_append_file(self, subset_dir):
-        """Mock DataSourceConnector to return append_3 subset file."""
+        """Mock FileDiscoveryService to return append_3 subset file."""
         append_file = os.path.join(
             subset_dir, "2024年11月年金终稿数据_subset_append_3.xlsx"
         )
@@ -96,7 +96,7 @@ class TestAnnuityOverwriteAppendSmallSubsets:
         monkeypatch.setenv("WDH_DATA_BASE_DIR", subset_dir)
 
         with patch(
-            "src.work_data_hub.orchestration.ops.DataSourceConnector"
+            "src.work_data_hub.orchestration.ops.FileDiscoveryService"
         ) as mock_connector_class:
             mock_connector_class.return_value = mock_connector_for_distinct_file
 
@@ -208,7 +208,7 @@ class TestAnnuityOverwriteAppendSmallSubsets:
         monkeypatch.setenv("WDH_DATA_BASE_DIR", subset_dir)
 
         with patch(
-            "src.work_data_hub.orchestration.ops.DataSourceConnector"
+            "src.work_data_hub.orchestration.ops.FileDiscoveryService"
         ) as mock_connector_class:
             mock_connector_class.return_value = mock_connector_for_overlap_file
 
@@ -249,7 +249,7 @@ class TestAnnuityOverwriteAppendSmallSubsets:
         monkeypatch.setenv("WDH_DATA_BASE_DIR", subset_dir)
 
         with patch(
-            "src.work_data_hub.orchestration.ops.DataSourceConnector"
+            "src.work_data_hub.orchestration.ops.FileDiscoveryService"
         ) as mock_connector_class:
             mock_connector_class.return_value = mock_connector_for_overlap_file
 
@@ -302,7 +302,7 @@ class TestAnnuityOverwriteAppendSmallSubsets:
         monkeypatch.setenv("WDH_DATA_BASE_DIR", subset_dir)
 
         with patch(
-            "src.work_data_hub.orchestration.ops.DataSourceConnector"
+            "src.work_data_hub.orchestration.ops.FileDiscoveryService"
         ) as mock_connector_class:
             mock_connector_class.return_value = mock_connector_for_append_file
 
@@ -346,7 +346,7 @@ class TestAnnuityOverwriteAppendSmallSubsets:
         monkeypatch.setenv("WDH_DATA_BASE_DIR", subset_dir)
 
         with patch(
-            "src.work_data_hub.orchestration.ops.DataSourceConnector"
+            "src.work_data_hub.orchestration.ops.FileDiscoveryService"
         ) as mock_connector_class:
             mock_connector_class.return_value = mock_connector_for_distinct_file
 
@@ -383,7 +383,7 @@ class TestAnnuityOverwriteAppendSmallSubsets:
         monkeypatch.setenv("WDH_DATA_BASE_DIR", subset_dir)
 
         with patch(
-            "src.work_data_hub.orchestration.ops.DataSourceConnector"
+            "src.work_data_hub.orchestration.ops.FileDiscoveryService"
         ) as mock_connector_class:
             mock_connector_class.return_value = mock_connector_for_overlap_file
 
@@ -427,7 +427,7 @@ class TestAnnuityOverwriteAppendSmallSubsets:
         monkeypatch.setenv("WDH_DATA_BASE_DIR", subset_dir)
 
         with patch(
-            "src.work_data_hub.orchestration.ops.DataSourceConnector"
+            "src.work_data_hub.orchestration.ops.FileDiscoveryService"
         ) as mock_connector_class:
             mock_connector_class.return_value = mock_connector_for_append_file
 
@@ -476,7 +476,7 @@ class TestAnnuityOverwriteAppendSmallSubsets:
         mock_connector.discover.return_value = [mock_discovered]
 
         with patch(
-            "src.work_data_hub.orchestration.ops.DataSourceConnector"
+            "src.work_data_hub.orchestration.ops.FileDiscoveryService"
         ) as mock_connector_class:
             mock_connector_class.return_value = mock_connector
 
@@ -517,3 +517,4 @@ def build_args(
         debug=False,
         raise_on_error=True,
     )
+

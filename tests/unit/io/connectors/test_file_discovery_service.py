@@ -12,7 +12,7 @@ from work_data_hub.io.connectors.exceptions import DiscoveryError
 from work_data_hub.io.connectors.file_pattern_matcher import FileMatchResult
 from work_data_hub.io.connectors.version_scanner import VersionedPath
 from work_data_hub.io.readers.excel_reader import ExcelReadResult, ExcelReader
-from src.work_data_hub.infrastructure.settings.data_source_schema import (
+from work_data_hub.infrastructure.settings.data_source_schema import (
     DataSourceConfigV2,
     DomainConfigV2,
 )
@@ -45,12 +45,13 @@ class DummyMatcher:
         self.raise_error = raise_error
         self.calls = []
 
-    def match_files(self, search_path, include_patterns, exclude_patterns):
+    def match_files(self, search_path, include_patterns, exclude_patterns, selection_strategy=None):
         self.calls.append(
             {
                 "search_path": search_path,
                 "include_patterns": include_patterns,
                 "exclude_patterns": exclude_patterns,
+                "selection_strategy": selection_strategy,
             }
         )
         if self.raise_error:
@@ -124,7 +125,7 @@ def test_template_variable_resolution_and_call_order():
 
     result = service.discover_and_load(
         domain="annuity_performance",
-        month="202501",
+        YYYYMM="202501",
     )
 
     assert isinstance(result, DataDiscoveryResult)
@@ -136,7 +137,7 @@ def test_template_variable_resolution_and_call_order():
     assert reader.calls[0]["sheet_name"] == "规模明细"
     assert result.row_count == 2
     assert result.column_count == 1
-    assert result.stage_durations["version_detection"] >= 0
+    assert result.stage_durations["discovery"] >= 0
     assert result.duration_ms >= sum(result.stage_durations.values())
 
 
@@ -160,7 +161,7 @@ def test_file_matching_failure_wrapped_with_stage():
     )
 
     with pytest.raises(DiscoveryError) as exc:
-        service.discover_and_load(domain="annuity_performance", month="202501")
+        service.discover_and_load(domain="annuity_performance", YYYYMM="202501")
 
     assert exc.value.failed_stage == "file_matching"
     assert "no file" in str(exc.value)
@@ -229,7 +230,7 @@ def test_multi_domain_independence_and_failure_isolated(tmp_path):
     )
 
     class SelectorMatcher:
-        def match_files(self, search_path, include_patterns, exclude_patterns):
+        def match_files(self, search_path, include_patterns, exclude_patterns, selection_strategy=None):
             if "B" in str(search_path):
                 raise FileNotFoundError("no domain B files")
             return FileMatchResult(
@@ -314,7 +315,7 @@ class TestPathTraversalSecurity:
 
         with pytest.raises(DiscoveryError) as exc:
             # Attempt to inject traversal via month parameter (non-numeric)
-            service.discover_and_load(domain="annuity_performance", month="../../..")
+            service.discover_and_load(domain="annuity_performance", YYYYMM="../../..")
 
         # Should fail at config_validation due to invalid YYYYMM format
         assert exc.value.failed_stage == "config_validation"
@@ -354,7 +355,7 @@ class TestPathTraversalSecurity:
         service = self._make_service("reference/monthly/{YYYYMM}/收集数据")
 
         # Should not raise - path is valid
-        result = service.discover_and_load(domain="annuity_performance", month="202501")
+        result = service.discover_and_load(domain="annuity_performance", YYYYMM="202501")
         assert result is not None
         assert result.version == "V1"
 
@@ -385,7 +386,7 @@ class TestTemplateVariableResolution:
         )
 
         with pytest.raises(DiscoveryError) as exc:
-            service.discover_and_load(domain="annuity_performance", month="2025AB")
+            service.discover_and_load(domain="annuity_performance", YYYYMM="2025AB")
 
         assert exc.value.failed_stage == "config_validation"
         assert "6 digits" in str(exc.value)
@@ -408,7 +409,7 @@ class TestTemplateVariableResolution:
         )
 
         with pytest.raises(DiscoveryError) as exc:
-            service.discover_and_load(domain="annuity_performance", month="20251")
+            service.discover_and_load(domain="annuity_performance", YYYYMM="20251")
 
         assert exc.value.failed_stage == "config_validation"
 
@@ -430,7 +431,7 @@ class TestTemplateVariableResolution:
         )
 
         with pytest.raises(DiscoveryError) as exc:
-            service.discover_and_load(domain="annuity_performance", month="202513")
+            service.discover_and_load(domain="annuity_performance", YYYYMM="202513")
 
         assert exc.value.failed_stage == "config_validation"
         assert "01 and 12" in str(exc.value)
@@ -764,3 +765,4 @@ class TestDataDiscoveryResult:
         assert result.duration_ms == 150
         assert result.columns_renamed == {"old": "new"}
         assert result.stage_durations["version_detection"] == 50
+
