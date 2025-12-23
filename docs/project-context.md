@@ -24,9 +24,9 @@
 * **Pre-commit Hooks:** Run `pre-commit install` in project root (one-time setup per clone).
   * All commits must pass `scripts/quality/check_file_length.py` (max 800 lines) and Ruff checks.
   * **Bypass Policy:** Use `git commit --no-verify` ONLY for emergency hotfixes.
-  * See [Story 7.6](file:///e:/Projects/WorkDataHub/docs/sprint-artifacts/stories/7-6-ci-integration-code-quality-tooling.md) for setup details.
+  * See `docs/sprint-artifacts/stories/7-6-ci-integration-code-quality-tooling.md` for setup details.
 * **Domain-Growth Modules:** Modules like `domain_registry.py` should be pre-modularized when domain count increases.
-  * See [Story 7.5](file:///e:/Projects/WorkDataHub/docs/sprint-artifacts/stories/7-5-domain-registry-pre-modularization.md) for modularization pattern.
+  * See `docs/sprint-artifacts/stories/7-5-domain-registry-pre-modularization.md` for modularization pattern.
 * **Complexity Checks:** Ruff PLR rules enforce code complexity limits:
   * `max-statements = 50` (per function, aligns with MAX 50 lines guideline)
   * `max-branches = 12` (cyclomatic complexity threshold)
@@ -112,106 +112,166 @@ if (Test-Path "data.json") { Remove-Item "data.json" }
 
 ## 5. 📊 Reference Documentation
 
-### Database Architecture Overview
+### Database Architecture
 
-本项目使用两个 PostgreSQL 数据库，理解它们的关系是开发的前提：
+本项目采用**双数据库架构**：
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         Database Architecture                            │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  ┌──────────────────────────┐      ┌──────────────────────────┐        │
-│  │   legacy (只读数据源)     │      │  postgres (主数据库)      │        │
-│  │   localhost:5432/legacy  │ ───▶ │  localhost:5432/postgres │        │
-│  │                          │ Sync │                          │        │
-│  │  • 58 tables             │      │  • 22 tables             │        │
-│  │  • 历史业务数据           │      │  • ETL处理后的数据        │        │
-│  │  • 参考数据源             │      │  • 公司enrichment数据     │        │
-│  └──────────────────────────┘      └──────────────────────────┘        │
-│                                                                          │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+| 数据库 | 角色 | 读写权限 |
+|--------|------|----------|
+| **legacy** | 历史数据源 (从原 MySQL 迁移) | 只读 |
+| **postgres** | 主数据库 (ETL 输出目标) | 读写 |
 
-#### 两个数据库的职责
-
-| 数据库 | 连接地址 | 用途 | 读写权限 |
-|--------|----------|------|----------|
-| **legacy** | `postgresql://localhost:5432/legacy` | 历史数据源，从原 MySQL 迁移而来 | **只读** |
-| **postgres** | `postgresql://localhost:5432/postgres` | 主数据库，ETL 输出目标 | **读写** |
-
-#### legacy 数据库 (只读)
-
-**来源:** 原 MySQL `annuity_hub` 数据库已完整迁移至此。
-
-**用途:**
-- 📖 参考数据同步 (Reference Sync) - 年金计划、组合计划等主数据
-- 📖 公司信息同步 - base_info、business_info 等 EQC 数据
-- 📖 历史数据对比验证
-
-**关键 Schema:**
-- `enterprise` (9 tables) - 公司主数据、EQC 搜索结果
-- `business` (9 tables) - 规模明细、收入明细等业务数据
-- `mapping` (11 tables) - 年金计划、组合计划等参考数据
-- `customer` (20 tables) - 客户生命周期数据
-- `finance` (7 tables) - 财务相关数据
-
-#### postgres 数据库 (主数据库)
-
-**用途:**
-- ✍️ ETL Pipeline 输出目标
-- ✍️ 公司 Enrichment 缓存 (enrichment_index)
-- ✍️ Pipeline 执行记录
-
-**关键 Schema:**
-- `enterprise` (12 tables) - 公司 enrichment、EQC API 数据
-- `business` (1 table) - ETL 处理后的规模明细
-- `mapping` (6 tables) - 参考数据 (从 legacy 同步)
-- `public` (3 tables) - Pipeline 基础设施
-
-#### 数据流向
-
-```
-Excel Files ──▶ ETL Pipeline ──▶ postgres.business.规模明细
-                    │
-                    ▼
-              Company Enrichment
-                    │
-         ┌─────────┴─────────┐
-         ▼                   ▼
-  postgres.enterprise   legacy.enterprise
-  (enrichment_index)    (base_info sync)
-```
-
-#### 环境变量配置
-
-```bash
-# .wdh_env 文件
-# 主数据库 (postgres)
-DATABASE_URL=postgresql://postgres:Post.169828@localhost:5432/postgres
-
-# Legacy 数据库 (只读)
-WDH_LEGACY_PG_HOST=localhost
-WDH_LEGACY_PG_PORT=5432
-WDH_LEGACY_PG_DATABASE=legacy
-WDH_LEGACY_PG_USER=postgres
-WDH_LEGACY_PG_PASSWORD=Post.169828
-```
-
-### Detailed Documentation
-
-* **[Database Schema Panorama](database-schema-panorama.md)** - 完整数据库结构文档
-  * 两个数据库的完整 schema 和表定义
-  * Entity Relationship 图
-  * Data Flow Architecture
+> **详细文档:** 完整的 Schema 定义、表结构、ER 图、数据流架构请参见 **[Database Schema Panorama](database-schema-panorama.md)**。
 
 ### Key Architecture Files
 
-| File | Purpose |
-|------|---------|
-| `src/work_data_hub/infrastructure/schema/` | Domain Registry - Single Source of Truth for schema definitions |
-| `config/data_sources.yml` | Domain file discovery patterns |
-| `config/foreign_keys.yml` | FK backfill configuration |
-| `config/reference_sync.yml` | Reference data sync settings (legacy → postgres) |
+> **Epic 7 Modularization (2025-12-22):** 大文件已按模块化原则拆分为包结构。
+
+| Package / File | Purpose |
+|----------------|---------|
+| `src/work_data_hub/infrastructure/schema/` | Domain Registry Package - 域 Schema 定义的唯一真相源 |
+| `src/work_data_hub/infrastructure/etl/ops/` | ETL Operations Package - Pipeline 编排与执行 |
+| `src/work_data_hub/infrastructure/enrichment/` | Company Enrichment Package - 公司ID解析服务 |
+| `src/work_data_hub/io/loader/` | Database Loader Package - 数据库写入服务 |
+| `src/work_data_hub/io/connectors/eqc/` | EQC Client Package - 企查查 API 客户端 |
+| `src/work_data_hub/io/connectors/discovery/` | File Discovery Package - 文件发现服务 |
+| `src/work_data_hub/cli/etl/` | ETL CLI Package - 命令行界面 |
+| `config/data_sources.yml` | 域文件发现模式配置 |
+| `config/foreign_keys.yml` | FK 回填配置 |
+| `config/reference_sync.yml` | 参考数据同步配置 (legacy → postgres) |
+| `config/company_mapping.yml` | Layer 1 硬编码公司映射 |
+
+---
+
+## 6. 🔍 Company Enrichment (公司ID解析)
+
+ETL Pipeline 的核心能力是将原始数据中的"客户名称"解析为标准化的 `company_id`。
+
+### 5层解析架构
+
+```
+Input: 客户名称 / 计划代码 / 年金账户号 / 年金账户名
+       │
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│  LAYER 1: YAML Config (config/company_mapping.yml)          │
+│  硬编码映射，优先级最高                                        │
+└─────────────────────────────────────────────────────────────┘
+       │ Miss
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│  LAYER 2: DB Cache (5种查找类型，按优先级)                    │
+│  plan_code > account_name > account_number >                 │
+│  customer_name > plan_customer                               │
+└─────────────────────────────────────────────────────────────┘
+       │ Miss
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│  LAYER 3: Existing Column                                    │
+│  检查源数据中是否已有 company_id                               │
+└─────────────────────────────────────────────────────────────┘
+       │ Miss
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│  LAYER 4: EQC API (Synchronous)                              │
+│  调用企查查 API，受预算控制，结果缓存到 Layer 2                │
+└─────────────────────────────────────────────────────────────┘
+       │ Miss
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│  LAYER 5: Temp ID (HMAC-SHA1)                                │
+│  生成临时ID (IN_xxx 格式)，加入异步队列待后续解析              │
+└─────────────────────────────────────────────────────────────┘
+       │
+       ▼
+Output: company_id (已解析或临时)
+```
+
+> **详细表结构:** Enrichment 相关表定义请参见 **[Database Schema Panorama](database-schema-panorama.md#2-schema-enterprise)**。
+
+---
+
+## 7. 📋 Domain Terminology (域术语对照)
+
+本项目采用**双命名体系**：
+
+| 标准域名称 (Code) | 数据库表名 / Sheet名 | Schema | 说明 |
+|-------------------|---------------------|--------|------|
+| `annuity_performance` | `规模明细` | business | 年金业绩规模数据 |
+| `annuity_income` | `收入明细` | business | 年金收入明细数据 |
+| `annuity_plans` | `年金计划` | mapping | 年金计划主数据 |
+| `portfolio_plans` | `组合计划` | mapping | 组合计划主数据 |
+
+**命名约定：**
+- **标准域名称** (`annuity_performance`): 用于代码、配置文件、CLI 参数
+- **数据库表名** (`规模明细`): 沿用原 MySQL 表名，保持业务连续性
+- 两者为**完全对等关系**，在 Domain Registry 中映射
+
+---
+
+## 8. 🚀 Quick Reference (快速参考)
+
+### CLI 常用命令
+
+```bash
+# 查看帮助
+uv run --env-file .wdh_env python -m work_data_hub.cli.etl --help
+
+# 试运行 (不写入数据库)
+uv run --env-file .wdh_env python -m work_data_hub.cli.etl \
+  --domain annuity_performance --dry-run
+
+# 执行 ETL (写入数据库)
+uv run --env-file .wdh_env python -m work_data_hub.cli.etl \
+  --domain annuity_performance --execute
+
+# 数据库连接检查
+uv run --env-file .wdh_env python -m work_data_hub.cli.etl --check-db
+
+# 多域批量处理
+uv run --env-file .wdh_env python -m work_data_hub.cli.etl \
+  --domains annuity_performance,annuity_income --execute
+
+# 禁用 EQC 调用 (离线模式)
+uv run --env-file .wdh_env python -m work_data_hub.cli.etl \
+  --domain annuity_performance --no-enrichment --execute
+```
+
+### 关键 CLI 参数
+
+| 参数 | 说明 |
+|------|------|
+| `--domain` | 单个域名称 |
+| `--domains` | 多个域名称 (逗号分隔) |
+| `--dry-run` | 试运行，不写入数据库 |
+| `--execute` | 执行模式，写入数据库 |
+| `--no-enrichment` | 禁用 EQC API 调用 |
+| `--check-db` | 仅检查数据库连接 |
+| `--period YYYY-MM` | 指定处理月份 |
+| `--file-selection` | 文件选择策略: `error` (默认), `newest`, `oldest` |
+
+### 配置文件速查
+
+| 配置用途 | 文件路径 |
+|----------|---------|
+| 数据源发现模式 | `config/data_sources.yml` |
+| FK 回填规则 | `config/foreign_keys.yml` |
+| 参考数据同步 | `config/reference_sync.yml` |
+| 公司硬编码映射 | `config/company_mapping.yml` |
+| 环境变量 | `.wdh_env` |
+
+### 测试命令
+
+```bash
+# 运行所有测试
+PYTHONPATH=src uv run --env-file .wdh_env pytest tests/ -v
+
+# 运行特定模块测试
+PYTHONPATH=src uv run --env-file .wdh_env pytest tests/io/schema/ -v
+
+# 代码质量检查
+uv run ruff check src/
+uv run ruff format --check src/
+```
 
 ---

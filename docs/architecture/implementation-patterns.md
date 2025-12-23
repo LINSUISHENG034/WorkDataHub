@@ -183,3 +183,67 @@ uv run pytest -v --cov=src --cov-report=term-missing
 - Context propagates through every TransformStep; steps may read/write `metadata` for metrics (e.g., `db_queries` counters).
 - Service entrypoints are responsible for constructing a fully populated `PipelineContext` and passing it into pipeline execution to satisfy AC10/AC11.
 
+---
+
+### Pattern 6: Package Modularization (Epic 7)
+
+> **Added 2025-12-22:** Enforces 800-line file limit via pre-commit hooks.
+
+**When to Apply:**
+- Any file exceeding 800 lines MUST be decomposed
+- Files approaching 600+ lines SHOULD be proactively modularized
+
+**Decomposition Strategy:**
+
+```
+Before (monolithic):                 After (package):
+src/module/                          src/module/
+├── large_file.py (1200+ lines)      ├── __init__.py     # Public API exports
+                                     ├── package/
+                                     │   ├── __init__.py
+                                     │   ├── core.py     # Main class
+                                     │   ├── models.py   # Data classes
+                                     │   ├── utils.py    # Helper functions
+                                     │   └── ...
+                                     └── large_file.py   # Facade (re-exports)
+```
+
+**Key Principles:**
+
+1. **Facade Pattern:** Original file becomes a thin re-export layer for backward compatibility
+2. **Single Responsibility:** Each sub-module handles one concern
+3. **Public API via `__init__.py`:** All exports explicitly listed
+4. **Zero Breaking Changes:** External imports continue to work
+
+**File Size Guidelines (from `project-context.md`):**
+
+| Limit | Threshold | Action |
+|-------|-----------|--------|
+| **MAX 800 lines** | File size | Split into sub-modules immediately |
+| **MAX 50 lines** | Function size | Extract helper functions |
+| **MAX 100 lines** | Class size | Use composition, split class |
+
+**Epic 7 Examples:**
+
+| Original File | Package | Story |
+|---------------|---------|-------|
+| `ops.py` (1700 lines) | `infrastructure/etl/ops/` | 7.1 |
+| `warehouse_loader.py` (1400 lines) | `io/loader/` | 7.2 |
+| `eqc_client.py` (1100 lines) | `io/connectors/eqc/` | 7.2 |
+| `etl.py` (1200 lines) | `cli/etl/` | 7.4 |
+| `domain_registry.py` (900 lines) | `infrastructure/schema/` | 7.5 |
+
+**Pre-commit Hook Enforcement:**
+
+```bash
+# .pre-commit-config.yaml
+- repo: local
+  hooks:
+    - id: check-file-length
+      name: Check file length (max 800 lines)
+      entry: python scripts/quality/check_file_length.py
+      language: system
+      types: [python]
+```
+
+---

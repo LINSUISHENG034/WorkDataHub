@@ -869,6 +869,28 @@
 | **Enrichment** | Process of resolving company_id from customer names |
 | **Backfill** | Auto-derivation of reference data from domain tables |
 
+### E. Environment Configuration
+
+数据库连接通过 `.wdh_env` 文件配置：
+
+```bash
+# .wdh_env 文件
+# 主数据库 (postgres) - ETL 输出目标
+DATABASE_URL=postgresql://postgres:Post.169828@localhost:5432/postgres
+
+# Legacy 数据库 (只读) - 历史数据源
+WDH_LEGACY_PG_HOST=localhost
+WDH_LEGACY_PG_PORT=5432
+WDH_LEGACY_PG_DATABASE=legacy
+WDH_LEGACY_PG_USER=postgres
+WDH_LEGACY_PG_PASSWORD=Post.169828
+```
+
+**使用方式：**
+```bash
+uv run --env-file .wdh_env python -m work_data_hub.cli.etl --check-db
+```
+
 ---
 
 **Document End**

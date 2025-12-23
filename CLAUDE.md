@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **📚 Detailed Standards:** See [`docs/project-context.md`](docs/project-context.md) for complete development standards, architecture documentation, CLI reference, and domain terminology.
+
 ## Core Development Philosophy
 
 ### KISS (Keep It Simple, Stupid)

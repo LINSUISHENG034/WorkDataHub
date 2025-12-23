@@ -7,34 +7,42 @@ domain-agnostic services that support Clean Architecture boundaries. Created as
 part of Epic 5 (Stories 5.1-5.8), this layer enables rapid domain migration for
 Epic 9 by centralizing common transformation, validation, and enrichment logic.
 
+> **Epic 7 Modularization (2025-12-22):** Large files have been decomposed into
+> package structures following the 800-line limit. See Module Structure below.
+
 ## Architecture Position
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Orchestration Layer                       │
-│              (Dagster jobs, CLI, scheduling)                 │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    Orchestration Layer                                   │
+│                 (CLI: cli/etl/, scheduling)                              │
+└─────────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                        I/O Layer                             │
-│         (File connectors, DB loaders, API clients)           │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         I/O Layer                                        │
+│    io/loader/        io/connectors/eqc/        io/connectors/discovery/  │
+│  (DB writing)        (EQC API client)          (File discovery)          │
+└─────────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   Infrastructure Layer                       │
-│    (Transforms, Validation, Cleansing, Enrichment)          │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                   Infrastructure Layer                                   │
+│  etl/ops/     enrichment/     schema/     transforms/     validation/    │
+│ (Pipeline    (Company ID    (Domain     (Transform      (Schema         │
+│  execution)   resolution)    Registry)   steps)          validation)     │
+└─────────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      Domain Layer                            │
-│        (Business logic, Models, Schemas, Services)           │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      Domain Layer                                        │
+│        (Business logic, Models, Schemas, Services)                       │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Module Structure
+
+> **Updated 2025-12-22 (Epic 7):** Reflects modularized package structure.
 
 ```
 src/work_data_hub/infrastructure/
@@ -50,11 +58,41 @@ src/work_data_hub/infrastructure/
 │   │   └── cleansing_rules.yml  # Domain-specific rule config
 │   └── integrations/
 │       └── pydantic_adapter.py  # Pydantic field validator
-├── enrichment/
-│   ├── __init__.py
+├── enrichment/                  # [Epic 7 Story 7.3: Modularized]
+│   ├── __init__.py              # Public API exports
 │   ├── company_id_resolver.py   # Batch company ID resolution
+│   ├── gateway.py               # EnrichmentGateway (5-layer orchestration)
 │   ├── normalizer.py            # Company name normalization
+│   ├── providers/               # Provider implementations
+│   │   ├── __init__.py
+│   │   ├── base.py              # EnterpriseInfoProvider protocol
+│   │   ├── yaml_provider.py     # Layer 1: YAML config
+│   │   ├── db_cache_provider.py # Layer 2: DB cache (enrichment_index)
+│   │   └── eqc_provider.py      # Layer 4: EQC API
+│   ├── temp_id.py               # Layer 5: Temp ID generation (HMAC-SHA1)
 │   └── types.py                 # ResolutionStrategy, ResolutionResult
+├── etl/
+│   └── ops/                     # [Epic 7 Story 7.1: ops.py decomposition]
+│       ├── __init__.py          # Public API: run_domain_pipeline, etc.
+│       ├── core.py              # Main orchestration logic
+│       ├── config.py            # ETL configuration loading
+│       ├── discovery.py         # File discovery integration
+│       ├── enrichment.py        # Enrichment step integration
+│       ├── loading.py           # Database loading step
+│       ├── backfill.py          # FK backfill operations
+│       ├── reference_sync.py    # Reference data sync
+│       └── models.py            # ETLResult, ETLConfig dataclasses
+├── schema/                      # [Epic 7 Story 7.5: Domain Registry]
+│   ├── __init__.py              # Public API: DomainRegistry, get_schema
+│   ├── registry.py              # DomainRegistry class
+│   ├── types.py                 # ColumnType, ColumnDef, IndexDef, DomainSchema
+│   ├── domains/                 # Domain-specific schema definitions
+│   │   ├── __init__.py
+│   │   ├── annuity_performance.py
+│   │   ├── annuity_income.py
+│   │   ├── annuity_plans.py
+│   │   └── portfolio_plans.py
+│   └── sql_generator.py         # SQL DDL generation helpers
 ├── settings/
 │   ├── __init__.py
 │   ├── data_source_schema.py    # Pydantic schemas for config
@@ -67,11 +105,52 @@ src/work_data_hub/infrastructure/
 │   └── cleansing_step.py        # CleansingStep integration
 └── validation/
     ├── __init__.py
+    ├── domain_validators.py     # [Epic 6.2-P13] Registry-driven validation
     ├── error_handler.py         # handle_validation_errors()
     ├── report_generator.py      # Validation report generation
     ├── schema_helpers.py        # Schema utility functions
     ├── schema_steps.py          # Reusable schema validation steps
     └── types.py                 # ValidationErrorDetail, etc.
+```
+
+### I/O Layer Packages (Epic 7 Story 7.2)
+
+```
+src/work_data_hub/io/
+├── loader/                      # [Story 7.2: warehouse_loader.py decomposition]
+│   ├── __init__.py              # WarehouseLoader, LoadResult exports
+│   ├── core.py                  # WarehouseLoader class
+│   ├── operations.py            # insert_missing, fill_null_only
+│   ├── insert_builder.py        # SQL INSERT statement building
+│   ├── sql_utils.py             # quote_ident, quote_qualified
+│   └── models.py                # LoadResult, exceptions
+├── connectors/
+│   ├── eqc/                     # [Story 7.2: eqc_client.py decomposition]
+│   │   ├── __init__.py          # EQCClient exports
+│   │   ├── core.py              # EQCClient class
+│   │   ├── transport.py         # HTTP transport layer
+│   │   ├── parsers.py           # Response parsing
+│   │   ├── models.py            # Data models
+│   │   └── utils.py             # Rate limiting
+│   └── discovery/               # [Story 7.2: file_connector.py decomposition]
+│       ├── __init__.py          # FileDiscoveryService exports
+│       ├── service.py           # FileDiscoveryService class
+│       └── models.py            # Discovery result models
+└── warehouse_loader.py          # Facade (backward-compatible re-exports)
+```
+
+### CLI Layer Package (Epic 7 Story 7.4)
+
+```
+src/work_data_hub/cli/
+├── __init__.py
+├── etl/                         # [Story 7.4: etl.py decomposition]
+│   ├── __init__.py              # CLI entry point
+│   ├── commands.py              # Click command definitions
+│   ├── options.py               # CLI option definitions
+│   ├── handlers.py              # Command handlers
+│   └── formatters.py            # Output formatting
+└── etl.py                       # Facade (backward-compatible entry point)
 ```
 
 ## Key Components
@@ -135,22 +214,34 @@ domains:
 
 ### 3. Company ID Resolver (`enrichment/`)
 
-Batch resolution of company identifiers with hierarchical strategy.
+Batch resolution of company identifiers with 5-layer hierarchical strategy.
 
-**Resolution Priority:**
-1. Plan code override mapping
-2. Existing company_id column
-3. Enrichment service lookup (optional)
-4. Temporary ID generation
+> **Updated Epic 6 (2025-12-08):** Full 5-layer enrichment architecture implemented.
+
+**Resolution Priority (5 Layers):**
+1. **Layer 1: YAML Config** - `config/company_mapping.yml` hardcoded mappings
+2. **Layer 2: DB Cache** - `enterprise.enrichment_index` (5 lookup types by priority)
+3. **Layer 3: Existing Column** - Check if source data already has `company_id`
+4. **Layer 4: EQC API** - Synchronous lookup with budget control
+5. **Layer 5: Temp ID** - HMAC-SHA1 based temporary ID (IN_xxx format)
+
+**Layer 2 Lookup Types (by priority):**
+- `plan_code` > `account_name` > `account_number` > `customer_name` > `plan_customer`
 
 **Usage:**
 ```python
+from work_data_hub.infrastructure.enrichment.gateway import EnrichmentGateway
 from work_data_hub.infrastructure.enrichment.company_id_resolver import (
     CompanyIdResolver, ResolutionStrategy
 )
 
+# Full 5-layer resolution via gateway
+gateway = EnrichmentGateway(db_connection=conn, eqc_client=client)
+company_id = gateway.resolve(customer_name="某某公司")
+
+# Batch resolution in pipeline context
 resolver = CompanyIdResolver(
-    enrichment_service=None,
+    enrichment_gateway=gateway,
     plan_override_mapping={"PLAN001": "COMP001"}
 )
 
