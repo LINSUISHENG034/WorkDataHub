@@ -291,7 +291,26 @@ development_status:
   7-6-ci-integration-code-quality-tooling: done  # Code Review PASSED 2025-12-22: Unit tests added, all ACs verified
   epic-7-retrospective: optional
 
+  # Epic 7.1: Pre-Epic 8 Bug Fixes & Improvements
+  # Added 2025-12-23 via Correct-Course workflow
+  # Focused on fixing data integrity issues and removing legacy code before Epic 8
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-23-epic-7.1-pre-epic8-fixes.md
+  epic-7.1: in-progress
+  7.1-1-fix-data-clearing-root-cause: backlog  # P0: Fix enrichment_index/base_info clearing
+  7.1-2-etl-execute-mode-validation: backlog  # P0: Verify --execute writes correctly
+  7.1-3-fix-test-collection-errors: backlog  # P0: Fix work_data_hub.scripts import errors
+  7.1-4-remove-company-mapping-legacy: backlog  # P0: Zero Legacy - delete deprecated table/code
+  7.1-5-add-file-selection-cleaner-compare: backlog  # P1: CLI parameter consistency
+  7.1-6-fix-classification-logic: backlog  # P1: regression → data_source_difference
+  7.1-7-verify-legacy-db-connection: backlog  # P1: MySQL connection for Epic 8
+  7.1-8-eqc-confidence-dynamic-adjustment: backlog  # P1: Match type based confidence (configurable)
+  7.1-9-clean-up-failing-tests: backlog  # P2: Address 33 failing tests
+  7.1-10-categorize-ruff-warnings: backlog  # P2: Triage 1074 Ruff warnings
+  7.1-11-update-project-context: backlog  # P2: Reflect Epic 7 changes
+  epic-7.1-retrospective: optional
+
   # Epic 8: Testing & Validation Infrastructure
+  # BLOCKED: Waiting for Epic 7.1 P0 items to complete
   epic-8: backlog
   8-1-golden-dataset-extraction-from-legacy-system: backlog
   8-2-automated-reconciliation-engine: backlog

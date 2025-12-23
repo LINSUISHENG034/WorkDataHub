@@ -109,3 +109,109 @@ if (Test-Path "data.json") { Remove-Item "data.json" }
 * **Docstrings:** All public modules, classes, and functions **must** have a descriptive docstring.
 
 ---
+
+## 5. 📊 Reference Documentation
+
+### Database Architecture Overview
+
+本项目使用两个 PostgreSQL 数据库，理解它们的关系是开发的前提：
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         Database Architecture                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌──────────────────────────┐      ┌──────────────────────────┐        │
+│  │   legacy (只读数据源)     │      │  postgres (主数据库)      │        │
+│  │   localhost:5432/legacy  │ ───▶ │  localhost:5432/postgres │        │
+│  │                          │ Sync │                          │        │
+│  │  • 58 tables             │      │  • 22 tables             │        │
+│  │  • 历史业务数据           │      │  • ETL处理后的数据        │        │
+│  │  • 参考数据源             │      │  • 公司enrichment数据     │        │
+│  └──────────────────────────┘      └──────────────────────────┘        │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 两个数据库的职责
+
+| 数据库 | 连接地址 | 用途 | 读写权限 |
+|--------|----------|------|----------|
+| **legacy** | `postgresql://localhost:5432/legacy` | 历史数据源，从原 MySQL 迁移而来 | **只读** |
+| **postgres** | `postgresql://localhost:5432/postgres` | 主数据库，ETL 输出目标 | **读写** |
+
+#### legacy 数据库 (只读)
+
+**来源:** 原 MySQL `annuity_hub` 数据库已完整迁移至此。
+
+**用途:**
+- 📖 参考数据同步 (Reference Sync) - 年金计划、组合计划等主数据
+- 📖 公司信息同步 - base_info、business_info 等 EQC 数据
+- 📖 历史数据对比验证
+
+**关键 Schema:**
+- `enterprise` (9 tables) - 公司主数据、EQC 搜索结果
+- `business` (9 tables) - 规模明细、收入明细等业务数据
+- `mapping` (11 tables) - 年金计划、组合计划等参考数据
+- `customer` (20 tables) - 客户生命周期数据
+- `finance` (7 tables) - 财务相关数据
+
+#### postgres 数据库 (主数据库)
+
+**用途:**
+- ✍️ ETL Pipeline 输出目标
+- ✍️ 公司 Enrichment 缓存 (enrichment_index)
+- ✍️ Pipeline 执行记录
+
+**关键 Schema:**
+- `enterprise` (12 tables) - 公司 enrichment、EQC API 数据
+- `business` (1 table) - ETL 处理后的规模明细
+- `mapping` (6 tables) - 参考数据 (从 legacy 同步)
+- `public` (3 tables) - Pipeline 基础设施
+
+#### 数据流向
+
+```
+Excel Files ──▶ ETL Pipeline ──▶ postgres.business.规模明细
+                    │
+                    ▼
+              Company Enrichment
+                    │
+         ┌─────────┴─────────┐
+         ▼                   ▼
+  postgres.enterprise   legacy.enterprise
+  (enrichment_index)    (base_info sync)
+```
+
+#### 环境变量配置
+
+```bash
+# .wdh_env 文件
+# 主数据库 (postgres)
+DATABASE_URL=postgresql://postgres:Post.169828@localhost:5432/postgres
+
+# Legacy 数据库 (只读)
+WDH_LEGACY_PG_HOST=localhost
+WDH_LEGACY_PG_PORT=5432
+WDH_LEGACY_PG_DATABASE=legacy
+WDH_LEGACY_PG_USER=postgres
+WDH_LEGACY_PG_PASSWORD=Post.169828
+```
+
+### Detailed Documentation
+
+* **[Database Schema Panorama](database-schema-panorama.md)** - 完整数据库结构文档
+  * 两个数据库的完整 schema 和表定义
+  * Entity Relationship 图
+  * Data Flow Architecture
+
+### Key Architecture Files
+
+| File | Purpose |
+|------|---------|
+| `src/work_data_hub/infrastructure/schema/` | Domain Registry - Single Source of Truth for schema definitions |
+| `config/data_sources.yml` | Domain file discovery patterns |
+| `config/foreign_keys.yml` | FK backfill configuration |
+| `config/reference_sync.yml` | Reference data sync settings (legacy → postgres) |
+
+---

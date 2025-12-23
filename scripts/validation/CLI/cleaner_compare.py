@@ -107,7 +107,7 @@ def discover_source_file(month: str, domain: str) -> tuple:
         discovery_service = FileDiscoveryService()
         result = discovery_service.discover_file(
             domain=domain,
-            month=month,
+            YYYYMM=month,  # Template variable in data_sources.yml is {YYYYMM}
         )
 
         print(f"   ✓ Discovered: {result.file_path.name}")

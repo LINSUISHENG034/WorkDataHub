@@ -91,7 +91,7 @@ class AnnuityPerformanceConfig(DomainComparisonConfig):
         sheet_name: str,
         row_limit: Optional[int],
         enable_enrichment: bool,
-        sync_lookup_budget: int,
+        sync_lookup_budget: int,  # Kept for interface compatibility
     ) -> "pd.DataFrame":
         """
         Build and execute New Pipeline for annuity_performance domain.
@@ -107,6 +107,19 @@ class AnnuityPerformanceConfig(DomainComparisonConfig):
             load_plan_override_mapping,
         )
         from work_data_hub.domain.pipelines.types import PipelineContext
+        from work_data_hub.infrastructure.enrichment.eqc_lookup_config import (
+            EqcLookupConfig,
+        )
+
+        # Build EqcLookupConfig based on enable_enrichment flag (Story 6.2-P17)
+        if enable_enrichment:
+            eqc_config = EqcLookupConfig(
+                enabled=True,
+                sync_budget=sync_lookup_budget,
+                auto_create_provider=True,
+            )
+        else:
+            eqc_config = EqcLookupConfig.disabled()
 
         # Load raw data (same as Legacy cleaner input)
         raw_df = pd.read_excel(excel_path, sheet_name=sheet_name, dtype=str)
@@ -131,9 +144,9 @@ class AnnuityPerformanceConfig(DomainComparisonConfig):
         if engine is None:
             # Run without database mapping repository
             pipeline = build_bronze_to_silver_pipeline(
+                eqc_config=eqc_config,
                 enrichment_service=None,
                 plan_override_mapping=plan_override_mapping,
-                sync_lookup_budget=sync_lookup_budget if enable_enrichment else 0,
                 mapping_repository=None,
             )
 
@@ -161,9 +174,9 @@ class AnnuityPerformanceConfig(DomainComparisonConfig):
             )
 
             pipeline = build_bronze_to_silver_pipeline(
+                eqc_config=eqc_config,
                 enrichment_service=None,
                 plan_override_mapping=plan_override_mapping,
-                sync_lookup_budget=sync_lookup_budget if enable_enrichment else 0,
                 mapping_repository=mapping_repository,
             )
 
