@@ -17,7 +17,7 @@ Epic 6 Story 6.2 (Temporary Company ID Generation) implementation diverges from 
 |--------|-------------|------------------------|
 | **Algorithm** | HMAC-SHA1 hash | Database sequence |
 | **Behavior** | Stateless, deterministic | Stateful, non-deterministic |
-| **ID Format** | `IN_<16-char-base32>` | `TEMP_<6-digit-number>` |
+| **ID Format** | `IN<16-char-Base32>` | `TEMP_<6-digit-number>` |
 | **Idempotency** | Same input = same output | Each call = different output |
 
 ### Discovery Context
@@ -30,9 +30,9 @@ Epic 6 Story 6.2 (Temporary Company ID Generation) implementation diverges from 
 
 **Requirement (Epic 6, Story 6.2 Acceptance Criteria):**
 ```
-- Generate stable ID: HMAC_SHA1(WDH_ALIAS_SALT, "company_name") → Base32 encode → IN_<16-chars>
+- Generate stable ID: HMAC_SHA1(WDH_ALIAS_SALT, "company_name") → Base32 encode → IN<16-chars>
 - Same input always produces same ID (deterministic)
-- Prefix `IN_` distinguishes temporary from real company IDs
+- Prefix `IN` distinguishes temporary from real company IDs
 ```
 
 **Current Implementation (`lookup_queue.py:517-521`):**
@@ -138,7 +138,7 @@ Create a Patch Story to fix the implementation without reopening Epic 6.
 **Acceptance Criteria:**
 1. `get_next_temp_id(company_name: str)` generates ID using HMAC-SHA1
 2. Same company name always produces same temporary ID (deterministic)
-3. ID format: `IN_<16-char-base32>` (not `TEMP_XXXXXX`)
+3. ID format: `IN<16-char-Base32>` (not `TEMP_XXXXXX`)
 4. `WDH_ALIAS_SALT` environment variable configured
 5. Unit tests verify determinism with 10K unique names
 6. No ID collisions in collision test
@@ -177,19 +177,19 @@ def get_next_temp_id(self, company_name: str) -> str:
         company_name: Company name to generate ID for
 
     Returns:
-        Temporary ID in IN_<16-char-base32> format
+        Temporary ID in IN<16-char-Base32> format
     """
     if self.plan_only:
         # Return deterministic mock for plan-only mode
         normalized = company_name.strip().lower() if company_name else "unknown"
         mock_hash = hashlib.sha1(normalized.encode()).hexdigest()[:8]
-        return f"IN_{mock_hash.upper()}"
+        return f"IN{mock_hash.upper()}"
 
     salt = os.getenv("WDH_ALIAS_SALT", "default_dev_salt")
     normalized = company_name.strip().lower()
     digest = hmac.new(salt.encode(), normalized.encode(), hashlib.sha1).digest()
     encoded = base64.b32encode(digest)[:16].decode('ascii')
-    return f"IN_{encoded}"
+    return f"IN{encoded}"
 ```
 
 **Rationale:** Implements HMAC-SHA1 as specified in Story 6.2 requirements

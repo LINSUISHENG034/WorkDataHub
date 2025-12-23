@@ -58,7 +58,7 @@ The resolver processes records in this priority order:
 3. **Existing Column** - Preserve valid numeric company IDs from source
 4. **EQC Sync Lookup** - Real-time EQC API queries (budget-limited)
 5. **Default Fallback** - `600866980` for empty customer names
-6. **Temp ID Generation** - `IN_XXXX` for remaining unresolved
+6. **Temp ID Generation** - `INXXXX` for remaining unresolved
 
 ## EQC Provider Auto-Creation
 

@@ -209,7 +209,7 @@ class TestCompanyIdResolutionStep:
         # Row 2 (UNKNOWN plan code) should get temp ID
         temp_id = result_df.loc[2, "company_id"]
         assert temp_id is not None
-        assert temp_id.startswith("IN_")
+        assert temp_id.startswith("IN")
 
     def test_temp_id_is_deterministic(self, sample_df, context):
         """Same customer name produces same temp ID."""

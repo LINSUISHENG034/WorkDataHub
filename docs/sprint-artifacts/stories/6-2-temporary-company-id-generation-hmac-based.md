@@ -10,7 +10,7 @@ Status: completed
 
 ## Acceptance Criteria
 
-1. **AC1**: Deterministic ID format — `HMAC_SHA1(WDH_ALIAS_SALT, normalized_name)` → Base32 (first 10 bytes) → `IN_<16 chars>`.
+1. **AC1**: Deterministic ID format — `HMAC_SHA1(WDH_ALIAS_SALT, normalized_name)` → Base32 (first 10 bytes) → `IN<16 chars>`.
 2. **AC2**: Idempotent — identical input + salt returns identical ID.
 3. **AC3**: Collision resistance — 10,000 distinct names produce unique IDs.
 4. **AC4**: Joins safe — storing the temporary ID in DB yields consistent joins for the same name across runs.
@@ -26,7 +26,7 @@ Status: completed
 - Tech Spec: `docs/sprint-artifacts/tech-spec/tech-spec-epic-6-company-enrichment.md` (temporary ID format, salt handling, pipeline placement).
 - Pipeline integration: `CompanyIdResolver` (fallback when YAML/database/EQC miss; does not spend EQC budget).
 - Async/backfill path: temporary IDs later replaced via async enrichment queue (outside this story but must remain compatible).
-- Data stores: IDs may be written to `enterprise` schema tables; ensure width supports `IN_` prefix + 16 chars (19 total).
+- Data stores: IDs may be written to `enterprise` schema tables; ensure width supports `IN` prefix + 16 chars (19 total).
 
 ## Tasks / Subtasks
 
@@ -39,7 +39,7 @@ Status: completed
   - [x] Lowercase conversion for hash stability
 - [x] Task 2: Implement HMAC-based ID generation (AC1, AC2, AC3, AC9)
   - [x] `generate_temp_company_id()` uses HMAC-SHA1 + Base32 (first 10 bytes)
-  - [x] Prefix with `IN_`; format length 19
+  - [x] Prefix with `IN`; format length 19
   - [x] Handle empty normalized names with `"__empty__"` guard
 - [x] Task 3: Unit tests for normalization (AC6)
   - [x] Whitespace handling (10 cases)
@@ -47,7 +47,7 @@ Status: completed
   - [x] Bracket + full-width normalization
   - [x] Legacy parity (10 cases)
 - [x] Task 4: Unit tests for ID generation (AC1–AC3, AC8)
-  - [x] Format validation (`IN_` + 16 chars)
+  - [x] Format validation (`IN` + 16 chars)
   - [x] Consistency + uniqueness + salt sensitivity
   - [x] Empty name handling
   - [x] Throughput guard (no external calls; CPU-only)
@@ -81,7 +81,7 @@ Status: completed
 
 ## Algorithm Details
 
-**Temporary ID Format:** `IN_<16-char-Base32>`
+**Temporary ID Format:** `IN<16-char-Base32>`
 
 ```python
 def generate_temp_company_id(customer_name: str, salt: str) -> str:
@@ -94,7 +94,7 @@ def generate_temp_company_id(customer_name: str, salt: str) -> str:
         hashlib.sha1,
     ).digest()
     encoded = base64.b32encode(digest[:10]).decode("ascii")
-    return f"IN_{encoded}"
+    return f"IN{encoded}"
 ```
 
 **Normalization Operations (order):**
@@ -147,7 +147,7 @@ PYTHONPATH=src uv run pytest tests/unit/infrastructure/enrichment/test_normalize
    - Secret only; not in git or logs
    - Changing salt invalidates historical temporary IDs
 2. **Determinism & Stability:** No randomness; CPU-only; no network/API calls
-3. **Database Width:** Columns storing temp IDs must allow 19 chars (`IN_` + 16)
+3. **Database Width:** Columns storing temp IDs must allow 19 chars (`IN` + 16)
 4. **Logging:** Never log raw salt or raw HMAC inputs
 
 ## Integration with CompanyIdResolver
@@ -163,7 +163,7 @@ if strategy.generate_temp_ids and mask_still_missing.any():
 
 - Fallback only; does not consume EQC sync budget.
 - Compatible with async enrichment queue replacing temporary IDs later.
-- Backfill logic must accept `IN_` IDs without blocking pipeline flow.
+- Backfill logic must accept `IN` IDs without blocking pipeline flow.
 
 ## Performance & Observability
 

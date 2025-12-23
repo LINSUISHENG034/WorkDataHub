@@ -68,7 +68,7 @@ CompanyIdResolutionStep(
 ```
 
 **临时 ID 格式：**
-- 格式：`IN_<16位Base32>` (HMAC-SHA1)
+- 格式：`IN<16位Base32>` (HMAC-SHA1，无下划线分隔符)
 - 实现：`infrastructure/enrichment/normalizer.py::generate_temp_company_id()`
 - 盐值：`WDH_ALIAS_SALT` 环境变量
 
@@ -101,7 +101,7 @@ data/mappings/
 
 | 决策 | 选择 | 理由 |
 |------|------|------|
-| 临时 ID 格式 | `IN_<16位Base32>` (HMAC-SHA1) | 与现有实现一致，稳定可追溯 |
+| 临时 ID 格式 | `IN<16位Base32>` (HMAC-SHA1) | 与现有实现一致，稳定可追溯 |
 | 数据库 Schema | `enterprise` schema | 与业务表隔离，便于管理 |
 | Legacy 映射迁移 | 全部迁移 | 保持 Legacy Parity |
 | EQC Token 管理 | 用户手动获取 + `.env` 配置 + 预检测 | Token 暂无有效期，统一配置管理 |
@@ -549,7 +549,7 @@ class CompanyMappingRepository:
 │                              ↓ 未命中                           │
 │  第四层: EQC 同步查询 (budget 限制，结果缓存到数据库)            │
 │                              ↓ 未命中                           │
-│  第五层: 临时 ID 生成 (IN_<16位Base32>) + 入队异步回填           │
+│  第五层: 临时 ID 生成 (IN<16位Base32>) + 入队异步回填            │
 └─────────────────────────────────────────────────────────────────┘
 ```
 

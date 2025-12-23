@@ -83,7 +83,7 @@ python -c "from work_data_hub.infrastructure.enrichment import CompanyIdResolver
 1. **Plan override lookup** - `data/mappings/company_id_overrides_plan.yml`
 2. **Internal mapping lookup** - Via `CompanyEnrichmentService.resolve_company_id()`
 3. **Enrichment service call** - Optional, if service provided and budget > 0
-4. **Temporary ID generation** - `IN_<16-char-base32>` format using HMAC-SHA1
+4. **Temporary ID generation** - `IN<16-char-Base32>` format using HMAC-SHA1
 
 **Strategy Configuration:**
 ```python
@@ -167,7 +167,7 @@ uv run pytest tests/unit/infrastructure/enrichment/test_company_id_resolver.py -
 
 ### AC-5.4.4: Temporary ID Generation
 
-**Requirement:** Implement `IN_<16-char-base32>` format matching existing logic.
+**Requirement:** Implement `IN<16-char-Base32>` format matching existing logic.
 
 **Current Implementation (from `processing_helpers.py:550-581`):**
 ```python
@@ -182,7 +182,7 @@ def generate_temp_company_id(customer_name: str) -> str:
     message = customer_name.encode("utf-8")
     digest = hmac.new(key, message, hashlib.sha1).digest()
     encoded = base64.b32encode(digest[:10]).decode("ascii")
-    return f"IN_{encoded}"
+    return f"IN{encoded}"
 ```
 
 **Infrastructure Implementation:**
@@ -352,7 +352,7 @@ def generate_temp_company_id(customer_name: str, salt: str) -> str:
     """
     Generate stable temporary company ID with legacy-compatible normalization.
 
-    Format: IN_<16-char-Base32>
+    Format: IN<16-char-Base32>
     Algorithm: HMAC-SHA1
     """
     import base64
@@ -369,7 +369,7 @@ def generate_temp_company_id(customer_name: str, salt: str) -> str:
     ).digest()
 
     encoded = base64.b32encode(digest[:10]).decode('ascii')
-    return f"IN_{encoded}"
+    return f"IN{encoded}"
 ```
 
 **Verification:**
@@ -538,7 +538,7 @@ def generate_temp_company_id(customer_name: str) -> str:
     message = customer_name.encode("utf-8")
     digest = hmac.new(key, message, hashlib.sha1).digest()
     encoded = base64.b32encode(digest[:10]).decode("ascii")
-    return f"IN_{encoded}"
+    return f"IN{encoded}"
 ```
 
 **Current company code extraction (`processing_helpers.py:584-618`):**
@@ -568,7 +568,7 @@ XNP596: 601038164
 ### Architecture Decision Reference
 
 **AD-002 (Temporary Company ID Generation):**
-- Format: `IN_<16-char-Base32>`
+- Format: `IN<16-char-Base32>`
 - Algorithm: HMAC-SHA1 with salt
 - Salt: `WDH_ALIAS_SALT` environment variable
 - Normalization: Legacy-compatible + lowercase

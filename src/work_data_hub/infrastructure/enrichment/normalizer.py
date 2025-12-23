@@ -196,22 +196,25 @@ def generate_temp_company_id(customer_name: str, salt: str) -> str:
     """
     Generate stable temporary company ID with legacy-compatible normalization.
 
-    Format: IN_<16-char-Base32>
+    Format: IN<16-char-Base32> (no underscore separator)
     Algorithm: HMAC-SHA1
 
     The customer name is normalized before hashing to ensure consistent
     ID generation across name variants.
+
+    Note: Base32 charset (A-Z, 2-7) doesn't include underscore, so "IN" prefix
+    is unambiguous without a separator. This matches existing database data.
 
     Args:
         customer_name: Customer name to generate ID for.
         salt: Salt for HMAC (from WDH_ALIAS_SALT environment variable).
 
     Returns:
-        Temporary ID in format "IN_<16-char-Base32>".
+        Temporary ID in format "IN<16-char-Base32>" (18 characters total).
 
     Examples:
         >>> generate_temp_company_id("中国平安", "test_salt")
-        'IN_...'  # 19 characters total
+        'IN...'  # 18 characters total
         >>> # Same input produces same output
         >>> id1 = generate_temp_company_id("中国平安", "salt")
         >>> id2 = generate_temp_company_id("中国平安", "salt")
@@ -234,4 +237,4 @@ def generate_temp_company_id(customer_name: str, salt: str) -> str:
     # Take first 10 bytes and encode as Base32 (produces 16 characters)
     encoded = base64.b32encode(digest[:10]).decode("ascii")
 
-    return f"IN_{encoded}"
+    return f"IN{encoded}"

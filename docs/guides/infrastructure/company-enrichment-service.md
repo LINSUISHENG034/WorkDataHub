@@ -75,7 +75,7 @@
 │                              ↓ Not found / Budget exhausted                  │
 │  ┌────────────────────────────────────────────────────────────────────────┐ │
 │  │ Layer 5: Temporary ID Generation + Async Queue                         │ │
-│  │   - 生成临时 ID: IN_<16-char-Base32> (HMAC-SHA1 确定性生成)             │ │
+│  │   - 生成临时 ID: IN<16-char-Base32> (HMAC-SHA1 确定性生成)              │ │
 │  │   - 同一公司名始终生成相同临时 ID (支持跨运行关联)                       │ │
 │  │   - 加入异步队列: enterprise.enrichment_requests                        │ │
 │  └────────────────────────────────────────────────────────────────────────┘ │
@@ -504,7 +504,7 @@ WHERE status = 'done' AND processed_at < NOW() - INTERVAL '30 days';
 
 | 测试场景 | 输入 | 预期输出 | 实际结果 |
 |----------|------|----------|----------|
-| 临时 ID 生成 | customer_name=新公司XYZ | IN_XXXXXXXX | 待验证 |
+| 临时 ID 生成 | customer_name=新公司XYZ | INXXXXXXXX | 待验证 |
 | 确定性验证 | 同一名称两次 | 相同 ID | 待验证 |
 
 ---

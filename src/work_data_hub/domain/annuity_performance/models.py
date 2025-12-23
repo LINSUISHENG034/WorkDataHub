@@ -353,11 +353,19 @@ class AnnuityPerformanceOut(BaseModel):
     @field_validator("company_id", mode="after")
     @classmethod
     def normalize_company_id(cls, v: Optional[str]) -> Optional[str]:
+        """Validate company_id format.
+
+        Valid formats:
+        - Numeric ID: e.g., "614810477"
+        - Temp ID: "IN<16-char-Base32>", e.g., "INABCDEFGHIJKLMNOP"
+
+        No normalization needed - inputs should already be in correct format.
+        """
         if v is None:
             return v
-        normalized = v.upper().replace("-", "").replace("_", "").replace(" ", "")
-        if not normalized.replace(".", "").replace("（", "").replace("）", "").strip():
-            raise ValueError(f"company_id cannot be empty after normalization: {v}")
+        normalized = v.upper()
+        if not normalized.strip():
+            raise ValueError(f"company_id cannot be empty: {v}")
         return normalized
 
     @field_validator(

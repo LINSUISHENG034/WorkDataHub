@@ -52,7 +52,7 @@
 | **Gold Layer** | Business-ready data with final projections and schemas (pandera) |
 | **Strangler Fig** | Migration pattern: gradually replace legacy with parallel running |
 | **Parity Test** | CI-enforced test comparing new vs legacy outputs (100% match required) |
-| **Temporary Company ID** | Stable ID (`IN_<16-char-Base32>`) for unresolved companies (Decision #2) |
+| **Temporary Company ID** | Stable ID (`IN<16-char-Base32>`) for unresolved companies (Decision #2) |
 | **Version Detection** | Algorithm selecting correct V1/V2/V3 folder per domain (Decision #1) |
 | **DataFrame Step** | Bulk transformation operating on entire DataFrame (Decision #3) |
 | **Row Step** | Per-row transformation with detailed validation/enrichment (Decision #3) |

@@ -83,7 +83,7 @@ class TestPlanOverrideResolution:
         result_df = result.data
         stats = result.statistics
 
-        assert result_df.loc[0, "company_id"].startswith("IN_")
+        assert result_df.loc[0, "company_id"].startswith("IN")
         assert stats.plan_override_hits == 0
         assert stats.temp_ids_generated == 1
 
@@ -141,7 +141,7 @@ class TestExistingColumnPassthrough:
         stats = result.statistics
 
         # Should generate temp ID since existing is empty
-        assert result_df.loc[0, "company_id"].startswith("IN_")
+        assert result_df.loc[0, "company_id"].startswith("IN")
         assert stats.existing_column_hits == 0
 
     def test_plan_override_takes_priority_over_existing(
@@ -206,8 +206,8 @@ class TestTempIdGeneration:
         result_df = result.data
 
         temp_id = result_df.loc[0, "company_id"]
-        assert temp_id.startswith("IN_")
-        assert len(temp_id) == 19  # "IN_" + 16 chars
+        assert temp_id.startswith("IN")
+        assert len(temp_id) == 18  # "IN" + 16 chars
 
     def test_temp_id_consistency(self, resolver_standalone, default_strategy):
         """Test same input produces same temp ID."""
@@ -437,7 +437,7 @@ class TestEnrichmentServiceIntegration:
         result_df = result.data
         stats = result.statistics
 
-        assert result_df.loc[0, "company_id"].startswith("IN_")
+        assert result_df.loc[0, "company_id"].startswith("IN")
 
 
 class TestEmptyNullHandling:
@@ -455,7 +455,7 @@ class TestEmptyNullHandling:
         result = resolver_with_overrides.resolve_batch(df, default_strategy)
         result_df = result.data
 
-        assert result_df.loc[0, "company_id"].startswith("IN_")
+        assert result_df.loc[0, "company_id"].startswith("IN")
 
     def test_empty_customer_name(self, resolver_standalone, default_strategy):
         """Test empty customer name generates consistent temp ID."""
@@ -470,7 +470,7 @@ class TestEmptyNullHandling:
         result_df = result.data
 
         # Should still generate a temp ID (using placeholder)
-        assert result_df.loc[0, "company_id"].startswith("IN_")
+        assert result_df.loc[0, "company_id"].startswith("IN")
 
     def test_null_customer_name(self, resolver_standalone, default_strategy):
         """Test null customer name generates consistent temp ID."""
@@ -484,7 +484,7 @@ class TestEmptyNullHandling:
         result = resolver_standalone.resolve_batch(df, default_strategy)
         result_df = result.data
 
-        assert result_df.loc[0, "company_id"].startswith("IN_")
+        assert result_df.loc[0, "company_id"].startswith("IN")
 
     def test_missing_required_column_raises(
         self, resolver_standalone, default_strategy
@@ -515,7 +515,7 @@ class TestEmptyNullHandling:
         result_df = result.data
         stats = result.statistics
 
-        assert result_df.loc[0, "company_id"].startswith("IN_")
+        assert result_df.loc[0, "company_id"].startswith("IN")
         assert stats.yaml_hits.get("plan", 0) == 0
 
 
@@ -613,7 +613,7 @@ class TestCustomStrategy:
         result_df = result.data
 
         assert "resolved_id" in result_df.columns
-        assert result_df.loc[0, "resolved_id"].startswith("IN_")
+        assert result_df.loc[0, "resolved_id"].startswith("IN")
 
     def test_custom_output_column(self, resolver_with_overrides):
         """Test custom output column name."""
@@ -800,7 +800,7 @@ class TestDatabaseCacheLookup:
 
         result = resolver.resolve_batch(df, default_strategy)
         # Should fall through to temp ID
-        assert result.data.loc[0, "company_id"].startswith("IN_")
+        assert result.data.loc[0, "company_id"].startswith("IN")
         assert result.statistics.db_cache_hits_total == 0
 
 
@@ -1158,7 +1158,7 @@ class TestAsyncQueueIntegration:
         # Should not raise, should continue with temp ID
         result = resolver.resolve_batch(df, default_strategy)
 
-        assert result.data.loc[0, "company_id"].startswith("IN_")
+        assert result.data.loc[0, "company_id"].startswith("IN")
         assert result.statistics.temp_ids_generated == 1
         assert result.statistics.async_queued == 0  # Failed, so 0
 
@@ -1267,7 +1267,7 @@ class TestAsyncQueueIntegration:
         result = resolver.resolve_batch(df, default_strategy)
 
         # Should still generate temp ID
-        assert result.data.loc[0, "company_id"].startswith("IN_")
+        assert result.data.loc[0, "company_id"].startswith("IN")
         assert result.statistics.temp_ids_generated == 1
         assert result.statistics.async_queued == 0
 
@@ -1341,7 +1341,7 @@ class TestAsyncQueueIntegration:
         # Verify enqueue request includes temp_id
         call_args = mock_repo.enqueue_for_enrichment.call_args[0][0]
         assert len(call_args) == 1
-        assert call_args[0]["temp_id"].startswith("IN_")
+        assert call_args[0]["temp_id"].startswith("IN")
         assert call_args[0]["raw_name"] == "公司A"
 
 

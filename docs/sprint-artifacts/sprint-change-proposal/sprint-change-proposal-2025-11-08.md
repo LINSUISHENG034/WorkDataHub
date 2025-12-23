@@ -40,7 +40,7 @@ The PRD's FR-3.3 "Company Enrichment Integration" (lines 825-833) captures the e
 
 | Missing Element | Current PRD | Documented in Reference |
 |----------------|-------------|------------------------|
-| Temporary ID Strategy | ❌ Not mentioned | ✅ HMAC-based `IN_` aliases with salt management |
+| Temporary ID Strategy | ❌ Not mentioned | ✅ HMAC-based `IN` aliases with salt management |
 | Confidence Scoring | ❌ Not mentioned | ✅ Three-tier thresholds (≥0.90 / 0.60-0.90 / <0.60) with human review |
 | Provider Architecture | ❌ Not mentioned | ✅ EnterpriseInfoProvider protocol, Gateway, multiple providers (Stub/EQC/Legacy) |
 | Legacy Migration | ❌ Not mentioned | ✅ 5-layer mapping consolidation from Mongo/MySQL |
@@ -234,7 +234,7 @@ When `/create-epics-and-stories` runs:
 **Summary:** Expand acceptance criteria from 5 high-level items to 12 detailed criteria covering Provider pattern, temporary IDs, confidence scoring, security, and legacy migration.
 
 **Key Additions:**
-- Temporary ID generation (HMAC-based `IN_` aliases)
+- Temporary ID generation (HMAC-based `IN` aliases)
 - Confidence scoring with human review thresholds
 - Provider abstraction pattern (EnterpriseInfoProvider protocol)
 - Data persistence schema (3 tables)
@@ -266,7 +266,7 @@ When `/create-epics-and-stories` runs:
     - (1) Internal mapping tables: `plan_company_map`, `account_company_map`, `name_company_index`
     - (2) Synchronous EQC API lookup (budget-limited to prevent blocking)
     - (3) Async enrichment queue for deferred resolution
-  - ✅ **Temporary ID generation:** Unresolved companies get stable `IN_<16-char-Base32>` IDs generated via `HMAC_SHA1(WDH_ALIAS_SALT, business_key)` - ensures same company always maps to same temporary ID
+  - ✅ **Temporary ID generation:** Unresolved companies get stable `IN<16-char-Base32>` IDs generated via `HMAC_SHA1(WDH_ALIAS_SALT, business_key)` - ensures same company always maps to same temporary ID
   - ✅ **Confidence scoring with human review thresholds:**
     - ≥0.90: Auto-accept and use company_id
     - 0.60-0.90: Accept but flag `needs_review=True`
@@ -383,7 +383,7 @@ WDH_LOOKUP_RETRY_DELAY=300  # seconds
 **IN SCOPE for MVP:**
 - ✅ `EnterpriseInfoProvider` protocol definition (abstraction layer)
 - ✅ `StubProvider` implementation (offline company fixtures for testing)
-- ✅ Temporary ID generation (HMAC-based `IN_` aliases with salt)
+- ✅ Temporary ID generation (HMAC-based `IN` aliases with salt)
 - ✅ Basic enrichment stats tracking (internal hits, unknown count)
 - ✅ Enrichment integration in annuity pipeline (demonstrate pattern)
 - ✅ Feature flag (`WDH_ENRICH_COMPANY_ID`) for toggle on/off

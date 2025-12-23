@@ -102,7 +102,7 @@ so that **temporary IDs can be resolved to real company IDs in background proces
 │                              ↓ Not found                         │
 │  Layer 4: EQC Sync Lookup (budget-limited, cached)               │
 │                              ↓ Not found                         │
-│  Layer 5: Temporary ID Generation (IN_<16-char-Base32>)          │
+│  Layer 5: Temporary ID Generation (IN<16-char-Base32>)          │
 │           + ENQUEUE for async enrichment (Story 6.5) ← NEW       │
 └─────────────────────────────────────────────────────────────────┘
 ```

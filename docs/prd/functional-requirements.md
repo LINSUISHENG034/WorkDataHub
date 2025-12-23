@@ -133,7 +133,7 @@ Organized by **capability** (not technology), with acceptance criteria that conn
     - (1) Internal mapping tables: `plan_company_map`, `account_company_map`, `name_company_index`
     - (2) Synchronous EQC API lookup (budget-limited to prevent blocking)
     - (3) Async enrichment queue for deferred resolution
-  - ✅ **Temporary ID generation:** Unresolved companies get stable `IN_<16-char-Base32>` IDs generated via `HMAC_SHA1(WDH_ALIAS_SALT, business_key)` - ensures same company always maps to same temporary ID
+  - ✅ **Temporary ID generation:** Unresolved companies get stable `IN<16-char-Base32>` IDs generated via `HMAC_SHA1(WDH_ALIAS_SALT, business_key)` - ensures same company always maps to same temporary ID
   - ✅ **Confidence scoring with human review thresholds:**
     - ≥0.90: Auto-accept and use company_id
     - 0.60-0.90: Accept but flag `needs_review=True`

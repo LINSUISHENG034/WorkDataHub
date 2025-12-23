@@ -223,7 +223,7 @@ Batch resolution of company identifiers with 5-layer hierarchical strategy.
 2. **Layer 2: DB Cache** - `enterprise.enrichment_index` (5 lookup types by priority)
 3. **Layer 3: Existing Column** - Check if source data already has `company_id`
 4. **Layer 4: EQC API** - Synchronous lookup with budget control
-5. **Layer 5: Temp ID** - HMAC-SHA1 based temporary ID (IN_xxx format)
+5. **Layer 5: Temp ID** - HMAC-SHA1 based temporary ID (INxxx format)
 
 **Layer 2 Lookup Types (by priority):**
 - `plan_code` > `account_name` > `account_number` > `customer_name` > `plan_customer`

@@ -297,7 +297,7 @@ sql = builder.upsert(
    ```
 
 5. **Temporary ID Generation**
-   - Unresolved companies get stable `IN_<16-char-Base32>` IDs
+   - Unresolved companies get stable `IN<16-char-Base32>` IDs
    - Generated via `HMAC_SHA1(WDH_ALIAS_SALT, business_key)` truncated to 128 bits
    - Business key: normalized company name + optional plan code/account signals
    - Ensures same company always maps to same temporary ID across runs

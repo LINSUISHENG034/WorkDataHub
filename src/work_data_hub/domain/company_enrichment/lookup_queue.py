@@ -515,7 +515,7 @@ class LookupQueue:
             company_name: Company name to generate ID for
 
         Returns:
-            Temporary ID in IN_<16-char-base32> format (e.g., IN_ABCD1234EFGH5678)
+            Temporary ID in IN<16-char-Base32> format (e.g., INABCD1234EFGH5678)
 
         Raises:
             LookupQueueError: If temp ID generation fails

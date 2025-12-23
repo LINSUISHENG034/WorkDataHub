@@ -131,7 +131,7 @@ so that **company ID resolution uses a unified hierarchical strategy with automa
 │                              ↓ Not found                         │
 │  Layer 4: EQC Sync Lookup (budget-limited, Story 6.5)            │
 │                              ↓ Not found                         │
-│  Layer 5: Temporary ID Generation (IN_<16-char-Base32>)          │
+│  Layer 5: Temporary ID Generation (IN<16-char-Base32>)          │
 │           + Queue for async enrichment (Story 6.7)               │
 └─────────────────────────────────────────────────────────────────┘
 ```

@@ -118,11 +118,11 @@ class TestAnnuityPerformanceOut:
 
     def test_code_normalization(self):
         """Test that identifier codes are normalized properly."""
-        # company_id is now Optional
-        model = AnnuityPerformanceOut(计划代码="test-001", company_id="comp_002")
+        # company_id is now Optional - use valid formats (numeric or temp ID)
+        model = AnnuityPerformanceOut(计划代码="test-001", company_id="614810477")
 
         assert model.计划代码 == "TEST001"  # Uppercase, no separators
-        assert model.company_id == "COMP002"  # Uppercase, no separators (when provided)
+        assert model.company_id == "614810477"  # Numeric ID unchanged
 
 
 class TestDecimalQuantization:

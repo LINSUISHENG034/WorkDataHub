@@ -84,7 +84,7 @@ df.loc[mask, 'company_id'] = df['年金账户名'].map(COMPANY_ID5_MAPPING)[mask
 
 **Epic 4 MVP Strategy:**
 - **Story 4.3:** Implement steps 1-5 structure with stub provider
-- **Stub Provider:** Returns temporary ID (`IN_*`) for all unmapped cases
+- **Stub Provider:** Returns temporary ID (`IN*`) for all unmapped cases
 - **Epic 5 Growth:** Replace stub with real enrichment service (EQC API, async queue)
 
 **Parity Requirement:**
@@ -177,7 +177,7 @@ After reviewing PRD and epics.md, Epic 5 (Stories 5.1-5.8) provides a **complete
 │   → Cache results to company_name_index             │
 ├─────────────────────────────────────────────────────┤
 │ Tier 3: Temporary ID Generation (Story 5.2)        │
-│   → HMAC-based stable IDs: IN_<16-char-Base32>     │
+│   → HMAC-based stable IDs: IN<16-char-Base32>     │
 │   → Same company → same temp ID (deterministic)     │
 ├─────────────────────────────────────────────────────┤
 │ Background: Async Queue (Story 5.7)                │
@@ -220,7 +220,7 @@ enterprise.enrichment_requests (async queue):
 
 **Epic 4 MVP Strategy (Before Epic 5):**
 - Use `StubProvider` (Story 5.1): Returns temporary IDs for ALL companies
-- Generate stable temporary IDs (Story 5.2): `IN_<HMAC-SHA1-Base32>`
+- Generate stable temporary IDs (Story 5.2): `IN<HMAC-SHA1-Base32>`
 - No database lookup needed in MVP (all temp IDs)
 - Epic 5 backfills real company_ids when complete
 
@@ -988,7 +988,7 @@ domains:
 
 **AC-4.3.3:** Enrichment stub integration
 - Stub provider returns temporary IDs for unknowns
-- Format: `IN_<16-char-Base32>`
+- Format: `IN<16-char-Base32>`
 
 **AC-4.3.4:** Partial success handling
 - Continue with valid rows if <10% fail

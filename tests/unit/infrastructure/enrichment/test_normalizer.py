@@ -124,11 +124,11 @@ class TestGenerateTempCompanyId:
     """Tests for generate_temp_company_id function."""
 
     def test_format(self):
-        """Test temp ID format is IN_<16-char-Base32>."""
+        """Test temp ID format is IN<16-char-Base32> (no underscore)."""
         temp_id = generate_temp_company_id("中国平安", "test_salt")
 
-        assert temp_id.startswith("IN_")
-        assert len(temp_id) == 19  # "IN_" + 16 chars
+        assert temp_id.startswith("IN")
+        assert len(temp_id) == 18  # "IN" + 16 chars
 
     def test_consistency(self):
         """Test same input produces same output."""
@@ -155,8 +155,8 @@ class TestGenerateTempCompanyId:
         """Test empty name produces valid ID."""
         temp_id = generate_temp_company_id("", "test_salt")
 
-        assert temp_id.startswith("IN_")
-        assert len(temp_id) == 19
+        assert temp_id.startswith("IN")
+        assert len(temp_id) == 18
 
     def test_whitespace_variants_same_id(self):
         """Test whitespace variants produce same temp ID."""

@@ -169,7 +169,7 @@ class EnrichmentObserver:
         >>> observer = EnrichmentObserver()
         >>> observer.record_lookup()
         >>> observer.record_cache_hit("exact_match")
-        >>> observer.record_temp_id("Unknown Corp", "IN_ABC123")
+        >>> observer.record_temp_id("Unknown Corp", "INABC123DEF456GH")
         >>> stats = observer.get_stats()
         >>> stats.total_lookups
         1

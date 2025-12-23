@@ -309,7 +309,7 @@
 | `id` | INTEGER | **NO** | **PK** - Auto-increment |
 | `raw_name` | VARCHAR | **NO** | Original company name |
 | `normalized_name` | VARCHAR | **NO** | Normalized name for matching |
-| `temp_id` | VARCHAR | YES | Temporary ID (IN_xxx format) |
+| `temp_id` | VARCHAR | YES | Temporary ID (INxxx format) |
 | `status` | VARCHAR | **NO** | Status: pending, processing, done, failed (default: pending) |
 | `attempts` | INTEGER | **NO** | Processing attempt count (default: 0) |
 | `last_error` | TEXT | YES | Error message if failed |
@@ -821,7 +821,7 @@
 │       ▼                                                                   │
 │  ┌─────────────────────────────────────────────────────────────┐        │
 │  │                    LAYER 5: Temp ID                          │        │
-│  │  Generate HMAC-based temporary ID (IN_xxx format)            │        │
+│  │  Generate HMAC-based temporary ID (INxxx format)             │        │
 │  │  → Queue for async enrichment                                │        │
 │  └─────────────────────────────────────────────────────────────┘        │
 │       │                                                                   │

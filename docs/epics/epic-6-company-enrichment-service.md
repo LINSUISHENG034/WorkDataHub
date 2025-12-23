@@ -74,14 +74,14 @@ So that **same company always maps to same temporary ID across runs, enabling co
 **Given** I have unresolved company name `"新公司XYZ"`
 **When** I generate temporary ID
 **Then** System should:
-- Generate stable ID: `HMAC_SHA1(WDH_ALIAS_SALT, "新公司XYZ")` → Base32 encode → `IN_<16-chars>`
-- Example: `"新公司XYZ"` → `"IN_ABCD1234EFGH5678"`
+- Generate stable ID: `HMAC_SHA1(WDH_ALIAS_SALT, "新公司XYZ")` → Base32 encode → `IN<16-chars>`
+- Example: `"新公司XYZ"` → `"INABCD1234EFGH5678"`
 - Same input always produces same ID (deterministic)
 - Different inputs produce different IDs (collision-resistant)
-- Prefix `IN_` distinguishes temporary from real company IDs
+- Prefix `IN` distinguishes temporary from real company IDs
 
 **And** When I generate ID for `"新公司XYZ"` twice
-**Then** Both calls return identical ID: `"IN_ABCD1234EFGH5678"`
+**Then** Both calls return identical ID: `"INABCD1234EFGH5678"`
 
 **And** When I generate IDs for 10,000 different company names
 **Then** No collisions occur (all IDs unique)
@@ -102,11 +102,11 @@ So that **same company always maps to same temporary ID across runs, enabling co
 - Function signature:
   ```python
   def generate_temp_company_id(company_name: str, salt: str) -> str:
-      """Generate stable temporary ID: IN_<16-char-Base32>"""
+      """Generate stable temporary ID: IN<16-char-Base32>"""
       normalized = company_name.strip().lower()  # Normalize before hashing
       digest = hmac.new(salt.encode(), normalized.encode(), hashlib.sha1).digest()
       encoded = base64.b32encode(digest)[:16].decode('ascii')
-      return f"IN_{encoded}"
+      return f"IN{encoded}"
   ```
 - Security: Salt must be kept secret (not committed to git)
 - Reference: PRD §834 (Temporary ID generation), reference/01_company_id_analysis.md §S-002
@@ -246,7 +246,7 @@ So that **enrichment never blocks pipelines and all companies get valid IDs (rea
 **Then** Generate temporary ID and return:
 ```python
 CompanyInfo(
-    company_id="IN_ABCD1234EFGH5678",
+    company_id="INABCD1234EFGH5678",
     official_name="新公司XYZ",  # Original name
     unified_credit_code=None,
     confidence=0.0,  # Temporary ID has no confidence

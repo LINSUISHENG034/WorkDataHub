@@ -32,12 +32,12 @@ Story 6.2 specified HMAC-SHA1 for deterministic temporary ID generation, but the
 **Then** the system generates ID using:
 - `HMAC_SHA1(WDH_ALIAS_SALT, normalized_company_name)`
 - Base32 encode the digest
-- Return format: `IN_<16-char-base32>`
+- Return format: `IN<16-char-Base32>`
 
 ### AC2: Deterministic Behavior
 **Given** company name "新公司XYZ"
 **When** `get_next_temp_id("新公司XYZ")` is called multiple times
-**Then** all calls return identical ID (e.g., `IN_ABCD1234EFGH5678`)
+**Then** all calls return identical ID (e.g., `INABCD1234EFGH5678`)
 
 ### AC3: Environment Consistency
 **Given** same `WDH_ALIAS_SALT` configured in Staging and Production
@@ -84,12 +84,12 @@ def get_next_temp_id(self, company_name: str) -> str:
         company_name: Company name to generate ID for
 
     Returns:
-        Temporary ID in IN_<16-char-base32> format
+        Temporary ID in IN<16-char-Base32> format
     """
     if self.plan_only:
         normalized = company_name.strip().lower() if company_name else "unknown"
         mock_hash = hashlib.sha1(normalized.encode()).hexdigest()[:8]
-        return f"IN_{mock_hash.upper()}"
+        return f"IN{mock_hash.upper()}"
 
     salt = os.getenv("WDH_ALIAS_SALT")
     if not salt:
@@ -102,10 +102,10 @@ def get_next_temp_id(self, company_name: str) -> str:
 
     logger.debug(
         "Generated temporary ID",
-        extra={"company_name": company_name, "temp_id": f"IN_{encoded}"}
+        extra={"company_name": company_name, "temp_id": f"IN{encoded}"}
     )
 
-    return f"IN_{encoded}"
+    return f"IN{encoded}"
 ```
 
 **Call Site Updates:** Update any code calling `get_next_temp_id()` to pass `company_name`
@@ -122,7 +122,7 @@ def get_next_temp_id(self, company_name: str) -> str:
 ## Definition of Done
 
 - [ ] `get_next_temp_id(company_name)` implemented with HMAC-SHA1
-- [ ] ID format changed from `TEMP_XXXXXX` to `IN_<base32>`
+- [ ] ID format changed from `TEMP_XXXXXX` to `IN<Base32>`
 - [ ] All call sites updated to pass company name
 - [ ] `WDH_ALIAS_SALT` environment variable documented
 - [ ] Unit tests for determinism (same input = same output)
@@ -166,7 +166,7 @@ def get_next_temp_id(self, company_name: str) -> str:
 ### Completion Notes
 
 ✅ **All Acceptance Criteria Met:**
-- AC1: HMAC-SHA1 implementation with `IN_<16-char-base32>` format
+- AC1: HMAC-SHA1 implementation with `IN<16-char-Base32>` format
 - AC2: Deterministic behavior - same input produces same output
 - AC3: Environment consistency with same salt
 - AC4: No collisions in 10K unique names test
@@ -202,7 +202,7 @@ def get_next_temp_id(self, company_name: str) -> str:
 
 - **2025-12-13:** Story implementation completed
   - Refactored `get_next_temp_id()` from database sequence to HMAC-SHA1
-  - Changed ID format from `TEMP_XXXXXX` to `IN_<16-char-base32>`
+  - Changed ID format from `TEMP_XXXXXX` to `IN<16-char-Base32>`
   - Updated method signature to require `company_name` parameter
   - Added comprehensive test coverage (9 new tests)
   - All 133 company_enrichment tests passing

@@ -275,7 +275,7 @@ The dataset must include specific rows to exercise each layer of the new archite
 | 2 | Database Cache | `enterprise.enrichment_index` (P1-P5 lookup types) | Batch-optimized SQL |
 | 3 | Existing Column | Passthrough + backflow to DB | Preserves pre-resolved IDs |
 | 4 | EQC Sync Lookup | External API (budgeted) | Cached to DB after lookup |
-| 5 | Temp ID Generation | HMAC-SHA1 based | Format: `IN_<16-char-Base32>` |
+| 5 | Temp ID Generation | HMAC-SHA1 based | Format: `IN<16-char-Base32>` |
 
 **Test Scenarios:**
 
@@ -302,7 +302,7 @@ The dataset must include specific rows to exercise each layer of the new archite
     *   Expected: EQC API called, result cached to DB
 *   **[SV-ENR-08] Temp ID Generation**:
     *   Input: Completely unknown company name, budget exhausted
-    *   Expected: `company_id` = "IN_XXXXXXXXXXXXXXXX" (deterministic HMAC-SHA1)
+    *   Expected: `company_id` = "INXXXXXXXXXXXXXXXX" (deterministic HMAC-SHA1)
 *   **[SV-ENR-09] Temp ID Determinism**:
     *   Input: Same company name processed twice
     *   Expected: Identical temp ID generated (same salt)
@@ -465,7 +465,7 @@ A **Manifest File** (`dataset_manifest.csv`) maps specific rows to their test pu
 | 13 | V2/File.xlsx | 13        | Silver| SV-ENR-03    | DB-P1 resolved   | DB cache - plan code lookup |
 | 14 | V2/File.xlsx | 14        | Silver| SV-ENR-04    | DB-P4 resolved   | DB cache - normalized customer name |
 | 15 | V2/File.xlsx | 15        | Silver| SV-ENR-06    | Passthrough      | Existing company_id column preserved |
-| 16 | V2/File.xlsx | 16        | Silver| SV-ENR-08    | "IN_XXXX..."     | Temp ID generation (unknown company) |
+| 16 | V2/File.xlsx | 16        | Silver| SV-ENR-08    | "INXXXX..."     | Temp ID generation (unknown company) |
 | 17 | V2/File.xlsx | 17        | Silver| SV-ENR-09    | Same as row 16   | Temp ID determinism (same name) |
 
 ### 4.3 Reference Data Backfill Scenarios
@@ -515,7 +515,7 @@ This section provides concrete data examples for constructing test rows. Each ro
 | 13 | P0290 | 测试公司A | - | - | 123456789 | SV-ENR-03 (DB-P1) |
 | 14 | P9999 | 中国石油天然气集团公司 | - | - | 987654321 | SV-ENR-04 (DB-P4) |
 | 15 | P9998 | 已知公司 | - | 888777666 | 888777666 | SV-ENR-06 (Passthrough) |
-| 16 | P9997 | 完全未知的公司名称XYZ | - | - | IN_XXXX... | SV-ENR-08 (Temp ID) |
+| 16 | P9997 | 完全未知的公司名称XYZ | - | - | INXXXX... | SV-ENR-08 (Temp ID) |
 
 #### 4.5.4 Multi-Scenario Row Construction
 

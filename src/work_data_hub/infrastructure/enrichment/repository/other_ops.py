@@ -114,7 +114,7 @@ class OtherOpsMixin:
         Example:
             >>> requests = [
             ...     {"raw_name": "公司A", "normalized_name": "公司a",
-            ...      "temp_id": "IN_ABC123"},
+            ...      "temp_id": "INABC123DEF456GH"},
             ... ]
             >>> result = repo.enqueue_for_enrichment(requests)
             >>> print(f"Queued: {result.queued_count}")

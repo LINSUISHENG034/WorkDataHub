@@ -160,7 +160,7 @@ def generate_temp_company_id(company_name: str, salt: str) -> str:
     """
     Generate stable temporary company ID.
 
-    Format: IN_<16-char-Base32>
+    Format: IN<16-char-Base32> (no underscore separator)
     Algorithm: HMAC-SHA1 (more secure than legacy MD5)
     """
     normalized = normalize_for_temp_id(company_name)
@@ -175,7 +175,7 @@ def generate_temp_company_id(company_name: str, salt: str) -> str:
     # Take first 80 bits (10 bytes), Base32 encode → 16 chars
     encoded = base64.b32encode(digest[:10]).decode('ascii')
 
-    return f"IN_{encoded}"
+    return f"IN{encoded}"
 ```
 
 #### Decision Table
@@ -185,7 +185,7 @@ def generate_temp_company_id(company_name: str, salt: str) -> str:
 | **Business Key** | Normalized company name only | Enable cross-domain joins |
 | **Normalization** | Legacy-compatible + `.lower()` | Maintain parity with existing cleansing |
 | **Hash Algorithm** | HMAC-SHA1 (not MD5) | More secure, cryptographically sound |
-| **ID Format** | `IN_<16-char-Base32>` | Distinguishable from legacy GM/GC codes |
+| **ID Format** | `IN<16-char-Base32>` | Distinguishable from legacy GM/GC codes |
 | **Salt Management** | `WDH_ALIAS_SALT` env var | Must be secret, consistent across environments |
 
 #### Security & Configuration

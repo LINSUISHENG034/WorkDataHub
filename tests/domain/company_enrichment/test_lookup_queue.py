@@ -397,8 +397,8 @@ class TestTempIdGeneration:
             temp_id = lookup_queue.get_next_temp_id("Test Company")
 
         # Verify HMAC-based format
-        assert temp_id.startswith("IN_")
-        assert len(temp_id) == 19  # "IN_" + 16 chars
+        assert temp_id.startswith("IN")
+        assert len(temp_id) == 18  # "IN" + 16 chars
 
     def test_get_next_temp_id_deterministic(self, lookup_queue, mock_connection):
         """Test temp ID generation is deterministic."""
@@ -414,7 +414,7 @@ class TestTempIdGeneration:
         temp_id = plan_only_queue.get_next_temp_id("Test Company")
 
         # Should return deterministic mock ID
-        assert temp_id.startswith("IN_")
+        assert temp_id.startswith("IN")
         assert len(temp_id) >= 10
 
 
@@ -437,7 +437,7 @@ class TestConcurrentAccess:
 
         # All temp IDs should be unique (different company names)
         assert len(set(temp_ids)) == len(temp_ids)
-        assert all(temp_id.startswith("IN_") for temp_id in temp_ids)
+        assert all(temp_id.startswith("IN") for temp_id in temp_ids)
 
     def test_concurrent_dequeue_operations(self, mock_connection):
         """Test concurrent dequeue operations don't interfere."""
@@ -636,8 +636,8 @@ class TestStory62P1HmacTempId:
 
         # All calls should return identical ID
         assert temp_id_1 == temp_id_2 == temp_id_3
-        assert temp_id_1.startswith("IN_")
-        assert len(temp_id_1) == 19  # "IN_" + 16 chars
+        assert temp_id_1.startswith("IN")
+        assert len(temp_id_1) == 18  # "IN" + 16 chars
 
     def test_hmac_temp_id_format(self, lookup_queue, mock_connection):
         """AC1: Temp ID format is IN_<16-char-base32>."""
@@ -645,8 +645,8 @@ class TestStory62P1HmacTempId:
             temp_id = lookup_queue.get_next_temp_id("Test Company")
 
         # Verify format
-        assert temp_id.startswith("IN_")
-        assert len(temp_id) == 19  # "IN_" + 16 chars
+        assert temp_id.startswith("IN")
+        assert len(temp_id) == 18  # "IN" + 16 chars
         # Base32 uses A-Z and 2-7
         base32_part = temp_id[3:]
         assert all(c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567" for c in base32_part)
@@ -709,15 +709,15 @@ class TestStory62P1HmacTempId:
             temp_id = lookup_queue.get_next_temp_id("Test Company")
 
         # Should still generate valid ID
-        assert temp_id.startswith("IN_")
-        assert len(temp_id) == 19
+        assert temp_id.startswith("IN")
+        assert len(temp_id) == 18
 
     def test_hmac_temp_id_plan_only_mode(self, plan_only_queue):
         """Test HMAC temp ID in plan-only mode."""
         temp_id = plan_only_queue.get_next_temp_id("Test Company")
 
         # Should return deterministic mock ID
-        assert temp_id.startswith("IN_")
+        assert temp_id.startswith("IN")
         assert len(temp_id) >= 10  # At least "IN_" + some hash
 
     def test_hmac_temp_id_requires_company_name(self, lookup_queue):
@@ -726,7 +726,7 @@ class TestStory62P1HmacTempId:
         with patch.dict("os.environ", {"WDH_ALIAS_SALT": "test_salt_123"}):
             # Should work with company_name
             temp_id = lookup_queue.get_next_temp_id("Test Company")
-            assert temp_id.startswith("IN_")
+            assert temp_id.startswith("IN")
 
             # Should fail without company_name (TypeError)
             with pytest.raises(TypeError):

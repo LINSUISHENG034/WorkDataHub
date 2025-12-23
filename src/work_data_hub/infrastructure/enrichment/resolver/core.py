@@ -81,7 +81,7 @@ class CompanyIdResolver:
         ... })
         >>> result = resolver.resolve_batch(df, ResolutionStrategy())
         >>> result.data["company_id"].tolist()
-        ['614810477', 'IN_XXXXXXXXXXXXXXXX']
+        ['614810477', 'INXXXXXXXXXXXXXXXX']
     """
 
     def __init__(

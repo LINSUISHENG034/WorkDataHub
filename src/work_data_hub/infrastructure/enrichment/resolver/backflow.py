@@ -212,7 +212,7 @@ def generate_temp_id(customer_name: Optional[str], salt: str) -> str:
         salt: Salt for HMAC generation.
 
     Returns:
-        Temporary ID in format "IN_<16-char-Base32>".
+        Temporary ID in format "IN<16-char-Base32>".
     """
     if (
         customer_name is None

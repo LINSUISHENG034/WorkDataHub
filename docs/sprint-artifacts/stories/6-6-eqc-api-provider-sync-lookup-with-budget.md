@@ -460,7 +460,7 @@ $ uv run python -m work_data_hub.orchestration.run_pipeline
 │           - 5s timeout, 2 retries on network errors              │
 │           - Results cached to DB for future runs                 │
 │                              ↓ Not found / Budget exhausted      │
-│  Layer 5: Temporary ID Generation (IN_<16-char-Base32>)          │
+│  Layer 5: Temporary ID Generation (IN<16-char-Base32>)          │
 │           + ENQUEUE for async enrichment (Story 6.5)             │
 └─────────────────────────────────────────────────────────────────┘
 ```
