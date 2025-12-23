@@ -1,6 +1,29 @@
-"""Pytest configuration for optional legacy/E2E suites and DB fixtures."""
+"""Pytest configuration for optional legacy/E2E suites and DB fixtures.
+
+IMPORTANT: .wdh_env is loaded FIRST with override=True to ensure all environment
+variables come from .wdh_env file only, NOT from system environment variables.
+This is the SINGLE SOURCE OF TRUTH for all configuration.
+"""
 
 from __future__ import annotations
+
+# ============================================================================
+# CRITICAL: Load .wdh_env FIRST, before any other imports
+# override=True ensures .wdh_env values take precedence over system env vars
+# ============================================================================
+from pathlib import Path
+from dotenv import load_dotenv
+
+_WDH_ENV_FILE = Path(__file__).parent.parent / ".wdh_env"
+if _WDH_ENV_FILE.exists():
+    load_dotenv(_WDH_ENV_FILE, override=True)
+else:
+    import warnings
+
+    warnings.warn(
+        f".wdh_env not found at {_WDH_ENV_FILE}. "
+        "Tests may use system environment variables which could be dangerous!"
+    )
 
 import os
 import platform
@@ -45,6 +68,57 @@ LEGACY_MARK = "legacy_suite"
 E2E_MARK = "e2e_suite"
 LEGACY_ENV = "RUN_LEGACY_TESTS"
 E2E_ENV = "RUN_E2E_TESTS"
+
+
+def _validate_test_database(dsn: str) -> bool:
+    """Ensure we're not connected to production database.
+
+    This safety check prevents accidental data loss by verifying the database
+    name matches test database naming conventions before destructive operations.
+
+    Args:
+        dsn: Database connection string (SQLAlchemy/PostgreSQL URL format)
+
+    Returns:
+        True if database name matches test pattern
+
+    Raises:
+        RuntimeError: If database name doesn't match test pattern
+
+    Examples:
+        >>> _validate_test_database("postgresql://localhost/work_data_hub_test")
+        True
+        >>> _validate_test_database("postgresql://localhost/work_data_hub")
+        Traceback (most recent call last):
+        ...
+        RuntimeError: Refusing to run tests against non-test database...
+    """
+    import re
+    from sqlalchemy.engine.url import make_url
+
+    # Allow override for debugging (use with extreme caution)
+    if os.getenv("WDH_SKIP_DB_VALIDATION") == "1":
+        return True
+
+    db_name = make_url(dsn).database
+
+    # Handle edge case: None or empty database name
+    if not db_name:
+        raise RuntimeError(
+            f"Refusing to run tests against empty/missing database name. "
+            f"Test databases must contain one of: test, tmp, dev, local, sandbox. "
+            f"Override with WDH_SKIP_DB_VALIDATION=1 (DANGEROUS)."
+        )
+
+    test_db_pattern = r"(test|tmp|dev|local|sandbox)"
+
+    if not re.search(test_db_pattern, db_name, re.IGNORECASE):
+        raise RuntimeError(
+            f"Refusing to run tests against non-test database: {db_name}. "
+            f"Test databases must contain one of: test, tmp, dev, local, sandbox. "
+            f"Override with WDH_SKIP_DB_VALIDATION=1 (DANGEROUS)."
+        )
+    return True
 
 
 def _env_enabled(name: str) -> bool:
@@ -181,6 +255,9 @@ def postgres_db_with_migrations() -> Generator[str, None, None]:
     try:
         yield temp_dsn
     finally:
+        _validate_test_database(
+            temp_dsn
+        )  # Safety check: prevent production DB clearing
         migration_runner.downgrade(temp_dsn, "base")
         _drop_database(admin_dsn, temp_db)
         get_settings.cache_clear()

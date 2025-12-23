@@ -296,7 +296,7 @@ development_status:
   # Focused on fixing data integrity issues and removing legacy code before Epic 8
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-23-epic-7.1-pre-epic8-fixes.md
   epic-7.1: in-progress
-  7.1-1-fix-data-clearing-root-cause: backlog  # P0: Fix enrichment_index/base_info clearing
+  7.1-1-fix-data-clearing-root-cause: done  # P0: Fix enrichment_index/base_info clearing - Code Review PASSED 2025-12-23
   7.1-2-etl-execute-mode-validation: backlog  # P0: Verify --execute writes correctly
   7.1-3-fix-test-collection-errors: backlog  # P0: Fix work_data_hub.scripts import errors
   7.1-4-remove-company-mapping-legacy: backlog  # P0: Zero Legacy - delete deprecated table/code

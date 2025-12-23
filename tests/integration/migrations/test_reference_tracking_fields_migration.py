@@ -22,6 +22,7 @@ import uuid
 
 import os
 
+from tests.conftest import _validate_test_database
 from work_data_hub.config import get_settings
 from work_data_hub.io.schema import migration_runner
 
@@ -165,6 +166,7 @@ def migrated_db(db_engine: Engine):
     try:
         yield db_engine
     finally:
+        _validate_test_database(url)  # Safety check: prevent production DB clearing
         migration_runner.downgrade(url, DOWN_REVISION)
 
 
@@ -413,6 +415,7 @@ class TestSchemaValidation:
             )
 
         # Cleanup
+        _validate_test_database(url)  # Safety check: prevent production DB clearing
         migration_runner.downgrade(url, DOWN_REVISION)
 
 
@@ -438,6 +441,7 @@ class TestMigrationIdempotency:
                 assert tracking_col in columns
 
         # Cleanup
+        _validate_test_database(url)  # Safety check: prevent production DB clearing
         migration_runner.downgrade(url, DOWN_REVISION)
 
 
@@ -448,6 +452,7 @@ class TestMigrationReversibility:
         """AC6: Upgrade then downgrade should remove tracking columns."""
         url = str(db_engine.url)
         migration_runner.upgrade(url, MIGRATION_REVISION)
+        _validate_test_database(url)  # Safety check: prevent production DB clearing
         migration_runner.downgrade(url, DOWN_REVISION)
 
         inspector = inspect(db_engine)
@@ -476,12 +481,14 @@ class TestMigrationReversibility:
                 assert tracking_col in columns
 
         # Final cleanup
+        _validate_test_database(url)  # Safety check: prevent production DB clearing
         migration_runner.downgrade(url, DOWN_REVISION)
 
     def test_downgrade_removes_indexes(self, db_engine: Engine, reference_schema: str):
         """AC6: Downgrade should remove all tracking field indexes."""
         url = str(db_engine.url)
         migration_runner.upgrade(url, MIGRATION_REVISION)
+        _validate_test_database(url)  # Safety check: prevent production DB clearing
         migration_runner.downgrade(url, DOWN_REVISION)
 
         # Check indexes are gone for all tables

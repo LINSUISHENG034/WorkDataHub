@@ -61,7 +61,7 @@ def _index_exists(conn, index_name: str, schema: str) -> bool:
     return result.scalar()
 
 
-def upgrade() -> None:
+def upgrade() -> None:  # noqa: PLR0912
     """Create enterprise schema with consolidated tables.
 
     Creates the complete enterprise schema aligned with Legacy archive tables:
@@ -534,85 +534,8 @@ def upgrade() -> None:
                 schema=SCHEMA_NAME,
             )
 
-    # === Step 5: Create company_mapping table (preserved from original) ===
-    if not _table_exists(conn, "company_mapping", SCHEMA_NAME):
-        op.create_table(
-            "company_mapping",
-            sa.Column(
-                "id",
-                sa.Integer,
-                primary_key=True,
-                autoincrement=True,
-                comment="Auto-increment primary key",
-            ),
-            sa.Column(
-                "alias_name",
-                sa.String(255),
-                nullable=False,
-                comment="Alias or lookup key (别名/查询键)",
-            ),
-            sa.Column(
-                "canonical_id",
-                sa.String(100),
-                nullable=False,
-                comment="Resolved company_id (规范化公司ID)",
-            ),
-            sa.Column(
-                "match_type",
-                sa.String(20),
-                nullable=False,
-                comment="Mapping type: plan/account/hardcode/name/account_name",
-            ),
-            sa.Column(
-                "priority",
-                sa.Integer,
-                nullable=False,
-                comment="Resolution priority 1-5 (lower = higher priority)",
-            ),
-            sa.Column(
-                "source",
-                sa.String(50),
-                nullable=False,
-                server_default="internal",
-                comment="Data source: internal/eqc/pipeline_backflow",
-            ),
-            sa.Column(
-                "created_at",
-                sa.DateTime(timezone=True),
-                server_default=func.now(),
-                nullable=False,
-                comment="Record creation timestamp",
-            ),
-            sa.Column(
-                "updated_at",
-                sa.DateTime(timezone=True),
-                server_default=func.now(),
-                onupdate=func.now(),
-                nullable=False,
-                comment="Record last update timestamp",
-            ),
-            # Constraints
-            sa.UniqueConstraint(
-                "alias_name", "match_type", name="uq_company_mapping_alias_type"
-            ),
-            sa.CheckConstraint(
-                "priority >= 1 AND priority <= 5", name="chk_company_mapping_priority"
-            ),
-            sa.CheckConstraint(
-                "match_type IN ('plan','account','hardcode','name','account_name')",
-                name="chk_company_mapping_match_type",
-            ),
-            schema=SCHEMA_NAME,
-        )
-
-    # Index for efficient lookup by alias_name and priority
-    if not _index_exists(conn, "idx_company_mapping_lookup", SCHEMA_NAME):
-        op.create_index(
-            "idx_company_mapping_lookup",
-            "company_mapping",
-            ["alias_name", "priority"],
-            schema=SCHEMA_NAME,
-        )
+    # NOTE: Step 5 (company_mapping) REMOVED - see enrichment_index
+    # See Story 7.1-4: Remove company_mapping Legacy
 
     # === Step 6: Create enrichment_requests table (preserved from original) ===
     if not _table_exists(conn, "enrichment_requests", SCHEMA_NAME):
@@ -742,9 +665,7 @@ def downgrade() -> None:
     conn.execute(
         sa.text(f"DROP INDEX IF EXISTS {SCHEMA_NAME}.idx_enrichment_requests_status")
     )
-    conn.execute(
-        sa.text(f"DROP INDEX IF EXISTS {SCHEMA_NAME}.idx_company_mapping_lookup")
-    )
+    # NOTE: idx_company_mapping_lookup removal skipped - table deprecated
     conn.execute(sa.text(f"DROP INDEX IF EXISTS {SCHEMA_NAME}.idx_biz_label_hierarchy"))
     conn.execute(
         sa.text(f"DROP INDEX IF EXISTS {SCHEMA_NAME}.idx_biz_label_company_id")
@@ -765,7 +686,7 @@ def downgrade() -> None:
     # === Step 2: Drop tables (with IF EXISTS for safety) ===
     # Note: Drop order matters due to FK constraints
     conn.execute(sa.text(f"DROP TABLE IF EXISTS {SCHEMA_NAME}.enrichment_requests"))
-    conn.execute(sa.text(f"DROP TABLE IF EXISTS {SCHEMA_NAME}.company_mapping"))
+    # NOTE: company_mapping drop skipped - table deprecated and no longer created
     conn.execute(sa.text(f"DROP TABLE IF EXISTS {SCHEMA_NAME}.biz_label"))
     conn.execute(sa.text(f"DROP TABLE IF EXISTS {SCHEMA_NAME}.business_info"))
     conn.execute(sa.text(f"DROP TABLE IF EXISTS {SCHEMA_NAME}.base_info"))

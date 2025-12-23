@@ -17,6 +17,7 @@ import pytest
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Engine
 
+from tests.conftest import _validate_test_database
 from work_data_hub.config import get_settings
 from work_data_hub.io.schema import migration_runner
 
@@ -56,6 +57,7 @@ def migrated_db(db_engine: Engine):
     try:
         yield db_engine
     finally:
+        _validate_test_database(url)  # Safety check: prevent production DB clearing
         migration_runner.downgrade(url, DOWN_REVISION)
 
 
@@ -243,6 +245,7 @@ class TestMigrationIdempotency:
         assert "enrichment_index" in tables
 
         # Cleanup
+        _validate_test_database(url)  # Safety check: prevent production DB clearing
         migration_runner.downgrade(url, DOWN_REVISION)
 
 
@@ -253,6 +256,7 @@ class TestMigrationReversibility:
         """Upgrade then downgrade should remove enrichment_index table."""
         url = db_engine.url.render_as_string(hide_password=False)
         migration_runner.upgrade(url, MIGRATION_REVISION)
+        _validate_test_database(url)  # Safety check: prevent production DB clearing
         migration_runner.downgrade(url, DOWN_REVISION)
 
         inspector = inspect(db_engine)
@@ -266,12 +270,14 @@ class TestMigrationReversibility:
         assert "enrichment_index" in tables
 
         # Final cleanup
+        _validate_test_database(url)  # Safety check: prevent production DB clearing
         migration_runner.downgrade(url, DOWN_REVISION)
 
     def test_downgrade_removes_indexes(self, db_engine: Engine):
         """Downgrade should remove all enrichment_index indexes."""
         url = db_engine.url.render_as_string(hide_password=False)
         migration_runner.upgrade(url, MIGRATION_REVISION)
+        _validate_test_database(url)  # Safety check: prevent production DB clearing
         migration_runner.downgrade(url, DOWN_REVISION)
 
         # Check indexes are gone (table doesn't exist, so no indexes)
