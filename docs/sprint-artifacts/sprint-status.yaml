@@ -297,7 +297,7 @@ development_status:
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-23-epic-7.1-pre-epic8-fixes.md
   epic-7.1: in-progress
   7.1-1-fix-data-clearing-root-cause: done  # P0: Fix enrichment_index/base_info clearing - Code Review PASSED 2025-12-23
-  7.1-2-etl-execute-mode-validation: in-progress  # P0: Verify --execute writes correctly
+  7.1-2-etl-execute-mode-validation: done  # P0: Verify --execute writes correctly - Code Review PASSED 2025-12-25
   7.1-3-fix-test-collection-errors: backlog  # P0: Fix work_data_hub.scripts import errors
   7.1-4-remove-company-mapping-legacy: backlog  # P0: Zero Legacy - delete deprecated table/code
   7.1-5-add-file-selection-cleaner-compare: backlog  # P1: CLI parameter consistency
@@ -307,6 +307,10 @@ development_status:
   7.1-9-clean-up-failing-tests: backlog  # P2: Address 33 failing tests
   7.1-10-categorize-ruff-warnings: backlog  # P2: Triage 1074 Ruff warnings
   7.1-11-update-project-context: done  # P2: Reflect Epic 7 changes - Completed 2025-12-23
+  # Tech Debt Stories (Added 2025-12-25 from Story 7.1-2 Code Review)
+  7.1-12-annuity-plans-schema-backfill-alignment: backlog  # P1: TD-1/TD-3 Fix UNIQUE constraint + backfill config
+  7.1-13-e2e-test-infrastructure-foundation: backlog  # P2: TD-2/TD-5 E2E test fixtures + regression suite
+  7.1-14-eqc-api-performance-optimization: backlog  # P1: TD-4 EQC API 20-60s/call blocking issue
   epic-7.1-retrospective: optional
 
   # Epic 8: Testing & Validation Infrastructure
