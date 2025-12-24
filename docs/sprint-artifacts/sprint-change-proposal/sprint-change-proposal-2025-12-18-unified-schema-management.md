@@ -282,7 +282,7 @@ tasks:
   - name: 创建 annuity_performance 表迁移
     file: io/schema/migrations/versions/YYYYMMDD_create_annuity_performance.py
     actions:
-      - 主键重命名: annuity_performance_id → id
+      - 主键重命名: id → id
       - 从 domain_registry 生成 DDL
       - Conditional Create 支持
 
@@ -489,14 +489,14 @@ def upgrade() -> None:
 
 | 变更前 | 变更后 | 原因 |
 |-------|--------|------|
-| `annuity_performance_id` | `id` | 简洁统一 |
-| `annuity_income_id` | `id` | 简洁统一 |
+| `id` | `id` | 简洁统一 |
+| `id` | `id` | 简洁统一 |
 | `annuity_plans_id` | `id` | 简洁统一 |
 | `portfolio_plans_id` | `id` | 简洁统一 |
 
 **理由**:
 1. **业务无关性**: 自增主键仅作为技术标识，无业务含义
-2. **SQL 简洁性**: `SELECT id FROM ...` 比 `SELECT annuity_performance_id FROM ...` 更简洁
+2. **SQL 简洁性**: `SELECT id FROM ...` 比 `SELECT id FROM ...` 更简洁
 3. **跨表一致性**: 所有业务明细表使用相同的主键命名，降低认知负担
 4. **ORM 友好**: 大多数 ORM 框架默认使用 `id` 作为主键名
 
@@ -1004,8 +1004,8 @@ Phase 4 (Optional):
 
 | Table | Current PK | New PK | Migration Required |
 |-------|------------|--------|-------------------|
-| `business."规模明细"` | `annuity_performance_id` | `id` | Yes (rename column) |
-| `business."收入明细"` | `annuity_income_id` | `id` | Yes (rename column) |
+| `business."规模明细"` | `id` | `id` | Yes (rename column) |
+| `business."收入明细"` | `id` | `id` | Yes (rename column) |
 | `mapping."年金计划"` | `annuity_plans_id` | `id` | Yes (rename column) |
 | `mapping."组合计划"` | `portfolio_plans_id` | `id` | Yes (rename column) |
 
@@ -1018,10 +1018,10 @@ BEGIN
         SELECT 1 FROM information_schema.columns
         WHERE table_schema = 'business'
         AND table_name = '规模明细'
-        AND column_name = 'annuity_performance_id'
+        AND column_name = 'id'
     ) THEN
         ALTER TABLE business."规模明细"
-        RENAME COLUMN "annuity_performance_id" TO "id";
+        RENAME COLUMN "id" TO "id";
     END IF;
 END $$;
 ```

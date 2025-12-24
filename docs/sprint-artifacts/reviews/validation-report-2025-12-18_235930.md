@@ -319,7 +319,7 @@ From story:
 
 E10 — PK rename impacts existing DDL conventions and requires careful migration plan  
 From `scripts/create_table/ddl/annuity_performance.sql`:
-- `annuity_performance_id` is the current identity primary key (see top of file)
+- `id` is the current identity primary key (see top of file)
 
 E11 — “SQL-Generation-Module” anchor referenced may not exist as written  
 From story:

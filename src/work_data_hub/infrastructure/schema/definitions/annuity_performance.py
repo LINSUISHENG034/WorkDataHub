@@ -4,8 +4,13 @@ Story 7.5: Domain Registry Pre-modularization
 Extracted from domain_registry.py for isolation and maintainability.
 """
 
-from ..core import ColumnDef, ColumnType, DomainSchema, IndexDef
-from ..registry import register_domain
+from work_data_hub.infrastructure.schema.core import (
+    ColumnDef,
+    ColumnType,
+    DomainSchema,
+    IndexDef,
+)
+from work_data_hub.infrastructure.schema.registry import register_domain
 
 register_domain(
     DomainSchema(
@@ -13,7 +18,7 @@ register_domain(
         pg_schema="business",
         pg_table="规模明细",
         sheet_name="规模明细",
-        primary_key="annuity_performance_id",
+        primary_key="id",
         delete_scope_key=["月度", "计划代码", "company_id"],
         composite_key=["月度", "计划代码", "组合代码", "company_id"],
         bronze_required=[

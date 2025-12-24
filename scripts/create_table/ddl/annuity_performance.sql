@@ -4,7 +4,7 @@
 DROP TABLE IF EXISTS business."规模明细" CASCADE;
 
 CREATE TABLE business."规模明细" (
-  "annuity_performance_id"    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "id"    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 
   -- Core business fields (normalized)
   "月度"                      DATE NOT NULL,
@@ -67,7 +67,7 @@ CREATE TRIGGER trigger_update_annuity_performance_updated_at
 DO $$
 BEGIN
     RAISE NOTICE '=== 规模明细 Table Creation Complete ===';
-    RAISE NOTICE 'Primary Key: annuity_performance_id (GENERATED ALWAYS AS IDENTITY)';
+    RAISE NOTICE 'Primary Key: id (GENERATED ALWAYS AS IDENTITY)';
     RAISE NOTICE 'Delete Scope Key (non-unique): 月度, 计划代码, company_id';
     RAISE NOTICE 'Audit Fields: created_at, updated_at with auto-update trigger';
     RAISE NOTICE 'Indexes: Performance indexes created for common query patterns';

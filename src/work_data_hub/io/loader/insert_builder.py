@@ -28,8 +28,8 @@ def _get_column_order(
         all_keys.update(row.keys())
 
     # Exclude auto-generated ID columns (GENERATED ALWAYS AS IDENTITY)
-    # Common patterns: id, {entity}_id
-    auto_generated_columns = {"id", "annuity_performance_id", "trustee_performance_id"}
+    # All domain tables now use 'id' as identity column
+    auto_generated_columns = {"id"}
     for col in auto_generated_columns:
         all_keys.discard(col)
 
@@ -220,10 +220,7 @@ def build_delete_sql(
             else:
                 pk_values.append(row[col])
 
-        # Fix: Indentation of pk_tuples.append was inside else; moved it to match original if logic
-        # Original:
-        #         if len(pk_values) == len(pk_cols):
-        #             pk_tuples.append(tuple(pk_values))
+        # Append only if all PK values present (outside else block)
         if len(pk_values) == len(pk_cols):
             pk_tuples.append(tuple(pk_values))
 

@@ -60,7 +60,7 @@ def upgrade() -> None:
             "收入明细",
             # Primary Key
             sa.Column(
-                "annuity_income_id",
+                "id",
                 sa.Integer(),
                 sa.Identity(always=True),
                 primary_key=True,
@@ -140,7 +140,8 @@ def upgrade() -> None:
                         CREATE TRIGGER trigger_update_annuity_income_updated_at
                             BEFORE UPDATE ON business."收入明细"
                             FOR EACH ROW
-                            EXECUTE FUNCTION business.update_annuity_income_updated_at();
+                            EXECUTE FUNCTION
+                                business.update_annuity_income_updated_at();
                     END IF;
                 END $$;
                 """
