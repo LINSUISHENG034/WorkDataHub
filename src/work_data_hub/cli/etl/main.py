@@ -256,7 +256,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 1
 
         # Exclude special orchestration domains from --all-domains
-        SPECIAL_DOMAINS = {"company_mapping", "company_lookup_queue", "reference_sync"}
+        # Note: company_mapping removed in Story 7.1-4 (Zero Legacy)
+        SPECIAL_DOMAINS = {"company_lookup_queue", "reference_sync"}
         domains_to_process = [d for d in configured_domains if d not in SPECIAL_DOMAINS]
 
         print(f"📋 Processing all configured domains: {', '.join(domains_to_process)}")
@@ -285,7 +286,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     "   Multi-domain runs only support configured data domains from config/data_sources.yml"
                 )
                 print(
-                    "   Special orchestration domains (company_mapping, company_lookup_queue, reference_sync)"
+                    "   Special orchestration domains (company_lookup_queue, reference_sync)"
                 )
                 print("   can only be used in single-domain runs")
                 return 1
@@ -306,7 +307,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 configured = etl_module._load_configured_domains()
                 print(f"   Available configured domains: {', '.join(configured)}")
                 print(
-                    "   Special orchestration domains: company_mapping, company_lookup_queue, reference_sync"
+                    "   Special orchestration domains: company_lookup_queue, reference_sync"
                 )
                 return 1
 

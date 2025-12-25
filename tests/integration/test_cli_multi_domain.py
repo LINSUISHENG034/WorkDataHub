@@ -50,11 +50,12 @@ class TestDomainValidation:
             mock_load.return_value = ["annuity_performance", "annuity_income"]
 
             # Test that special domains are rejected when allow_special=False
+            # Note: company_mapping removed in Story 7.1-4, now using company_lookup_queue
             valid, invalid = _validate_domains(
-                ["annuity_performance", "company_mapping"], allow_special=False
+                ["annuity_performance", "company_lookup_queue"], allow_special=False
             )
             assert valid == ["annuity_performance"]
-            assert invalid == ["company_mapping"]
+            assert invalid == ["company_lookup_queue"]
 
     def test_validate_allows_special_domains_in_single_domain(self):
         """Test that special orchestration domains are allowed in single-domain runs."""
@@ -63,8 +64,11 @@ class TestDomainValidation:
             mock_load.return_value = ["annuity_performance", "annuity_income"]
 
             # Test that special domains are allowed when allow_special=True
-            valid, invalid = _validate_domains(["company_mapping"], allow_special=True)
-            assert valid == ["company_mapping"]
+            # Note: company_mapping removed in Story 7.1-4, now using company_lookup_queue
+            valid, invalid = _validate_domains(
+                ["company_lookup_queue"], allow_special=True
+            )
+            assert valid == ["company_lookup_queue"]
             assert invalid == []
 
     def test_validate_unknown_domain(self):
@@ -74,9 +78,10 @@ class TestDomainValidation:
             mock_load.return_value = ["annuity_performance", "annuity_income"]
 
             # Test that unknown domains are rejected
-            valid, invalid = _validate_domains(["unknown_domain"], allow_special=False)
+            # Note: company_mapping removed in Story 7.1-4, now treated as unknown
+            valid, invalid = _validate_domains(["company_mapping"], allow_special=False)
             assert valid == []
-            assert invalid == ["unknown_domain"]
+            assert invalid == ["company_mapping"]
 
 
 class TestAllDomainsDiscovery:
@@ -99,18 +104,18 @@ class TestAllDomainsDiscovery:
     def test_all_domains_excludes_special_domains(self):
         """Test that --all-domains excludes special orchestration domains."""
         # Mock configured domains including a special domain
+        # Note: company_mapping removed in Story 7.1-4, now using company_lookup_queue
         with patch("work_data_hub.cli.etl._load_configured_domains") as mock_load:
             mock_load.return_value = [
                 "annuity_performance",
                 "annuity_income",
                 "sandbox_trustee_performance",
-                "company_mapping",  # This should be excluded
+                "company_lookup_queue",  # This should be excluded
             ]
 
             # Simulate --all-domains logic
             configured_domains = _load_configured_domains()
             SPECIAL_DOMAINS = {
-                "company_mapping",
                 "company_lookup_queue",
                 "reference_sync",
             }
@@ -119,7 +124,7 @@ class TestAllDomainsDiscovery:
             ]
 
             # Verify special domains are excluded
-            assert "company_mapping" not in domains_to_process
+            assert "company_lookup_queue" not in domains_to_process
             assert "annuity_performance" in domains_to_process
             assert "annuity_income" in domains_to_process
 
@@ -134,9 +139,10 @@ class TestMultiDomainCLI:
             mock_load.return_value = ["annuity_performance", "annuity_income"]
 
             # Test multi-domain with special domain (should fail)
+            # Note: company_mapping removed in Story 7.1-4, now using company_lookup_queue
             argv = [
                 "--domains",
-                "annuity_performance,company_mapping",
+                "annuity_performance,company_lookup_queue",
                 "--period",
                 "202411",
                 "--plan-only",
@@ -150,7 +156,7 @@ class TestMultiDomainCLI:
             # Verify error message
             captured = capsys.readouterr()
             assert "Invalid domains for multi-domain processing" in captured.out
-            assert "company_mapping" in captured.out
+            assert "company_lookup_queue" in captured.out
 
     def test_single_domain_allows_special_domain(self):
         """Test that single-domain runs allow special orchestration domains."""
@@ -163,7 +169,8 @@ class TestMultiDomainCLI:
                 mock_execute.return_value = 0
 
                 # Test single domain with special domain (should succeed validation)
-                argv = ["--domains", "company_mapping", "--execute"]
+                # Note: company_mapping removed in Story 7.1-4, now using company_lookup_queue
+                argv = ["--domains", "company_lookup_queue", "--execute"]
 
                 exit_code = etl_main(argv)
 
@@ -381,15 +388,15 @@ Manual Verification Test Cases:
 
 3. Test domain validation error:
    ```bash
-   python -m work_data_hub.cli etl --domains annuity_performance,company_mapping --period 202411 --plan-only
+   python -m work_data_hub.cli etl --domains annuity_performance,company_lookup_queue --period 202411 --plan-only
    ```
    Expected: Error message about invalid domains for multi-domain processing
 
 4. Test single-domain with special domain:
    ```bash
-   python -m work_data_hub.cli etl --domains company_mapping --execute
+   python -m work_data_hub.cli etl --domains company_lookup_queue --execute
    ```
-   Expected: Validation passes, company mapping job executes
+   Expected: Validation passes, company lookup queue job executes
 
 5. Test continue-on-failure (requires setup to force failure):
    - Modify one domain to fail (e.g., invalid period)

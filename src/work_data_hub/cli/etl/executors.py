@@ -6,150 +6,7 @@ Story 7.4: CLI Layer Modularization - Domain and job execution utilities.
 
 import argparse
 
-from work_data_hub.config.settings import get_settings
-
 from .config import build_run_config
-
-
-def _execute_company_mapping_job(args: argparse.Namespace) -> int:
-    """
-    Execute company mapping migration job with direct database operations.
-
-    This function handles the company mapping migration outside of the standard
-    Dagster job framework since it doesn't follow the discover->read->process->load
-    pattern. Instead it goes directly from legacy extraction to database loading.
-    """
-    import psycopg2
-
-    from work_data_hub.domain.company_enrichment.service import (
-        validate_mapping_consistency,
-    )
-    from work_data_hub.io.loader.company_mapping_loader import (
-        CompanyMappingLoaderError,
-        extract_legacy_mappings,
-        generate_load_plan,
-        load_company_mappings,
-    )
-
-    effective_plan_only = not args.execute if hasattr(args, "execute") else True
-
-    print("🚀 Starting company mapping migration...")
-    print(f"   Domain: {args.domains}")
-    print(f"   Mode: {args.mode}")
-    print(f"   Execute: {args.execute}")
-    print(f"   Plan-only: {effective_plan_only}")
-    print("=" * 50)
-
-    try:
-        # Step 1: Extract legacy mappings
-        print("📥 Extracting legacy mappings from 5 sources...")
-        try:
-            mappings = extract_legacy_mappings()
-        except CompanyMappingLoaderError as e:
-            print(f"❌ Legacy mapping extraction failed: {e}")
-            return 1
-
-        if not mappings:
-            print("⚠️ No mappings extracted - migration aborted")
-            return 1
-
-        print(f"✅ Successfully extracted {len(mappings)} total mappings")
-
-        # Step 2: Validate mapping consistency
-        print("🔍 Validating mapping consistency...")
-        warnings = validate_mapping_consistency(mappings)
-
-        if warnings:
-            print(f"⚠️ Found {len(warnings)} validation warnings:")
-            for i, warning in enumerate(warnings[:5], 1):
-                print(f"   {i}. {warning}")
-            if len(warnings) > 5:
-                print(f"   ... and {len(warnings) - 5} more warnings")
-
-        # Step 3: Generate execution plan
-        print("📋 Generating execution plan...")
-        plan = generate_load_plan(mappings, "enterprise", "company_mapping")
-
-        print("MIGRATION PLAN:")
-        print(f"  Target: {plan['table']}")
-        print(f"  Total mappings: {plan['total_mappings']:,}")
-        print("  Breakdown by type:")
-
-        for match_type, count in plan["mapping_breakdown"].items():
-            priority = {
-                "plan": 1,
-                "account": 2,
-                "hardcode": 3,
-                "name": 4,
-                "account_name": 5,
-            }.get(match_type, "?")
-            print(f"    {match_type} (priority {priority}): {count:,} mappings")
-
-        if effective_plan_only:
-            print("\n" + "=" * 50)
-            print("✅ Plan generation complete - no database changes made")
-            return 0
-
-        # Step 4: Execute migration
-        print("💾 Executing database migration...")
-
-        settings = get_settings()
-        conn_string = settings.get_database_connection_string()
-
-        try:
-            with psycopg2.connect(conn_string) as conn:
-                print(
-                    f"🔌 Connected to PostgreSQL: "
-                    f"{settings.database_host}:{settings.database_port}/"
-                    f"{settings.database_db}"
-                )
-
-                # Verify target table exists
-                cursor = conn.cursor()
-                cursor.execute(
-                    """
-                    SELECT EXISTS (
-                        SELECT FROM information_schema.tables
-                        WHERE table_schema = %s AND table_name = %s
-                    );
-                """,
-                    ("enterprise", "company_mapping"),
-                )
-                table_exists = cursor.fetchone()[0]
-
-                if not table_exists:
-                    print("❌ Target table enterprise.company_mapping does not exist")
-                    print("   Run database migrations first")
-                    return 1
-
-                # Execute load
-                result = load_company_mappings(
-                    conn, mappings, "enterprise", "company_mapping"
-                )
-
-                print("\n📊 Migration Results:")
-                print(f"   Rows inserted: {result['inserted']:,}")
-                print(f"   Rows updated: {result.get('updated', 0):,}")
-                print(f"   Total processed: {result['total']:,}")
-
-                conn.commit()
-                print("\n" + "=" * 50)
-                print("🎉 MIGRATION SUCCESS")
-                print("=" * 50)
-                return 0
-
-        except psycopg2.Error as e:
-            print(f"❌ Database error: {e}")
-            return 1
-
-    except KeyboardInterrupt:
-        print("⚠️ Migration interrupted by user")
-        return 130
-    except Exception as e:
-        print(f"❌ Unexpected migration failure: {e}")
-        if args.raise_on_error:
-            raise
-        return 1
 
 
 def _execute_queue_processing_job(args: argparse.Namespace) -> int:
@@ -359,8 +216,6 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:
             if max_files > 1
             else sandbox_trustee_performance_job
         )
-    elif domain_key == "company_mapping":
-        return _execute_company_mapping_job(args)
     elif domain_key == "company_lookup_queue":
         return _execute_queue_processing_job(args)
     elif domain_key == "reference_sync":
@@ -369,7 +224,7 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:
         raise ValueError(
             f"Unsupported domain: {domain}. "
             f"Supported: sandbox_trustee_performance, annuity_performance, annuity_income, "
-            f"company_mapping, company_lookup_queue, reference_sync"
+            f"company_lookup_queue, reference_sync"
         )
 
     # Execute job with appropriate settings

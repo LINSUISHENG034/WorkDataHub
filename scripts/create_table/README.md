@@ -6,7 +6,7 @@
 
 This directory is now ONLY for:
 
-1. **Utility Tables** - Standalone tables not part of domain schema (e.g., `company_mapping`, `lookup_requests`)
+1. **Utility Tables** - Standalone tables not part of domain schema (e.g., `lookup_requests`)
 2. **Temporary Tables** - Staging tables for data processing
 3. **One-time Scripts** - Data repair and migration scripts
 4. **Historical Reference** - Legacy DDL files retained for reference (deprecated, not for new deployments)
@@ -69,10 +69,12 @@ scripts/create_table/
 │   ├── annuity_performance.sql  # DEPRECATED - use domain_registry
 │   ├── annuity_plans.sql        # DEPRECATED - use domain_registry
 │   ├── portfolio_plans.sql      # DEPRECATED - use domain_registry
-│   ├── company_mapping.sql      # Active - utility table
 │   └── lookup_requests.sql      # Active - utility table
 └── generate_from_json.py        # DDL generation utility
 ```
+
+> **Note:** `company_mapping.sql` was removed in Story 7.1-4 (Zero Legacy).
+> The `enterprise.company_mapping` table was replaced by `enterprise.enrichment_index`.
 
 ## References
 

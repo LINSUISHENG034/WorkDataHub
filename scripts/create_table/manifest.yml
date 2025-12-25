@@ -67,13 +67,6 @@ deprecated_domains:
 # ACTIVE: Utility and temporary tables
 # These tables are NOT managed by domain_registry, and remain in this manifest.
 utility_tables:
-  # company_mapping is managed here for now (not a domain detail table)
-  company_mapping:
-    table: "enterprise.company_mapping"
-    entity: "company_mapping"
-    delete_scope_key: ["alias_name", "match_type"]
-    ddl: "scripts/create_table/ddl/company_mapping.sql"
-
   # lookup_requests is a utility table for EQC API queue
   lookup_requests:
     table: "enterprise.lookup_requests"

@@ -19,11 +19,6 @@ from work_data_hub.domain.annuity_performance.service import (
 )
 from work_data_hub.domain.pipelines.types import DomainPipelineResult
 from work_data_hub.io.connectors.file_connector import FileDiscoveryService
-from work_data_hub.io.loader.company_mapping_loader import (
-    extract_legacy_mappings,
-    generate_load_plan,
-    load_company_mappings,
-)
 from work_data_hub.io.loader.warehouse_loader import WarehouseLoader
 
 from .ops import (
@@ -186,29 +181,6 @@ def annuity_performance_story45_job() -> Any:
     """
 
     run_annuity_pipeline_op()
-
-
-@job
-def import_company_mappings_job() -> Any:
-    """
-    Company ID mapping migration job.
-
-    This job handles the migration of legacy 5-layer COMPANY_ID mapping
-    structure to the unified PostgreSQL enterprise.company_mapping table.
-    Supports both plan-only (preview) and execute modes.
-
-    Operations:
-    1. Extract mappings from all 5 legacy sources (MySQL + hardcoded)
-    2. Validate mapping consistency and detect conflicts
-    3. Load to PostgreSQL with delete_insert (upsert) mode
-    4. Generate execution statistics and validation reports
-
-    This is a database-only job - no file discovery or Excel processing.
-    """
-    # This job is handled directly in main() since it doesn't use the standard
-    # discover -> read -> process -> load pattern. It goes directly from
-    # legacy extraction to database loading.
-    pass
 
 
 @job
@@ -436,154 +408,6 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
         }
 
     return run_config
-
-
-def _execute_company_mapping_job(args: argparse.Namespace) -> int:
-    """
-    Execute company mapping migration job with direct database operations.
-
-    This function handles the company mapping migration outside of the standard
-    Dagster job framework since it doesn't follow the discover->read->process->load
-    pattern. Instead it goes directly from legacy extraction to database loading.
-    """
-    import psycopg2
-
-    from work_data_hub.domain.company_enrichment.service import (
-        validate_mapping_consistency,
-    )
-    from work_data_hub.io.loader.company_mapping_loader import (
-        CompanyMappingLoaderError,
-    )
-
-    effective_plan_only = not args.execute if hasattr(args, "execute") else True
-
-    print("🚀 Starting company mapping migration...")
-    print(f"   Domain: {args.domain}")
-    print(f"   Mode: {args.mode}")
-    print(f"   Execute: {args.execute}")
-    print(f"   Plan-only: {effective_plan_only}")
-    print("=" * 50)
-
-    try:
-        # Step 1: Extract legacy mappings
-        print("📥 Extracting legacy mappings from 5 sources...")
-        try:
-            mappings = extract_legacy_mappings()
-        except CompanyMappingLoaderError as e:
-            print(f"❌ Legacy mapping extraction failed: {e}")
-            return 1
-
-        if not mappings:
-            print("⚠️ No mappings extracted - migration aborted")
-            return 1
-
-        print(f"✅ Successfully extracted {len(mappings)} total mappings")
-
-        # Step 2: Validate mapping consistency
-        print("🔍 Validating mapping consistency...")
-        warnings = validate_mapping_consistency(mappings)
-
-        if warnings:
-            print(f"⚠️ Found {len(warnings)} validation warnings:")
-            for i, warning in enumerate(warnings[:5], 1):  # Show first 5
-                print(f"   {i}. {warning}")
-            if len(warnings) > 5:
-                print(f"   ... and {len(warnings) - 5} more warnings")
-
-        # Step 3: Generate execution plan
-        print("📋 Generating execution plan...")
-        plan = generate_load_plan(mappings, "enterprise", "company_mapping")
-
-        print("MIGRATION PLAN:")
-        print(f"  Target: {plan['table']}")
-        print(f"  Total mappings: {plan['total_mappings']:,}")
-        print("  Breakdown by type:")
-
-        for match_type, count in plan["mapping_breakdown"].items():
-            priority = {
-                "plan": 1,
-                "account": 2,
-                "hardcode": 3,
-                "name": 4,
-                "account_name": 5,
-            }.get(match_type, "?")
-            print(f"    {match_type} (priority {priority}): {count:,} mappings")
-
-        if effective_plan_only:
-            print("\n" + "=" * 50)
-            print("✅ Plan generation complete - no database changes made")
-            return 0
-
-        # Step 4: Execute migration
-        print("💾 Executing database migration...")
-
-        settings = get_settings()
-        conn_string = settings.get_database_connection_string()
-
-        try:
-            with psycopg2.connect(conn_string) as conn:
-                print(
-                    "🔌 Connected to PostgreSQL: "
-                    f"{settings.database_host}:{settings.database_port}/"
-                    f"{settings.database_db}"
-                )
-
-                # Verify target table exists
-                cursor = conn.cursor()
-                cursor.execute(
-                    """
-                    SELECT EXISTS (
-                        SELECT FROM information_schema.tables
-                        WHERE table_schema = %s AND table_name = %s
-                    );
-                """,
-                    ("enterprise", "company_mapping"),
-                )
-
-                row = cursor.fetchone()
-                table_exists = row[0] if row else False
-                cursor.close()
-
-                if not table_exists:
-                    print("❌ Target table enterprise.company_mapping does not exist")
-                    print(
-                        "Please run the DDL script first: "
-                        "scripts/create_table/ddl/company_mapping.sql"
-                    )
-                    return 1
-
-                # Execute the load
-                stats = load_company_mappings(
-                    mappings=mappings,
-                    conn=conn,
-                    schema="enterprise",
-                    table="company_mapping",
-                    mode="delete_insert",
-                    chunk_size=1000,
-                )
-
-                print("✅ MIGRATION COMPLETED SUCCESSFULLY:")
-                print(f"   Deleted: {stats['deleted']} existing records")
-                print(f"   Inserted: {stats['inserted']} new records")
-                print(f"   Batches processed: {stats['batches']}")
-
-        except psycopg2.Error as e:
-            print(f"❌ PostgreSQL connection/operation failed: {e}")
-            return 1
-
-        print("=" * 50)
-        print("🎉 MIGRATION SUCCESS - All legacy mappings migrated")
-        print("=" * 50)
-        return 0
-
-    except KeyboardInterrupt:
-        print("⚠️ Migration interrupted by user")
-        return 130
-    except Exception as e:
-        print(f"❌ Unexpected migration failure: {e}")
-        if args.raise_on_error:
-            raise
-        return 1
 
 
 def _execute_queue_processing_job(args: argparse.Namespace) -> int:

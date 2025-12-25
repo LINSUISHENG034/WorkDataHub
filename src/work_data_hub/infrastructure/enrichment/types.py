@@ -126,7 +126,7 @@ class ResolutionStatistics:
             "account_number": 0,
             "customer_name": 0,
             "plan_customer": 0,
-            "legacy": 0,  # Legacy fallback (company_mapping) for backward compatibility
+            # Note: legacy (company_mapping) removed in Story 7.1-4 (Zero Legacy)
         }
     )
     db_decision_path_counts: Dict[str, int] = field(default_factory=dict)

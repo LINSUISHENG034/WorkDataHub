@@ -1,11 +1,11 @@
-"""Integration tests for Enterprise Schema migration (Stories 6.1, 6.2-P5, 6.2-P7).
+"""Integration tests for Enterprise Schema migration (Stories 6.1, 6.2-P5, 6.2-P7, 7.1-4).
 
 Tests verify:
 - AC1: Schema creation is idempotent
 - AC2: base_info table structure (37+ legacy columns + new columns)
 - AC3: business_info table structure with normalized types
 - AC4: biz_label table structure with FK constraints
-- AC5: company_mapping table structure with constraints
+- AC5: company_mapping table REMOVED (Story 7.1-4 - Zero Legacy)
 - AC6: enrichment_requests table with partial unique index
 - AC7: Migration reversibility (upgrade/downgrade)
 - AC8: company_master table does NOT exist (removed in 6.2-P7)
@@ -305,51 +305,12 @@ class TestEnterpriseSchemaExists:
             "company_master table should NOT exist (removed in 6.2-P7)"
         )
 
-    def test_company_mapping_table_exists(self, migrated_db: Engine):
-        """AC5: Verify company_mapping table exists with correct columns."""
+    def test_company_mapping_table_does_not_exist(self, migrated_db: Engine):
+        """AC5: Verify company_mapping table does NOT exist (removed in Story 7.1-4)."""
         inspector = inspect(migrated_db)
         tables = inspector.get_table_names(schema=SCHEMA_NAME)
-        assert "company_mapping" in tables, "company_mapping table should exist"
-
-        columns = {
-            c["name"]
-            for c in inspector.get_columns("company_mapping", schema=SCHEMA_NAME)
-        }
-        expected_columns = {
-            "id",
-            "alias_name",
-            "canonical_id",
-            "match_type",
-            "priority",
-            "source",
-            "created_at",
-            "updated_at",
-        }
-        assert expected_columns.issubset(columns), (
-            f"company_mapping missing columns: {expected_columns - columns}"
-        )
-
-    def test_company_mapping_unique_constraint(self, migrated_db: Engine):
-        """AC5: Verify (alias_name, match_type) unique constraint."""
-        inspector = inspect(migrated_db)
-        unique_constraints = inspector.get_unique_constraints(
-            "company_mapping", schema=SCHEMA_NAME
-        )
-        has_alias_type_unique = any(
-            set(uc["column_names"]) == {"alias_name", "match_type"}
-            for uc in unique_constraints
-        )
-        assert has_alias_type_unique, (
-            "company_mapping should have UNIQUE(alias_name, match_type)"
-        )
-
-    def test_company_mapping_lookup_index(self, migrated_db: Engine):
-        """AC5: Verify idx_company_mapping_lookup index exists."""
-        inspector = inspect(migrated_db)
-        indexes = inspector.get_indexes("company_mapping", schema=SCHEMA_NAME)
-        index_names = [idx["name"] for idx in indexes]
-        assert "idx_company_mapping_lookup" in index_names, (
-            "idx_company_mapping_lookup index should exist"
+        assert "company_mapping" not in tables, (
+            "company_mapping table should NOT exist (Zero Legacy - Story 7.1-4)"
         )
 
     def test_enrichment_requests_table_exists(self, migrated_db: Engine):

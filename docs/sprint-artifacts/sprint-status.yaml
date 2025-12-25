@@ -299,7 +299,7 @@ development_status:
   7.1-1-fix-data-clearing-root-cause: done  # P0: Fix enrichment_index/base_info clearing - Code Review PASSED 2025-12-23
   7.1-2-etl-execute-mode-validation: done  # P0: Verify --execute writes correctly - Code Review PASSED 2025-12-25
   7.1-3-fix-test-collection-errors: done  # P0: Fix work_data_hub.scripts import errors - Code Review PASSED 2025-12-25
-  7.1-4-remove-company-mapping-legacy: backlog  # P0: Zero Legacy - delete deprecated table/code
+  7.1-4-remove-company-mapping-legacy: done  # P0: Zero Legacy - delete deprecated table/code - Code Review PASSED 2025-12-25
   7.1-5-add-file-selection-cleaner-compare: backlog  # P1: CLI parameter consistency
   7.1-6-fix-classification-logic: backlog  # P1: regression → data_source_difference
   7.1-7-verify-legacy-db-connection: backlog  # P1: MySQL connection for Epic 8

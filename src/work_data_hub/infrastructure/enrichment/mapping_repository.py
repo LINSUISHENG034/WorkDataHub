@@ -2,7 +2,10 @@
 Company Mapping Repository for database access layer.
 
 This module provides the CompanyMappingRepository class for batch-optimized
-database operations on the enterprise.company_mapping table.
+database operations on the enterprise schema tables.
+
+Note: company_mapping table removed in Story 7.1-4 (Zero Legacy).
+Repository now exclusively serves enrichment_index (Story 6.1.1).
 
 Story 6.3: Internal Mapping Tables and Database Schema
 Story 6.1.1: Extended with enrichment_index table operations

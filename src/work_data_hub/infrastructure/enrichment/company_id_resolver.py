@@ -11,10 +11,13 @@ Architecture Reference:
 
 Resolution Priority (Story 6.4 - Multi-Tier Lookup):
 1. YAML overrides (5 priority levels: plan → account → hardcode → name → account_name)
-2. Database cache lookup (enterprise.company_mapping)
+2. Database cache lookup (enrichment_index - Story 6.1.1)
 3. Existing company_id column passthrough + backflow
 4. EQC sync lookup (budgeted, cached)
 5. Temporary ID generation (HMAC-SHA1 based)
+
+Note: company_mapping table removed in Story 7.1-4 (Zero Legacy).
+All legacy fallback paths have been removed.
 
 Story 7.3: This file is now a facade module re-exporting from the resolver package.
 All public symbols are preserved for backward compatibility.

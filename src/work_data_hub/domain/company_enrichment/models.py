@@ -24,8 +24,10 @@ class CompanyMappingRecord(BaseModel):
     """
     Input/output model for company ID mapping records.
 
-    Maps directly to enterprise.company_mapping table DDL structure,
-    providing validation and transformation for legacy mapping data migration.
+    Used for enrichment_index table (Story 6.1.1) and EQC API result caching.
+
+    Note: enterprise.company_mapping table was removed in Story 7.1-4 (Zero Legacy).
+    This model now exclusively serves enrichment_index operations.
     """
 
     model_config = ConfigDict(

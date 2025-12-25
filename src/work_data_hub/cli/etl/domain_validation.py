@@ -45,7 +45,8 @@ def _validate_domains(
         Tuple of (valid_domains, invalid_domains)
     """
     # Special orchestration domains (not in data_sources.yml)
-    SPECIAL_DOMAINS = {"company_mapping", "company_lookup_queue", "reference_sync"}
+    # Note: company_mapping removed in Story 7.1-4 (Zero Legacy)
+    SPECIAL_DOMAINS = {"company_lookup_queue", "reference_sync"}
 
     # Load configured data domains
     configured_domains = set(_load_configured_domains())

@@ -2,7 +2,10 @@
 Database cache resolution strategies.
 
 This module handles Step 2 of the resolution priority: DB cache lookup
-including enrichment_index and legacy company_mapping fallback.
+via enrichment_index.
+
+Note: company_mapping table removed in Story 7.1-4 (Zero Legacy).
+All legacy fallback code has been removed.
 
 Story 7.3: Infrastructure Layer Decomposition
 """
@@ -12,7 +15,6 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 import pandas as pd
 
-from work_data_hub.infrastructure.cleansing import normalize_company_name
 from work_data_hub.utils.logging import get_logger
 
 from ..normalizer import normalize_for_temp_id
@@ -40,10 +42,13 @@ def resolve_via_db_cache(
     mapping_repository: "CompanyMappingRepository",
 ) -> Tuple[pd.Series, Dict[str, int]]:
     """
-    Resolve company_id via database cache.
+    Resolve company_id via database cache (enrichment_index).
 
-    Uses CompanyMappingRepository.lookup_batch() for batch-optimized
-    single SQL round-trip.
+    Uses CompanyMappingRepository.lookup_enrichment_index_batch() for
+    batch-optimized single SQL round-trip.
+
+    Note: company_mapping table removed in Story 7.1-4 (Zero Legacy).
+    All legacy fallback code has been removed.
 
     Story 6.4.1: P4 (customer_name) uses normalized values for lookup,
     while P1 (plan_code), P2 (account_number), P5 (account_name) use RAW values.
@@ -58,29 +63,10 @@ def resolve_via_db_cache(
     Returns:
         Tuple of (resolved_series, hits_by_priority)
     """
-    # Prefer new enrichment_index path (Story 6.1.1)
-    use_enrichment_index = callable(
-        getattr(mapping_repository, "lookup_enrichment_index_batch", None)
-    )
-    if use_enrichment_index:
-        try:
-            resolved, hits = _resolve_via_enrichment_index(
-                df, mask_unresolved, strategy, stats, mapping_repository
-            )
-            # Use legacy fallback only if nothing was resolved and legacy API exists
-            if sum(hits.values()) > 0 or not callable(
-                getattr(mapping_repository, "lookup_batch", None)
-            ):
-                return resolved, hits
-        except Exception as e:  # Graceful fallback to legacy path
-            logger.warning(
-                "company_id_resolver.enrichment_index_lookup_failed",
-                error=str(e),
-            )
-
-    # Fallback: legacy company_mapping lookup
-    return _resolve_via_company_mapping(
-        df, mask_unresolved, strategy, mapping_repository
+    # Note: company_mapping fallback removed in Story 7.1-4
+    # Direct resolution via enrichment_index (Story 6.1.1)
+    return _resolve_via_enrichment_index(
+        df, mask_unresolved, strategy, stats, mapping_repository
     )
 
 
@@ -295,72 +281,5 @@ def _resolve_via_enrichment_index(
     return resolved, hits_by_priority
 
 
-def _resolve_via_company_mapping(
-    df: pd.DataFrame,
-    mask_unresolved: pd.Series,
-    strategy: ResolutionStrategy,
-    mapping_repository: "CompanyMappingRepository",
-) -> Tuple[pd.Series, Dict[str, int]]:
-    """
-    Legacy fallback: resolve via company_mapping table.
-    """
-    # Collect all potential lookup values from unresolved rows
-    lookup_columns = [
-        (strategy.plan_code_column, False),  # P1: RAW
-        (strategy.account_number_column, False),  # P2: RAW
-        (strategy.customer_name_column, True),  # P4: NORMALIZED
-        (strategy.account_name_column, False),  # P5: RAW
-    ]
-
-    alias_names: set[str] = set()
-    for col, needs_normalization in lookup_columns:
-        if col not in df.columns:
-            continue
-        values = df.loc[mask_unresolved, col].dropna().astype(str).unique()
-        for v in values:
-            if needs_normalization:
-                normalized = normalize_company_name(v)
-                if normalized:
-                    alias_names.add(normalized)
-            else:
-                alias_names.add(v)
-
-    if not alias_names:
-        return pd.Series(pd.NA, index=df.index, dtype=object), {"legacy": 0}
-
-    # Batch lookup from database
-    try:
-        results = mapping_repository.lookup_batch(list(alias_names))
-    except Exception as e:
-        logger.warning(
-            "company_id_resolver.db_cache_lookup_failed",
-            error=str(e),
-        )
-        return pd.Series(pd.NA, index=df.index, dtype=object), {"legacy": 0}
-
-    resolved = pd.Series(pd.NA, index=df.index, dtype=object)
-    hits_by_priority: Dict[str, int] = {"legacy": 0}
-
-    for idx in df[mask_unresolved].index:
-        row = df.loc[idx]
-        for col, needs_normalization in lookup_columns:
-            if col not in df.columns:
-                continue
-            value = row[col]
-            if pd.isna(value):
-                continue
-            str_value = str(value)
-
-            if needs_normalization:
-                lookup_key = normalize_company_name(str_value)
-                if not lookup_key:
-                    continue
-            else:
-                lookup_key = str_value
-
-            if lookup_key in results:
-                resolved.loc[idx] = results[lookup_key].company_id
-                hits_by_priority["legacy"] += 1
-                break
-
-    return resolved, hits_by_priority
+# Note: _resolve_via_company_mapping() removed in Story 7.1-4 (Zero Legacy)
+# All company_id resolution now uses enrichment_index (Story 6.1.1)

@@ -57,8 +57,9 @@ class TestQualifyTable:
 
     def test_qualify_ascii_table_with_schema(self):
         """ASCII table with schema."""
-        result = qualify_table("company_mapping", schema="enterprise")
-        assert result == 'enterprise."company_mapping"'
+        # Note: company_mapping removed in Story 7.1-4, using lookup_requests as example
+        result = qualify_table("lookup_requests", schema="enterprise")
+        assert result == 'enterprise."lookup_requests"'
 
 
 class TestBuildIndexedParams:

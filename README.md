@@ -298,7 +298,9 @@ dagster dev
 **Available Jobs:**
 - `sample_trustee_performance_job`: Sample multi-file processing pipeline
 - `annuity_performance_job`: End-to-end annuity ETL with enrichment
-- `import_company_mappings_job`: Reference data loading
+- `process_company_lookup_queue_job`: Process pending EQC lookup requests
+
+Note: `import_company_mappings_job` removed in Story 7.1-4 (Zero Legacy)
 
 **Executing Jobs:**
 

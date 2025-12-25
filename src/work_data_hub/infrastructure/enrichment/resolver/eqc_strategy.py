@@ -38,7 +38,10 @@ def resolve_via_eqc_sync(
     mapping_repository: Optional["CompanyMappingRepository"],
 ) -> Tuple[pd.Series, int, int]:
     """
-    Resolve via EQC within budget; cache results to enterprise.company_mapping.
+    Resolve via EQC within budget; cache results to enrichment_index.
+
+    Note: company_mapping table removed in Story 7.1-4 (Zero Legacy).
+    All EQC results now cached to enrichment_index (Story 6.1.1).
 
     Story 6.6: Supports both EqcProvider (preferred) and legacy enrichment_service.
 

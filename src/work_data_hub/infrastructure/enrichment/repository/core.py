@@ -13,7 +13,8 @@ from work_data_hub.utils.logging import get_logger
 
 from ..normalizer import normalize_for_temp_id
 from ..types import LookupType
-from .company_mapping_ops import CompanyMappingOpsMixin
+
+# Note: company_mapping_ops removed in Story 7.1-4 (Zero Legacy)
 from .enrichment_index_ops import EnrichmentIndexOpsMixin
 from .other_ops import OtherOpsMixin
 
@@ -21,7 +22,7 @@ logger = get_logger(__name__)
 
 
 class CompanyMappingRepository(
-    CompanyMappingOpsMixin,
+    # CompanyMappingOpsMixin removed in Story 7.1-4
     EnrichmentIndexOpsMixin,
     OtherOpsMixin,
 ):
@@ -33,9 +34,10 @@ class CompanyMappingRepository(
     transaction management by the caller.
 
     Composed using mixins for maintainability:
-    - CompanyMappingOpsMixin: company_mapping table operations
     - EnrichmentIndexOpsMixin: enrichment_index table operations
     - OtherOpsMixin: Other table operations (company_name_index, base_info, etc.)
+
+    Note: company_mapping table removed in Story 7.1-4 (Zero Legacy)
 
     Attributes:
         connection: SQLAlchemy Connection for database operations.
