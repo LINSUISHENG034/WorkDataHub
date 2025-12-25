@@ -302,7 +302,7 @@ development_status:
   7.1-4-remove-company-mapping-legacy: done  # P0: Zero Legacy - delete deprecated table/code - Code Review PASSED 2025-12-25
   7.1-5-add-file-selection-cleaner-compare: done  # P1: CLI parameter consistency - Code Review PASSED 2025-12-25
   7.1-6-fix-classification-logic: done  # P1: regression → data_source_difference - Code Review PASSED 2025-12-25
-  7.1-7-verify-legacy-db-connection: backlog  # P1: MySQL connection for Epic 8
+  7.1-7-verify-legacy-db-connection: done  # P1: Legacy DB connection verified - Code Review PASSED 2025-12-25
   7.1-8-eqc-confidence-dynamic-adjustment: backlog  # P1: Match type based confidence (configurable)
   7.1-9-clean-up-failing-tests: backlog  # P2: Address 33 failing tests
   7.1-10-categorize-ruff-warnings: backlog  # P2: Triage 1074 Ruff warnings

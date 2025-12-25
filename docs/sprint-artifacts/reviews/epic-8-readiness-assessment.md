@@ -1,7 +1,7 @@
 # Epic 8 Readiness Assessment
 
 **Created:** 2025-12-23
-**Last Updated:** 2025-12-23
+**Last Updated:** 2025-12-25
 **Status:** Active - Pre-Flight Phase
 
 ---
@@ -72,9 +72,9 @@ Epic 7 (Code Quality - File Length Refactoring) 已成功完成全部6个Story�
 
 | # | Action Item | Status | Details |
 |---|-------------|--------|---------|
-| P1-1 | cleaner_compare.py添加`--file-selection` | ⏳ TODO | 与ETL CLI对齐 |
-| P1-2 | 修复分类逻辑 | ⏳ TODO | 见2.6节 |
-| P1-3 | 确认Legacy数据库连接 | ⏳ TODO | Epic 8依赖 |
+| P1-1 | cleaner_compare.py添加`--file-selection` | ✅ DONE | Story 7.1-5 |
+| P1-2 | 修复分类逻辑 | ✅ DONE | Story 7.1-6 |
+| P1-3 | 确认Legacy数据库连接 | ✅ VERIFIED | Story 7.1-7 (with notes) |
 
 ### 2.3 P2 - MEDIUM (推荐)
 
@@ -115,7 +115,38 @@ tests/integration/migrations/test_enrichment_index_migration.py:342,398,470
 2. 删除测试(如脚本已废弃)
 3. 修复导入路径
 
-### 2.6 P1-2 详情: 分类逻辑问题
+### 2.6 P1-3 详情: Legacy数据库连接验证
+
+**Story:** 7.1-7-verify-legacy-db-connection.md
+
+**验证结果:**
+- ✅ AC-1: `WDH_LEGACY_*` 环境变量已配置 (5/5 variables)
+- ✅ AC-2: `PostgresSourceAdapter` 可正常实例化
+- ✅ AC-3: Legacy数据库连接成功 (PostgreSQL 17.6)
+- ⚠️ AC-4: 参考表不存在于Legacy数据库
+
+**发现的问题:**
+`config/reference_sync.yml` 配置的以下表不存在于Legacy数据库:
+- `enterprise.annuity_plan`
+- `enterprise.portfolio_plan`
+- `enterprise.organization`
+
+**根因分析:**
+Story 6.2-P1 (MySQL → PostgreSQL migration) 时，只迁移了部分表结构。Legacy数据库 `enterprise` schema 实际包含的表:
+- `annuity_account_mapping`, `base_info`, `biz_label`, `blank_company_id`
+- `business_info`, `company_id_mapping`, `company_types_classification`
+- `eqc_search_result`, `industrial_classification`
+
+**影响评估:**
+- **连接基础设施**: ✅ 完全正常
+- **参考数据同步**: ⚠️ 需要创建缺失的参考表或更新reference_sync.yml配置
+
+**建议行动:**
+1. Epic 8不依赖这些参考表进行Golden Dataset对比
+2. reference_sync.yml配置修正可延后至Epic 8之后
+3. 当前Story目标(验证连接)已达成
+
+### 2.7 P1-2 详情: 分类逻辑问题
 
 **当前逻辑 (cleaner_compare.py:531-533):**
 ```python
