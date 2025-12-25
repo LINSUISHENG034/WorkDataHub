@@ -11,6 +11,55 @@ Note: These tests require a real database connection.
 Set DATABASE_URL environment variable to run.
 """
 
+# CRITICAL: Work around tests/integration/migrations namespace collision
+# by importing the actual module from src/ directly.
+#
+# WHY THIS WORKAROUND IS NEEDED (Code Review 2025-12-25):
+# - Python's import system finds tests/integration/migrations/ before src/migrations/
+# - Standard `from migrations.migrate_legacy_to_enrichment_index` fails with ImportError
+# - This workaround uses importlib.util to load the module by absolute file path
+# - If this file moves, update the parent.parent... chain accordingly
+import sys
+from pathlib import Path
+import importlib.util
+from types import ModuleType
+
+
+def _load_migration_module() -> ModuleType:
+    """Load migrations module from src/ directory.
+
+    Uses importlib.util to bypass Python's normal import path resolution,
+    which would incorrectly find tests/integration/migrations/ instead of
+    src/migrations/.
+
+    NOTE: This intentionally registers the module in sys.modules to avoid
+    re-loading on subsequent imports within the same test session. This is
+    safe because pytest isolates test sessions.
+    """
+    # tests/integration/scripts/ -> 4 levels up -> project root
+    # If this file moves, this path calculation must be updated!
+    project_root = Path(__file__).parent.parent.parent.parent
+    module_path = (
+        project_root / "src" / "migrations" / "migrate_legacy_to_enrichment_index.py"
+    )
+
+    spec = importlib.util.spec_from_file_location(
+        "migrations.migrate_legacy_to_enrichment_index", module_path
+    )
+    module = importlib.util.module_from_spec(spec)
+    # Cache in sys.modules to prevent re-loading (intentional, not a leak)
+    sys.modules["migrations.migrate_legacy_to_enrichment_index"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_migration_module = _load_migration_module()
+LegacyMigrationConfig = _migration_module.LegacyMigrationConfig
+MigrationReport = _migration_module.MigrationReport
+migrate_company_id_mapping = _migration_module.migrate_company_id_mapping
+migrate_eqc_search_result = _migration_module.migrate_eqc_search_result
+rollback_migration = _migration_module.rollback_migration
+
 import os
 from decimal import Decimal
 from typing import Generator
@@ -19,13 +68,6 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection, Engine
 
-from work_data_hub.scripts.migrate_legacy_to_enrichment_index import (
-    LegacyMigrationConfig,
-    MigrationReport,
-    migrate_company_id_mapping,
-    migrate_eqc_search_result,
-    rollback_migration,
-)
 from work_data_hub.infrastructure.enrichment.mapping_repository import (
     CompanyMappingRepository,
 )
