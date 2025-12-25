@@ -44,7 +44,7 @@ INVALID_COMPANY_ID_VALUES: List[str] = [
 # Classification types
 CLASSIFICATION_UPGRADE_EQC_RESOLVED = "upgrade_eqc_resolved"
 CLASSIFICATION_REGRESSION_MISSING = "regression_missing_resolution"
-CLASSIFICATION_REGRESSION_MISMATCH = "regression_company_id_mismatch"
+CLASSIFICATION_DATA_SOURCE_DIFFERENCE = "data_source_difference"
 CLASSIFICATION_NEEDS_REVIEW = "needs_review"
 CLASSIFICATION_UPGRADE_NAME_CLEANING = "upgrade_name_cleaning"
 

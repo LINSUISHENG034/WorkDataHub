@@ -47,8 +47,8 @@ sys.path.insert(0, str(LEGACY_ANNUITY_HUB_PATH))
 from configs import DOMAIN_CONFIGS, get_domain_config
 from domain_config import (
     ARTIFACTS_DIR,
+    CLASSIFICATION_DATA_SOURCE_DIFFERENCE,
     CLASSIFICATION_NEEDS_REVIEW,
-    CLASSIFICATION_REGRESSION_MISMATCH,
     CLASSIFICATION_REGRESSION_MISSING,
     CLASSIFICATION_UPGRADE_EQC_RESOLVED,
     CLASSIFICATION_UPGRADE_NAME_CLEANING,
@@ -514,7 +514,7 @@ def classify_company_id_diff(legacy_val: str, new_val: str) -> str:
     Classifications:
     - upgrade_eqc_resolved: New resolved via EQC/DB when Legacy failed
     - regression_missing_resolution: Legacy was numeric, New is temp ID
-    - regression_company_id_mismatch: Both numeric but different
+    - data_source_difference: Both numeric but different (different data sources)
     - needs_review: Cannot be automatically classified
     """
     legacy_val = legacy_val.strip() if legacy_val else ""
@@ -539,9 +539,9 @@ def classify_company_id_diff(legacy_val: str, new_val: str) -> str:
     if legacy_is_numeric and new_is_temp:
         return CLASSIFICATION_REGRESSION_MISSING
 
-    # Case 3: Both numeric but different - REGRESSION
+    # Case 3: Both numeric but different - DATA SOURCE DIFFERENCE
     if legacy_is_numeric and new_is_numeric and legacy_val != new_val:
-        return CLASSIFICATION_REGRESSION_MISMATCH
+        return CLASSIFICATION_DATA_SOURCE_DIFFERENCE
 
     # Case 4: Both are temp IDs but different
     if legacy_is_temp and new_is_temp and legacy_val != new_val:

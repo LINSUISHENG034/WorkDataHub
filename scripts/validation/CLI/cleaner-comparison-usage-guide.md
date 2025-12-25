@@ -559,7 +559,7 @@ Classifications for `company_id` differences:
 |----------------|---------|
 | `upgrade_eqc_resolved` | ✅ New resolved, Legacy was empty/invalid |
 | `regression_missing_resolution` | ❌ Legacy had ID, New returns temp ID |
-| `regression_company_id_mismatch` | ❌ Both numeric but different |
+| `data_source_difference` | ℹ️ Both numeric but different (different data sources) |
 | `needs_review` | ❓ Manual review required |
 
 ## Exit Codes
@@ -601,5 +601,7 @@ The following scripts have been deprecated:
 
 | Date | Change |
 |------|--------|
+| 2025-12-25 | **Story 7.1-6**: Renamed `regression_company_id_mismatch` → `data_source_difference`, updated icon from ❌ to ℹ️ to reflect data source variations are expected, not errors |
 | 2025-12-18 | **Story 6.2-P12**: Refactored to config-driven, domain-agnostic architecture. Added `--domain` (required) and `--run-id` arguments. Renamed scripts. |
 | 2025-12-18 | Added deterministic export support via `--run-id` |
+
