@@ -130,7 +130,7 @@ if (Test-Path "data.json") { Remove-Item "data.json" }
 | Package / File | Purpose |
 |----------------|---------|
 | `src/work_data_hub/infrastructure/schema/` | Domain Registry Package - 域 Schema 定义的唯一真相源 |
-| `src/work_data_hub/infrastructure/etl/ops/` | ETL Operations Package - Pipeline 编排与执行 |
+| `src/work_data_hub/orchestration/ops/` | ETL Operations Package - Pipeline 编排与执行 |
 | `src/work_data_hub/infrastructure/enrichment/` | Company Enrichment Package - 公司ID解析服务 |
 | `src/work_data_hub/io/loader/` | Database Loader Package - 数据库写入服务 |
 | `src/work_data_hub/io/connectors/eqc/` | EQC Client Package - 企查查 API 客户端 |

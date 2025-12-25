@@ -227,11 +227,11 @@ src/module/                          src/module/
 
 | Original File | Package | Story |
 |---------------|---------|-------|
-| `ops.py` (1700 lines) | `infrastructure/etl/ops/` | 7.1 |
-| `warehouse_loader.py` (1400 lines) | `io/loader/` | 7.2 |
-| `eqc_client.py` (1100 lines) | `io/connectors/eqc/` | 7.2 |
-| `etl.py` (1200 lines) | `cli/etl/` | 7.4 |
-| `domain_registry.py` (900 lines) | `infrastructure/schema/` | 7.5 |
+| `ops.py` (1700 lines) | `orchestration/ops/` | 7-1 |
+| `warehouse_loader.py` (1400 lines) | `io/loader/` | 7-2 |
+| `eqc_client.py` (1100 lines) | `io/connectors/eqc/` | 7-2 |
+| `etl.py` (1200 lines) | `cli/etl/` | 7-4 |
+| `domain_registry.py` (900 lines) | `infrastructure/schema/` | 7-5 |
 
 **Pre-commit Hook Enforcement:**
 

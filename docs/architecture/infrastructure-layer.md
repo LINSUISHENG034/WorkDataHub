@@ -15,7 +15,7 @@ Epic 9 by centralizing common transformation, validation, and enrichment logic.
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                    Orchestration Layer                                   │
-│                 (CLI: cli/etl/, scheduling)                              │
+│         (CLI: cli/etl/, orchestration/ops/, scheduling)                  │
 └─────────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -28,9 +28,9 @@ Epic 9 by centralizing common transformation, validation, and enrichment logic.
                               ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                   Infrastructure Layer                                   │
-│  etl/ops/     enrichment/     schema/     transforms/     validation/    │
-│ (Pipeline    (Company ID    (Domain     (Transform      (Schema         │
-│  execution)   resolution)    Registry)   steps)          validation)     │
+│    enrichment/       schema/       transforms/       validation/         │
+│   (Company ID      (Domain        (Transform        (Schema              │
+│    resolution)      Registry)      steps)            validation)         │
 └─────────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -42,7 +42,7 @@ Epic 9 by centralizing common transformation, validation, and enrichment logic.
 
 ## Module Structure
 
-> **Updated 2025-12-22 (Epic 7):** Reflects modularized package structure.
+> **Updated 2025-12-26 (Epic 7.1-11 Code Review):** Reflects actual modularized package structure.
 
 ```
 src/work_data_hub/infrastructure/
@@ -50,6 +50,9 @@ src/work_data_hub/infrastructure/
 ├── cleansing/
 │   ├── __init__.py
 │   ├── registry.py              # CleansingRegistry singleton
+│   ├── rule_engine.py           # Rule execution engine
+│   ├── biz_label_parser.py      # Business label parsing
+│   ├── business_info_cleanser.py # Business info cleansing
 │   ├── rules/
 │   │   ├── __init__.py
 │   │   ├── numeric_rules.py     # Numeric cleansing rules
@@ -61,38 +64,43 @@ src/work_data_hub/infrastructure/
 ├── enrichment/                  # [Epic 7 Story 7.3: Modularized]
 │   ├── __init__.py              # Public API exports
 │   ├── company_id_resolver.py   # Batch company ID resolution
-│   ├── gateway.py               # EnrichmentGateway (5-layer orchestration)
 │   ├── normalizer.py            # Company name normalization
-│   ├── providers/               # Provider implementations
+│   ├── types.py                 # ResolutionStrategy, ResolutionResult
+│   ├── eqc_lookup_config.py     # [Story 6.2-P17] EQC lookup configuration
+│   ├── eqc_confidence_config.py # [Story 7.1-8] EQC match confidence config
+│   ├── eqc_provider.py          # Layer 4: EQC API provider
+│   ├── domain_learning_service.py # Domain learning from processed data
+│   ├── data_refresh_service.py  # EQC data refresh management
+│   ├── refresh_checkpoint.py    # Refresh state tracking
+│   ├── repository/              # Database operations
 │   │   ├── __init__.py
-│   │   ├── base.py              # EnterpriseInfoProvider protocol
-│   │   ├── yaml_provider.py     # Layer 1: YAML config
-│   │   ├── db_cache_provider.py # Layer 2: DB cache (enrichment_index)
-│   │   └── eqc_provider.py      # Layer 4: EQC API
-│   ├── temp_id.py               # Layer 5: Temp ID generation (HMAC-SHA1)
-│   └── types.py                 # ResolutionStrategy, ResolutionResult
-├── etl/
-│   └── ops/                     # [Epic 7 Story 7.1: ops.py decomposition]
-│       ├── __init__.py          # Public API: run_domain_pipeline, etc.
-│       ├── core.py              # Main orchestration logic
-│       ├── config.py            # ETL configuration loading
-│       ├── discovery.py         # File discovery integration
-│       ├── enrichment.py        # Enrichment step integration
-│       ├── loading.py           # Database loading step
-│       ├── backfill.py          # FK backfill operations
-│       ├── reference_sync.py    # Reference data sync
-│       └── models.py            # ETLResult, ETLConfig dataclasses
+│   │   ├── core.py              # Repository base
+│   │   ├── enrichment_index_ops.py # Layer 2: enrichment_index operations
+│   │   ├── models.py            # Repository data models
+│   │   └── other_ops.py         # Other DB operations
+│   ├── resolver/                # Resolution strategies
+│   │   ├── __init__.py
+│   │   ├── core.py              # EnrichmentGateway (5-layer orchestration)
+│   │   ├── yaml_strategy.py     # Layer 1: YAML config
+│   │   ├── db_strategy.py       # Layer 2: DB cache (enrichment_index)
+│   │   ├── eqc_strategy.py      # Layer 4: EQC API
+│   │   └── backflow.py          # Result backflow to cache
+│   ├── mapping_repository.py    # Company mapping repository
+│   ├── business_info_repository.py  # Business info operations
+│   ├── biz_label_repository.py  # Business label operations
+│   └── csv_exporter.py          # CSV export utility
 ├── schema/                      # [Epic 7 Story 7.5: Domain Registry]
 │   ├── __init__.py              # Public API: DomainRegistry, get_schema
 │   ├── registry.py              # DomainRegistry class
-│   ├── types.py                 # ColumnType, ColumnDef, IndexDef, DomainSchema
-│   ├── domains/                 # Domain-specific schema definitions
-│   │   ├── __init__.py
-│   │   ├── annuity_performance.py
-│   │   ├── annuity_income.py
-│   │   ├── annuity_plans.py
-│   │   └── portfolio_plans.py
-│   └── sql_generator.py         # SQL DDL generation helpers
+│   ├── domain_registry.py       # Domain registry utilities
+│   ├── core.py                  # Core schema types (ColumnType, ColumnDef, etc.)
+│   ├── ddl_generator.py         # SQL DDL generation helpers
+│   └── definitions/             # Domain-specific schema definitions
+│       ├── __init__.py
+│       ├── annuity_performance.py
+│       ├── annuity_income.py
+│       ├── annuity_plans.py
+│       └── portfolio_plans.py
 ├── settings/
 │   ├── __init__.py
 │   ├── data_source_schema.py    # Pydantic schemas for config
@@ -123,7 +131,9 @@ src/work_data_hub/io/
 │   ├── operations.py            # insert_missing, fill_null_only
 │   ├── insert_builder.py        # SQL INSERT statement building
 │   ├── sql_utils.py             # quote_ident, quote_qualified
-│   └── models.py                # LoadResult, exceptions
+│   ├── models.py                # LoadResult, exceptions
+│   ├── company_enrichment_loader.py # Company enrichment DB loading
+│   └── warehouse_loader.py      # Facade (backward-compatible re-exports)
 ├── connectors/
 │   ├── eqc/                     # [Story 7.2: eqc_client.py decomposition]
 │   │   ├── __init__.py          # EQCClient exports
@@ -139,6 +149,32 @@ src/work_data_hub/io/
 └── warehouse_loader.py          # Facade (backward-compatible re-exports)
 ```
 
+### Orchestration Layer (Epic 7 Story 7.1)
+
+> **Note:** ETL pipeline operations are in `orchestration/ops/`, not `infrastructure/etl/ops/`.
+
+```
+src/work_data_hub/orchestration/
+├── __init__.py
+├── jobs.py                      # Dagster job definitions
+├── schedules.py                 # Dagster schedules
+├── sensors.py                   # Dagster sensors
+├── repository.py                # Dagster repository
+├── reference_sync_jobs.py       # Reference sync job definitions
+├── reference_sync_ops.py        # Reference sync operations
+└── ops/                         # [Story 7.1: ops.py decomposition]
+    ├── __init__.py              # Public API: run_domain_pipeline, etc.
+    ├── _internal.py             # Internal utilities
+    ├── pipeline_ops.py          # Main pipeline orchestration
+    ├── file_processing.py       # File discovery and processing
+    ├── company_enrichment.py    # Company ID enrichment step
+    ├── loading.py               # Database loading step
+    ├── generic_backfill.py      # FK backfill operations
+    ├── hybrid_reference.py      # Hybrid reference service
+    ├── reference_backfill.py    # Reference data backfill
+    └── demo_ops.py              # Demo/test operations
+```
+
 ### CLI Layer Package (Epic 7 Story 7.4)
 
 ```
@@ -146,10 +182,12 @@ src/work_data_hub/cli/
 ├── __init__.py
 ├── etl/                         # [Story 7.4: etl.py decomposition]
 │   ├── __init__.py              # CLI entry point
-│   ├── commands.py              # Click command definitions
-│   ├── options.py               # CLI option definitions
-│   ├── handlers.py              # Command handlers
-│   └── formatters.py            # Output formatting
+│   ├── main.py                  # Main CLI command
+│   ├── config.py                # CLI configuration
+│   ├── executors.py             # Command execution handlers
+│   ├── auth.py                  # Authentication handling
+│   ├── diagnostics.py           # Database diagnostics
+│   └── domain_validation.py     # Domain validation utilities
 └── etl.py                       # Facade (backward-compatible entry point)
 ```
 
