@@ -76,13 +76,20 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-def discover_source_file(month: str, domain: str) -> tuple:
+def discover_source_file(
+    month: str, domain: str, file_selection: str = "error"
+) -> tuple:
     """
     Discover source file using New Pipeline's FileDiscoveryService.
 
     Args:
         month: Month in YYYYMM format (e.g., '202311')
         domain: Domain name for file discovery config
+        file_selection: File selection strategy when multiple files match
+            - "error" (default): Raise error on ambiguous matches
+            - "newest": Select most recently modified file
+            - "oldest": Select oldest modified file
+            - "first": Select alphabetically first file
 
     Returns:
         Tuple of (file_path, sheet_name)
@@ -100,6 +107,9 @@ def discover_source_file(month: str, domain: str) -> tuple:
 
     try:
         from work_data_hub.io.connectors.file_connector import FileDiscoveryService
+        from work_data_hub.io.connectors.file_pattern_matcher import (
+            SelectionStrategy,
+        )
 
         print(
             f"🔍 Auto-discovering source file for domain '{domain}', month {month}..."
@@ -108,6 +118,7 @@ def discover_source_file(month: str, domain: str) -> tuple:
         result = discovery_service.discover_file(
             domain=domain,
             YYYYMM=month,  # Template variable in data_sources.yml is {YYYYMM}
+            selection_strategy=SelectionStrategy(file_selection),
         )
 
         print(f"   ✓ Discovered: {result.file_path.name}")
@@ -680,20 +691,24 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=f"""
 Examples:
-  # Auto-discovery mode (recommended)
-  python cleaner_compare.py --domain annuity_performance --month 202311 --limit 100
+  # Auto-discovery with file selection (new!)
+  python cleaner_compare.py --domain annuity_performance --month 202311 \\
+      --file-selection newest --limit 100
 
   # Manual mode - specify file path directly
   python cleaner_compare.py --domain annuity_performance data/202412_annuity.xlsx --limit 100
 
   # Full dataset with enrichment and export
-  python cleaner_compare.py --domain annuity_performance --month 202311 --limit 0 --enrichment --export
+  python cleaner_compare.py --domain annuity_performance --month 202311 \\
+      --file-selection newest --limit 0 --enrichment --export
 
-  # Deterministic export for reproducible comparisons
-  python cleaner_compare.py --domain annuity_performance --month 202311 --export --run-id baseline-202311
+  # Deterministic file selection for reproducible comparisons
+  python cleaner_compare.py --domain annuity_performance --month 202311 \\
+      --file-selection first --export --run-id baseline-202311
 
   # New Pipeline only (no Legacy dependencies needed)
-  python cleaner_compare.py --domain annuity_performance --month 202311 --new-only --debug
+  python cleaner_compare.py --domain annuity_performance --month 202311 \\
+      --file-selection newest --new-only --debug
 
 Available domains: {", ".join(available_domains)}
         """,
@@ -715,6 +730,17 @@ Available domains: {", ".join(available_domains)}
         "--month",
         type=str,
         help="Month in YYYYMM format for auto-discovery (e.g., 202311)",
+    )
+    parser.add_argument(
+        "--file-selection",
+        type=str,
+        choices=["error", "newest", "oldest", "first"],
+        default="error",
+        help=(
+            "Strategy when multiple files match discovery patterns. "
+            "'error' (default) raises an error, 'newest' selects most recently modified, "
+            "'oldest' selects oldest, 'first' selects alphabetically first."
+        ),
     )
     parser.add_argument(
         "--sheet",
@@ -778,7 +804,7 @@ Available domains: {", ".join(available_domains)}
     if args.month:
         # Auto-discovery mode
         excel_path_str, discovered_sheet = discover_source_file(
-            args.month, config.domain_name
+            args.month, config.domain_name, args.file_selection
         )
         excel_path = Path(excel_path_str)
         # Use discovered sheet unless user explicitly specified one
