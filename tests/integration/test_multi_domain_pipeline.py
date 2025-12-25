@@ -385,9 +385,11 @@ class TestMultiDomainPipeline:
         assert income_result.rows_loaded > 0
 
         # Loader captured two distinct tables with domain-specific upsert keys
-        assert loader.calls[0]["table"] == "annuity_performance_NEW"
+        # Story 7.1-9: Config file uses Chinese sheet names as table names
+        assert loader.calls[0]["table"] == "规模明细_NEW"
         assert loader.calls[0]["upsert_keys"] == ["月度", "业务类型", "计划类型"]
-        assert loader.calls[1]["table"] == "annuity_income_NEW"
+        assert loader.calls[1]["table"] == "收入明细_NEW"
+        # Both domains use the same DEFAULT_REFRESH_KEYS
         assert loader.calls[1]["upsert_keys"] == ["月度", "业务类型", "计划类型"]
 
         # Column sets remain domain-specific

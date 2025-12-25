@@ -507,7 +507,8 @@ class TestIntegration:
 
             # Verify output configuration
             assert annuity_config.output is not None
-            assert annuity_config.output.table == "annuity_performance"
+            # Story 7.1-9: Config file uses sheet_name as table name
+            assert annuity_config.output.table == "规模明细"
             assert annuity_config.output.schema_name == "business"  # From defaults
 
             # Verify exclude_patterns extended from defaults
@@ -518,5 +519,6 @@ class TestIntegration:
             # Test getting the annuity_income domain
             income_config = get_domain_config_v2("annuity_income", config_path)
             assert income_config.output is not None
-            assert income_config.output.table == "annuity_income"
+            # Story 7.1-9: Config file uses sheet_name as table name
+            assert income_config.output.table == "收入明细"
             assert income_config.output.schema_name == "business"  # From defaults

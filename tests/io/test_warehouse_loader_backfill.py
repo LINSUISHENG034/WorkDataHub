@@ -8,7 +8,7 @@ added for reference backfill functionality.
 from unittest.mock import Mock, MagicMock, patch, call
 import pytest
 
-from src.work_data_hub.io.loader.warehouse_loader import (
+from work_data_hub.io.loader.warehouse_loader import (
     DataWarehouseLoaderError,
     insert_missing,
     fill_null_only,

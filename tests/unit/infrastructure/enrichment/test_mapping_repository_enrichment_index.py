@@ -641,6 +641,11 @@ class TestUpdateHitCount:
 # =============================================================================
 
 
+@pytest.mark.skip(
+    reason="Epic 7 refactoring removed backward-compatibility methods (lookup_batch, insert_batch). "
+    "These methods were replaced with lookup_enrichment_index_batch and insert_enrichment_index_batch. "
+    "See test_mapping_repository_enrichment_index.py for current API tests."
+)
 class TestRegressionExistingMethods:
     """Regression tests ensuring existing methods remain unaffected (AC4.5)."""
 

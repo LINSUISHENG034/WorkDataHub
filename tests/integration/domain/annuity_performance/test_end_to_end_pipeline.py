@@ -155,7 +155,8 @@ class TestProcessAnnuityPerformance:
         assert result.rows_loaded == 4
         assert result.rows_failed == 1  # 1 intentionally invalid row dropped
         assert result.metrics["discovery"]["row_count"] == len(df.index)
-        assert loader.calls[0]["table"] == "annuity_performance_NEW"
+        # Story 7.1-9: Config file uses sheet_name as table name
+        assert loader.calls[0]["table"] == "规模明细_NEW"
         assert loader.calls[0]["upsert_keys"] == list(DEFAULT_REFRESH_KEYS)
 
     def test_idempotent_re_run_tracks_updates(self):

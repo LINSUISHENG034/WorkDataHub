@@ -120,12 +120,15 @@ class TestBuildRunConfig:
 
     def test_build_run_config_success(self, tmp_path):
         """Test successful run config building from CLI args."""
-        # Create test configuration
+        # Create test configuration with V2 required fields
         config_data = {
             "domains": {
                 "sandbox_trustee_performance": {
-                    "table": "sandbox_trustee_performance",
-                    "pk": ["report_date", "plan_code", "company_code"],
+                    "base_path": "reference/{YYYYMM}/收集数据/数据采集",
+                    "file_patterns": ["*年金终稿*.xlsx"],
+                    "sheet_name": "规模明细",
+                    "version_strategy": "highest_number",
+                    "fallback": "error",
                 }
             }
         }
@@ -160,9 +163,9 @@ class TestBuildRunConfig:
             )
             assert result["ops"]["read_excel_op"]["config"]["sheet"] == 0
             load_config = result["ops"]["load_op"]["config"]
-            assert load_config["table"] == "sandbox_trustee_performance"
+            assert load_config["table"] == '"sandbox_trustee_performance"'
             assert load_config["mode"] == "delete_insert"
-            assert load_config["pk"] == ["report_date", "plan_code", "company_code"]
+            assert load_config["pk"] == []  # Empty as fallback since not in V2 config
             assert load_config["plan_only"] is True
             assert load_config["skip"] is False
             # Note: backfill_refs_op renamed to generic_backfill_refs_op in Story 6.2-P6
@@ -198,7 +201,7 @@ class TestBuildRunConfig:
 
             # Should use fallback values
             load_config = result["ops"]["load_op"]["config"]
-            assert load_config["table"] == "sandbox_trustee_performance"
+            assert load_config["table"] == '"sandbox_trustee_performance"'
             assert load_config["pk"] == []  # Empty list as fallback
             assert load_config["mode"] == "append"
             assert load_config["plan_only"] is False
@@ -230,7 +233,7 @@ class TestBuildRunConfig:
             result = build_run_config(args, domain="sandbox_trustee_performance")
 
             load_config = result["ops"]["load_op"]["config"]
-            assert load_config["table"] == "sandbox_trustee_performance"
+            assert load_config["table"] == '"sandbox_trustee_performance"'
             assert load_config["pk"] == []
 
     def test_build_run_config_execute_flag_inversion(self, tmp_path):

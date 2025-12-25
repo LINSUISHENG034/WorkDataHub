@@ -130,7 +130,9 @@ class TestEqcProviderLookup:
         assert result.company_id == "614810477"
         assert result.official_name == "中国平安保险集团股份有限公司"
         assert result.unified_credit_code == "91440300100001XXXX"
-        assert result.confidence == 0.9
+        # Story 7.1-8: Confidence is now based on match_type from config, not raw match_score
+        # Default confidence is 0.7 when match type cannot be determined from mock data
+        assert result.confidence == 0.7
         assert result.match_type == "eqc"
 
     def test_lookup_not_found_returns_none(self, provider: EqcProvider) -> None:

@@ -34,21 +34,37 @@ def _build_fake_connection():
     return conn, cursor
 
 
-def _create_loader(monkeypatch, operational_error=Exception):
-    """Instantiate WarehouseLoader with patched psycopg2 pool for unit tests."""
+def _create_loader(monkeypatch, operational_error=None):
+    """Instantiate WarehouseLoader with patched psycopg2 pool for unit tests.
+
+    Args:
+        monkeypatch: pytest monkeypatch fixture
+        operational_error: Exception class to use for OperationalError (unused in Epic 7)
+
+    Returns:
+        Tuple of (loader, pool_instance, health_conn, health_cursor)
+    """
+    import sys
+    from work_data_hub.io.loader import warehouse_loader
+
     pool_instance = MagicMock()
     health_conn, health_cursor = _build_fake_connection()
     pool_instance.getconn.return_value = health_conn
     pool_instance.putconn.return_value = None
+    pool_instance.closed = False
     pool_cls = MagicMock(return_value=pool_instance)
+
+    # Epic 7 refactoring: Set attribute directly on facade module
+    # This allows the core module's _get_dynamic_import to find it
+    # The module must be in sys.modules with the attribute before WarehouseLoader instantiates
+    # Use setattr for automatic cleanup by monkeypatch (raising=False since attribute doesn't exist)
     monkeypatch.setattr(
-        "work_data_hub.io.loader.warehouse_loader.ThreadedConnectionPool",
-        pool_cls,
+        warehouse_loader, "ThreadedConnectionPool", pool_cls, raising=False
     )
-    monkeypatch.setattr(
-        "work_data_hub.io.loader.warehouse_loader.OperationalError",
-        operational_error,
-    )
+
+    # Note: operational_error parameter is kept for backward compatibility but not used
+    # in Epic 7 since OperationalError is not used by the loader module
+
     loader = WarehouseLoader(connection_url="postgresql://user:pass@test/db")
     return loader, pool_instance, health_conn, health_cursor
 
@@ -365,10 +381,12 @@ class TestWarehouseLoaderClass:
         cursor.fetchall.side_effect = [[(True,), (False,)], [(True,)]]
         loader._get_connection_with_retry = MagicMock(return_value=conn)
 
+        # Epic 7 refactoring: Set execute_values on facade module for dynamic import
+        from work_data_hub.io.loader import warehouse_loader
+
         mocked_execute_values = MagicMock()
         monkeypatch.setattr(
-            "work_data_hub.io.loader.warehouse_loader.execute_values",
-            mocked_execute_values,
+            warehouse_loader, "execute_values", mocked_execute_values, raising=False
         )
 
         result = loader.load_dataframe(

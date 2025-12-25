@@ -313,7 +313,7 @@ class TestEnrichmentServiceIntegration:
         mock_service.resolve_company_id.return_value = mock_result
 
         mock_repo = MagicMock()
-        mock_repo.lookup_batch.return_value = {
+        mock_repo.lookup_enrichment_index_batch.return_value = {
             # Ensure DB cache path skipped so EQC path used
             "noop": MatchResult("db_hit", "name", 4, "internal")
         }
@@ -735,20 +735,26 @@ class TestYamlMultiTierLookup:
 class TestDatabaseCacheLookup:
     """Tests for database cache lookup (AC4)."""
 
-    def test_db_cache_lookup_batch(self, default_strategy):
+    def test_db_cache_lookup_enrichment_index_batch(self, default_strategy):
         """Test database batch lookup works with mocked repository."""
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import (
-            MatchResult,
-        )
 
         mock_repo = MagicMock()
-        mock_repo.lookup_batch.return_value = {
-            "公司B": MatchResult(
+        # Epic 7 refactoring: lookup_batch → lookup_enrichment_index_batch
+        # Returns Dict[tuple[LookupType, str], EnrichmentIndexRecord]
+        mock_repo.lookup_enrichment_index_batch.return_value = {
+            (LookupType.CUSTOMER_NAME, "公司b"): EnrichmentIndexRecord(
+                lookup_key="公司b",  # Normalized by resolver
+                lookup_type=LookupType.CUSTOMER_NAME,
                 company_id="db_company_123",
-                match_type="name",
-                priority=4,
-                source="internal",
+                confidence=1.0,
+                source=SourceType.YAML,
+                source_domain=None,
+                source_table=None,
+                hit_count=0,
+                last_hit_at=None,
+                created_at=None,
+                updated_at=None,
             )
         }
 
@@ -773,9 +779,9 @@ class TestDatabaseCacheLookup:
 
         result = resolver.resolve_batch(df, default_strategy)
         assert result.data.loc[0, "company_id"] == "db_company_123"
-        assert result.statistics.db_cache_hits["legacy"] == 1
+        assert result.statistics.db_cache_hits["customer_name"] == 1
         assert result.statistics.db_cache_hits_total == 1
-        mock_repo.lookup_batch.assert_called_once()
+        mock_repo.lookup_enrichment_index_batch.assert_called_once()
 
     def test_db_cache_lookup_no_repository(self, default_strategy):
         """Test graceful skip when no repository provided."""
@@ -815,7 +821,7 @@ class TestBackflowMechanism:
         )
 
         mock_repo = MagicMock()
-        mock_repo.lookup_batch.return_value = {}
+        mock_repo.lookup_enrichment_index_batch.return_value = {}
         mock_repo.insert_batch_with_conflict_check.return_value = InsertBatchResult(
             inserted_count=2,
             skipped_count=0,
@@ -856,7 +862,7 @@ class TestBackflowMechanism:
         )
 
         mock_repo = MagicMock()
-        mock_repo.lookup_batch.return_value = {}
+        mock_repo.lookup_enrichment_index_batch.return_value = {}
         mock_repo.insert_batch_with_conflict_check.return_value = InsertBatchResult(
             inserted_count=0,
             skipped_count=0,
@@ -897,7 +903,7 @@ class TestBackflowMechanism:
         )
 
         mock_repo = MagicMock()
-        mock_repo.lookup_batch.return_value = {}
+        mock_repo.lookup_enrichment_index_batch.return_value = {}
         mock_repo.insert_batch_with_conflict_check.return_value = InsertBatchResult(
             inserted_count=0,
             skipped_count=1,
@@ -1061,7 +1067,7 @@ class TestAsyncQueueIntegration:
         )
 
         mock_repo = MagicMock()
-        mock_repo.lookup_batch.return_value = {}
+        mock_repo.lookup_enrichment_index_batch.return_value = {}
         mock_repo.enqueue_for_enrichment.return_value = EnqueueResult(
             queued_count=2, skipped_count=0
         )
@@ -1098,7 +1104,7 @@ class TestAsyncQueueIntegration:
         from unittest.mock import MagicMock
 
         mock_repo = MagicMock()
-        mock_repo.lookup_batch.return_value = {}
+        mock_repo.lookup_enrichment_index_batch.return_value = {}
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
@@ -1133,7 +1139,7 @@ class TestAsyncQueueIntegration:
         from unittest.mock import MagicMock
 
         mock_repo = MagicMock()
-        mock_repo.lookup_batch.return_value = {}
+        mock_repo.lookup_enrichment_index_batch.return_value = {}
         mock_repo.enqueue_for_enrichment.side_effect = Exception("DB Error")
 
         resolver = CompanyIdResolver(
@@ -1170,7 +1176,7 @@ class TestAsyncQueueIntegration:
         )
 
         mock_repo = MagicMock()
-        mock_repo.lookup_batch.return_value = {}
+        mock_repo.lookup_enrichment_index_batch.return_value = {}
         mock_repo.enqueue_for_enrichment.return_value = EnqueueResult(
             queued_count=1, skipped_count=0
         )
@@ -1213,7 +1219,7 @@ class TestAsyncQueueIntegration:
         )
 
         mock_repo = MagicMock()
-        mock_repo.lookup_batch.return_value = {}
+        mock_repo.lookup_enrichment_index_batch.return_value = {}
         mock_repo.enqueue_for_enrichment.return_value = EnqueueResult(
             queued_count=3, skipped_count=0
         )
@@ -1276,7 +1282,7 @@ class TestAsyncQueueIntegration:
         from unittest.mock import MagicMock
 
         mock_repo = MagicMock()
-        mock_repo.lookup_batch.return_value = {}
+        mock_repo.lookup_enrichment_index_batch.return_value = {}
 
         resolver = CompanyIdResolver(
             eqc_config=EqcLookupConfig.disabled(),
@@ -1312,7 +1318,7 @@ class TestAsyncQueueIntegration:
         )
 
         mock_repo = MagicMock()
-        mock_repo.lookup_batch.return_value = {}
+        mock_repo.lookup_enrichment_index_batch.return_value = {}
         mock_repo.enqueue_for_enrichment.return_value = EnqueueResult(
             queued_count=1, skipped_count=0
         )
@@ -1451,18 +1457,21 @@ class TestEnrichmentIndexDbCache:
     def test_enrichment_index_fallbacks_to_legacy_on_no_hits(self, default_strategy):
         """If enrichment_index misses, resolver should fall back to legacy table when available."""
         mock_repo = MagicMock()
-        mock_repo.lookup_enrichment_index_batch.return_value = {}
-        # Legacy path result
-        from work_data_hub.infrastructure.enrichment.mapping_repository import (
-            MatchResult,
-        )
-
-        mock_repo.lookup_batch.return_value = {
-            "legacy_key": MatchResult(
+        # Epic 7: All lookups use enrichment_index (no separate legacy path)
+        # Return legacy mapping as CUSTOMER_NAME type
+        mock_repo.lookup_enrichment_index_batch.return_value = {
+            (LookupType.CUSTOMER_NAME, "legacy_key"): EnrichmentIndexRecord(
+                lookup_key="legacy_key",
+                lookup_type=LookupType.CUSTOMER_NAME,
                 company_id="C_LEGACY",
-                match_type="name",
-                priority=4,
-                source="internal",
+                confidence=1.0,
+                source=SourceType.YAML,
+                source_domain=None,
+                source_table=None,
+                hit_count=0,
+                last_hit_at=None,
+                created_at=None,
+                updated_at=None,
             )
         }
 
@@ -1488,7 +1497,8 @@ class TestEnrichmentIndexDbCache:
         result = resolver.resolve_batch(df, default_strategy)
 
         assert result.data.loc[0, "company_id"] == "C_LEGACY"
-        assert result.statistics.db_cache_hits["legacy"] == 1
+        # Epic 7: Legacy mappings are now tracked as customer_name hits
+        assert result.statistics.db_cache_hits["customer_name"] == 1
         assert result.statistics.db_cache_hits_total == 1
 
     def test_enrichment_index_updates_hit_count_per_hit(self, default_strategy):
@@ -1582,19 +1592,28 @@ class TestP4NormalizationDbCacheLookup:
 
     def test_db_cache_lookup_normalizes_p4_customer_name(self, default_strategy):
         """P4 (customer_name) should be normalized before DB lookup (AC1)."""
+        from decimal import Decimal
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import (
-            MatchResult,
+        from work_data_hub.infrastructure.enrichment.types import (
+            EnrichmentIndexRecord,
+            LookupType,
+            SourceType,
+        )
+        from work_data_hub.infrastructure.enrichment.normalizer import (
+            normalize_for_temp_id,
         )
 
         mock_repo = MagicMock()
         # DB has normalized key "公司A" (without brackets/status markers)
-        mock_repo.lookup_batch.return_value = {
-            "公司A": MatchResult(
+        # The normalized value of "（核心）公司A" is "公司a" (lowercase, brackets removed)
+        normalized_key = normalize_for_temp_id("（核心）公司A")
+        mock_repo.lookup_enrichment_index_batch.return_value = {
+            (LookupType.CUSTOMER_NAME, normalized_key): EnrichmentIndexRecord(
+                lookup_key=normalized_key,
+                lookup_type=LookupType.CUSTOMER_NAME,
                 company_id="normalized_company_123",
-                match_type="name",
-                priority=4,
-                source="internal",
+                source=SourceType.YAML,
+                confidence=Decimal("1.00"),
             )
         }
 
@@ -1615,32 +1634,37 @@ class TestP4NormalizationDbCacheLookup:
         df = pd.DataFrame(
             {
                 "计划代码": ["UNKNOWN"],
-                "客户名称": ["（核心）公司A"],  # Should normalize to "公司A"
+                "客户名称": ["（核心）公司A"],  # Should normalize to "公司a"
             }
         )
 
         result = resolver.resolve_batch(df, default_strategy)
 
-        # Should hit cache because normalized("（核心）公司A") == "公司A"
+        # Should hit cache because normalized("（核心）公司A") matches
         assert result.data.loc[0, "company_id"] == "normalized_company_123"
-        assert result.statistics.db_cache_hits["legacy"] == 1
+        assert result.statistics.db_cache_hits["customer_name"] == 1
         assert result.statistics.db_cache_hits_total == 1
 
     def test_db_cache_lookup_raw_for_p1_plan_code(self, default_strategy):
         """P1 (plan_code) should use RAW values for DB lookup (AC3)."""
+        from decimal import Decimal
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import (
-            MatchResult,
+        from work_data_hub.infrastructure.enrichment.types import (
+            EnrichmentIndexRecord,
+            LookupType,
+            SourceType,
         )
 
         mock_repo = MagicMock()
         # DB has raw key "PLAN001" (exact match required)
-        mock_repo.lookup_batch.return_value = {
-            "PLAN001": MatchResult(
+        # Return Dict[tuple[LookupType, str], EnrichmentIndexRecord] format
+        mock_repo.lookup_enrichment_index_batch.return_value = {
+            (LookupType.PLAN_CODE, "PLAN001"): EnrichmentIndexRecord(
+                lookup_key="PLAN001",
+                lookup_type=LookupType.PLAN_CODE,
                 company_id="plan_company_123",
-                match_type="plan",
-                priority=1,
-                source="internal",
+                source=SourceType.YAML,
+                confidence=Decimal("1.00"),
             )
         }
 
@@ -1667,23 +1691,28 @@ class TestP4NormalizationDbCacheLookup:
 
         # Should hit cache with exact raw match
         assert result.data.loc[0, "company_id"] == "plan_company_123"
-        assert result.statistics.db_cache_hits["legacy"] == 1
+        assert result.statistics.db_cache_hits["plan_code"] == 1
         assert result.statistics.db_cache_hits_total == 1
 
     def test_db_cache_lookup_raw_for_p2_account_number(self, default_strategy):
         """P2 (account_number) should use RAW values for DB lookup (AC3)."""
+        from decimal import Decimal
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import (
-            MatchResult,
+        from work_data_hub.infrastructure.enrichment.types import (
+            EnrichmentIndexRecord,
+            LookupType,
+            SourceType,
         )
 
         mock_repo = MagicMock()
-        mock_repo.lookup_batch.return_value = {
-            "ACC001": MatchResult(
+        # Return Dict[tuple[LookupType, str], EnrichmentIndexRecord] format
+        mock_repo.lookup_enrichment_index_batch.return_value = {
+            (LookupType.ACCOUNT_NUMBER, "ACC001"): EnrichmentIndexRecord(
+                lookup_key="ACC001",
+                lookup_type=LookupType.ACCOUNT_NUMBER,
                 company_id="account_company_123",
-                match_type="account",
-                priority=2,
-                source="internal",
+                source=SourceType.YAML,
+                confidence=Decimal("1.00"),
             )
         }
 
@@ -1710,23 +1739,28 @@ class TestP4NormalizationDbCacheLookup:
         result = resolver.resolve_batch(df, default_strategy)
 
         assert result.data.loc[0, "company_id"] == "account_company_123"
-        assert result.statistics.db_cache_hits["legacy"] == 1
+        assert result.statistics.db_cache_hits["account_number"] == 1
         assert result.statistics.db_cache_hits_total == 1
 
     def test_db_cache_lookup_raw_for_p5_account_name(self, default_strategy):
         """P5 (account_name) should use RAW values for DB lookup (AC3)."""
+        from decimal import Decimal
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import (
-            MatchResult,
+        from work_data_hub.infrastructure.enrichment.types import (
+            EnrichmentIndexRecord,
+            LookupType,
+            SourceType,
         )
 
         mock_repo = MagicMock()
-        mock_repo.lookup_batch.return_value = {
-            "账户名A": MatchResult(
+        # Return Dict[tuple[LookupType, str], EnrichmentIndexRecord] format
+        mock_repo.lookup_enrichment_index_batch.return_value = {
+            (LookupType.ACCOUNT_NAME, "账户名A"): EnrichmentIndexRecord(
+                lookup_key="账户名A",
+                lookup_type=LookupType.ACCOUNT_NAME,
                 company_id="account_name_company_123",
-                match_type="account_name",
-                priority=5,
-                source="internal",
+                source=SourceType.YAML,
+                confidence=Decimal("1.00"),
             )
         }
 
@@ -1753,7 +1787,7 @@ class TestP4NormalizationDbCacheLookup:
         result = resolver.resolve_batch(df, default_strategy)
 
         assert result.data.loc[0, "company_id"] == "account_name_company_123"
-        assert result.statistics.db_cache_hits["legacy"] == 1
+        assert result.statistics.db_cache_hits["account_name"] == 1
         assert result.statistics.db_cache_hits_total == 1
 
 
@@ -1768,7 +1802,7 @@ class TestP4NormalizationBackflow:
         )
 
         mock_repo = MagicMock()
-        mock_repo.lookup_batch.return_value = {}
+        mock_repo.lookup_enrichment_index_batch.return_value = {}
         mock_repo.insert_batch_with_conflict_check.return_value = InsertBatchResult(
             inserted_count=1,
             skipped_count=0,
@@ -1817,7 +1851,7 @@ class TestP4NormalizationBackflow:
         )
 
         mock_repo = MagicMock()
-        mock_repo.lookup_batch.return_value = {}
+        mock_repo.lookup_enrichment_index_batch.return_value = {}
         mock_repo.insert_batch_with_conflict_check.return_value = InsertBatchResult(
             inserted_count=1,
             skipped_count=0,
@@ -1864,7 +1898,7 @@ class TestP4NormalizationBackflow:
         )
 
         mock_repo = MagicMock()
-        mock_repo.lookup_batch.return_value = {}
+        mock_repo.lookup_enrichment_index_batch.return_value = {}
         mock_repo.insert_batch_with_conflict_check.return_value = InsertBatchResult(
             inserted_count=1,
             skipped_count=0,
@@ -1913,7 +1947,7 @@ class TestP4NormalizationBackflow:
         )
 
         mock_repo = MagicMock()
-        mock_repo.lookup_batch.return_value = {}
+        mock_repo.lookup_enrichment_index_batch.return_value = {}
         mock_repo.insert_batch_with_conflict_check.return_value = InsertBatchResult(
             inserted_count=0,
             skipped_count=0,
@@ -1956,19 +1990,28 @@ class TestP4NormalizationEdgeCases:
 
     def test_p4_normalization_special_characters(self, default_strategy):
         """Test P4 normalization handles special characters correctly."""
+        from decimal import Decimal
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import (
-            MatchResult,
+        from work_data_hub.infrastructure.enrichment.types import (
+            EnrichmentIndexRecord,
+            LookupType,
+            SourceType,
+        )
+        from work_data_hub.infrastructure.enrichment.normalizer import (
+            normalize_for_temp_id,
         )
 
         mock_repo = MagicMock()
         # DB has normalized key without decorative characters
-        mock_repo.lookup_batch.return_value = {
-            "公司C": MatchResult(
+        # normalize_for_temp_id("「公司C」") normalizes to "公司c" (lowercase, brackets removed)
+        normalized_key = normalize_for_temp_id("「公司C」")
+        mock_repo.lookup_enrichment_index_batch.return_value = {
+            (LookupType.CUSTOMER_NAME, normalized_key): EnrichmentIndexRecord(
+                lookup_key=normalized_key,
+                lookup_type=LookupType.CUSTOMER_NAME,
                 company_id="special_company_123",
-                match_type="name",
-                priority=4,
-                source="internal",
+                source=SourceType.YAML,
+                confidence=Decimal("1.00"),
             )
         }
 
@@ -1995,24 +2038,33 @@ class TestP4NormalizationEdgeCases:
         result = resolver.resolve_batch(df, default_strategy)
 
         assert result.data.loc[0, "company_id"] == "special_company_123"
-        assert result.statistics.db_cache_hits["legacy"] == 1
+        assert result.statistics.db_cache_hits["customer_name"] == 1
         assert result.statistics.db_cache_hits_total == 1
 
     def test_p4_normalization_full_width_conversion(self, default_strategy):
         """Test P4 normalization converts full-width ASCII to half-width."""
+        from decimal import Decimal
         from unittest.mock import MagicMock
-        from work_data_hub.infrastructure.enrichment.mapping_repository import (
-            MatchResult,
+        from work_data_hub.infrastructure.enrichment.types import (
+            EnrichmentIndexRecord,
+            LookupType,
+            SourceType,
+        )
+        from work_data_hub.infrastructure.enrichment.normalizer import (
+            normalize_for_temp_id,
         )
 
         mock_repo = MagicMock()
         # DB has half-width version
-        mock_repo.lookup_batch.return_value = {
-            "ABC公司": MatchResult(
+        # normalize_for_temp_id("ＡＢＣ公司") normalizes to "abc公司" (lowercase, half-width)
+        normalized_key = normalize_for_temp_id("ＡＢＣ公司")
+        mock_repo.lookup_enrichment_index_batch.return_value = {
+            (LookupType.CUSTOMER_NAME, normalized_key): EnrichmentIndexRecord(
+                lookup_key=normalized_key,
+                lookup_type=LookupType.CUSTOMER_NAME,
                 company_id="fullwidth_company_123",
-                match_type="name",
-                priority=4,
-                source="internal",
+                source=SourceType.YAML,
+                confidence=Decimal("1.00"),
             )
         }
 
@@ -2039,7 +2091,7 @@ class TestP4NormalizationEdgeCases:
         result = resolver.resolve_batch(df, default_strategy)
 
         assert result.data.loc[0, "company_id"] == "fullwidth_company_123"
-        assert result.statistics.db_cache_hits["legacy"] == 1
+        assert result.statistics.db_cache_hits["customer_name"] == 1
         assert result.statistics.db_cache_hits_total == 1
 
     def test_p3_hardcode_yaml_uses_raw_values(self, default_strategy):
@@ -2076,16 +2128,24 @@ class TestP4NormalizationIntegration:
 
     def test_cache_hit_after_backflow_with_normalized_p4(self, default_strategy):
         """Test round-trip: backflow writes normalized → lookup finds normalized (AC5)."""
+        from decimal import Decimal
         from unittest.mock import MagicMock
         from work_data_hub.infrastructure.enrichment.mapping_repository import (
             InsertBatchResult,
-            MatchResult,
+        )
+        from work_data_hub.infrastructure.enrichment.types import (
+            EnrichmentIndexRecord,
+            LookupType,
+            SourceType,
+        )
+        from work_data_hub.infrastructure.enrichment.normalizer import (
+            normalize_for_temp_id,
         )
 
         mock_repo = MagicMock()
 
         # Phase 1: Backflow - simulate existing column resolution
-        mock_repo.lookup_batch.return_value = {}  # No cache hit initially
+        mock_repo.lookup_enrichment_index_batch.return_value = {}  # No cache hit initially
         mock_repo.insert_batch_with_conflict_check.return_value = InsertBatchResult(
             inserted_count=1,
             skipped_count=0,
@@ -2108,7 +2168,7 @@ class TestP4NormalizationIntegration:
         df1 = pd.DataFrame(
             {
                 "计划代码": ["UNKNOWN"],
-                "客户名称": ["公司D（核心）"],  # Will normalize to "公司D"
+                "客户名称": ["公司D（核心）"],  # Will normalize to "公司d"
                 "公司代码": ["real_company_789"],
             }
         )
@@ -2121,15 +2181,18 @@ class TestP4NormalizationIntegration:
         backflow_call = mock_repo.insert_batch_with_conflict_check.call_args[0][0]
         name_entries = [e for e in backflow_call if e["match_type"] == "name"]
         assert len(name_entries) == 1
-        assert name_entries[0]["alias_name"] == "公司D"  # Normalized
+        # normalize_company_name removes brackets but preserves case: "公司D（核心）" -> "公司D"
+        assert name_entries[0]["alias_name"] == "公司D"
 
         # Phase 2: Lookup - simulate cache hit with normalized key
-        mock_repo.lookup_batch.return_value = {
-            "公司D": MatchResult(
+        normalized_key = normalize_for_temp_id("（非核心）公司D")
+        mock_repo.lookup_enrichment_index_batch.return_value = {
+            (LookupType.CUSTOMER_NAME, normalized_key): EnrichmentIndexRecord(
+                lookup_key=normalized_key,
+                lookup_type=LookupType.CUSTOMER_NAME,
                 company_id="real_company_789",
-                match_type="name",
-                priority=4,
-                source="internal",
+                source=SourceType.BACKFLOW,
+                confidence=Decimal("1.00"),
             )
         }
 
@@ -2137,13 +2200,13 @@ class TestP4NormalizationIntegration:
         df2 = pd.DataFrame(
             {
                 "计划代码": ["UNKNOWN"],
-                "客户名称": ["（非核心）公司D"],  # Also normalizes to "公司D"
+                "客户名称": ["（非核心）公司D"],  # Also normalizes to "公司d"
             }
         )
 
         result2 = resolver.resolve_batch(df2, default_strategy)
 
-        # Should hit cache because normalized("（非核心）公司D") == "公司D"
+        # Should hit cache because normalized("（非核心）公司D") matches
         assert result2.data.loc[0, "company_id"] == "real_company_789"
-        assert result2.statistics.db_cache_hits["legacy"] == 1
+        assert result2.statistics.db_cache_hits["customer_name"] == 1
         assert result2.statistics.db_cache_hits_total == 1

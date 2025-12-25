@@ -304,9 +304,9 @@ development_status:
   7.1-6-fix-classification-logic: done  # P1: regression → data_source_difference - Code Review PASSED 2025-12-25
   7.1-7-verify-legacy-db-connection: done  # P1: Legacy DB connection verified - Code Review PASSED 2025-12-25
   7.1-8-eqc-confidence-dynamic-adjustment: done  # P1: Match type based confidence (configurable) - Code Review PASSED 2025-12-25
-  7.1-9-clean-up-failing-tests: backlog  # P2: Address 33 failing tests
+  7.1-9-clean-up-failing-tests: done  # P2: Address 111 failing tests + 71 errors - Story completed 2025-12-26 ✅ All tests pass
   7.1-10-categorize-ruff-warnings: backlog  # P2: Triage 1074 Ruff warnings
-  7.1-11-update-project-context: done  # P2: Reflect Epic 7 changes - Completed 2025-12-23
+  7.1-11-update-project-context: review  # P2: Reflect Epic 7 changes - Completed 2025-12-23
   # Tech Debt Stories (Added 2025-12-25 from Story 7.1-2 Code Review)
   7.1-12-annuity-plans-schema-backfill-alignment: backlog  # P1: TD-1/TD-3 Fix UNIQUE constraint + backfill config
   7.1-13-e2e-test-infrastructure-foundation: backlog  # P2: TD-2/TD-5 E2E test fixtures + regression suite

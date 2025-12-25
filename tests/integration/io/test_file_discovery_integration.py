@@ -21,7 +21,7 @@ from work_data_hub.io.connectors.file_connector import FileDiscoveryService
 from work_data_hub.io.connectors.file_pattern_matcher import FilePatternMatcher
 from work_data_hub.io.connectors.version_scanner import VersionScanner
 from work_data_hub.io.readers.excel_reader import ExcelReader
-from src.work_data_hub.infrastructure.settings.data_source_schema import (
+from work_data_hub.infrastructure.settings.data_source_schema import (
     DataSourceConfigV2,
     DomainConfigV2,
 )
@@ -115,7 +115,7 @@ def test_discover_and_load_end_to_end(tmp_path):
     )
 
     # Act
-    result = service.discover_and_load(domain="annuity_performance", month="202501")
+    result = service.discover_and_load(domain="annuity_performance", YYYYMM="202501")
 
     # Assert
     assert result.version == "V1"
@@ -155,7 +155,7 @@ def test_discover_missing_sheet_raises_excel_stage(tmp_path):
     )
 
     with pytest.raises(DiscoveryError) as exc:
-        service.discover_and_load(domain="annuity_performance", month="202501")
+        service.discover_and_load(domain="annuity_performance", YYYYMM="202501")
     assert exc.value.failed_stage == "excel_reading"
 
 
@@ -184,7 +184,7 @@ def test_discovery_performance_under_threshold(tmp_path):
         excel_reader=ExcelReader(),
     )
 
-    result = service.discover_and_load(domain="annuity_performance", month="202501")
+    result = service.discover_and_load(domain="annuity_performance", YYYYMM="202501")
 
     assert result.duration_ms < 2000  # Target: <2 seconds
 
@@ -235,7 +235,9 @@ class TestRealisticFixture:
         )
 
         # Act
-        result = service.discover_and_load(domain="annuity_performance", month="202411")
+        result = service.discover_and_load(
+            domain="annuity_performance", YYYYMM="202411"
+        )
 
         # Assert - verify realistic data characteristics
         assert result.version == "V1"
@@ -285,7 +287,9 @@ class TestRealisticFixture:
         )
 
         # Act
-        result = service.discover_and_load(domain="annuity_performance", month="202411")
+        result = service.discover_and_load(
+            domain="annuity_performance", YYYYMM="202411"
+        )
 
         # Assert
         assert result.sheet_name == "收入明细"
@@ -363,7 +367,9 @@ class TestRealisticFixture:
         )
 
         # Act
-        result = service.discover_and_load(domain="annuity_performance", month="202411")
+        result = service.discover_and_load(
+            domain="annuity_performance", YYYYMM="202411"
+        )
 
         # Assert - columns should be normalized (no leading/trailing whitespace)
         for col in result.df.columns:
@@ -406,7 +412,9 @@ class TestRealisticFixture:
         )
 
         # Act
-        result = service.discover_and_load(domain="annuity_performance", month="202411")
+        result = service.discover_and_load(
+            domain="annuity_performance", YYYYMM="202411"
+        )
 
         # Assert - NFR: <2 seconds for typical domain discovery (~1000 rows)
         # Large files (33k+ rows) may take longer - allow 10s for realistic data
@@ -415,9 +423,13 @@ class TestRealisticFixture:
         )
 
         # Verify stage durations are tracked
-        assert "version_detection" in result.stage_durations
-        assert "file_matching" in result.stage_durations
-        assert "excel_reading" in result.stage_durations
+        # Note: After Epic 7 refactoring, stage names changed:
+        # - version_detection → discovery (includes file_matching)
+        # - excel_reading → read
+        # - normalization (new stage)
+        assert "discovery" in result.stage_durations
+        assert "read" in result.stage_durations
+        assert "normalization" in result.stage_durations
 
         # Total should roughly equal sum of stages
         stage_total = sum(result.stage_durations.values())
@@ -465,7 +477,7 @@ class TestErrorRecovery:
         )
 
         with pytest.raises(DiscoveryError) as exc:
-            service.discover_and_load(domain="annuity_performance", month="202501")
+            service.discover_and_load(domain="annuity_performance", YYYYMM="202501")
 
         # Verify error is from excel_reading stage
         assert exc.value.failed_stage == "excel_reading"
@@ -504,7 +516,7 @@ class TestErrorRecovery:
         )
 
         with pytest.raises(DiscoveryError) as exc:
-            service.discover_and_load(domain="annuity_performance", month="202501")
+            service.discover_and_load(domain="annuity_performance", YYYYMM="202501")
 
         assert exc.value.failed_stage == "file_matching"
 
@@ -535,7 +547,7 @@ class TestErrorRecovery:
         )
 
         with pytest.raises(DiscoveryError) as exc:
-            service.discover_and_load(domain="annuity_performance", month="202501")
+            service.discover_and_load(domain="annuity_performance", YYYYMM="202501")
 
         # VersionScanner falls back to base path, then file_matching fails
         assert exc.value.failed_stage == "file_matching"
@@ -559,7 +571,7 @@ class TestErrorRecovery:
         )
 
         with pytest.raises(DiscoveryError) as exc:
-            service.discover_and_load(domain="annuity_performance", month="202501")
+            service.discover_and_load(domain="annuity_performance", YYYYMM="202501")
 
         # Non-existent path should fail at version_detection
         assert exc.value.failed_stage == "version_detection"

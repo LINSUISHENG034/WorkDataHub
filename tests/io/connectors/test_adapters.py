@@ -61,10 +61,16 @@ def test_postgres_fetch_maps_columns_and_incremental(monkeypatch):
 
 def test_postgres_env_prefix_fallback(monkeypatch):
     # Only legacy prefix provided -> should still be picked up
+    # Story 7.1-9: Also set WDH_LEGACY_* to override any existing defaults
     monkeypatch.setenv("WDH_LEGACY_PG_HOST", "legacy-host")
     monkeypatch.setenv("WDH_LEGACY_PG_USER", "legacy-user")
     monkeypatch.setenv("WDH_LEGACY_PG_PASSWORD", "legacy-pass")
     monkeypatch.setenv("WDH_LEGACY_PG_DATABASE", "legacy-db")
+    # Override primary env vars in case they're set by conftest.py or .wdh_env
+    monkeypatch.setenv("WDH_LEGACY_HOST", "legacy-host")
+    monkeypatch.setenv("WDH_LEGACY_USER", "legacy-user")
+    monkeypatch.setenv("WDH_LEGACY_PASSWORD", "legacy-pass")
+    monkeypatch.setenv("WDH_LEGACY_DATABASE", "legacy-db")
 
     adapter = PostgresSourceAdapter(connection_env_prefix="WDH_LEGACY")
 

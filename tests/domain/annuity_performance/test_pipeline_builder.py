@@ -8,13 +8,16 @@ from work_data_hub.domain.annuity_performance.pipeline_builder import (
     build_bronze_to_silver_pipeline,
 )
 from work_data_hub.domain.pipelines.types import PipelineContext
+from work_data_hub.infrastructure.enrichment.eqc_lookup_config import EqcLookupConfig
 
 
 def test_pipeline_handles_missing_month_column() -> None:
+    # Story 6.2-P17: eqc_config is now required, use disabled for test
+    eqc_config = EqcLookupConfig.disabled()
     pipeline = build_bronze_to_silver_pipeline(
+        eqc_config=eqc_config,
         enrichment_service=None,
         plan_override_mapping={},
-        sync_lookup_budget=0,
         mapping_repository=None,
     )
 

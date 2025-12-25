@@ -13,7 +13,7 @@ import pytest
 import yaml
 from dagster import build_op_context
 
-from src.work_data_hub.orchestration.ops import (
+from work_data_hub.orchestration.ops import (
     BackfillRefsConfig,
     backfill_refs_op,
     derive_plan_refs_op,
@@ -225,7 +225,7 @@ class TestBackfillOps:
         assert operation["table"] == "年金计划"
         assert "updated" in operation  # fill_null_only returns updated count
 
-    @patch("src.work_data_hub.orchestration.ops.insert_missing")
+    @patch("work_data_hub.orchestration.ops.reference_backfill.insert_missing")
     def test_backfill_refs_op_execute_mode(self, mock_insert_missing):
         """Test backfill_refs_op in execute mode with mocked database."""
         mock_insert_missing.return_value = {"inserted": 1, "batches": 1}
@@ -241,18 +241,21 @@ class TestBackfillOps:
         )
 
         with patch(
-            "src.work_data_hub.orchestration.ops.psycopg2", create=True
+            "work_data_hub.orchestration.ops.reference_backfill.psycopg2"
         ) as mock_psycopg2:
             # Create a proper mock connection with cursor context manager
-            mock_conn = Mock()
+            mock_conn = Mock(encoding="utf-8")
+
             mock_cursor = Mock()
+            mock_cursor.connection = mock_conn
             mock_cursor.__enter__ = Mock(return_value=mock_cursor)
             mock_cursor.__exit__ = Mock(return_value=None)
             mock_conn.cursor.return_value = mock_cursor
+
             mock_psycopg2.connect.return_value = mock_conn
 
             with patch(
-                "src.work_data_hub.orchestration.ops.get_settings"
+                "work_data_hub.orchestration.ops.reference_backfill.get_settings"
             ) as mock_settings:
                 mock_settings_instance = Mock()
                 mock_settings_instance.get_database_connection_string.return_value = (
@@ -282,7 +285,15 @@ class TestBackfillOps:
                     }
                 }
 
-                with patch("builtins.open", create=True):
+                # Mock open to return a file-like object
+                mock_file = Mock()
+                mock_file.__enter__ = Mock(return_value=mock_file)
+                mock_file.__exit__ = Mock(return_value=None)
+
+                with patch(
+                    "work_data_hub.orchestration.ops.reference_backfill.open",
+                    return_value=mock_file,
+                ):
                     with patch("yaml.safe_load", return_value=mock_yaml_content):
                         result = backfill_refs_op(
                             context, config, plan_candidates, portfolio_candidates
@@ -326,7 +337,7 @@ class TestSkipFactsAndQualifiedSQL:
 
     def test_skip_facts_mode_integration(self):
         """Test skip-facts mode works end-to-end (backfill only)."""
-        from src.work_data_hub.orchestration.ops import LoadConfig, load_op
+        from work_data_hub.orchestration.ops import LoadConfig, load_op
 
         # Setup with skip flag enabled
         context = build_op_context()
@@ -359,14 +370,14 @@ class TestSkipFactsAndQualifiedSQL:
         assert result["deleted"] == 0
         assert result["batches"] == 0
 
-    @patch("src.work_data_hub.orchestration.ops.get_settings")
+    @patch("work_data_hub.orchestration.ops.reference_backfill.get_settings")
     @patch("builtins.open")
     @patch("yaml.safe_load")
     def test_qualified_sql_generation_with_schema_config(
         self, mock_yaml_load, mock_open, mock_get_settings
     ):
         """Test qualified SQL generation uses configured schema properly."""
-        from src.work_data_hub.orchestration.ops import (
+        from work_data_hub.orchestration.ops import (
             BackfillRefsConfig,
             backfill_refs_op,
         )
@@ -455,7 +466,7 @@ class TestSkipFactsAndQualifiedSQL:
 
     def test_enhanced_derivations_in_full_pipeline(self):
         """Test enhanced derivations work in full pipeline context."""
-        from src.work_data_hub.orchestration.ops import derive_plan_refs_op
+        from work_data_hub.orchestration.ops import derive_plan_refs_op
 
         # Sample data with enhanced derivation requirements
         processed_rows = [
@@ -519,18 +530,14 @@ class TestSkipFactsAndQualifiedSQL:
         assert plan["计划类型"] == "DC"
         assert plan["company_id"] == "COMP1"
 
-    @patch("src.work_data_hub.io.loader.warehouse_loader.quote_qualified")
-    @patch("src.work_data_hub.orchestration.ops.insert_missing")
-    def test_qualified_sql_generation_called_correctly(
-        self, mock_insert_missing, mock_quote_qualified
-    ):
+    @patch("work_data_hub.orchestration.ops.reference_backfill.insert_missing")
+    def test_qualified_sql_generation_called_correctly(self, mock_insert_missing):
         """Test that qualified SQL generation is called with proper schema."""
-        from src.work_data_hub.orchestration.ops import (
+        from work_data_hub.orchestration.ops import (
             BackfillRefsConfig,
             backfill_refs_op,
         )
 
-        mock_quote_qualified.return_value = '"public"."年金计划"'
         mock_insert_missing.return_value = {"inserted": 1, "batches": 1}
 
         plan_candidates = [
@@ -551,9 +558,7 @@ class TestSkipFactsAndQualifiedSQL:
         )
 
         # Mock the settings and YAML loading for refs config
-        with patch(
-            "src.work_data_hub.orchestration.ops.get_settings"
-        ) as mock_get_settings:
+        with patch("work_data_hub.orchestration.ops.get_settings") as mock_get_settings:
             mock_settings_instance = Mock()
             mock_settings_instance.data_sources_config = "test_config.yml"
             mock_get_settings.return_value = mock_settings_instance
