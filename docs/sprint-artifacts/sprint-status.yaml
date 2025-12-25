@@ -303,7 +303,7 @@ development_status:
   7.1-5-add-file-selection-cleaner-compare: done  # P1: CLI parameter consistency - Code Review PASSED 2025-12-25
   7.1-6-fix-classification-logic: done  # P1: regression → data_source_difference - Code Review PASSED 2025-12-25
   7.1-7-verify-legacy-db-connection: done  # P1: Legacy DB connection verified - Code Review PASSED 2025-12-25
-  7.1-8-eqc-confidence-dynamic-adjustment: backlog  # P1: Match type based confidence (configurable)
+  7.1-8-eqc-confidence-dynamic-adjustment: done  # P1: Match type based confidence (configurable) - Code Review PASSED 2025-12-25
   7.1-9-clean-up-failing-tests: backlog  # P2: Address 33 failing tests
   7.1-10-categorize-ruff-warnings: backlog  # P2: Triage 1074 Ruff warnings
   7.1-11-update-project-context: done  # P2: Reflect Epic 7 changes - Completed 2025-12-23

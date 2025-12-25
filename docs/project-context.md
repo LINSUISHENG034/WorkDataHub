@@ -147,6 +147,39 @@ if (Test-Path "data.json") { Remove-Item "data.json" }
 
 ETL Pipeline 的核心能力是将原始数据中的"客户名称"解析为标准化的 `company_id`。
 
+### EQC API 置信度评分 (Story 7.1-8)
+
+**配置文件:** `config/eqc_confidence.yml`
+
+EQC API 返回的匹配结果根据匹配类型分配不同的置信度分数：
+
+| 匹配类型 (type) | 置信度 | 说明 |
+|----------------|--------|------|
+| 全称精确匹配 | 1.00 | 公司名称完全匹配，最高可靠性 |
+| 模糊匹配 | 0.80 | 部分匹配或相似名称 |
+| 拼音 | 0.60 | 拼音匹配，最低可靠性 |
+
+**配置示例:**
+```yaml
+eqc_match_confidence:
+  全称精确匹配: 1.00
+  模糊匹配: 0.80
+  拼音: 0.60
+  default: 0.70
+
+min_confidence_for_cache: 0.60  # 低于此分数的结果不会缓存到 enrichment_index
+```
+
+**影响范围:**
+- **Layer 4 (EQC API):** API 查询结果根据 `type` 字段分配动态置信度
+- **Layer 2 (DB Cache):** 低置信度结果（如 0.60 的拼音匹配）可以设置阈值过滤
+- **Domain Learning:** 可根据置信度阈值过滤低质量匹配
+
+**数据分布** (基于现有 `base_info` 数据):
+- 全称精确匹配: 13 条 (confidence = 1.00)
+- 模糊匹配: 107 条 (confidence = 0.80)
+- 拼音: 5 条 (confidence = 0.60)
+
 ### 5层解析架构
 
 ```
@@ -258,6 +291,7 @@ uv run --env-file .wdh_env python -m work_data_hub.cli.etl \
 | FK 回填规则 | `config/foreign_keys.yml` |
 | 参考数据同步 | `config/reference_sync.yml` |
 | 公司硬编码映射 | `config/company_mapping.yml` |
+| EQC 匹配类型置信度 | `config/eqc_confidence.yml` |
 | 环境变量 | `.wdh_env` |
 
 ### 测试命令

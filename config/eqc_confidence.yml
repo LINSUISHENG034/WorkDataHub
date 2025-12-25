@@ -1,0 +1,11 @@
+# EQC API match type confidence mapping (Story 7.1-8)
+# Maps match_type from EQC API response to confidence score (0.0-1.0)
+
+eqc_match_confidence:
+  全称精确匹配: 1.00
+  模糊匹配: 0.80
+  拼音: 0.60
+  default: 0.70
+
+# Minimum confidence for caching EQC results to enrichment_index
+min_confidence_for_cache: 0.60

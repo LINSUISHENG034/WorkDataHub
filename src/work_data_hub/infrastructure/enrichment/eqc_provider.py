@@ -36,6 +36,9 @@ from work_data_hub.io.connectors.eqc_client import (
 from work_data_hub.utils.logging import get_logger
 
 if TYPE_CHECKING:
+    from work_data_hub.infrastructure.enrichment.eqc_confidence_config import (
+        EQCConfidenceConfig,
+    )
     from work_data_hub.infrastructure.enrichment.mapping_repository import (
         CompanyMappingRepository,
     )
@@ -204,6 +207,7 @@ class EqcProvider:
         base_url: Optional[str] = None,
         mapping_repository: Optional["CompanyMappingRepository"] = None,
         validate_on_init: bool = False,
+        eqc_confidence_config: Optional["EQCConfidenceConfig"] = None,
     ) -> None:
         """
         Initialize EqcProvider.
@@ -214,6 +218,7 @@ class EqcProvider:
             base_url: EQC API base URL. If None, uses settings default.
             mapping_repository: Optional repository for caching results.
             validate_on_init: If True, validate token on initialization.
+            eqc_confidence_config: Optional config for match type confidence scoring.
 
         Raises:
             EqcTokenInvalidError: If validate_on_init=True and token is invalid.
@@ -229,6 +234,16 @@ class EqcProvider:
         self.mapping_repository = mapping_repository
         self._disabled = False
         self.client: Optional[EQCClient] = None
+
+        # Story 7.1-8: Load EQC confidence config for dynamic confidence scoring
+        if eqc_confidence_config is None:
+            from work_data_hub.infrastructure.enrichment.eqc_confidence_config import (
+                EQCConfidenceConfig,
+            )
+
+            self.eqc_confidence_config = EQCConfidenceConfig.load_from_yaml()
+        else:
+            self.eqc_confidence_config = eqc_confidence_config
 
         # Log initialization (never log token)
         if not self.token:
@@ -387,12 +402,17 @@ class EqcProvider:
             logger.debug("eqc_provider.incomplete_result")
             return None, None
 
+        # Story 7.1-8: Extract match type and get dynamic confidence
+        company_id = str(top.company_id)
+        eqc_match_quality = _extract_match_type_from_raw_json(raw_search_json)
+        confidence = self.eqc_confidence_config.get_confidence_for_match_type(
+            eqc_match_quality
+        )
+
         # Step 2: Get additional data (findDepart and findLabels)
         # Store these as instance variables for _cache_result to use
         self._raw_business_info = None
         self._raw_biz_label = None
-
-        company_id = str(top.company_id)
 
         # Error isolation: Try to get business info, but continue if it fails
         try:
@@ -426,13 +446,13 @@ class EqcProvider:
                 error_type=type(e).__name__,
             )
 
-        # Create CompanyInfo
+        # Create CompanyInfo with dynamic confidence (Story 7.1-8)
         company_info = CompanyInfo(
             company_id=company_id,
             official_name=top.official_name,
             unified_credit_code=getattr(top, "unite_code", None),
-            confidence=getattr(top, "match_score", 0.9) or 0.9,
-            match_type="eqc",
+            confidence=confidence,  # Dynamic based on eqc_match_quality
+            match_type="eqc",  # Source type (unchanged)
         )
 
         return company_info, raw_search_json
@@ -464,6 +484,39 @@ class EqcProvider:
 
             # Normalize using the same method as Layer 2 lookup for consistency
             normalized = normalize_for_temp_id(company_name) or company_name.strip()
+
+            # Story 7.1-8: Check minimum confidence threshold before caching
+            if result.confidence < self.eqc_confidence_config.min_confidence_for_cache:
+                logger.info(
+                    "eqc_provider.cache_skipped_low_confidence",
+                    msg="EQC result below confidence threshold, not cached",
+                    confidence=result.confidence,
+                    threshold=self.eqc_confidence_config.min_confidence_for_cache,
+                )
+                # Still write to base_info for persistence (Story 6.2-P5)
+                # But skip enrichment_index cache
+                if raw_json is not None and self.mapping_repository:
+                    try:
+                        self.mapping_repository.upsert_base_info(
+                            company_id=result.company_id,
+                            search_key_word=company_name,
+                            company_full_name=result.official_name,
+                            unite_code=result.unified_credit_code,
+                            raw_data=raw_json,
+                            raw_business_info=getattr(self, "_raw_business_info", None),
+                            raw_biz_label=getattr(self, "_raw_biz_label", None),
+                        )
+                        logger.debug(
+                            "eqc_provider.persisted_to_base_info_only",
+                            msg="Persisted EQC result to base_info only (below cache threshold)",
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            "eqc_provider.base_info_persistence_failed",
+                            msg="Failed to persist to base_info - continuing without persistence",
+                            error_type=type(e).__name__,
+                        )
+                return
 
             # Write to enterprise.enrichment_index with match_type=eqc (Epic 6.1)
             record = EnrichmentIndexRecord(
@@ -537,3 +590,35 @@ class EqcProvider:
         """Re-enable provider after 401 (use with caution)."""
         self._disabled = False
         logger.debug("eqc_provider.re_enabled")
+
+
+def _extract_match_type_from_raw_json(raw_json: Optional[dict]) -> str:
+    """
+    Extract EQC match quality from raw API response (Story 7.1-8).
+
+    The EQC API returns results with a 'type' field indicating match quality:
+    - 全称精确匹配 (exact full name match) - highest reliability
+    - 模糊匹配 (fuzzy match) - medium reliability
+    - 拼音 (pinyin match) - lowest reliability
+
+    Example raw_json structure:
+    {"list": [{"type": "全称精确匹配", "name": "公司全称", ...}]}
+
+    Args:
+        raw_json: Raw API response from EQC search endpoint.
+
+    Returns:
+        EQC match quality string, or "default" if not found.
+    """
+    if not raw_json or not isinstance(raw_json, dict):
+        return "default"
+
+    results = raw_json.get("list", [])
+    if not results or not isinstance(results, list):
+        return "default"
+
+    first_result = results[0]
+    if not isinstance(first_result, dict):
+        return "default"
+
+    return first_result.get("type", "default")
