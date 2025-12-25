@@ -17,7 +17,7 @@
 * **File Size:** **MAX 800 lines**. *Action:* If a file exceeds this, split it into sub-modules immediately.
 * **Function Size:** **MAX 50 lines**. *Action:* Extract logic into private helper functions.
 * **Class Size:** **MAX 100 lines**. *Action:* Use composition over inheritance; split large classes.
-* **Line Length:** **MAX 100 characters** (Matches `ruff` config).
+* **Line Length:** **MAX 88 characters** (Matches `ruff` config in pyproject.toml).
 
 ### Code Smell Prevention
 

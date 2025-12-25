@@ -305,13 +305,29 @@ development_status:
   7.1-7-verify-legacy-db-connection: done  # P1: Legacy DB connection verified - Code Review PASSED 2025-12-25
   7.1-8-eqc-confidence-dynamic-adjustment: done  # P1: Match type based confidence (configurable) - Code Review PASSED 2025-12-25
   7.1-9-clean-up-failing-tests: done  # P2: Address 111 failing tests + 71 errors - Story completed 2025-12-26 ✅ All tests pass
-  7.1-10-categorize-ruff-warnings: backlog  # P2: Triage 1074 Ruff warnings
+  7.1-10-categorize-ruff-warnings: done  # P2: Triage 419 Ruff warnings - Code Review PASSED 2025-12-26 ✅ Triage document + 3 tech debt stories
   7.1-11-update-project-context: review  # P2: Reflect Epic 7 changes - Completed 2025-12-23
   # Tech Debt Stories (Added 2025-12-25 from Story 7.1-2 Code Review)
   7.1-12-annuity-plans-schema-backfill-alignment: backlog  # P1: TD-1/TD-3 Fix UNIQUE constraint + backfill config
   7.1-13-e2e-test-infrastructure-foundation: backlog  # P2: TD-2/TD-5 E2E test fixtures + regression suite
   7.1-14-eqc-api-performance-optimization: backlog  # P1: TD-4 EQC API 20-60s/call blocking issue
+  # Tech Debt Stories (Added 2025-12-26 from Story 7.1-10 Ruff Warning Triage)
+  7.1-15-fix-tid251-clean-architecture-violations: backlog  # P0: Fix 11 TID251 violations (Critical - Blocking Epic 8)
+  7.1-16-refactor-magic-values-to-constants: backlog  # P1: Refactor 66 PLR2004 magic values
+  7.1-17-reduce-function-arity-complexity: backlog  # P1: Refactor 96 PLR09 complexity violations
   epic-7.1-retrospective: optional
+
+# Technical Debt Metrics (Added 2025-12-26 from Story 7.1-10)
+technical_debt_metrics:
+  ruff_warnings:
+    baseline: 419  # Story 7.1-10
+    p0_critical: 11  # TID251 Clean Architecture violations
+    p1_high: 162  # PLR code quality (66+32+30+25+9)
+    p2_medium: 215  # E501 (205) + F841 (5) + E402 (5)
+    p3_low: 31  # TID252 relative imports
+    auto_fixable: 246  # 59% of warnings (E501, F841, E402, TID252)
+    analysis_date: 2025-12-26
+    reference: docs/sprint-artifacts/reviews/ruff-warning-triage-7.1-10.md
 
   # Epic 8: Testing & Validation Infrastructure
   # BLOCKED: Waiting for Epic 7.1 P0 items to complete

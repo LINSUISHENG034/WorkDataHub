@@ -45,21 +45,24 @@ dev = [
 ]
 
 [tool.ruff]
-line-length = 88
+line-length = 88  # Project hard constraint (matches project-context.md)
 target-version = "py310"
 
 [tool.ruff.lint]
+# Current rules: E, F, W (pycodestyle), I (isort), PLR (pylint refactor), TID (tidy imports)
+# NOTE: UP (pyupgrade) not enabled - add to extend-select if needed (see Story 7.1-10)
 select = ["E", "F", "W", "I", "PLR"]
-extend-select = ["TID"]
+extend-select = ["TID"]  # Clean Architecture enforcement (Story 1.6)
 
 [tool.ruff.lint.per-file-ignores]
-"src/work_data_hub/io/**/*.py" = ["TID251"]
-"src/work_data_hub/orchestration/**/*.py" = ["TID251"]
-"src/work_data_hub/domain/annuity_performance/*.py" = ["E501"]
-"src/work_data_hub/scripts/**/*.py" = ["TID251"]
-"scripts/**/*.py" = ["TID251"]
-"tests/**/*.py" = ["ALL"]
-"legacy/**/*.py" = ["ALL"]
+# Per-file ignores with TODO references (see Story 7.1-10 Ruff Warning Triage)
+"src/work_data_hub/io/**/*.py" = ["TID251"]  # IO layer can import from itself (acceptable)
+"src/work_data_hub/orchestration/**/*.py" = ["TID251"]  # Orchestration can import from IO (acceptable)
+"src/work_data_hub/domain/annuity_performance/*.py" = ["E501"]  # Legacy long lines (to fix in Story 7.1-15)
+"src/work_data_hub/scripts/**/*.py" = ["TID251"]  # Scripts can import from IO layer
+"scripts/**/*.py" = ["TID251"]  # Root scripts can import from IO layer
+"tests/**/*.py" = ["ALL"]  # Test files exempt from all rules
+"legacy/**/*.py" = ["ALL"]  # Legacy code exempt from all rules
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api."work_data_hub.io"]
 msg = "Domain layer cannot import from work_data_hub.io (Story 1.6 Clean Architecture)."
@@ -68,8 +71,8 @@ msg = "Domain layer cannot import from work_data_hub.io (Story 1.6 Clean Archite
 msg = "Domain layer cannot import from work_data_hub.orchestration (Story 1.6 Clean Architecture)."
 
 [tool.ruff.lint.pylint]
-max-statements = 50  # Per function limit (aligns with project-context.md)
-max-branches = 12    # Cyclomatic complexity threshold
+max-statements = 50  # Per function limit (aligns with project-context.md Hard Constraints)
+max-branches = 12    # Cyclomatic complexity threshold (PLR0912 trigger)
 
 [tool.ruff.format]
 quote-style = "double"
