@@ -22,7 +22,7 @@ import argparse
 import sys
 from typing import List, Optional
 
-from work_data_hub.io.auth.auto_eqc_auth import (
+from work_data_hub.io.auth.auto_eqc_auth import (  # noqa: TID251 - CLI is outermost layer
     DEFAULT_ENV_FILE,
     DEFAULT_TIMEOUT_SECONDS,
     run_get_token_auto_qr,

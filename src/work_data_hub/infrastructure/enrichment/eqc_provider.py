@@ -27,7 +27,7 @@ import requests
 
 from work_data_hub.config.settings import get_settings
 from work_data_hub.infrastructure.enrichment.normalizer import normalize_for_temp_id
-from work_data_hub.io.connectors.eqc_client import (
+from work_data_hub.io.connectors.eqc_client import (  # noqa: TID251 - Infrastructure needs EQC client
     EQCAuthenticationError,
     EQCClient,
     EQCClientError,

@@ -61,7 +61,7 @@ def _validate_and_refresh_token(auto_refresh: bool = True) -> bool:
 def _trigger_token_refresh() -> bool:
     """Trigger automatic token refresh via QR login."""
     try:
-        from work_data_hub.io.auth.auto_eqc_auth import run_get_token_auto_qr
+        from work_data_hub.io.auth.auto_eqc_auth import run_get_token_auto_qr  # noqa: TID251 - CLI is outermost layer
 
         token = run_get_token_auto_qr(save_to_env=True, timeout_seconds=180)
         if token:

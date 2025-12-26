@@ -21,7 +21,10 @@ from work_data_hub.config.settings import get_settings
 from work_data_hub.infrastructure.enrichment.mapping_repository import (
     CompanyMappingRepository,
 )
-from work_data_hub.io.connectors.eqc_client import EQCClient, EQCClientError
+from work_data_hub.io.connectors.eqc_client import (  # noqa: TID251 - Infrastructure needs EQC client
+    EQCClient,
+    EQCClientError,
+)
 from work_data_hub.utils.logging import get_logger
 
 logger = get_logger(__name__)

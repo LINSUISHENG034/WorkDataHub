@@ -58,6 +58,7 @@ extend-select = ["TID"]  # Clean Architecture enforcement (Story 1.6)
 # Per-file ignores with TODO references (see Story 7.1-10 Ruff Warning Triage)
 "src/work_data_hub/io/**/*.py" = ["TID251"]  # IO layer can import from itself (acceptable)
 "src/work_data_hub/orchestration/**/*.py" = ["TID251"]  # Orchestration can import from IO (acceptable)
+"src/work_data_hub/cli/**/*.py" = ["TID251"]  # CLI is outermost layer (Story 7.1-15)
 "src/work_data_hub/domain/annuity_performance/*.py" = ["E501"]  # Legacy long lines (to fix in Story 7.1-15)
 "src/work_data_hub/scripts/**/*.py" = ["TID251"]  # Scripts can import from IO layer
 "scripts/**/*.py" = ["TID251"]  # Root scripts can import from IO layer

@@ -13,7 +13,9 @@ def _execute_queue_processing_job(args: argparse.Namespace) -> int:
     """Execute company lookup queue processing job."""
     from dagster import DagsterInstance
 
-    from work_data_hub.orchestration.jobs import process_company_lookup_queue_job
+    from work_data_hub.orchestration.jobs import (  # noqa: TID251 - CLI is outermost layer
+        process_company_lookup_queue_job,
+    )
 
     effective_plan_only = not args.execute if hasattr(args, "execute") else True
 
@@ -74,7 +76,9 @@ def _execute_reference_sync_job(args: argparse.Namespace) -> int:
     """Execute reference sync job from authoritative sources."""
     from dagster import DagsterInstance
 
-    from work_data_hub.orchestration.reference_sync_jobs import reference_sync_job
+    from work_data_hub.orchestration.reference_sync_jobs import (  # noqa: TID251 - CLI is outermost layer
+        reference_sync_job,
+    )
     from work_data_hub.orchestration.reference_sync_ops import ReferenceSyncOpConfig
 
     effective_plan_only = not args.execute if hasattr(args, "execute") else True

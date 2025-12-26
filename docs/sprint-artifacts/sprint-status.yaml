@@ -312,7 +312,7 @@ development_status:
   7.1-13-e2e-test-infrastructure-foundation: done  # P2: TD-2/TD-5 E2E test fixtures + regression suite ✅ Code Review PASSED 2025-12-26
   7.1-14-eqc-api-performance-optimization: done  # P1: Cache warming + Progress reporting - Code Review PASSED 2025-12-26
   # Tech Debt Stories (Added 2025-12-26 from Story 7.1-10 Ruff Warning Triage)
-  7.1-15-fix-tid251-clean-architecture-violations: backlog  # P0: Fix 11 TID251 violations (Critical - Blocking Epic 8)
+  7.1-15-fix-tid251-clean-architecture-violations: done  # P0: 7 TID251 violations fixed - Code Review PASSED 2025-12-26
   7.1-16-refactor-magic-values-to-constants: backlog  # P1: Refactor 66 PLR2004 magic values
   7.1-17-reduce-function-arity-complexity: backlog  # P1: Refactor 96 PLR09 complexity violations
   epic-7.1-retrospective: optional
