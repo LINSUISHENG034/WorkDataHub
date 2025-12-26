@@ -293,3 +293,122 @@ def postgres_connection(postgres_db_with_migrations: str):
         yield conn
     finally:
         conn.close()
+
+
+# ============================================================================
+# E2E Test Infrastructure: Domain and Mapping Tables (Story 7.1-13)
+# ============================================================================
+
+
+def _create_domain_tables(dsn: str, domains: list[str]) -> None:
+    """Create domain tables for E2E testing.
+
+    Uses generate_create_table_sql() from domain registry to create tables
+    with correct schema including UNIQUE constraints needed for FK backfill.
+
+    Must be called AFTER postgres_db_with_migrations fixture has applied
+    Alembic migrations.
+
+    Args:
+        dsn: PostgreSQL connection string
+        domains: List of domain names (e.g., ["annuity_performance", "annuity_income"])
+
+    Raises:
+        RuntimeError: If DDL generation or table creation fails for any domain
+    """
+    from work_data_hub.infrastructure.schema.ddl_generator import (
+        generate_create_table_sql,
+    )
+    from work_data_hub.infrastructure.schema.registry import list_domains
+
+    conn = psycopg2.connect(dsn)
+    conn.autocommit = True
+
+    try:
+        with conn.cursor() as cur:
+            # Create business schema if not exists
+            cur.execute("CREATE SCHEMA IF NOT EXISTS business")
+
+            # Validate domains are registered
+            registered_domains = list_domains()
+            for domain in domains:
+                if domain not in registered_domains:
+                    raise RuntimeError(
+                        f"Domain '{domain}' is not registered. "
+                        f"Available domains: {sorted(registered_domains)}"
+                    )
+
+            # Create domain tables
+            for domain in domains:
+                try:
+                    create_sql = generate_create_table_sql(domain)
+                    cur.execute(create_sql)
+                except Exception as e:
+                    raise RuntimeError(
+                        f"Failed to create table for domain '{domain}': {e}"
+                    )
+    finally:
+        conn.close()
+
+
+def _create_mapping_tables(dsn: str) -> None:
+    """Create mapping tables with required UNIQUE constraints.
+
+    Mapping tables are required for FK backfill ON CONFLICT operations.
+    - annuity_plans: UNIQUE constraint on 年金计划号 (Story 7.1-12)
+    - portfolio_plans: Composite index on (年金计划号, 组合代码)
+
+    Args:
+        dsn: PostgreSQL connection string
+
+    Raises:
+        RuntimeError: If table creation fails
+    """
+    from work_data_hub.infrastructure.schema.ddl_generator import (
+        generate_create_table_sql,
+    )
+
+    conn = psycopg2.connect(dsn)
+    conn.autocommit = True
+
+    try:
+        with conn.cursor() as cur:
+            # Create mapping schema if not exists
+            cur.execute("CREATE SCHEMA IF NOT EXISTS mapping")
+
+            # Create annuity_plans (has UNIQUE on 年金计划号 per Story 7.1-12)
+            cur.execute(generate_create_table_sql("annuity_plans"))
+
+            # Create portfolio_plans (has composite index for ON CONFLICT)
+            cur.execute(generate_create_table_sql("portfolio_plans"))
+    finally:
+        conn.close()
+
+
+@pytest.fixture
+def postgres_db_with_domain_tables(
+    postgres_db_with_migrations: str,
+) -> Generator[str, None, None]:
+    """Extend base fixture with domain and mapping tables for E2E testing.
+
+    Creates:
+    - Domain tables: business.规模明细, business.收入明细
+    - Mapping tables: mapping.年金计划, mapping.组合计划
+
+    Scope: function (matches base fixture scope to avoid ScopeMismatch errors).
+
+    Cleanup: Handled by base fixture's ephemeral database drop (no explicit
+    cleanup needed - tables are dropped when the temp DB is dropped).
+
+    Args:
+        postgres_db_with_migrations: DSN for test DB with migrations applied
+
+    Yields:
+        str: DSN for test database with domain and mapping tables created
+    """
+    _create_domain_tables(
+        postgres_db_with_migrations, ["annuity_performance", "annuity_income"]
+    )
+    _create_mapping_tables(postgres_db_with_migrations)
+    yield postgres_db_with_migrations
+    # No explicit cleanup needed - base fixture drops entire ephemeral DB

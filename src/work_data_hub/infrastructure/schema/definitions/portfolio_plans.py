@@ -40,7 +40,7 @@ register_domain(
         ],
         indexes=[
             IndexDef(["年金计划号"]),
-            IndexDef(["组合代码"]),
+            IndexDef(["组合代码"], unique=True),  # UNIQUE for ON CONFLICT FK backfill
             IndexDef(["年金计划号", "组合代码"]),
         ],
     )
