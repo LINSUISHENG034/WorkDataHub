@@ -36,7 +36,7 @@ register_domain(
         ],
         indexes=[
             IndexDef(["company_id"]),
-            IndexDef(["年金计划号"]),
+            IndexDef(["年金计划号"], unique=True),
             IndexDef(["年金计划号", "company_id"]),
         ],
     )
