@@ -5,6 +5,7 @@ This module handles Step 4 of the resolution priority: EQC sync lookup
 with budget management, caching, and error handling.
 
 Story 7.3: Infrastructure Layer Decomposition
+Story 7.1-14: Added ProgressReporter integration (AC-4)
 """
 
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
@@ -17,6 +18,7 @@ from work_data_hub.utils.logging import get_logger
 from ..eqc_lookup_config import EqcLookupConfig
 from ..normalizer import normalize_for_temp_id
 from ..types import ResolutionStrategy
+from .progress import ProgressReporter
 
 if TYPE_CHECKING:
     from work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
@@ -36,6 +38,7 @@ def resolve_via_eqc_sync(
     eqc_provider: Optional["EqcProvider"],
     enrichment_service: Optional["CompanyEnrichmentService"],
     mapping_repository: Optional["CompanyMappingRepository"],
+    verbose: bool = False,
 ) -> Tuple[pd.Series, int, int]:
     """
     Resolve via EQC within budget; cache results to enrichment_index.
@@ -44,6 +47,7 @@ def resolve_via_eqc_sync(
     All EQC results now cached to enrichment_index (Story 6.1.1).
 
     Story 6.6: Supports both EqcProvider (preferred) and legacy enrichment_service.
+    Story 7.1-14: Added ProgressReporter integration (AC-4).
 
     Args:
         df: Input DataFrame.
@@ -53,6 +57,7 @@ def resolve_via_eqc_sync(
         eqc_provider: Optional EqcProvider for API lookups.
         enrichment_service: Optional legacy enrichment service.
         mapping_repository: Optional repository for caching results.
+        verbose: Whether to show progress bar (Story 7.1-14 AC-4).
 
     Returns:
         Tuple of (resolved_series, eqc_hits, budget_remaining)
@@ -72,7 +77,7 @@ def resolve_via_eqc_sync(
     # Story 6.6: Use EqcProvider path if available
     if use_eqc_provider:
         return _resolve_via_eqc_provider(
-            df, mask_unresolved, strategy, eqc_config, eqc_provider
+            df, mask_unresolved, strategy, eqc_config, eqc_provider, verbose
         )
 
     # Legacy path using enrichment_service
@@ -83,6 +88,7 @@ def resolve_via_eqc_sync(
         eqc_config,
         enrichment_service,
         mapping_repository,
+        verbose,
     )
 
 
@@ -92,6 +98,7 @@ def _resolve_via_eqc_provider(
     strategy: ResolutionStrategy,
     eqc_config: EqcLookupConfig,
     eqc_provider: "EqcProvider",
+    verbose: bool = False,
 ) -> Tuple[pd.Series, int, int]:
     """
     Resolve via EqcProvider (Story 6.6).
@@ -99,12 +106,15 @@ def _resolve_via_eqc_provider(
     Uses the new EqcProvider adapter for EQC API lookups with built-in
     budget management, caching, and error handling.
 
+    Story 7.1-14: Added ProgressReporter integration (AC-4).
+
     Args:
         df: Input DataFrame.
         mask_unresolved: Boolean mask of unresolved rows.
         strategy: Resolution strategy configuration.
         eqc_config: EQC lookup configuration.
         eqc_provider: EqcProvider for API lookups.
+        verbose: Whether to show progress bar.
 
     Returns:
         Tuple of (resolved_series, eqc_hits, budget_remaining)
@@ -133,6 +143,15 @@ def _resolve_via_eqc_provider(
         indices_by_name.setdefault(normalized_name, []).append(idx)
         exemplar_raw_by_name.setdefault(normalized_name, raw_text)
 
+    # Story 7.1-14 AC-4: Initialize ProgressReporter for EQC enrichment
+    total_unique_names = len(indices_by_name)
+    reporter = ProgressReporter(
+        total_rows=total_unique_names,
+        verbose=verbose,
+        desc="EQC API Enrichment",
+    )
+    reporter.start()
+
     for normalized_name, indices in indices_by_name.items():
         # Check if provider still has budget
         if not eqc_provider.is_available:
@@ -146,13 +165,23 @@ def _resolve_via_eqc_provider(
                 for idx in indices:
                     resolved.loc[idx] = result.company_id
                 eqc_hits += len(indices)
+                # Story 7.1-14: Update progress with cache hit (EQC returned result)
+                reporter.update(cache_hit=True, api_call=True)
+            else:
+                # Story 7.1-14: Update progress with cache miss (no result)
+                reporter.update(cache_hit=False, api_call=True)
 
         except Exception as e:
             logger.warning(
                 "company_id_resolver.eqc_provider_lookup_failed",
                 error_type=type(e).__name__,
             )
+            # Story 7.1-14: Update progress even on failure
+            reporter.update(cache_hit=False, api_call=True)
             # Continue to next name - don't block pipeline
+
+    # Story 7.1-14 AC-4: Finish progress reporting
+    reporter.finish()
 
     budget_remaining = eqc_provider.remaining_budget
 
@@ -172,9 +201,12 @@ def _resolve_via_enrichment_service(
     eqc_config: EqcLookupConfig,
     enrichment_service: "CompanyEnrichmentService",
     mapping_repository: Optional["CompanyMappingRepository"],
+    verbose: bool = False,
 ) -> Tuple[pd.Series, int, int]:
     """
     Legacy path: resolve via enrichment_service.
+
+    Story 7.1-14: Added ProgressReporter integration (AC-4).
 
     Args:
         df: Input DataFrame.
@@ -183,6 +215,7 @@ def _resolve_via_enrichment_service(
         eqc_config: EQC lookup configuration.
         enrichment_service: Legacy enrichment service.
         mapping_repository: Optional repository for caching results.
+        verbose: Whether to show progress bar.
 
     Returns:
         Tuple of (resolved_series, eqc_hits, budget_remaining)
@@ -207,6 +240,15 @@ def _resolve_via_enrichment_service(
         normalized_name = normalize_for_temp_id(raw_text) or raw_text
         indices_by_name.setdefault(normalized_name, []).append(idx)
         exemplar_row_by_name.setdefault(normalized_name, df.loc[idx])
+
+    # Story 7.1-14 AC-4: Initialize ProgressReporter for EQC enrichment
+    total_unique_names = len(indices_by_name)
+    reporter = ProgressReporter(
+        total_rows=total_unique_names,
+        verbose=verbose,
+        desc="EQC API Enrichment (Legacy)",
+    )
+    reporter.start()
 
     for normalized_name, indices in indices_by_name.items():
         if budget_remaining <= 0:
@@ -234,6 +276,8 @@ def _resolve_via_enrichment_service(
                 for idx in indices:
                     resolved.loc[idx] = result.company_id
                 eqc_hits += len(indices)
+                # Story 7.1-14: Update progress with success
+                reporter.update(cache_hit=True, api_call=True)
 
                 cache_payloads.append(
                     {
@@ -246,6 +290,9 @@ def _resolve_via_enrichment_service(
                         "source": "eqc_sync",
                     }
                 )
+            else:
+                # Story 7.1-14: Update progress with no result
+                reporter.update(cache_hit=False, api_call=True)
 
         except Exception as e:
             budget_remaining -= 1
@@ -253,7 +300,12 @@ def _resolve_via_enrichment_service(
                 "company_id_resolver.eqc_lookup_failed",
                 error=str(e),
             )
+            # Story 7.1-14: Update progress even on failure
+            reporter.update(cache_hit=False, api_call=True)
             # Continue to next name - don't block pipeline
+
+    # Story 7.1-14 AC-4: Finish progress reporting
+    reporter.finish()
 
     if cache_payloads and mapping_repository:
         # Deduplicate by alias_name/match_type to avoid redundant inserts

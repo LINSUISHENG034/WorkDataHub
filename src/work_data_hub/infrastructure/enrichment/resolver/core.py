@@ -241,6 +241,7 @@ class CompanyIdResolver:
         self,
         df: pd.DataFrame,
         strategy: ResolutionStrategy,
+        verbose: bool = False,
     ) -> ResolutionResult:
         """
         Batch resolve company_id with hierarchical strategy.
@@ -260,6 +261,7 @@ class CompanyIdResolver:
             df: Input DataFrame containing columns specified in strategy.
             strategy: ResolutionStrategy configuration for column names
                 and resolution behavior.
+            verbose: Whether to show progress bar for EQC API calls (Story 7.1-14 AC-4).
 
         Returns:
             ResolutionResult containing the resolved DataFrame (in .data)
@@ -302,6 +304,28 @@ class CompanyIdResolver:
 
         # Track resolution sources for statistics
         resolution_mask = pd.Series(False, index=result_df.index)
+
+        # Story 7.1-14: Cache Warming (Task 2 - Highest ROI)
+        # Pre-batch cache warming: extract unique customer names and query enrichment_index once
+        # This reduces EQC API calls by proactively populating an in-memory cache
+        cache_stats: dict[str, int] = {}
+        if self.mapping_repository:
+            from .cache_warming import CacheWarmer
+
+            warmer = CacheWarmer(self.mapping_repository)
+            warmed_cache = warmer.warm_cache(result_df, strategy.customer_name_column)
+
+            if warmed_cache:
+                cache_stats = {
+                    "cache_warming_hits": len(warmed_cache),
+                    "cache_warming_total": len(
+                        result_df[strategy.customer_name_column].dropna().unique()
+                    ),
+                }
+                logger.info(
+                    "company_id_resolver.cache_warming_stats",
+                    **cache_stats,
+                )
 
         # Step 1: YAML overrides lookup (5 priority levels)
         yaml_resolved, yaml_hits = resolve_via_yaml_overrides(
@@ -406,6 +430,7 @@ class CompanyIdResolver:
                 self.eqc_provider,
                 self.enrichment_service,
                 self.mapping_repository,
+                verbose=verbose,  # Story 7.1-14 AC-4: Pass verbose for progress bar
             )
             # Fill in EQC results for unresolved rows
             result_df.loc[mask_missing, strategy.output_column] = result_df.loc[

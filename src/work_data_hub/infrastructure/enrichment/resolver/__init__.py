@@ -23,9 +23,13 @@ This is a refactored module - see Story 7.3 for decomposition details.
 All public exports are re-exported here for backward compatibility.
 """
 
+from .cache_warming import CacheWarmer
 from .core import CompanyIdResolver
+from .progress import ProgressReporter
 
 # Re-export all public symbols for backward compatibility
 __all__ = [
+    "CacheWarmer",
     "CompanyIdResolver",
+    "ProgressReporter",
 ]
