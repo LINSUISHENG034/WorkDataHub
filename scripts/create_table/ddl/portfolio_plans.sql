@@ -4,7 +4,7 @@
 DROP TABLE IF EXISTS "组合计划" CASCADE;
 
 CREATE TABLE "组合计划" (
-  "portfolio_plans_id"    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "id"    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "年金计划号" VARCHAR(255),
   "组合代码" VARCHAR(255) NOT NULL,
   "组合名称" VARCHAR(255),
@@ -47,7 +47,7 @@ CREATE TRIGGER trigger_update_portfolio_plans_updated_at
 DO $$
 BEGIN
     RAISE NOTICE '=== 组合计划 Table Creation Complete ===';
-    RAISE NOTICE 'Primary Key: portfolio_plans_id (GENERATED ALWAYS AS IDENTITY)';
+    RAISE NOTICE 'Primary Key: id (GENERATED ALWAYS AS IDENTITY)';
     RAISE NOTICE 'Delete Scope Key (non-unique): 年金计划号, 组合代码';
     RAISE NOTICE 'Audit Fields: created_at, updated_at with auto-update trigger';
     RAISE NOTICE 'Indexes: Performance indexes created for common query patterns';

@@ -4,7 +4,7 @@
 DROP TABLE IF EXISTS "年金计划" CASCADE;
 
 CREATE TABLE "年金计划" (
-  "annuity_plans_id"    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "id"    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "年金计划号" VARCHAR(255) NOT NULL,
   "计划简称" VARCHAR(255),
   "计划全称" VARCHAR(255),
@@ -43,7 +43,7 @@ CREATE TRIGGER trigger_update_annuity_plans_updated_at
 DO $$
 BEGIN
     RAISE NOTICE '=== 年金计划 Table Creation Complete ===';
-    RAISE NOTICE 'Primary Key: annuity_plans_id (GENERATED ALWAYS AS IDENTITY)';
+    RAISE NOTICE 'Primary Key: id (GENERATED ALWAYS AS IDENTITY)';
     RAISE NOTICE 'Delete Scope Key (non-unique): 年金计划号, company_id';
     RAISE NOTICE 'Audit Fields: created_at, updated_at with auto-update trigger';
     RAISE NOTICE 'Indexes: Performance indexes created for common query patterns';

@@ -13,7 +13,7 @@ register_domain(
         pg_schema="mapping",
         pg_table="组合计划",
         sheet_name="组合计划",
-        primary_key="portfolio_plans_id",
+        primary_key="id",
         delete_scope_key=["年金计划号", "组合代码"],
         composite_key=["年金计划号", "组合代码"],
         bronze_required=["组合代码"],
