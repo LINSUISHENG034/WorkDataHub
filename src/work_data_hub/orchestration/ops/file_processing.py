@@ -27,6 +27,10 @@ from ._internal import _load_valid_domains
 
 logger = logging.getLogger(__name__)
 
+# File processing limits (Story 7.1-16)
+MIN_MAX_FILES = 1
+MAX_MAX_FILES = 20  # Reasonable upper bound
+
 
 class DiscoverFilesConfig(Config):
     """Configuration for file discovery operation."""
@@ -245,10 +249,10 @@ class ReadProcessConfig(Config):
     @classmethod
     def validate_max_files(cls, v: int) -> int:
         """Validate max_files is positive and reasonable."""
-        if v < 1:
-            raise ValueError("max_files must be at least 1")
-        if v > 20:  # Reasonable upper bound
-            raise ValueError("max_files cannot exceed 20")
+        if v < MIN_MAX_FILES:
+            raise ValueError(f"max_files must be at least {MIN_MAX_FILES}")
+        if v > MAX_MAX_FILES:
+            raise ValueError(f"max_files cannot exceed {MAX_MAX_FILES}")
         return v
 
 

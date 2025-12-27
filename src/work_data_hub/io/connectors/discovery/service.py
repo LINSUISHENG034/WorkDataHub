@@ -7,6 +7,11 @@ from pathlib import Path
 from typing import Any, Optional
 
 from work_data_hub.config.settings import get_settings
+from work_data_hub.infrastructure.constants import (
+    MAX_MONTH,
+    MIN_MONTH,
+    YYYYMM_LENGTH,
+)
 from work_data_hub.infrastructure.settings.data_source_schema import (
     DataSourceConfigV2,
     DataSourcesValidationError,
@@ -282,20 +287,24 @@ class FileDiscoveryService:
         # Validate YYYYMM format if present (security: prevent path traversal)
         if "YYYYMM" in template_vars:
             yyyymm = template_vars["YYYYMM"]
-            if not isinstance(yyyymm, str) or len(yyyymm) != 6 or not yyyymm.isdigit():
+            if (
+                not isinstance(yyyymm, str)
+                or len(yyyymm) != YYYYMM_LENGTH
+                or not yyyymm.isdigit()
+            ):
                 raise DiscoveryError(
                     domain="unknown",
                     failed_stage=DiscoveryStage.CONFIG_VALIDATION,
                     original_error=ValueError(f"Invalid YYYYMM format: {yyyymm}"),
-                    message=f"YYYYMM must be exactly 6 digits, got: {yyyymm}",
+                    message=f"YYYYMM must be exactly {YYYYMM_LENGTH} digits, got: {yyyymm}",
                 )
             month = int(yyyymm[4:6])
-            if month < 1 or month > 12:
+            if month < MIN_MONTH or month > MAX_MONTH:
                 raise DiscoveryError(
                     domain="unknown",
                     failed_stage=DiscoveryStage.CONFIG_VALIDATION,
                     original_error=ValueError(f"Invalid month: {yyyymm[4:6]}"),
-                    message=f"Month must be between 01 and 12, got: {yyyymm[4:6]}",
+                    message=f"Month must be between {MIN_MONTH:02d} and {MAX_MONTH:02d}, got: {yyyymm[4:6]}",
                 )
 
         try:

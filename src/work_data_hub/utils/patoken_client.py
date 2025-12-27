@@ -24,6 +24,10 @@ AUTO_REFRESH_URL = "https://otp.paic.com.cn/api/rest/newPortal/v1/autoRefresh"
 MANUAL_REFRESH_URL = "https://otp.paic.com.cn/api/rest/newPortal/v1/manualRefresh"
 DEFAULT_TIMEOUT = 15
 
+# SM2 encrypt function signature check (Story 7.1-16)
+# Newer versions of gmssl require 3 parameters for encrypt
+SM2_ENCRYPT_MIN_PARAMS = 3
+
 
 class PATokenError(RuntimeError):
     """Top-level exception for PA token failures."""
@@ -246,7 +250,7 @@ class PATokenClient:
         crypt = sm2.CryptSM2(public_key=public_key, private_key=None)
         random_hex = func.random_hex(crypt.para_len)
         encrypt_params = inspect.signature(crypt.encrypt).parameters
-        if len(encrypt_params) >= 3:
+        if len(encrypt_params) >= SM2_ENCRYPT_MIN_PARAMS:
             cipher_bytes = crypt.encrypt(plaintext.encode("utf-8"), random_hex)
         else:
             cipher_bytes = crypt.encrypt(plaintext.encode("utf-8"))

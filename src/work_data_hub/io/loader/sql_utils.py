@@ -1,5 +1,8 @@
 from typing import Optional
 
+# PostgreSQL identifier max length (Story 7.1-16)
+MAX_IDENTIFIER_LENGTH = 63
+
 
 def quote_ident(name: str) -> str:
     """
@@ -18,8 +21,10 @@ def quote_ident(name: str) -> str:
         raise ValueError("Identifier name must be non-empty string")
 
     # Basic validation - identifiers should be reasonable
-    if len(name) > 63:  # PostgreSQL limit
-        raise ValueError("Identifier too long (max 63 characters)")
+    if len(name) > MAX_IDENTIFIER_LENGTH:  # PostgreSQL limit
+        raise ValueError(
+            f"Identifier too long (max {MAX_IDENTIFIER_LENGTH} characters)"
+        )
 
     # Escape internal double quotes by doubling them
     escaped = name.replace('"', '""')

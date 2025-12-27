@@ -9,6 +9,14 @@ Usage:
 
 from __future__ import annotations
 
+from work_data_hub.infrastructure.constants import (
+    MAX_MONTH,
+    MAX_VALID_YEAR,
+    MIN_MONTH,
+    MIN_VALID_YEAR,
+    YYYYMM_LENGTH,
+)
+
 
 def normalize_month(month: str) -> str:
     """
@@ -33,15 +41,21 @@ def normalize_month(month: str) -> str:
         raise ValueError("month is required (YYYYMM)")
 
     text = str(month).strip()
-    if len(text) != 6 or not text.isdigit():
-        raise ValueError("month must be a 6-digit string in YYYYMM format")
+    if len(text) != YYYYMM_LENGTH or not text.isdigit():
+        raise ValueError(
+            f"month must be a {YYYYMM_LENGTH}-digit string in YYYYMM format"
+        )
 
     yyyy = int(text[:4])
     mm = int(text[4:])
-    if yyyy < 2000 or yyyy > 2100:
-        raise ValueError("month year component must be between 2000 and 2100")
-    if mm < 1 or mm > 12:
-        raise ValueError("month component must be between 01 and 12")
+    if yyyy < MIN_VALID_YEAR or yyyy > MAX_VALID_YEAR:
+        raise ValueError(
+            f"month year component must be between {MIN_VALID_YEAR} and {MAX_VALID_YEAR}"
+        )
+    if mm < MIN_MONTH or mm > MAX_MONTH:
+        raise ValueError(
+            f"month component must be between {MIN_MONTH:02d} and {MAX_MONTH:02d}"
+        )
     return text
 
 

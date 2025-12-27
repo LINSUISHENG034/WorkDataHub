@@ -23,6 +23,12 @@ import hmac
 import re
 from typing import List
 
+from work_data_hub.infrastructure.cleansing.constants import (
+    FULLWIDTH_CHAR_END,
+    FULLWIDTH_CHAR_START,
+    FULLWIDTH_TO_HALFWIDTH_OFFSET,
+)
+
 # Status markers from legacy (29 patterns) + additional patterns from edge cases
 # These indicate company status changes and should be stripped for ID generation
 CORE_REPLACE_STRING: List[str] = [
@@ -160,7 +166,9 @@ def normalize_for_temp_id(company_name: str) -> str:
     # 4. Full-width → Half-width conversion (before bracket normalization)
     name = "".join(
         [
-            chr(ord(char) - 0xFEE0) if 0xFF01 <= ord(char) <= 0xFF5E else char
+            chr(ord(char) - FULLWIDTH_TO_HALFWIDTH_OFFSET)
+            if FULLWIDTH_CHAR_START <= ord(char) <= FULLWIDTH_CHAR_END
+            else char
             for char in name
         ]
     )

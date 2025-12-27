@@ -12,11 +12,19 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import ValidationError
 
+from work_data_hub.infrastructure.constants import MAX_MONTH, MIN_MONTH, MIN_VALID_YEAR
 from work_data_hub.utils.date_parser import parse_chinese_date
 
 from .models import TrusteePerformanceIn, TrusteePerformanceOut
 
 logger = logging.getLogger(__name__)
+
+# Year validation range for trustee performance data (Story 7.1-16)
+MIN_VALID_YEAR_TRUSTEE = MIN_VALID_YEAR  # 2000
+MAX_VALID_YEAR_TRUSTEE = 2030  # Near-future limit for data validation
+
+# Regex group count for year-month parsing
+YEAR_MONTH_GROUP_COUNT = 2
 
 
 class TrusteePerformanceTransformationError(Exception):
@@ -211,10 +219,10 @@ def _extract_report_date(
     # Validate extracted values
     if year is not None and month is not None:
         # Treat explicitly provided but invalid values as validation errors
-        if not (2000 <= year <= 2030):
+        if not (MIN_VALID_YEAR_TRUSTEE <= year <= MAX_VALID_YEAR_TRUSTEE):
             logger.debug(f"Row {row_index}: Invalid year {year}; returning None")
             return None
-        if not (1 <= month <= 12):
+        if not (MIN_MONTH <= month <= MAX_MONTH):
             logger.debug(f"Row {row_index}: Invalid month {month}; returning None")
             return None
 
@@ -262,17 +270,17 @@ def _parse_report_period(report_period: str) -> Optional[Tuple[int, int]]:
         if match:
             try:
                 groups = match.groups()
-                if len(groups) == 2:
+                if len(groups) == YEAR_MONTH_GROUP_COUNT:
                     # Determine which group is year vs month based on value
                     val1, val2 = int(groups[0]), int(groups[1])
 
-                    if val1 > 12:  # First value is likely year
+                    if val1 > MAX_MONTH:  # First value is likely year
                         return (val1, val2)
-                    elif val2 > 12:  # Second value is likely year
+                    elif val2 > MAX_MONTH:  # Second value is likely year
                         return (val2, val1)
-                    elif val1 > 2000:  # First value looks like year
+                    elif val1 > MIN_VALID_YEAR_TRUSTEE:  # First value looks like year
                         return (val1, val2)
-                    elif val2 > 2000:  # Second value looks like year
+                    elif val2 > MIN_VALID_YEAR_TRUSTEE:  # Second value looks like year
                         return (val2, val1)
 
             except (ValueError, IndexError):

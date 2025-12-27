@@ -14,6 +14,13 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+# 2-digit year parsing pivot (Story 7.1-16)
+# Years < 50 are treated as 20xx, years >= 50 are treated as 19xx
+TWO_DIGIT_YEAR_PIVOT = 50
+CENTURY_2000 = 2000
+CENTURY_1900 = 1900
+ONE_HUNDRED = 100
+
 SUPPORTED_FORMATS = (
     "YYYYMM, YYYYMMDD, YYYY年MM月, YYYY年MM月DD日, "
     "YYYY-MM, YYYY-MM-DD, YY年MM月 (2-digit year)"
@@ -182,10 +189,10 @@ def parse_report_period(report_period: str) -> Optional[Tuple[int, int]]:
             continue
         try:
             year, month = int(match.group(1)), int(match.group(2))
-            if year < 50:
-                year += 2000
-            elif 50 <= year < 100:
-                year += 1900
+            if year < TWO_DIGIT_YEAR_PIVOT:
+                year += CENTURY_2000
+            elif TWO_DIGIT_YEAR_PIVOT <= year < ONE_HUNDRED:
+                year += CENTURY_1900
             return (year, month)
         except ValueError:
             continue
@@ -258,10 +265,10 @@ def _parse_year_month(match: re.Match[str]) -> date:
 def _parse_two_digit_year_month(match: re.Match[str]) -> date:
     year = int(match.group(1))
     month = int(match.group(2))
-    if year < 50:
-        year += 2000
+    if year < TWO_DIGIT_YEAR_PIVOT:
+        year += CENTURY_2000
     else:
-        year += 1900
+        year += CENTURY_1900
     return date(year, month, 1)
 
 
@@ -269,10 +276,10 @@ def _parse_two_digit_year_month_day(match: re.Match[str]) -> date:
     year = int(match.group(1))
     month = int(match.group(2))
     day = int(match.group(3))
-    if year < 50:
-        year += 2000
+    if year < TWO_DIGIT_YEAR_PIVOT:
+        year += CENTURY_2000
     else:
-        year += 1900
+        year += CENTURY_1900
     return date(year, month, day)
 
 

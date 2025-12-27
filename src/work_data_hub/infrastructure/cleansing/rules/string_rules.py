@@ -5,6 +5,11 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from work_data_hub.infrastructure.cleansing.constants import (
+    FULLWIDTH_CHAR_END,
+    FULLWIDTH_CHAR_START,
+    FULLWIDTH_TO_HALFWIDTH_OFFSET,
+)
 from work_data_hub.infrastructure.cleansing.registry import RuleCategory, rule
 
 _DECORATIVE_CHARS = (
@@ -108,7 +113,9 @@ def normalize_company_name(value: Any) -> Any:
     # Convert full-width ASCII to half-width (legacy default to_fullwidth=False)
     normalized = "".join(
         [
-            chr(ord(char) - 0xFEE0) if 0xFF01 <= ord(char) <= 0xFF5E else char
+            chr(ord(char) - FULLWIDTH_TO_HALFWIDTH_OFFSET)
+            if FULLWIDTH_CHAR_START <= ord(char) <= FULLWIDTH_CHAR_END
+            else char
             for char in normalized
         ]
     )

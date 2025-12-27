@@ -21,6 +21,7 @@ Security:
 """
 
 from dataclasses import dataclass
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Optional, Protocol
 
 import requests
@@ -147,7 +148,7 @@ def validate_eqc_token(token: str, base_url: str) -> bool:
             status_code=response.status_code,
             elapsed_seconds=elapsed_seconds,
         )
-        if response.status_code == 200:
+        if response.status_code == HTTPStatus.OK:
             logger.info("eqc.token_validation.result", valid=True, reason="http_200")
             return True
         # 401/403 are strong signals that the token/session is not usable.

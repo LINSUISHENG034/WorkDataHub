@@ -781,7 +781,10 @@ class TestDatabaseCacheLookup:
         assert result.data.loc[0, "company_id"] == "db_company_123"
         assert result.statistics.db_cache_hits["customer_name"] == 1
         assert result.statistics.db_cache_hits_total == 1
-        mock_repo.lookup_enrichment_index_batch.assert_called_once()
+        # Story 7.1-14: Cache warming calls lookup_enrichment_index_batch first
+        # (for CUSTOMER_NAME only), then db_strategy calls it again for full lookup.
+        # Total expected calls: 2 (1 cache warming + 1 db_strategy)
+        assert mock_repo.lookup_enrichment_index_batch.call_count == 2
 
     def test_db_cache_lookup_no_repository(self, default_strategy):
         """Test graceful skip when no repository provided."""
@@ -1402,7 +1405,10 @@ class TestEnrichmentIndexDbCache:
         assert result.data.loc[0, "company_id"] == "C_PLAN"
         assert result.statistics.db_cache_hits["plan_code"] == 1
         assert result.statistics.db_cache_hits_total == 1
-        mock_repo.lookup_enrichment_index_batch.assert_called_once()
+        # Story 7.1-14: Cache warming calls lookup_enrichment_index_batch first
+        # (for CUSTOMER_NAME only), then db_strategy calls it again for full lookup.
+        # Total expected calls: 2 (1 cache warming + 1 db_strategy)
+        assert mock_repo.lookup_enrichment_index_batch.call_count == 2
         mock_repo.update_hit_count.assert_called()
 
     def test_enrichment_index_logs_decision_path(self, default_strategy):

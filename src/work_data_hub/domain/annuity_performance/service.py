@@ -11,6 +11,7 @@ import structlog
 from work_data_hub.config import get_domain_output_config
 from work_data_hub.config.settings import get_settings
 from work_data_hub.domain.pipelines.types import DomainPipelineResult, PipelineContext
+from work_data_hub.infrastructure.constants import DROP_RATE_THRESHOLD
 from work_data_hub.infrastructure.enrichment.mapping_repository import (
     CompanyMappingRepository,
 )
@@ -258,7 +259,7 @@ def process_with_enrichment(
     dropped_count = len(rows) - len(records)
     if dropped_count > 0:
         drop_rate = dropped_count / len(rows) if rows else 0
-        if drop_rate > 0.5:
+        if drop_rate > DROP_RATE_THRESHOLD:
             logger.bind(
                 domain="annuity_performance", step="process_with_enrichment"
             ).warning(

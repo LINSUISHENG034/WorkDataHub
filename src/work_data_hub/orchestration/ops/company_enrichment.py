@@ -18,6 +18,10 @@ from ._internal import _PSYCOPG2_NOT_LOADED, psycopg2
 
 logger = logging.getLogger(__name__)
 
+# Batch size limits for queue processing (Story 7.1-16)
+MIN_BATCH_SIZE = 1
+MAX_BATCH_SIZE = 500  # Reasonable upper bound to avoid memory issues
+
 
 class QueueProcessingConfig(Config):
     """Configuration for company lookup queue processing operation."""
@@ -29,10 +33,10 @@ class QueueProcessingConfig(Config):
     @classmethod
     def validate_batch_size(cls, v: int) -> int:
         """Validate batch size is positive and reasonable."""
-        if v < 1:
-            raise ValueError("Batch size must be at least 1")
-        if v > 500:  # Reasonable upper bound to avoid memory issues
-            raise ValueError("Batch size cannot exceed 500")
+        if v < MIN_BATCH_SIZE:
+            raise ValueError(f"Batch size must be at least {MIN_BATCH_SIZE}")
+        if v > MAX_BATCH_SIZE:
+            raise ValueError(f"Batch size cannot exceed {MAX_BATCH_SIZE}")
         return v
 
 

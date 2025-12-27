@@ -24,6 +24,9 @@ from .hybrid_service import HybridResult
 
 logger = structlog.get_logger(__name__)
 
+# Export limits (Story 7.1-16)
+MAX_EXPORT_ROWS = 50000  # Maximum rows per export file to avoid disk churn
+
 
 @dataclass
 class ReferenceDataMetrics:
@@ -490,7 +493,7 @@ class ObservabilityService:
                 )
 
             # Enforce backpressure: limit rows per file to avoid disk churn
-            if total_rows + len(chunk) > 50000:  # Max 50K rows per export
+            if total_rows + len(chunk) > MAX_EXPORT_ROWS:
                 self.logger.warning(
                     "observability.export_row_limit_reached",
                     table=table,

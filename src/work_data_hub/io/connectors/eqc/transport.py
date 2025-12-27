@@ -7,6 +7,7 @@ import logging
 import random
 import time
 from collections import deque
+from http import HTTPStatus
 from typing import Deque, Optional
 
 import requests
@@ -175,7 +176,7 @@ class EQCTransport:
                 )
 
                 # Handle different status codes
-                if response.status_code == 200:
+                if response.status_code == HTTPStatus.OK:
                     logger.debug(
                         "EQC API request successful",
                         extra={
@@ -185,7 +186,7 @@ class EQCTransport:
                     )
                     return response
 
-                elif response.status_code == 403:
+                elif response.status_code == HTTPStatus.FORBIDDEN:
                     # Some EQC environments reject additional browser-mimic headers.
                     # Retry once with a minimal header set (token-only) if caller didn't
                     # explicitly pass headers.
@@ -204,13 +205,13 @@ class EQCTransport:
                             headers={"token": self.token},
                             **kwargs,
                         )
-                        if response.status_code == 200:
+                        if response.status_code == HTTPStatus.OK:
                             return response
-                        if response.status_code == 401:
+                        if response.status_code == HTTPStatus.UNAUTHORIZED:
                             raise EQCAuthenticationError("Invalid or expired EQC token")
-                        if response.status_code == 404:
+                        if response.status_code == HTTPStatus.NOT_FOUND:
                             raise EQCNotFoundError("Resource not found")
-                        if response.status_code == 429:
+                        if response.status_code == HTTPStatus.TOO_MANY_REQUESTS:
                             raise EQCRateLimitError("Rate limit exceeded")
                         raise EQCClientError(
                             f"Unexpected status code after minimal-header retry: {response.status_code}"
@@ -218,7 +219,7 @@ class EQCTransport:
 
                     raise EQCClientError("Forbidden (403) from EQC API")
 
-                elif response.status_code == 401:
+                elif response.status_code == HTTPStatus.UNAUTHORIZED:
                     logger.error(
                         "EQC authentication failed",
                         extra={
@@ -228,7 +229,7 @@ class EQCTransport:
                     )
                     raise EQCAuthenticationError("Invalid or expired EQC token")
 
-                elif response.status_code == 404:
+                elif response.status_code == HTTPStatus.NOT_FOUND:
                     logger.warning(
                         "EQC resource not found",
                         extra={
@@ -238,7 +239,7 @@ class EQCTransport:
                     )
                     raise EQCNotFoundError("Resource not found")
 
-                elif response.status_code == 429:
+                elif response.status_code == HTTPStatus.TOO_MANY_REQUESTS:
                     logger.warning(
                         "EQC rate limit exceeded",
                         extra={
@@ -255,7 +256,7 @@ class EQCTransport:
                         continue
                     raise EQCRateLimitError("Rate limit exceeded, retries exhausted")
 
-                elif response.status_code >= 500:
+                elif response.status_code >= HTTPStatus.INTERNAL_SERVER_ERROR:
                     logger.warning(
                         "EQC server error",
                         extra={

@@ -24,6 +24,12 @@ from pydantic import (
 
 logger = logging.getLogger(__name__)
 
+# Date validation constants (Story 7.1-16)
+MAX_DATE_RANGE_DAYS = 3650  # Approximately 10 years
+
+# Return rate threshold for suspicious value warning (Story 7.1-16)
+SUSPICIOUS_RETURN_RATE_THRESHOLD = 0.5  # 50% return rate is suspicious
+
 
 class TrusteePerformanceIn(BaseModel):
     """
@@ -207,7 +213,7 @@ class TrusteePerformanceOut(BaseModel):
                 raise ValueError(f"Report date cannot be in future: {self.report_date}")
 
             # Check date is not too old (more than 10 years)
-            if (current_date - self.report_date).days > 3650:
+            if (current_date - self.report_date).days > MAX_DATE_RANGE_DAYS:
                 self.validation_warnings.append(
                     f"Report date is very old: {self.report_date}"
                 )
@@ -234,7 +240,9 @@ class TrusteePerformanceOut(BaseModel):
 
         # Check for suspicious return rates
         if self.return_rate is not None:
-            if abs(self.return_rate) > 0.5:  # >50% return rate
+            if (
+                abs(self.return_rate) > SUSPICIOUS_RETURN_RATE_THRESHOLD
+            ):  # >50% return rate
                 warnings.append(f"Unusually high return rate: {self.return_rate:.2%}")
 
         # Check for suspicious fund scales vs NAV

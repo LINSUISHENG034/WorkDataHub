@@ -23,6 +23,9 @@ from work_data_hub.domain.reference_backfill.sync_models import (
 
 logger = logging.getLogger(__name__)
 
+# MySQL error code for unknown column (Story 7.1-16)
+MYSQL_UNKNOWN_COLUMN_ERROR = 1054
+
 
 class LegacyMySQLConnector:
     """
@@ -325,7 +328,7 @@ class LegacyMySQLConnector:
                 code = int(err.args[0])
             except Exception:
                 code = None
-        return (code == 1054) or ("unknown column" in message)
+        return (code == MYSQL_UNKNOWN_COLUMN_ERROR) or ("unknown column" in message)
 
     def _apply_column_mappings(
         self,

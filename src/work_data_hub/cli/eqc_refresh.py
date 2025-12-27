@@ -48,6 +48,10 @@ from work_data_hub.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+# CLI display truncation limits (Story 7.1-16)
+MAX_DISPLAY_ERRORS = 10  # Maximum errors to display in console output
+MAX_DISPLAY_FAILED_IDS = 100  # Maximum failed company IDs to write to report
+
 
 def print_freshness_status(service: EqcDataRefreshService) -> None:
     status = service.get_freshness_status()
@@ -96,10 +100,10 @@ def print_refresh_results(result) -> None:
 
     if result.errors:
         print("\nErrors:")
-        for error in result.errors[:10]:
+        for error in result.errors[:MAX_DISPLAY_ERRORS]:
             print(f"  - {error}")
-        if len(result.errors) > 10:
-            print(f"  ... and {len(result.errors) - 10} more errors")
+        if len(result.errors) > MAX_DISPLAY_ERRORS:
+            print(f"  ... and {len(result.errors) - MAX_DISPLAY_ERRORS} more errors")
 
 
 def _parse_failed_company_ids(errors: list[str]) -> list[str]:
@@ -170,10 +174,12 @@ def generate_refresh_report(checkpoint: RefreshCheckpoint, output_dir: Path) -> 
         if checkpoint.failed_company_ids:
             f.write("Failed Company IDs:\n")
             f.write("-" * 70 + "\n")
-            for company_id in checkpoint.failed_company_ids[:100]:
+            for company_id in checkpoint.failed_company_ids[:MAX_DISPLAY_FAILED_IDS]:
                 f.write(f"  - {company_id}\n")
-            if len(checkpoint.failed_company_ids) > 100:
-                f.write(f"  ... and {len(checkpoint.failed_company_ids) - 100} more\n")
+            if len(checkpoint.failed_company_ids) > MAX_DISPLAY_FAILED_IDS:
+                f.write(
+                    f"  ... and {len(checkpoint.failed_company_ids) - MAX_DISPLAY_FAILED_IDS} more\n"
+                )
 
         if checkpoint.verification:
             f.write("\nPost-Refresh Verification (AC22):\n")
@@ -520,8 +526,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     print(
                         f"\n[DRY RUN] Would refresh {len(stale_companies)} stale companies"
                     )
-                    print("\nSample (first 10):")
-                    for company in stale_companies[:10]:
+                    print(f"\nSample (first {MAX_DISPLAY_ERRORS}):")
+                    for company in stale_companies[:MAX_DISPLAY_ERRORS]:
                         days_str = (
                             f"{company.days_since_update} days"
                             if company.days_since_update
@@ -530,8 +536,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         print(
                             f"  - {company.company_id}: {company.company_full_name} (last updated: {days_str})"
                         )
-                    if len(stale_companies) > 10:
-                        print(f"  ... and {len(stale_companies) - 10} more companies")
+                    if len(stale_companies) > MAX_DISPLAY_ERRORS:
+                        print(
+                            f"  ... and {len(stale_companies) - MAX_DISPLAY_ERRORS} more companies"
+                        )
                     return 0
 
                 if not args.yes and not confirm_refresh(

@@ -38,6 +38,9 @@ from work_data_hub.infrastructure.validation.types import ValidationErrorDetail
 if TYPE_CHECKING:
     import pandas as pd
 
+# Value truncation limit for CSV export (Story 7.1-16)
+MAX_VALUE_LENGTH_FOR_CSV = 100
+
 
 def export_error_csv(
     failed_rows: "pd.DataFrame",
@@ -324,8 +327,8 @@ def _sanitize_value(value: Any) -> str:
     str_value = str_value.replace("\n", " ").replace("\t", " ")
 
     # Truncate long values
-    if len(str_value) > 100:
-        str_value = str_value[:97] + "..."
+    if len(str_value) > MAX_VALUE_LENGTH_FOR_CSV:
+        str_value = str_value[: MAX_VALUE_LENGTH_FOR_CSV - 3] + "..."
 
     return str_value
 

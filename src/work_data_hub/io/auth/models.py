@@ -14,6 +14,9 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field, field_validator
 
+# Token validation constants (Story 7.1-16)
+MIN_TOKEN_LENGTH = 20  # Minimum acceptable token length
+
 
 class AuthenticationError(Exception):
     """Base exception for authentication failures."""
@@ -48,8 +51,8 @@ class AuthTokenResult(BaseModel):
     def normalize_token(cls, value: str) -> str:
         """Trim whitespace and enforce the minimum length check."""
         cleaned = value.strip()
-        if len(cleaned) < 20:
-            msg = "Token must be at least 20 characters long"
+        if len(cleaned) < MIN_TOKEN_LENGTH:
+            msg = f"Token must be at least {MIN_TOKEN_LENGTH} characters long"
             raise ValueError(msg)
         return cleaned
 

@@ -15,6 +15,10 @@ from .models import AnnuityPlanCandidate, PortfolioCandidate
 
 logger = logging.getLogger(__name__)
 
+# Date string parsing constants (Story 7.1-16)
+MIN_DATE_PARTS_FOR_PARSING = 2  # Minimum parts when splitting by "-"
+YYYYMM_LENGTH = 6  # Length of YYYYMM formatted date string
+
 
 def derive_plan_candidates(
     processed_rows: List[Dict[str, Any]],
@@ -226,7 +230,7 @@ def _format_remark_from_date(date_input: Any) -> Optional[str]:
         if hasattr(date_input, "year") and hasattr(date_input, "month"):
             dt_obj = date_input
         # Handle string/int YYYYMM format (202411 -> 2024-11)
-        elif str(date_input).isdigit() and len(str(date_input)) == 6:
+        elif str(date_input).isdigit() and len(str(date_input)) == YYYYMM_LENGTH:
             year_month = str(date_input)
             year = int(year_month[:4])
             month = int(year_month[4:6])
@@ -240,7 +244,7 @@ def _format_remark_from_date(date_input: Any) -> Optional[str]:
             # Simple parsing for common formats
             if "-" in date_str:
                 parts = date_str.split("-")
-                if len(parts) >= 2:
+                if len(parts) >= MIN_DATE_PARTS_FOR_PARSING:
                     year = int(parts[0])
                     month = int(parts[1])
                     dt_obj = datetime(year, month, 1)

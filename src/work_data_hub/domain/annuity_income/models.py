@@ -24,6 +24,12 @@ logger = logging.getLogger(__name__)
 CLEANSING_DOMAIN = "annuity_income"
 CLEANSING_REGISTRY = get_cleansing_registry()
 DEFAULT_COMPANY_RULES = ["trim_whitespace", "normalize_company_name"]
+
+# Date validation constants (Story 7.1-16)
+MIN_YYYYMM_VALUE = 200000  # Minimum valid YYYYMM value (January 2000)
+MAX_YYYYMM_VALUE = 999999  # Maximum valid YYYYMM value
+MAX_DATE_RANGE_DAYS = 3650  # Approximately 10 years
+
 DEFAULT_NUMERIC_RULES: List[Any] = [
     "standardize_null_values",
     "remove_currency_symbols",
@@ -140,7 +146,7 @@ class AnnuityIncomeIn(BaseModel):
         if v is None:
             return None
         if isinstance(v, int):
-            if 200000 <= v <= 999999:  # Valid YYYYMM range
+            if MIN_YYYYMM_VALUE <= v <= MAX_YYYYMM_VALUE:  # Valid YYYYMM range
                 return str(v)
         return v
 
@@ -285,7 +291,7 @@ class AnnuityIncomeOut(BaseModel):
                     f"Field '月度': Report date {report_date} cannot be in the future "
                     f"(today: {current_date})"
                 )
-            if (current_date - report_date).days > 3650:
+            if (current_date - report_date).days > MAX_DATE_RANGE_DAYS:
                 logger.warning(f"Report date {report_date} is older than 10 years")
         return self
 

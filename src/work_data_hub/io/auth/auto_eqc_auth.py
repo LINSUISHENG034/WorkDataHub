@@ -36,6 +36,13 @@ from work_data_hub.io.auth.models import AuthTimeoutError, BrowserError
 
 logger = logging.getLogger(__name__)
 
+# UI element size limits for QR switch detection (Story 7.1-16)
+QR_SWITCH_MAX_WIDTH = 100
+QR_SWITCH_MAX_HEIGHT = 100
+
+# Token masking thresholds (Story 7.1-16)
+MIN_TOKEN_LENGTH_FOR_MASKING = 12
+
 
 def _show_qr_ui(image_path: str, status_queue: multiprocessing.Queue):
     """
@@ -401,8 +408,8 @@ async def get_auth_token_auto_qr(
                                     box = await el.bounding_box()
                                     if (
                                         box
-                                        and box["width"] < 100
-                                        and box["height"] < 100
+                                        and box["width"] < QR_SWITCH_MAX_WIDTH
+                                        and box["height"] < QR_SWITCH_MAX_HEIGHT
                                     ):
                                         await el.click()
                                         await page.wait_for_timeout(1000)
@@ -561,7 +568,7 @@ def run_get_token_auto_qr(
     def _mask_token(value: str) -> str:
         if not value:
             return "<empty>"
-        if len(value) <= 12:
+        if len(value) <= MIN_TOKEN_LENGTH_FOR_MASKING:
             return "<redacted>"
         return f"{value[:8]}...{value[-4:]}"
 

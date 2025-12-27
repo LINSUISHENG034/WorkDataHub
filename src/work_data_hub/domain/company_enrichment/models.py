@@ -19,6 +19,10 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validat
 
 logger = logging.getLogger(__name__)
 
+# Temp ID validation constants (Story 7.1-16)
+TEMP_ID_PREFIX = "TEMP_"
+TEMP_ID_EXPECTED_LENGTH = 11  # TEMP_ (5) + 6 digit sequence
+
 
 class CompanyMappingRecord(BaseModel):
     """
@@ -505,7 +509,7 @@ class CompanyIdResult(BaseModel):
             return v
 
         # Temp IDs should follow TEMP_NNNNNN format
-        if not v.startswith("TEMP_") or len(v) != 11:
+        if not v.startswith(TEMP_ID_PREFIX) or len(v) != TEMP_ID_EXPECTED_LENGTH:
             logger.warning(f"Invalid temp ID format: {v}")
 
         return v

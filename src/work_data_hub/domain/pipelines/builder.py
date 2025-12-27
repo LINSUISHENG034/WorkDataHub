@@ -16,6 +16,9 @@ from .types import DataFrameStep, RowTransformStep
 
 logger = logging.getLogger(__name__)
 
+# Import path parsing constants (Story 7.1-16)
+MIN_IMPORT_PATH_PARTS = 2  # Minimum parts for factory method (Class.method)
+
 
 class PipelineBuilder:
     """
@@ -125,7 +128,7 @@ def _import_step_class_or_factory(import_path: str) -> Any:
             pass
 
         # Try as factory method (Class.method)
-        if len(parts) >= 2:
+        if len(parts) >= MIN_IMPORT_PATH_PARTS:
             method_name = parts[-1]
             class_name = parts[-2]
             module_path = ".".join(parts[:-2])

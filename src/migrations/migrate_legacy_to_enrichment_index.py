@@ -19,6 +19,9 @@ from work_data_hub.infrastructure.enrichment.types import (
     SourceType,
 )
 
+# Sample records limit for migration reports (Story 7.1-16)
+SAMPLE_RECORDS_LIMIT = 10
+
 
 @dataclass
 class LegacyMigrationConfig:
@@ -162,7 +165,7 @@ def migrate_company_id_mapping(
         rec = to_record(row)
         if rec is None:
             continue
-        if len(report.sample_records) < 10:
+        if len(report.sample_records) < SAMPLE_RECORDS_LIMIT:
             report.sample_records.append(
                 {"lookup_key": rec.lookup_key, "company_id": rec.company_id}
             )
@@ -212,7 +215,7 @@ def migrate_eqc_search_result(
         rec = to_record(row)
         if rec is None:
             continue
-        if len(report.sample_records) < 10:
+        if len(report.sample_records) < SAMPLE_RECORDS_LIMIT:
             report.sample_records.append(
                 {"lookup_key": rec.lookup_key, "company_id": rec.company_id}
             )
