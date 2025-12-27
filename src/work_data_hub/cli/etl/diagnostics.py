@@ -7,7 +7,7 @@ Story 7.4: CLI Layer Modularization - Database connection diagnostics.
 from work_data_hub.config.settings import get_settings
 
 
-def _check_database_connection() -> int:
+def _check_database_connection() -> int:  # noqa: PLR0915 - CLI diagnostic output
     """
     Test database connection and display diagnostic info.
 

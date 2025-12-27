@@ -102,7 +102,7 @@ Examples:
         return 1
 
 
-def _execute_refresh(args: argparse.Namespace) -> int:
+def _execute_refresh(args: argparse.Namespace) -> int:  # noqa: PLR0915 - CLI output
     """
     Execute EQC token refresh operation.
 

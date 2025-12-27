@@ -99,7 +99,7 @@ def _update_env_file(env_file: str, key: str, value: str) -> bool:
 
 async def get_auth_token_interactively(
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
-) -> Optional[str]:
+) -> Optional[str]:  # noqa: PLR0915 - Browser automation with stealth config
     """
     Launch browser, allow user login, capture authentication token.
 

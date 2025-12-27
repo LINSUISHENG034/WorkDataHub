@@ -58,7 +58,45 @@ extend-select = ["TID"]  # Clean Architecture enforcement (Story 1.6)
 # Per-file ignores with TODO references (see Story 7.1-10 Ruff Warning Triage)
 "src/work_data_hub/io/**/*.py" = ["TID251"]  # IO layer can import from itself (acceptable)
 "src/work_data_hub/orchestration/**/*.py" = ["TID251"]  # Orchestration can import from IO (acceptable)
+# PLR09xx: Orchestration ops are Dagster entry points - intentionally complex orchestrators (Story 7.1-17)
+"src/work_data_hub/orchestration/ops/*.py" = ["TID251", "PLR0912", "PLR0915"]
+# PLR09xx: IO layer database operations have many conditional branches for different modes (Story 7.1-17)
+"src/work_data_hub/io/loader/*.py" = ["PLR0912", "PLR0913", "PLR0915"]
+# PLR09xx: IO auth layer has browser automation with complex navigation (Story 7.1-17)
+"src/work_data_hub/io/auth/*.py" = ["PLR0912", "PLR0915"]
 "src/work_data_hub/cli/**/*.py" = ["TID251"]  # CLI is outermost layer (Story 7.1-15)
+# PLR09xx: Domain service constructors use dependency injection with many parameters (Story 7.1-17)
+"src/work_data_hub/domain/*/service.py" = ["PLR0913"]
+# PLR09xx: Domain reference backfill services have complex orchestration logic (Story 7.1-17)
+"src/work_data_hub/domain/reference_backfill/*.py" = ["PLR0912", "PLR0913", "PLR0915"]
+# PLR09xx: Company enrichment service has multi-layer resolution logic (Story 7.1-17)
+"src/work_data_hub/domain/company_enrichment/service.py" = ["PLR0911", "PLR0912", "PLR0913", "PLR0915"]
+# PLR09xx: Infrastructure enrichment resolver has multi-strategy lookup (Story 7.1-17)
+"src/work_data_hub/infrastructure/enrichment/resolver/*.py" = ["PLR0912", "PLR0913", "PLR0915"]
+# PLR09xx: Infrastructure enrichment services have complex data refresh/learning logic (Story 7.1-17)
+"src/work_data_hub/infrastructure/enrichment/*.py" = ["PLR0913", "PLR0915"]
+# PLR09xx: IO connectors have complex protocol handling (Story 7.1-17)
+"src/work_data_hub/io/connectors/**/*.py" = ["PLR0912", "PLR0913", "PLR0915"]
+# PLR09xx: IO excel reader has format validation branches (Story 7.1-17)
+"src/work_data_hub/io/readers/*.py" = ["PLR0912", "PLR0915"]
+# PLR09xx: Infrastructure cleansing has format parsing logic (Story 7.1-17)
+"src/work_data_hub/infrastructure/cleansing/*.py" = ["PLR0911", "PLR0915"]
+# PLR09xx: Infrastructure SQL builders have many optional parameters (Story 7.1-17)
+"src/work_data_hub/infrastructure/sql/**/*.py" = ["PLR0913"]
+# PLR09xx: Infrastructure validation has many configuration parameters (Story 7.1-17)
+"src/work_data_hub/infrastructure/validation/*.py" = ["PLR0913"]
+# PLR09xx: Infrastructure schema DDL generator has format dispatch logic (Story 7.1-17)
+"src/work_data_hub/infrastructure/schema/*.py" = ["PLR0911"]
+# PLR09xx: Domain pipeline core has validation dispatch logic (Story 7.1-17)
+"src/work_data_hub/domain/pipelines/**/*.py" = ["PLR0911", "PLR0912"]
+# PLR09xx: Domain sandbox service has conditional processing logic (Story 7.1-17)
+"src/work_data_hub/domain/sandbox_trustee_performance/service.py" = ["PLR0912", "PLR0913"]
+# PLR09xx: CLI functions are entry points with argument parsing and dispatch (Story 7.1-17)
+"src/work_data_hub/cli/*.py" = ["PLR0911", "PLR0912", "PLR0913", "PLR0915"]
+# PLR09xx: Config Settings class uses Pydantic with many optional defaults (Story 7.1-17)
+"src/work_data_hub/config/settings.py" = ["PLR0913"]
+# PLR09xx: Orchestration jobs define multi-step pipelines (Story 7.1-17)
+"src/work_data_hub/orchestration/jobs.py" = ["PLR0912", "PLR0915"]
 "src/work_data_hub/domain/annuity_performance/*.py" = ["E501"]  # Legacy long lines (to fix in Story 7.1-15)
 "src/work_data_hub/scripts/**/*.py" = ["TID251"]  # Scripts can import from IO layer
 "scripts/**/*.py" = ["TID251"]  # Root scripts can import from IO layer

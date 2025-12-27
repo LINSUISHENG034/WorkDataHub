@@ -29,7 +29,7 @@ from .auth import _validate_and_refresh_token
 from .diagnostics import _check_database_connection
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: Optional[List[str]] = None) -> int:  # noqa: PLR0911, PLR0912, PLR0915 - CLI entry point
     """
     Main CLI entry point for ETL operations.
 

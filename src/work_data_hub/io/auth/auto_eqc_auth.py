@@ -44,7 +44,7 @@ QR_SWITCH_MAX_HEIGHT = 100
 MIN_TOKEN_LENGTH_FOR_MASKING = 12
 
 
-def _show_qr_ui(image_path: str, status_queue: multiprocessing.Queue):
+def _show_qr_ui(image_path: str, status_queue: multiprocessing.Queue):  # noqa: PLR0915 - UI construction
     """
     Display the QR code in a polished, modern Tkinter window.
     Designed to run in a separate process.
@@ -245,7 +245,7 @@ async def _take_debug_screenshot(page: Page, name_suffix: str) -> None:
 
 async def get_auth_token_auto_qr(
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
-) -> Optional[str]:
+) -> Optional[str]:  # noqa: PLR0912, PLR0915 - Browser automation with multi-step navigation
     """
     Launch browser, auto-navigate to QR login, and capture token.
 

@@ -72,7 +72,7 @@ def _execute_queue_processing_job(args: argparse.Namespace) -> int:
         return 1
 
 
-def _execute_reference_sync_job(args: argparse.Namespace) -> int:
+def _execute_reference_sync_job(args: argparse.Namespace) -> int:  # noqa: PLR0915 - CLI job executor
     """Execute reference sync job from authoritative sources."""
     from dagster import DagsterInstance
 
@@ -158,7 +158,7 @@ def _execute_reference_sync_job(args: argparse.Namespace) -> int:
         return 1
 
 
-def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:
+def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:  # noqa: PLR0912, PLR0915 - CLI domain dispatcher
     """
     Execute ETL job for a single domain.
 

@@ -203,7 +203,7 @@ def _run_full_refresh_with_checkpoint(
     checkpoint_dir: Path,
     batch_size: int,
     rate_limit: Optional[float],
-) -> int:
+) -> int:  # noqa: PLR0913 - checkpoint orchestration requires many params
     checkpoint = RefreshCheckpoint(
         checkpoint_id=f"full_refresh_{uuid4().hex[:8]}",
         operation_type="full_refresh",
@@ -254,7 +254,7 @@ def handle_resume(
     yes: bool,
     batch_size: int,
     rate_limit: Optional[float],
-) -> int:
+) -> int:  # noqa: PLR0912, PLR0915 - CLI resume handler with retry + continue phases
     checkpoint = RefreshCheckpoint.find_latest(checkpoint_dir, "full_refresh")
     if not checkpoint:
         print("❌ No incomplete checkpoint found to resume from")
@@ -449,7 +449,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Optional[Sequence[str]] = None) -> int:  # noqa: PLR0911, PLR0912, PLR0915 - CLI entry point
     """
     Main CLI entry point.
 

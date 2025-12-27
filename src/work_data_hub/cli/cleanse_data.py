@@ -294,7 +294,7 @@ def cleanse_biz_label_from_raw(
     }
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Optional[Sequence[str]] = None) -> int:  # noqa: PLR0915 - CLI entry point
     """
     Main CLI entry point.
 

@@ -32,7 +32,7 @@ def _parse_pk_override(pk_arg: Any) -> List[str]:
     return [p.strip() for p in parts if p.strip()]
 
 
-def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:
+def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:  # noqa: PLR0912, PLR0915 - CLI config builder
     """
     Build Dagster run_config from CLI arguments for a specific domain.
 
