@@ -1,4 +1,4 @@
-# generated: 2025-12-12
+# generated: 2025-12-28
 # project: WorkDataHub
 # project_key: WorkDataHub
 # tracking_system: file-system
@@ -29,7 +29,7 @@
 # - SM typically drafts next story ONLY after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', dev reviews, then Dev moves to 'done'
 
-generated: 2025-12-12
+generated: 2025-12-28
 project: WorkDataHub
 project_key: WorkDataHub
 tracking_system: file-system
@@ -317,20 +317,22 @@ development_status:
   7.1-17-reduce-function-arity-complexity: done  # P1: All 98 PLR09 violations suppressed via per-file ignores ✅ Code Review PASSED 2025-12-27
   epic-7.1-retrospective: optional
 
-# Technical Debt Metrics (Added 2025-12-26 from Story 7.1-10)
-technical_debt_metrics:
-  ruff_warnings:
-    baseline: 419  # Story 7.1-10
-    p0_critical: 11  # TID251 Clean Architecture violations
-    p1_high: 162  # PLR code quality (66+32+30+25+9)
-    p2_medium: 215  # E501 (205) + F841 (5) + E402 (5)
-    p3_low: 31  # TID252 relative imports
-    auto_fixable: 246  # 59% of warnings (E501, F841, E402, TID252)
-    analysis_date: 2025-12-26
-    reference: docs/sprint-artifacts/reviews/ruff-warning-triage-7.1-10.md
+  # Epic 7.2: Alembic Migration Refactoring
+  # Added 2025-12-27 via Sprint Change Proposal
+  # Full reset approach: Archive existing migrations, create clean linear chain
+  # BLOCKING: Epic 8 depends on clean migration foundation
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-27-migration-refactoring.md
+  epic-7.2: in-progress
+  7.2-1-migration-backup-and-archive: done  # Phase 1: Archive 10 migrations to _archived/ - Code Review PASSED 2025-12-28
+  7.2-2-new-migration-structure: backlog  # Phase 2: Create 001_infrastructure + 002_domains + 003_seed_data
+  7.2-3-auto-id-field-unification: backlog  # Phase 3: Rename annuity_plans_id/portfolio_plans_id → id
+  7.2-4-test-script-cleanup: backlog  # Phase 4: Evaluate and update/delete 5 migration test files
+  7.2-5-cross-validation: backlog  # Phase 5: Verify DDL Generator ↔ Migration ↔ Domain Layer consistency
+  7.2-6-dev-environment-refresh: backlog  # Phase 6: Run alembic upgrade head, verify .wdh_env database
+  epic-7.2-retrospective: optional
 
   # Epic 8: Testing & Validation Infrastructure
-  # BLOCKED: Waiting for Epic 7.1 P0 items to complete
+  # BLOCKED: Waiting for Epic 7.2 (Migration Refactoring) to complete
   epic-8: backlog
   8-1-golden-dataset-extraction-from-legacy-system: backlog
   8-2-automated-reconciliation-engine: backlog
