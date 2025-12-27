@@ -111,7 +111,7 @@ domains:
       # Primary key for delete_insert mode (matches GOLD_COMPOSITE_KEY in schemas.py)
       pk:
         - "月度"
-        - "计划号"
+        - "计划代码"
         - "组合代码"
         - "company_id"
 

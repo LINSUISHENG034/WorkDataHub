@@ -23,7 +23,7 @@ from work_data_hub.infrastructure.validation.domain_validators import (
 # Story 5.5.5: Corrected to match real data - four income fields instead of 收入金额
 BRONZE_REQUIRED_COLUMNS: Sequence[str] = (
     "月度",
-    "计划号",
+    "计划代码",
     "客户名称",
     "业务类型",
     "固费",
@@ -35,7 +35,7 @@ BRONZE_NUMERIC_COLUMNS: Sequence[str] = ("固费", "浮费", "回补", "税")
 GOLD_NUMERIC_COLUMNS: Sequence[str] = ("固费", "浮费", "回补", "税")
 GOLD_REQUIRED_COLUMNS: Sequence[str] = (
     "月度",
-    "计划号",
+    "计划代码",
     "company_id",
     "客户名称",
     "固费",
@@ -44,7 +44,7 @@ GOLD_REQUIRED_COLUMNS: Sequence[str] = (
     "税",
 )
 # MVP Validation: Added 组合代码 to composite key to handle multiple portfolios per plan
-GOLD_COMPOSITE_KEY: Sequence[str] = ("月度", "计划号", "组合代码", "company_id")
+GOLD_COMPOSITE_KEY: Sequence[str] = ("月度", "计划代码", "组合代码", "company_id")
 
 CLEANSING_DOMAIN = "annuity_income"
 
@@ -52,7 +52,7 @@ BronzeAnnuityIncomeSchema = pa.DataFrameSchema(
     columns={
         "月度": pa.Column(pa.DateTime, nullable=True, coerce=True),
         "机构代码": pa.Column(pa.String, nullable=True, coerce=True),
-        "计划号": pa.Column(pa.String, nullable=True, coerce=True),
+        "计划代码": pa.Column(pa.String, nullable=True, coerce=True),
         "客户名称": pa.Column(pa.String, nullable=True, coerce=True),
         "业务类型": pa.Column(pa.String, nullable=True, coerce=True),
         # Story 5.5.5: Four income fields instead of 收入金额
@@ -69,7 +69,7 @@ BronzeAnnuityIncomeSchema = pa.DataFrameSchema(
 GoldAnnuityIncomeSchema = pa.DataFrameSchema(
     columns={
         "月度": pa.Column(pa.DateTime, nullable=False, coerce=True),
-        "计划号": pa.Column(pa.String, nullable=False, coerce=True),
+        "计划代码": pa.Column(pa.String, nullable=False, coerce=True),
         "company_id": pa.Column(
             pa.String,
             nullable=False,

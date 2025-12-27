@@ -29,7 +29,7 @@ class TestBronzeAnnuityIncomeSchema:
         df = pd.DataFrame(
             {
                 "月度": [pd.Timestamp("2024-12-01")],
-                "计划号": ["FP0001"],
+                "计划代码": ["FP0001"],
                 "机构代码": ["G00"],
                 "客户名称": ["测试公司"],
                 "业务类型": ["企年投资"],
@@ -61,7 +61,7 @@ class TestBronzeAnnuityIncomeSchema:
         # or create a full DF.
 
         full_df = df.assign(
-            计划号="FP0001", 机构代码="G00", 客户名称="测试公司", 业务类型="企年投资"
+            计划代码="FP0001", 机构代码="G00", 客户名称="测试公司", 业务类型="企年投资"
         )
         validated = BronzeAnnuityIncomeSchema.validate(full_df)
         assert isinstance(validated["固费"].iloc[0], float)
@@ -76,7 +76,7 @@ class TestGoldAnnuityIncomeSchema:
         df = pd.DataFrame(
             {
                 "月度": [pd.Timestamp("2024-12-01")],
-                "计划号": ["FP0001"],
+                "计划代码": ["FP0001"],
                 "company_id": ["COMP001"],
                 "客户名称": ["测试公司"],
                 "年金账户名": ["账户A"],
@@ -99,7 +99,7 @@ class TestGoldAnnuityIncomeSchema:
         df = pd.DataFrame(
             {
                 "月度": [pd.Timestamp("2024-12-01")],
-                # Missing 计划号, company_id, income fields...
+                # Missing 计划代码, company_id, income fields...
             }
         )
         with pytest.raises(pa.errors.SchemaError):
@@ -110,7 +110,7 @@ class TestGoldAnnuityIncomeSchema:
         df = pd.DataFrame(
             {
                 "月度": [pd.Timestamp("2024-12-01"), pd.Timestamp("2024-12-01")],
-                "计划号": ["FP0001", "FP0001"],
+                "计划代码": ["FP0001", "FP0001"],
                 "company_id": ["COMP001", "COMP001"],
                 "客户名称": ["A", "A"],
                 "固费": [1.0, 1.0],
@@ -132,7 +132,7 @@ class TestValidationFunctions:
         df = pd.DataFrame(
             {
                 "月度": ["202412"],
-                "计划号": ["FP0001"],
+                "计划代码": ["FP0001"],
                 "机构代码": ["G00"],
                 "客户名称": ["测试公司"],
                 "业务类型": ["企年投资"],
@@ -153,7 +153,7 @@ class TestValidationFunctions:
         df = pd.DataFrame(
             {
                 "月度": [pd.Timestamp("2024-12-01"), pd.Timestamp("2024-12-01")],
-                "计划号": ["FP0001", "FP0001"],
+                "计划代码": ["FP0001", "FP0001"],
                 "company_id": ["COMP001", "COMP001"],
                 "客户名称": ["A", "A"],
                 "固费": [1.0, 1.0],

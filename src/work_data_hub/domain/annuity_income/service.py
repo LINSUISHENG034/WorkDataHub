@@ -51,7 +51,12 @@ ENABLE_UPSERT_MODE = False  # Detail table - use refresh mode instead
 
 # UPSERT keys (only used when ENABLE_UPSERT_MODE = True)
 # For aggregate tables with unique records per key combination
-DEFAULT_UPSERT_KEYS: Optional[List[str]] = ["月度", "计划号", "组合代码", "company_id"]
+DEFAULT_UPSERT_KEYS: Optional[List[str]] = [
+    "月度",
+    "计划代码",
+    "组合代码",
+    "company_id",
+]
 
 # REFRESH keys (used when ENABLE_UPSERT_MODE = False)
 # Defines scope for DELETE before INSERT (Legacy: update_based_on_field)
@@ -88,11 +93,11 @@ def process_annuity_income(
         schema: Database schema name
         sync_lookup_budget: Maximum synchronous EQC lookups allowed
         export_unknown_names: Whether to export unresolved company names to CSV
-        upsert_keys: Columns for upsert operation (default: 月度, 计划号, company_id)
+        upsert_keys: Columns for upsert operation (default: 月度, 计划代码, company_id)
 
     Expected Inputs:
         Bronze DataFrame from discovered Excel file (sheet: 收入明细)
-        Required columns: 月度, 机构/机构代码, 机构名称, 计划号/计划代码, 客户名称,
+        Required columns: 月度, 机构/机构代码, 机构名称, 计划代码, 客户名称,
         业务类型, 计划类型, 组合代码, 固费, 浮费, 回补, 税
 
     Outputs:
@@ -282,13 +287,15 @@ def process_with_enrichment(
                 rate=drop_rate,
             )
         # Export failed rows to CSV for debugging (Story 5.6.1)
-        success_pairs = {(r.计划号, getattr(r, "组合代码", None)) for r in records}
-        if {"计划号", "组合代码"}.issubset(input_df.columns):
-            key_series = pd.Series(list(zip(input_df["计划号"], input_df["组合代码"])))
+        success_pairs = {(r.计划代码, getattr(r, "组合代码", None)) for r in records}
+        if {"计划代码", "组合代码"}.issubset(input_df.columns):
+            key_series = pd.Series(
+                list(zip(input_df["计划代码"], input_df["组合代码"]))
+            )
             failed_df = input_df[~key_series.isin(success_pairs)]
-        elif "计划号" in input_df.columns:
+        elif "计划代码" in input_df.columns:
             success_codes = {pair[0] for pair in success_pairs}
-            failed_df = input_df[~input_df["计划号"].isin(success_codes)]
+            failed_df = input_df[~input_df["计划代码"].isin(success_codes)]
         else:
             failed_df = input_df
         if not failed_df.empty:
@@ -331,7 +338,5 @@ def _records_to_dataframe(records: List[AnnuityIncomeOut]) -> pd.DataFrame:
     df = pd.DataFrame(
         [r.model_dump(mode="json", by_alias=True, exclude_none=True) for r in records]
     )
-    # Keep both plan columns for parity with annuity_performance
-    if "计划代码" not in df.columns and "计划号" in df.columns:
-        df["计划代码"] = df["计划号"]
+    # Now 计划代码 is the standard column name (no need for legacy conversion)
     return df

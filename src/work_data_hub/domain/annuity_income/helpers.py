@@ -73,7 +73,7 @@ def convert_dataframe_to_models(
                 for key, val in row.to_dict().items()
             }
             row_dict = {k: v for k, v in row_dict.items() if k in allowed_fields}
-            if not row_dict.get("计划号") or row_dict.get("月度") is None:
+            if not row_dict.get("计划代码") or row_dict.get("月度") is None:
                 continue
 
             # type ignore: Dynamic dictionary unpacking for Pydantic model

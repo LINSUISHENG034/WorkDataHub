@@ -67,7 +67,7 @@ class AnnuityIncomeIn(BaseModel):
     )
     机构名称: Optional[str] = Field(None, description="Institution name (机构名称)")
     机构代码: Optional[str] = Field(None, description="Institution code (机构代码)")
-    计划号: Optional[str] = Field(None, description="Plan code (计划号)")
+    计划代码: Optional[str] = Field(None, description="Plan code (计划代码)")
     客户名称: Optional[str] = Field(None, description="Customer name (客户名称)")
     业务类型: Optional[str] = Field(None, description="Business type (业务类型)")
     计划类型: Optional[str] = Field(None, description="Plan type (计划类型)")
@@ -152,7 +152,7 @@ class AnnuityIncomeIn(BaseModel):
 
     @field_validator(
         "组合代码",
-        "计划号",
+        "计划代码",
         "机构代码",
         "产品线代码",
         "company_id",
@@ -177,9 +177,9 @@ class AnnuityIncomeOut(BaseModel):
         from_attributes=True,
     )
 
-    # Required fields (composite PK: 月度, 计划号, company_id)
+    # Required fields (composite PK: 月度, 计划代码, company_id)
     月度: date = Field(..., description="Report date (月度)")
-    计划号: str = Field(
+    计划代码: str = Field(
         ..., min_length=1, max_length=255, description="Plan code identifier"
     )
     company_id: str = Field(
@@ -237,7 +237,7 @@ class AnnuityIncomeOut(BaseModel):
                 f"Field '客户名称': Cannot clean company name '{v}'. Error: {e}"
             )
 
-    @field_validator("计划号", mode="after")
+    @field_validator("计划代码", mode="after")
     @classmethod
     def normalize_plan_code(cls, v: str) -> str:
         normalized = v.upper().replace("-", "").replace("_", "").replace(" ", "")

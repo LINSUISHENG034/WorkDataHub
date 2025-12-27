@@ -34,7 +34,7 @@ class TestAnnuityIncomeIn:
         # Story 5.5.5: Updated to use four income fields instead of 收入金额
         data = {
             "月度": "202412",
-            "计划号": "FP0001",
+            "计划代码": "FP0001",
             "客户名称": "测试公司",
             "业务类型": "企年投资",
             "固费": 500000.0,
@@ -43,7 +43,7 @@ class TestAnnuityIncomeIn:
             "税": 50000.0,
         }
         model = AnnuityIncomeIn(**data)
-        assert model.计划号 == "FP0001"
+        assert model.计划代码 == "FP0001"
         assert model.客户名称 == "测试公司"
         assert model.固费 == 500000.0
 
@@ -51,7 +51,7 @@ class TestAnnuityIncomeIn:
         """Model allows extra fields (extra='allow')."""
         data = {
             "月度": "202412",
-            "计划号": "FP0001",
+            "计划代码": "FP0001",
             "客户名称": "测试公司",
             "unknown_field": "should be allowed",
         }
@@ -64,11 +64,11 @@ class TestAnnuityIncomeIn:
     def test_strips_whitespace(self):
         """Model strips whitespace from string fields."""
         data = {
-            "计划号": "  FP0001  ",
+            "计划代码": "  FP0001  ",
             "客户名称": "  测试公司  ",
         }
         model = AnnuityIncomeIn(**data)
-        assert model.计划号 == "FP0001"
+        assert model.计划代码 == "FP0001"
         assert model.客户名称 == "测试公司"
 
     def test_converts_nan_to_none(self):
@@ -77,7 +77,7 @@ class TestAnnuityIncomeIn:
 
         # Story 5.5.5: Updated to use 固费 instead of 收入金额
         data = {
-            "计划号": "FP0001",
+            "计划代码": "FP0001",
             "固费": float("nan"),
         }
         model = AnnuityIncomeIn(**data)
@@ -87,7 +87,7 @@ class TestAnnuityIncomeIn:
         """Model cleans numeric fields with currency symbols."""
         # Story 5.5.5: Updated to use four income fields instead of 收入金额
         data = {
-            "计划号": "FP0001",
+            "计划代码": "FP0001",
             "固费": "1,000,000.00",
             "浮费": "500,000.00",
             "回补": "200,000.00",
@@ -101,7 +101,7 @@ class TestAnnuityIncomeIn:
         """Model preprocesses YYYYMM integer to string."""
         data = {
             "月度": 202412,
-            "计划号": "FP0001",
+            "计划代码": "FP0001",
         }
         model = AnnuityIncomeIn(**data)
         assert model.月度 == "202412"
@@ -109,12 +109,12 @@ class TestAnnuityIncomeIn:
     def test_cleans_code_fields(self):
         """Model cleans code fields by stripping whitespace."""
         data = {
-            "计划号": "  FP0001  ",
+            "计划代码": "  FP0001  ",
             "机构代码": "  G00  ",
             "company_id": "  COMP123  ",
         }
         model = AnnuityIncomeIn(**data)
-        assert model.计划号 == "FP0001"
+        assert model.计划代码 == "FP0001"
         assert model.机构代码 == "G00"
         assert model.company_id == "COMP123"
 
@@ -123,20 +123,20 @@ class TestAnnuityIncomeOut:
     """Tests for AnnuityIncomeOut strict output model."""
 
     def test_requires_plan_code(self):
-        """Model requires 计划号 field."""
+        """Model requires 计划代码 field."""
         data = {
             "月度": "2024-12-01",
             "客户名称": "测试公司",
         }
         with pytest.raises(ValidationError) as exc_info:
             AnnuityIncomeOut(**data)
-        assert "计划号" in str(exc_info.value)
+        assert "计划代码" in str(exc_info.value)
 
     def test_forbids_extra_fields(self):
         """Model forbids extra fields (extra='forbid')."""
         data = {
             "月度": "2024-12-01",
-            "计划号": "FP0001",
+            "计划代码": "FP0001",
             "客户名称": "测试公司",
             "unknown_field": "should fail",
         }
@@ -148,7 +148,7 @@ class TestAnnuityIncomeOut:
         # Story 5.5.5: Updated to use four income fields instead of 收入金额
         data = {
             "月度": "202412",
-            "计划号": "FP0001",
+            "计划代码": "FP0001",
             "company_id": "COMP001",
             "客户名称": "测试公司",
             "产品线代码": "PL201",
@@ -168,7 +168,7 @@ class TestAnnuityIncomeOut:
         # Story 5.5.5: Updated to use four income fields instead of 收入金额
         data = {
             "月度": "2024-12-01",
-            "计划号": "fp0001",
+            "计划代码": "fp0001",
             "company_id": "COMP123",
             "客户名称": "测试公司",
             "产品线代码": "PL201",
@@ -179,14 +179,14 @@ class TestAnnuityIncomeOut:
             "税": 1.0,
         }
         model = AnnuityIncomeOut(**data)
-        assert model.计划号 == "FP0001"
+        assert model.计划代码 == "FP0001"
 
     def test_normalizes_company_id(self):
         """Model normalizes company_id to uppercase."""
         # Story 5.5.5: Updated to use four income fields instead of 收入金额
         data = {
             "月度": "2024-12-01",
-            "计划号": "FP0001",
+            "计划代码": "FP0001",
             "company_id": "comp123",
             "客户名称": "测试公司",
             "产品线代码": "PL201",
@@ -204,7 +204,7 @@ class TestAnnuityIncomeOut:
         # Story 5.5.5: Updated to use four income fields instead of 收入金额
         data = {
             "月度": "2024-12-01",
-            "计划号": "FP0001",
+            "计划代码": "FP0001",
             "company_id": "COMP123",
             "固费": "1,000,000.00",
             "浮费": "500,000.00",
@@ -225,7 +225,7 @@ class TestAnnuityIncomeOut:
         future_date = date.today() + timedelta(days=30)
         data = {
             "月度": future_date.isoformat(),
-            "计划号": "FP0001",
+            "计划代码": "FP0001",
             "company_id": "COMP123",
             "客户名称": "测试公司",
             "产品线代码": "PL201",
@@ -244,7 +244,7 @@ class TestAnnuityIncomeOut:
         # Story 5.5.5: Updated to use four income fields instead of 收入金额
         data = {
             "月度": "2024-12-01",
-            "计划号": "FP0001",
+            "计划代码": "FP0001",
             "company_id": "COMP123",
             "客户名称": "测试公司",
             "产品线代码": "PL201",
@@ -259,7 +259,7 @@ class TestAnnuityIncomeOut:
             "年金账户名": "测试公司年金账户",
         }
         model = AnnuityIncomeOut(**data)
-        assert model.计划号 == "FP0001"
+        assert model.计划代码 == "FP0001"
         assert model.company_id == "COMP123"
         assert model.固费 == 500000.0
 
@@ -312,7 +312,7 @@ class TestProcessingResultWithEnrichment:
         # Story 5.5.5: Updated to use four income fields instead of 收入金额
         record = AnnuityIncomeOut(
             月度="2024-12-01",
-            计划号="FP0001",
+            计划代码="FP0001",
             company_id="COMP001",
             客户名称="测试公司",
             产品线代码="PL201",

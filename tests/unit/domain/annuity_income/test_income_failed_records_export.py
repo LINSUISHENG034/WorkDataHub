@@ -33,7 +33,7 @@ class TestFailedRecordsExport:
         mock_validate_gold,
         mock_convert_to_models,
     ):
-        """AC5: Failed rows exported when dropped, filtered by 计划号+组合代码."""
+        """AC5: Failed rows exported when dropped, filtered by 计划代码+组合代码."""
         mock_export_unknown.return_value = None
         mock_export_error.return_value = Path(
             "logs/failed_records_test_20241206_120000.csv"
@@ -41,7 +41,7 @@ class TestFailedRecordsExport:
         pipeline = MagicMock()
         row_success = {
             "月度": "202412",
-            "计划号": "FP0001",
+            "计划代码": "FP0001",
             "组合代码": "A",
             "客户名称": "公司A",
             "产品线代码": "PL201",
@@ -54,7 +54,7 @@ class TestFailedRecordsExport:
         }
         row_fail = {
             "月度": "202412",
-            "计划号": "FP0001",
+            "计划代码": "FP0001",
             "组合代码": "B",
             "客户名称": "公司B",
             "产品线代码": "PL201",
@@ -107,7 +107,7 @@ class TestFailedRecordsExport:
         pipeline = MagicMock()
         row_success = {
             "月度": "202412",
-            "计划号": "FP0001",
+            "计划代码": "FP0001",
             "组合代码": "A",
             "客户名称": "公司A",
             "产品线代码": "PL201",

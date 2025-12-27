@@ -130,9 +130,9 @@ class CompanyIdResolutionStep(TransformStep):
         return "company_id_resolution"
 
     def apply(self, df: pd.DataFrame, context: PipelineContext) -> pd.DataFrame:
-        # AnnuityIncome uses 计划号 instead of 计划代码
+        # AnnuityIncome uses 计划代码 (same as AnnuityPerformance)
         strategy = ResolutionStrategy(
-            plan_code_column="计划号",
+            plan_code_column="计划代码",
             customer_name_column="客户名称",
             account_name_column="年金账户名",
             company_id_column=None,  # AnnuityIncome doesn't have 公司代码
@@ -169,9 +169,8 @@ def build_bronze_to_silver_pipeline(
     Compose the Bronze → Silver pipeline for AnnuityIncome domain.
 
     Pipeline steps (per Story 5.5.2 Task 6):
-    1. MappingStep: Column rename (机构 → 机构代码)
-    2. CalculationStep: Plan code normalization (计划号/计划代码 → uppercase;
-       keeps both)
+    1. MappingStep: Column rename (机构 → 机构代码, 计划号 → 计划代码)
+    2. CalculationStep: Plan code normalization (计划代码 → uppercase)
     3. CalculationStep: 机构代码 from 机构名称 via COMPANY_BRANCH_MAPPING
     4. CalculationStep: Date parsing for 月度 (parse_chinese_date)
     5. CalculationStep: 机构代码 default to 'G00' (replace 'null' string + fillna)
@@ -187,24 +186,11 @@ def build_bronze_to_silver_pipeline(
     steps: list[TransformStep] = [
         # Step 1: Column name standardization (机构 → 机构代码)
         MappingStep(COLUMN_ALIAS_MAPPING),
-        # Step 2: Plan code normalization (keep both 计划号 + 计划代码 upper-cased)
+        # Step 2: Plan code normalization (ensure 计划代码 is upper-cased)
         CalculationStep(
             {
-                "计划号": lambda df: (
-                    df.get(
-                        "计划号", pd.Series([pd.NA] * len(df), index=df.index)
-                    ).combine_first(
-                        df.get("计划代码", pd.Series([pd.NA] * len(df), index=df.index))
-                    )
-                )
-                .astype("string")
-                .str.upper(),
                 "计划代码": lambda df: (
-                    df.get(
-                        "计划代码", pd.Series([pd.NA] * len(df), index=df.index)
-                    ).combine_first(
-                        df.get("计划号", pd.Series([pd.NA] * len(df), index=df.index))
-                    )
+                    df.get("计划代码", pd.Series([pd.NA] * len(df), index=df.index))
                 )
                 .astype("string")
                 .str.upper(),

@@ -172,7 +172,7 @@ class TestCompanyIdResolutionStep:
         """Create sample DataFrame for testing."""
         return pd.DataFrame(
             {
-                "计划号": ["FP0001", "FP0002", "UNKNOWN"],
+                "计划代码": ["FP0001", "FP0002", "UNKNOWN"],
                 "客户名称": ["公司A", "公司B", "公司C"],
                 "年金账户名": ["账户1", "账户2", "账户3"],
             }
@@ -261,7 +261,7 @@ class TestPipelineExecution:
         return pd.DataFrame(
             {
                 "月度": ["202411", "202411"],
-                "计划号": ["FP0001", "FP0002"],
+                "计划代码": ["FP0001", "FP0002"],
                 "客户名称": ["测试公司A", "测试公司B"],
                 "年金账户名": ["账户A", "账户B"],
                 "业务类型": ["企年投资", "职年受托"],
@@ -369,11 +369,11 @@ class TestPipelineExecution:
         assert result_df.loc[1, "浮费"] == 600000.0
 
     def test_pipeline_handles_column_aliases(self, context):
-        """Pipeline normalizes 计划代码→计划号 and 机构→机构代码 before processing."""
+        """Pipeline normalizes 计划代码→计划代码 and 机构→机构代码 before processing."""
         alias_df = pd.DataFrame(
             {
                 "月度": ["202412"],
-                "计划代码": ["fp0003"],  # Alias column that should become 计划号
+                "计划代码": ["fp0003"],  # Alias column that should become 计划代码
                 "客户名称": ["测试公司C"],
                 "年金账户名": ["账户C"],
                 "业务类型": ["企年投资"],
@@ -394,9 +394,9 @@ class TestPipelineExecution:
         result_df = pipeline.execute(alias_df, context)
 
         # Aliases should be normalized (both plan columns uppercase and aligned)
-        assert "计划号" in result_df.columns
         assert "计划代码" in result_df.columns
-        assert result_df.loc[0, "计划号"] == "FP0003"
+        assert "计划代码" in result_df.columns
+        assert result_df.loc[0, "计划代码"] == "FP0003"
         assert result_df.loc[0, "计划代码"] == "FP0003"
 
         assert "机构代码" in result_df.columns

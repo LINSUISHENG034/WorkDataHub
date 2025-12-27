@@ -87,7 +87,7 @@ class TestConvertDataframeToModels:
         df = pd.DataFrame(
             {
                 "月度": [date(2024, 12, 1), date(2024, 11, 1)],
-                "计划号": ["FP0001", "FP0002"],
+                "计划代码": ["FP0001", "FP0002"],
                 "客户名称": ["公司A", "公司B"],
                 "company_id": ["COMP001", "COMP002"],
                 "产品线代码": ["PL201", "PL201"],
@@ -103,16 +103,16 @@ class TestConvertDataframeToModels:
 
         assert len(records) == 2
         assert all(isinstance(r, AnnuityIncomeOut) for r in records)
-        assert records[0].计划号 == "FP0001"
-        assert records[1].计划号 == "FP0002"
+        assert records[0].计划代码 == "FP0001"
+        assert records[1].计划代码 == "FP0002"
 
     def test_skips_rows_without_plan_code(self):
-        """Skips rows without 计划号."""
+        """Skips rows without 计划代码."""
         # Story 5.5.5: Updated to use four income fields instead of 收入金额
         df = pd.DataFrame(
             {
                 "月度": [date(2024, 12, 1), date(2024, 11, 1)],
-                "计划号": ["FP0001", None],
+                "计划代码": ["FP0001", None],
                 "客户名称": ["公司A", "公司B"],
                 "company_id": ["COMP001", "COMP002"],
                 "产品线代码": ["PL201", "PL201"],
@@ -127,7 +127,7 @@ class TestConvertDataframeToModels:
         records, unknown_names = convert_dataframe_to_models(df)
 
         assert len(records) == 1
-        assert records[0].计划号 == "FP0001"
+        assert records[0].计划代码 == "FP0001"
 
     def test_skips_rows_without_date(self):
         """Skips rows without 月度."""
@@ -135,7 +135,7 @@ class TestConvertDataframeToModels:
         df = pd.DataFrame(
             {
                 "月度": [date(2024, 12, 1), None],
-                "计划号": ["FP0001", "FP0002"],
+                "计划代码": ["FP0001", "FP0002"],
                 "客户名称": ["公司A", "公司B"],
                 "company_id": ["COMP001", "COMP002"],
                 "产品线代码": ["PL201", "PL201"],
@@ -157,7 +157,7 @@ class TestConvertDataframeToModels:
         df = pd.DataFrame(
             {
                 "月度": [date(2024, 12, 1), date(2024, 11, 1)],
-                "计划号": ["FP0001", "FP0002"],
+                "计划代码": ["FP0001", "FP0002"],
                 "客户名称": ["公司A", "公司B"],
                 "company_id": ["COMP001", "IN_ABC123"],  # Second has temp ID
                 "产品线代码": ["PL201", "PL201"],
@@ -180,7 +180,7 @@ class TestConvertDataframeToModels:
         df = pd.DataFrame(
             {
                 "月度": [date(2024, 12, 1)],
-                "计划号": ["FP0001"],
+                "计划代码": ["FP0001"],
                 "客户名称": ["公司A"],
                 "company_id": ["COMP001"],
                 "产品线代码": ["PL201"],
@@ -232,7 +232,7 @@ class TestProcessWithEnrichment:
         rows = [
             {
                 "月度": "202412",
-                "计划号": "FP0001",
+                "计划代码": "FP0001",
                 "客户名称": "测试公司A",
                 "业务类型": "企年投资",
                 "计划类型": "单一计划",
@@ -262,7 +262,7 @@ class TestProcessWithEnrichment:
         rows = [
             {
                 "月度": "202412",
-                "计划号": "FP0001",
+                "计划代码": "FP0001",
                 "客户名称": "测试公司A",
                 "业务类型": "企年投资",
                 "计划类型": "单一计划",
@@ -293,7 +293,7 @@ class TestRecordsToDataframe:
         records = [
             AnnuityIncomeOut(
                 月度="2024-12-01",
-                计划号="FP0001",
+                计划代码="FP0001",
                 company_id="COMP001",
                 客户名称="公司A",
                 产品线代码="PL201",
@@ -305,7 +305,7 @@ class TestRecordsToDataframe:
             ),
             AnnuityIncomeOut(
                 月度="2024-11-01",
-                计划号="FP0002",
+                计划代码="FP0002",
                 company_id="COMP002",
                 客户名称="公司B",
                 产品线代码="PL201",
@@ -321,7 +321,7 @@ class TestRecordsToDataframe:
 
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 2
-        assert "计划号" in df.columns
+        assert "计划代码" in df.columns
 
     def test_handles_empty_list(self):
         """Returns empty DataFrame for empty list."""
