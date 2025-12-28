@@ -171,7 +171,7 @@ def migrate_account_name_mapping(
                     company_id=row["company_id"],
                     confidence=1.00,  # 所有映射都是高置信度
                     source=SourceType.LEGACY_MIGRATION,
-                    source_table="legacy.business.规模明细",
+                    source_table="business.规模明细",
                 )
                 records.append(record)
 

@@ -325,7 +325,7 @@ development_status:
   epic-7.2: in-progress
   7.2-1-migration-backup-and-archive: done  # Phase 1: Archive 10 migrations to _archived/ - Code Review PASSED 2025-12-28
   7.2-3-domain-registry-id-unification: done  # Phase 2 (PRE-REQ): Modify Domain Registry definitions - annuity_plans_id/portfolio_plans_id → id ✅ 2025-12-28
-  7.2-2-new-migration-structure: ready-for-dev  # Phase 3: Create 001_infrastructure + 002_domains + 003_seed_data - Blocked by 7.2-3
+  7.2-2-new-migration-structure: done  # Phase 3: Create 001_infrastructure + 002_domains + 003_seed_data - Code Review PASSED 2025-12-28
   7.2-4-test-script-cleanup: backlog  # Phase 4: Evaluate and update/delete 5 migration test files
   7.2-5-cross-validation: backlog  # Phase 5: Verify DDL Generator ↔ Migration ↔ Domain Layer consistency
   7.2-6-dev-environment-refresh: backlog  # Phase 6: Run alembic upgrade head, verify .wdh_env database
