@@ -182,15 +182,17 @@ class AnnuityIncomeOut(BaseModel):
     计划代码: str = Field(
         ..., min_length=1, max_length=255, description="Plan code identifier"
     )
-    company_id: str = Field(
-        ...,  # Required for gold output parity and composite PK
+    company_id: Optional[str] = Field(
+        None,  # Nullable - Story 7.3-1
         min_length=1,
         max_length=50,
         description="Company identifier - generated during data cleansing",
     )
 
     # Required output fields
-    客户名称: str = Field(..., max_length=255, description="Customer name (normalized)")
+    客户名称: Optional[str] = Field(
+        None, max_length=255, description="Customer name (normalized)"
+    )
     产品线代码: str = Field(..., max_length=255, description="Product line code")
     机构代码: str = Field(..., max_length=255, description="Institution code")
     # Story 5.5.5: Four income fields instead of 收入金额
@@ -224,7 +226,10 @@ class AnnuityIncomeOut(BaseModel):
 
     @field_validator("客户名称", mode="before")
     @classmethod
-    def clean_customer_name(cls, v: Any, info: ValidationInfo) -> str:
+    def clean_customer_name(cls, v: Any, info: ValidationInfo) -> Optional[str]:
+        # Story 7.3-1: Allow null values - early return
+        if v is None:
+            return v
         try:
             field_name = info.field_name or "客户名称"
             return apply_domain_rules(
@@ -247,7 +252,7 @@ class AnnuityIncomeOut(BaseModel):
 
     @field_validator("company_id", mode="after")
     @classmethod
-    def normalize_company_id(cls, v: str) -> str:
+    def normalize_company_id(cls, v: Optional[str]) -> Optional[str]:
         """Validate company_id format.
 
         Valid formats:
@@ -255,7 +260,12 @@ class AnnuityIncomeOut(BaseModel):
         - Temp ID: "IN<16-char-Base32>", e.g., "INABCDEFGHIJKLMNOP"
 
         No normalization needed - inputs should already be in correct format.
+
+        Story 7.3-1: Allow null values.
         """
+        # Story 7.3-1: Allow null values - early return
+        if v is None:
+            return v
         normalized = v.upper()
         if not normalized.strip():
             raise ValueError(f"company_id cannot be empty: {v}")

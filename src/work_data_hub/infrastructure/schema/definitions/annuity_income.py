@@ -24,7 +24,6 @@ register_domain(
         bronze_required=[
             "月度",
             "计划代码",
-            "客户名称",
             "业务类型",
             "固费",
             "浮费",
@@ -34,8 +33,6 @@ register_domain(
         gold_required=[
             "月度",
             "计划代码",
-            "company_id",
-            "客户名称",
             "固费",
             "浮费",
             "回补",
@@ -45,8 +42,8 @@ register_domain(
         columns=[
             ColumnDef("月度", ColumnType.DATE, nullable=False),
             ColumnDef("计划代码", ColumnType.STRING, nullable=False, max_length=255),
-            ColumnDef("company_id", ColumnType.STRING, nullable=False, max_length=50),
-            ColumnDef("客户名称", ColumnType.STRING, nullable=False, max_length=255),
+            ColumnDef("company_id", ColumnType.STRING, nullable=True, max_length=50),
+            ColumnDef("客户名称", ColumnType.STRING, nullable=True, max_length=255),
             ColumnDef("年金账户名", ColumnType.STRING, max_length=255),
             ColumnDef("业务类型", ColumnType.STRING, max_length=255),
             ColumnDef("计划类型", ColumnType.STRING, max_length=255),

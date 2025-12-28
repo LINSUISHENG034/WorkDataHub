@@ -24,7 +24,6 @@ from work_data_hub.infrastructure.validation.domain_validators import (
 BRONZE_REQUIRED_COLUMNS: Sequence[str] = (
     "月度",
     "计划代码",
-    "客户名称",
     "业务类型",
     "固费",
     "浮费",
@@ -36,8 +35,6 @@ GOLD_NUMERIC_COLUMNS: Sequence[str] = ("固费", "浮费", "回补", "税")
 GOLD_REQUIRED_COLUMNS: Sequence[str] = (
     "月度",
     "计划代码",
-    "company_id",
-    "客户名称",
     "固费",
     "浮费",
     "回补",
@@ -72,11 +69,11 @@ GoldAnnuityIncomeSchema = pa.DataFrameSchema(
         "计划代码": pa.Column(pa.String, nullable=False, coerce=True),
         "company_id": pa.Column(
             pa.String,
-            nullable=False,
+            nullable=True,
             coerce=True,
             checks=pa.Check.str_length(min_value=1),
         ),
-        "客户名称": pa.Column(pa.String, nullable=False, coerce=True),
+        "客户名称": pa.Column(pa.String, nullable=True, coerce=True),
         "年金账户名": pa.Column(pa.String, nullable=True, coerce=True),
         "业务类型": pa.Column(pa.String, nullable=True, coerce=True),
         "计划类型": pa.Column(pa.String, nullable=True, coerce=True),

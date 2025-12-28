@@ -91,7 +91,7 @@ class TestGetDomainReturnsExpectedSchema:
     def test_annuity_income_has_correct_delete_scope_key(self) -> None:
         """annuity_income delete_scope_key should match expected."""
         schema = get_domain("annuity_income")
-        assert schema.delete_scope_key == ["月度", "计划号", "company_id"]
+        assert schema.delete_scope_key == ["月度", "计划代码", "company_id"]
 
     def test_portfolio_plans_has_correct_delete_scope_key(self) -> None:
         """portfolio_plans delete_scope_key should match DDL."""
@@ -138,7 +138,7 @@ class TestColumnDefinitionsComplete:
         column_names = [c.name for c in schema.columns]
         # Check key columns exist
         assert "月度" in column_names
-        assert "计划号" in column_names
+        assert "计划代码" in column_names
         assert "固费" in column_names
         assert "浮费" in column_names
 

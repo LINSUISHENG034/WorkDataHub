@@ -361,6 +361,13 @@ class TestMultiDomainPipeline:
         perf_df = create_mock_annuity_performance_data(month, rows=1000)
         income_df = create_mock_annuity_income_data(month, rows=1000)
 
+        # Story 7.3-1: explicitly include null customer/company IDs in input
+        assert income_df["客户名称"].isna().any()
+        assert income_df["客户名称"].notna().any()
+        assert "company_id" in income_df.columns
+        assert income_df["company_id"].isna().any()
+        assert income_df["company_id"].notna().any()
+
         perf_discovery = StubDiscoveryService(perf_df, sheet="规模明细")
         income_discovery = StubDiscoveryService(income_df, sheet=DEFAULT_SHEET)
         loader = StubWarehouseLoader()
@@ -396,8 +403,8 @@ class TestMultiDomainPipeline:
         perf_columns = set(loader.calls[0]["df"].columns)
         income_columns = set(loader.calls[1]["df"].columns)
         assert "计划代码" in perf_columns
-        # annuity_income keeps both plan columns normalized for parity checks
-        assert {"计划号", "计划代码"} <= income_columns
+        # annuity_income uses normalized "计划代码" field name (Story 7.1-11 fix)
+        assert "计划代码" in income_columns
 
     @pytest.mark.integration
     def test_shared_mappings_are_consistent(self) -> None:
@@ -468,17 +475,18 @@ class TestMultiDomainPipeline:
         common_cols = ai_cols_set & ap_cols_set
         assert "月度" in common_cols
         assert "company_id" in common_cols
+        assert (
+            "计划代码" in common_cols
+        )  # Both domains use 计划代码 after Story 7.1-11 fix
 
         # Some columns should be domain-specific
         ai_only = ai_cols_set - ap_cols_set
         ap_only = ap_cols_set - ai_cols_set
 
         # annuity_income specific
-        assert "计划号" in ai_only
         assert {"固费", "浮费", "回补", "税"} <= ai_only
 
         # annuity_performance specific
-        assert "计划代码" in ap_only
         assert "期初资产规模" in ap_only
 
     @pytest.mark.integration

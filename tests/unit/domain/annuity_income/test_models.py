@@ -263,6 +263,27 @@ class TestAnnuityIncomeOut:
         assert model.company_id == "COMP123"
         assert model.固费 == 500000.0
 
+    def test_accepts_null_customer_name_and_company_id(self):
+        """Story 7.3-1: Model accepts null 客户名称 and company_id."""
+        data = {
+            "月度": "2024-12-01",
+            "计划代码": "FP0001",
+            "客户名称": None,  # Explicitly null - Story 7.3-1
+            "company_id": None,  # Explicitly null - Story 7.3-1
+            "产品线代码": "PL201",
+            "机构代码": "G00",
+            "固费": 10.0,
+            "浮费": 5.0,
+            "回补": 3.0,
+            "税": 1.0,
+        }
+        model = AnnuityIncomeOut(**data)
+        assert model.客户名称 is None
+        assert model.company_id is None
+        # Verify other required fields still work
+        assert model.计划代码 == "FP0001"
+        assert model.产品线代码 == "PL201"
+
 
 class TestEnrichmentStats:
     """Tests for EnrichmentStats model."""
