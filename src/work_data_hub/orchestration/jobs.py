@@ -42,13 +42,15 @@ from .reference_sync_jobs import reference_sync_job
 @job
 def sandbox_trustee_performance_job() -> Any:
     """
-    End-to-end trustee performance processing job.
+    End-to-end trustee performance processing job with optional reference backfill.
 
     This job orchestrates the complete ETL pipeline:
     1. Discover files matching domain patterns
     2. Read Excel data from discovered files
     3. Process data through domain service validation
-    4. Load data to database or generate execution plan
+    4. Derive reference candidates from processed data
+    5. Backfill missing references to database (if enabled)
+    6. Load data to database or generate execution plan
     """
     # Wire ops together - Dagster handles dependency graph
     discovered_paths = discover_files_op()
@@ -59,7 +61,14 @@ def sandbox_trustee_performance_job() -> Any:
     processed_data = process_sandbox_trustee_performance_op(
         excel_rows, discovered_paths
     )
-    load_op(processed_data)  # No return needed
+
+    # Epic 6.2: Generic reference backfill using configuration-driven approach
+    # Handles FK references via data_sources.yml config
+    backfill_result = generic_backfill_refs_op(processed_data)
+
+    # Gate before loading facts (FK-safe ordering)
+    gated_rows = gate_after_backfill(processed_data, backfill_result)
+    load_op(gated_rows)
 
 
 @job

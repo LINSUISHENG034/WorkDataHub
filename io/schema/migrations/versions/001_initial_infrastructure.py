@@ -527,6 +527,7 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
             sa.PrimaryKeyConstraint(
                 "typeCode", name="company_types_classification_pkey"
             ),
+            schema="enterprise",
             comment="Static reference data: Company types classification "
             "(104 rows, structure only)",
         )

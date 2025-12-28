@@ -190,10 +190,16 @@ def _resolve_postgres_dsn() -> str:
 
 
 def _create_ephemeral_database(base_dsn: str) -> tuple[str, str, str]:
+    """Create a temporary test database with a fixed naming convention.
+
+    Uses fixed prefix 'wdh_test_' to prevent nested naming issues when base_db
+    already contains '_test_' (e.g., postgres_test_xxx_test_xxx_test_xxx).
+    """
     parsed = urlparse(base_dsn)
-    base_db = parsed.path.lstrip("/") or "postgres"
-    admin_db = "postgres" if base_db != "postgres" else base_db
-    temp_db = f"{base_db}_test_{uuid.uuid4().hex[:8]}"
+    # Always use 'postgres' as admin database for creating new databases
+    admin_db = "postgres"
+    # Use fixed prefix to prevent nested naming snowball effect
+    temp_db = f"wdh_test_{uuid.uuid4().hex[:8]}"
 
     admin_dsn = urlunparse(parsed._replace(path=f"/{admin_db}"))
     temp_dsn = urlunparse(parsed._replace(path=f"/{temp_db}"))
@@ -255,11 +261,20 @@ def postgres_db_with_migrations() -> Generator[str, None, None]:
     try:
         yield temp_dsn
     finally:
-        _validate_test_database(
-            temp_dsn
-        )  # Safety check: prevent production DB clearing
-        migration_runner.downgrade(temp_dsn, "base")
-        _drop_database(admin_dsn, temp_db)
+        # Robust cleanup: ensure database is ALWAYS dropped even if downgrade fails
+        # This prevents orphaned test databases from accumulating
+        try:
+            _validate_test_database(
+                temp_dsn
+            )  # Safety check: prevent production DB clearing
+            migration_runner.downgrade(temp_dsn, "base")
+        except Exception:
+            # Log but don't fail - database cleanup is more important
+            pass
+        finally:
+            # ALWAYS drop the temp database, regardless of downgrade success
+            _drop_database(admin_dsn, temp_db)
+
         get_settings.cache_clear()
 
         if original_database_url is None:

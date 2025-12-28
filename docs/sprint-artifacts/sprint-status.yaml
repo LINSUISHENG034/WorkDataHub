@@ -322,13 +322,13 @@ development_status:
   # Full reset approach: Archive existing migrations, create clean linear chain
   # BLOCKING: Epic 8 depends on clean migration foundation
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-27-migration-refactoring.md
-  epic-7.2: in-progress
+  epic-7.2: done # All 6 stories complete, Code Review PASSED 2025-12-28
   7.2-1-migration-backup-and-archive: done # Phase 1: Archive 10 migrations to _archived/ - Code Review PASSED 2025-12-28
   7.2-3-domain-registry-id-unification: done # Phase 2 (PRE-REQ): Modify Domain Registry definitions - annuity_plans_id/portfolio_plans_id → id ✅ 2025-12-28
   7.2-2-new-migration-structure: done # Phase 3: Create 001_infrastructure + 002_domains + 003_seed_data - Code Review PASSED 2025-12-28
   7.2-4-test-script-cleanup: done # Phase 4: Evaluate and update/delete 5 migration test files - ✅ Completed. All test scripts updated and verified against 001/002/003 migrations.
   7.2-5-cross-validation: done # Phase 5: Verify DDL Generator ↔ Migration ↔ Domain Layer consistency - ✅ 4/5 checks passed. P0 bug D001 documented for follow-up (annuity_income field name mismatch).
-  7.2-6-dev-environment-refresh: backlog # Phase 6: Run alembic upgrade head, verify .wdh_env database
+  7.2-6-dev-environment-refresh: done # Phase 6: Run alembic upgrade head, verify .wdh_env database - ✅ Code Review PASSED 2025-12-28, I001 fixed
   epic-7.2-retrospective: optional
 
   # Epic 8: Testing & Validation Infrastructure
