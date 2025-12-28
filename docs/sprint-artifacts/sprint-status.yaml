@@ -327,7 +327,7 @@ development_status:
   7.2-3-domain-registry-id-unification: done # Phase 2 (PRE-REQ): Modify Domain Registry definitions - annuity_plans_id/portfolio_plans_id → id ✅ 2025-12-28
   7.2-2-new-migration-structure: done # Phase 3: Create 001_infrastructure + 002_domains + 003_seed_data - Code Review PASSED 2025-12-28
   7.2-4-test-script-cleanup: done # Phase 4: Evaluate and update/delete 5 migration test files - ✅ Completed. All test scripts updated and verified against 001/002/003 migrations.
-  7.2-5-cross-validation: backlog # Phase 5: Verify DDL Generator ↔ Migration ↔ Domain Layer consistency
+  7.2-5-cross-validation: done # Phase 5: Verify DDL Generator ↔ Migration ↔ Domain Layer consistency - ✅ 4/5 checks passed. P0 bug D001 documented for follow-up (annuity_income field name mismatch).
   7.2-6-dev-environment-refresh: backlog # Phase 6: Run alembic upgrade head, verify .wdh_env database
   epic-7.2-retrospective: optional
 

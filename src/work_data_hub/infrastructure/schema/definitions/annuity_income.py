@@ -19,11 +19,11 @@ register_domain(
         pg_table="收入明细",
         sheet_name="收入明细",
         primary_key="id",
-        delete_scope_key=["月度", "计划号", "company_id"],
-        composite_key=["月度", "计划号", "组合代码", "company_id"],
+        delete_scope_key=["月度", "计划代码", "company_id"],
+        composite_key=["月度", "计划代码", "组合代码", "company_id"],
         bronze_required=[
             "月度",
-            "计划号",
+            "计划代码",
             "客户名称",
             "业务类型",
             "固费",
@@ -33,7 +33,7 @@ register_domain(
         ],
         gold_required=[
             "月度",
-            "计划号",
+            "计划代码",
             "company_id",
             "客户名称",
             "固费",
@@ -44,7 +44,7 @@ register_domain(
         numeric_columns=["固费", "浮费", "回补", "税"],
         columns=[
             ColumnDef("月度", ColumnType.DATE, nullable=False),
-            ColumnDef("计划号", ColumnType.STRING, nullable=False, max_length=255),
+            ColumnDef("计划代码", ColumnType.STRING, nullable=False, max_length=255),
             ColumnDef("company_id", ColumnType.STRING, nullable=False, max_length=50),
             ColumnDef("客户名称", ColumnType.STRING, nullable=False, max_length=255),
             ColumnDef("年金账户名", ColumnType.STRING, max_length=255),
@@ -84,9 +84,9 @@ register_domain(
         ],
         indexes=[
             IndexDef(["月度"]),
-            IndexDef(["计划号"]),
+            IndexDef(["计划代码"]),
             IndexDef(["company_id"]),
-            IndexDef(["月度", "计划号", "company_id"]),
+            IndexDef(["月度", "计划代码", "company_id"]),
         ],
     )
 )
