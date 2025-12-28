@@ -67,6 +67,18 @@ from work_data_hub.infrastructure.cleansing.rules.string_rules import (
     normalize_company_name,
     trim_whitespace,
 )
+from work_data_hub.infrastructure.cleansing.validators import (
+    DEFAULT_COMPANY_RULES,
+    DEFAULT_NUMERIC_RULES,
+    MAX_DATE_RANGE_DAYS,
+    MAX_YYYYMM_VALUE,
+    MIN_YYYYMM_VALUE,
+    apply_domain_rules,
+    clean_code_field,
+    clean_customer_name,
+    normalize_company_id,
+    normalize_plan_code,
+)
 
 # 版本信息
 __version__ = "1.1.0"
@@ -97,6 +109,17 @@ __all__: list[str] = [
     # 预配置清洗器
     "annuity_decimal_cleaner",
     "trustee_decimal_cleaner",
+    # 共享验证器 (Story 7.3-2)
+    "apply_domain_rules",
+    "clean_code_field",
+    "normalize_plan_code",
+    "normalize_company_id",
+    "clean_customer_name",
+    "DEFAULT_COMPANY_RULES",
+    "DEFAULT_NUMERIC_RULES",
+    "MIN_YYYYMM_VALUE",
+    "MAX_YYYYMM_VALUE",
+    "MAX_DATE_RANGE_DAYS",
 ]
 
 

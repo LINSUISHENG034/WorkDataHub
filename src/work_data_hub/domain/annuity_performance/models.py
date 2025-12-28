@@ -15,42 +15,37 @@ from pydantic import (
     model_validator,
 )
 
-from work_data_hub.infrastructure.cleansing import get_cleansing_registry
+from work_data_hub.infrastructure.cleansing import (
+    DEFAULT_NUMERIC_RULES,
+    MAX_DATE_RANGE_DAYS,
+    MAX_YYYYMM_VALUE,
+    MIN_YYYYMM_VALUE,
+    apply_domain_rules,
+    clean_code_field,
+    clean_customer_name,
+    get_cleansing_registry,
+    normalize_company_id,
+    normalize_plan_code,
+)
 
 # Story 6.2-P13: Import shared EnrichmentStats from infrastructure layer
 from work_data_hub.infrastructure.models.shared import EnrichmentStats
 from work_data_hub.utils.date_parser import parse_yyyymm_or_chinese
 
-logger = logging.getLogger(__name__)
-CLEANSING_DOMAIN = "annuity_performance"
-CLEANSING_REGISTRY = get_cleansing_registry()
-DEFAULT_COMPANY_RULES = ["trim_whitespace", "normalize_company_name"]
-
 # Date validation constants (Story 7.1-16)
 MIN_VALID_YEAR = 2000  # Earliest valid year for report dates
 MAX_VALID_YEAR = 2030  # Latest valid year for report dates
-MAX_DATE_RANGE_DAYS = 3650  # Approximately 10 years
 
-# Valid YYYYMM range for numeric input validation
-MIN_YYYYMM_VALUE = 200000  # Minimum valid YYYYMM value (January 2000)
-MAX_YYYYMM_VALUE = 999999  # Maximum valid YYYYMM value
-DEFAULT_NUMERIC_RULES: List[Any] = [
-    "standardize_null_values",
-    "remove_currency_symbols",
-    "clean_comma_separated_number",
+logger = logging.getLogger(__name__)
+CLEANSING_DOMAIN = "annuity_performance"
+CLEANSING_REGISTRY = get_cleansing_registry()
+
+# Note: DEFAULT_NUMERIC_RULES from shared module doesn't include
+# "handle_percentage_conversion", so we add it here for annuity_performance
+DEFAULT_NUMERIC_RULES_WITH_PERCENTAGE = [
+    *DEFAULT_NUMERIC_RULES,
     {"name": "handle_percentage_conversion"},
 ]
-
-
-def apply_domain_rules(
-    value: Any, field_name: str, fallback_rules: Optional[List[Any]] = None
-) -> Any:
-    rules = CLEANSING_REGISTRY.get_domain_rules(CLEANSING_DOMAIN, field_name)
-    if not rules:
-        rules = fallback_rules or []
-    if not rules:
-        return value
-    return CLEANSING_REGISTRY.apply_rules(value, rules, field_name=field_name)
 
 
 class AnnuityPerformanceIn(BaseModel):
@@ -176,10 +171,12 @@ class AnnuityPerformanceIn(BaseModel):
             return v
         field_name = info.field_name or "numeric_field"
         try:
+            # Story 7.3-2: Use shared apply_domain_rules with domain parameter
             cleaned = apply_domain_rules(
                 v,
                 field_name,
-                fallback_rules=DEFAULT_NUMERIC_RULES,
+                CLEANSING_DOMAIN,
+                fallback_rules=DEFAULT_NUMERIC_RULES_WITH_PERCENTAGE,
             )
         except ValueError as exc:
             raise ValueError(
@@ -220,10 +217,8 @@ class AnnuityPerformanceIn(BaseModel):
     )
     @classmethod
     def clean_code_fields(cls, v: Any) -> Optional[str]:
-        if v is None:
-            return None
-        s_val = str(v).strip()
-        return s_val if s_val else None
+        # Story 7.3-2: Use shared clean_code_field function
+        return clean_code_field(v)
 
     @property
     def 年化收益率(self) -> Optional[Union[Decimal, float, int, str]]:
@@ -338,47 +333,22 @@ class AnnuityPerformanceOut(BaseModel):
     @field_validator("客户名称", mode="before")
     @classmethod
     def clean_customer_name(cls, v: Any, info: ValidationInfo) -> Optional[str]:
-        if v is None:
-            return v
-        try:
-            field_name = info.field_name or "客户名称"
-            return apply_domain_rules(
-                v,
-                field_name,
-                fallback_rules=DEFAULT_COMPANY_RULES,
-            )
-        except Exception as e:
-            raise ValueError(
-                f"Field '客户名称': Cannot clean company name '{v}'. Error: {e}"
-            )
+        # Story 7.3-2: Use shared clean_customer_name function
+        field_name = info.field_name or "客户名称"
+        return clean_customer_name(v, field_name, CLEANSING_DOMAIN)
 
     @field_validator("计划代码", mode="after")
     @classmethod
     def normalize_codes(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        normalized = v.upper().replace("-", "").replace("_", "").replace(" ", "")
-        if not normalized.replace(".", "").replace("（", "").replace("）", "").strip():
-            raise ValueError(f"Code cannot be empty after normalization: {v}")
-        return normalized
+        # Story 7.3-2: Use shared normalize_plan_code function
+        # Note: annuity_performance allows null for 计划代码
+        return normalize_plan_code(v, allow_null=True)
 
     @field_validator("company_id", mode="after")
     @classmethod
     def normalize_company_id(cls, v: Optional[str]) -> Optional[str]:
-        """Validate company_id format.
-
-        Valid formats:
-        - Numeric ID: e.g., "614810477"
-        - Temp ID: "IN<16-char-Base32>", e.g., "INABCDEFGHIJKLMNOP"
-
-        No normalization needed - inputs should already be in correct format.
-        """
-        if v is None:
-            return v
-        normalized = v.upper()
-        if not normalized.strip():
-            raise ValueError(f"company_id cannot be empty: {v}")
-        return normalized
+        # Story 7.3-2: Use shared normalize_company_id function
+        return normalize_company_id(v)
 
     @field_validator(
         "期初资产规模",
@@ -399,8 +369,12 @@ class AnnuityPerformanceOut(BaseModel):
             return None
         field_name = info.field_name or "numeric_field"
         try:
+            # Story 7.3-2: Use shared apply_domain_rules with domain parameter
             normalized = apply_domain_rules(
-                v, field_name, fallback_rules=DEFAULT_NUMERIC_RULES
+                v,
+                field_name,
+                CLEANSING_DOMAIN,
+                fallback_rules=DEFAULT_NUMERIC_RULES_WITH_PERCENTAGE,
             )
             cleaned = CLEANSING_REGISTRY.apply_rule(
                 normalized, "comprehensive_decimal_cleaning", field_name=field_name

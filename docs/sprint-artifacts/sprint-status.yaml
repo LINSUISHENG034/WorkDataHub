@@ -338,7 +338,7 @@ development_status:
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-29-multi-domain-consistency.md
   epic-7.3: in-progress
   7.3-1-fix-annuity-income-null-handling: done # P0: Fix 客户名称/company_id nullability (CN-001, CI-001, DR-001) - ✅ Code Review PASSED 2025-12-29
-  7.3-2-extract-shared-validators: ready-for-dev # P1: Create infrastructure/cleansing/validators.py, eliminate ~120 LOC duplication
+  7.3-2-extract-shared-validators: done # P1: Create infrastructure/cleansing/validators.py, eliminate ~120 LOC duplication - ✅ Code Review PASSED 2025-12-29
   7.3-3-unify-validator-naming: backlog # P2: Standardize validator function names across domains
   epic-7.3-retrospective: optional
 

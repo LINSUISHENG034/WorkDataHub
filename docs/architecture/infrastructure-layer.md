@@ -50,6 +50,7 @@ src/work_data_hub/infrastructure/
 ├── cleansing/
 │   ├── __init__.py
 │   ├── registry.py              # CleansingRegistry singleton
+│   ├── validators.py            # [Story 7.3-2] Shared validators & constants
 │   ├── rule_engine.py           # Rule execution engine
 │   ├── biz_label_parser.py      # Business label parsing
 │   ├── business_info_cleanser.py # Business info cleansing
@@ -198,10 +199,12 @@ src/work_data_hub/cli/
 The transform pipeline provides a composable framework for data transformations.
 
 **Base Classes:**
+
 - `TransformStep` - Abstract base class for all transformation steps
 - `Pipeline` - Orchestrates step execution with metrics collection
 
 **Standard Steps:**
+
 - `MappingStep` - Column renaming/mapping
 - `ReplacementStep` - Value replacement with mapping dict
 - `CalculationStep` - Computed column generation
@@ -211,10 +214,12 @@ The transform pipeline provides a composable framework for data transformations.
 - `GoldProjectionStep` - Column projection + Gold schema validation
 
 **Validation Steps (`validation/schema_steps.py`):**
+
 - `BronzeSchemaValidationStep` - DataFrame-level validation for Bronze schema
 - `GoldSchemaValidationStep` - Gold-layer schema validation
 
 **Usage Example:**
+
 ```python
 from work_data_hub.infrastructure.transforms.base import Pipeline
 from work_data_hub.infrastructure.transforms.standard_steps import (
@@ -235,12 +240,14 @@ result_df = pipeline.execute(input_df, context)
 Centralized cleansing rule management with YAML configuration.
 
 **Key Features:**
+
 - Singleton registry pattern
 - Domain-specific rule configuration
 - Hot-reload support for rule changes
 - Pydantic integration via adapter
 
 **Configuration Example (`cleansing_rules.yml`):**
+
 ```yaml
 domains:
   annuity_performance:
@@ -257,6 +264,7 @@ Batch resolution of company identifiers with 5-layer hierarchical strategy.
 > **Updated Epic 6 (2025-12-08):** Full 5-layer enrichment architecture implemented.
 
 **Resolution Priority (5 Layers):**
+
 1. **Layer 1: YAML Config** - `config/company_mapping.yml` hardcoded mappings
 2. **Layer 2: DB Cache** - `enterprise.enrichment_index` (5 lookup types by priority)
 3. **Layer 3: Existing Column** - Check if source data already has `company_id`
@@ -264,9 +272,11 @@ Batch resolution of company identifiers with 5-layer hierarchical strategy.
 5. **Layer 5: Temp ID** - HMAC-SHA1 based temporary ID (INxxx format)
 
 **Layer 2 Lookup Types (by priority):**
+
 - `plan_code` > `account_name` > `account_number` > `customer_name` > `plan_customer`
 
 **Usage:**
+
 ```python
 from work_data_hub.infrastructure.enrichment.gateway import EnrichmentGateway
 from work_data_hub.infrastructure.enrichment.company_id_resolver import (
@@ -297,6 +307,7 @@ result = resolver.resolve_batch(df, strategy)
 Standardized error handling and reporting for schema validation.
 
 **Key Functions:**
+
 - `handle_validation_errors()` - Process Pandera validation errors
 - `collect_error_details()` - Extract structured error information
 - `ValidationErrorDetail` - Typed error representation
@@ -305,10 +316,10 @@ Standardized error handling and reporting for schema validation.
 
 ### Import Rules (TID251 Enforcement)
 
-| Layer | Can Import | Cannot Import |
-|-------|------------|---------------|
+| Layer             | Can Import               | Cannot Import       |
+| ----------------- | ------------------------ | ------------------- |
 | `infrastructure/` | stdlib, pandas, pydantic | io/, orchestration/ |
-| `domain/` | infrastructure/, stdlib | io/, orchestration/ |
+| `domain/`         | infrastructure/, stdlib  | io/, orchestration/ |
 
 ### Dependency Injection Pattern
 
@@ -327,11 +338,11 @@ def process_annuity_performance(
 
 ## Performance Characteristics
 
-| Metric | Target | Achieved |
-|--------|--------|----------|
-| 1000 rows processing | <3s | ~1.5s |
-| Memory usage (1K rows) | <200MB | ~150MB |
-| Code lines (domain) | <1,100 | ~1,100 |
+| Metric                 | Target | Achieved |
+| ---------------------- | ------ | -------- |
+| 1000 rows processing   | <3s    | ~1.5s    |
+| Memory usage (1K rows) | <200MB | ~150MB   |
+| Code lines (domain)    | <1,100 | ~1,100   |
 
 ## Migration Guide for New Domains (6-File Standard)
 
