@@ -9,7 +9,8 @@ This migration creates the P0 domain tables using the DDL Generator:
 - annuity_plans: mapping.年金计划 (1,159 rows)
 - portfolio_plans: mapping.组合计划 (1,338 rows)
 
-CRITICAL: Uses ddl_generator.generate_create_table_sql() to ensure Single Source of Truth.
+# CRITICAL: Uses ddl_generator.generate_create_table_sql() to ensure
+# Single Source of Truth.
 All tables use idempotent IF NOT EXISTS pattern.
 
 Revision ID: 20251228_000002
@@ -18,8 +19,6 @@ Create Date: 2025-12-28
 """
 
 from __future__ import annotations
-
-import re
 
 import sqlalchemy as sa
 from alembic import op
@@ -49,57 +48,34 @@ def _table_exists(conn, table_name: str, schema: str) -> bool:
 def _execute_domain_ddl(conn, domain_name: str) -> None:
     """Execute DDL for a domain using the Domain Registry.
 
-    This function calls ddl_generator.generate_create_table_sql() and
-    extracts the CREATE TABLE and index creation statements, excluding
-    the DROP TABLE statement (since this is an upgrade migration).
+    This function calls ddl_generator functions to get clean DDL statements.
     """
     # Import here to avoid circular imports
     from work_data_hub.infrastructure.schema import ddl_generator
-    from work_data_hub.infrastructure.schema.registry import get_domain
 
-    schema = get_domain(domain_name)
-    full_sql = ddl_generator.generate_create_table_sql(domain_name)
+    # 1. Create Table (IF NOT EXISTS is handled by the function argument)
+    create_table_sql = ddl_generator.generate_create_table_ddl(
+        domain_name, if_not_exists=True
+    )
+    conn.execute(sa.text(create_table_sql))
 
-    # Extract CREATE TABLE statement (skip DROP TABLE)
-    # Match from CREATE TABLE to the semicolon after audit columns
-    create_table_pattern = r"CREATE TABLE.*?\);"
-    create_table_match = re.search(create_table_pattern, full_sql, re.DOTALL)
-
-    if create_table_match:
-        create_table_sql = create_table_match.group(0)
-
-        # Replace TABLE with IF NOT EXISTS for idempotency
-        create_table_sql = create_table_sql.replace(
-            f"CREATE TABLE {schema.pg_schema}.{schema.pg_table}",
-            f"CREATE TABLE IF NOT EXISTS {schema.pg_schema}.{schema.pg_table}",
-        )
-
-        conn.execute(sa.text(create_table_sql))
-
-    # Extract and execute INDEX statements
-    index_pattern = r"CREATE(?: UNIQUE)? INDEX IF NOT EXISTS.*?;"
-    index_matches = re.findall(index_pattern, full_sql, re.DOTALL)
-
-    for index_sql in index_matches:
+    # 2. Create Indexes
+    index_sqls = ddl_generator.generate_indexes_ddl(domain_name)
+    for index_sql in index_sqls:
         conn.execute(sa.text(index_sql))
 
-    # Extract and execute TRIGGER statements
-    # Match both CREATE FUNCTION and CREATE TRIGGER
-    function_pattern = r"CREATE OR REPLACE FUNCTION.*?\$\$ LANGUAGE plpgsql;"
-    trigger_pattern = r"CREATE TRIGGER.*?EXECUTE FUNCTION.*?\);"
-
-    function_match = re.search(function_pattern, full_sql, re.DOTALL)
-    trigger_match = re.search(trigger_pattern, full_sql, re.DOTALL)
-
-    if function_match:
-        conn.execute(sa.text(function_match.group(0)))
-    if trigger_match:
-        conn.execute(sa.text(trigger_match.group(0)))
+    # 3. Create Triggers (Function + Trigger)
+    trigger_sqls = ddl_generator.generate_triggers_ddl(domain_name)
+    for trigger_sql in trigger_sqls:
+        conn.execute(sa.text(trigger_sql))
 
 
 def upgrade() -> None:
     """Create 4 P0 domain tables using DDL Generator."""
     conn = op.get_bind()
+
+    # Create business schema if not exists (needed for domain tables)
+    conn.execute(sa.text("CREATE SCHEMA IF NOT EXISTS business"))
 
     # === 1. annuity_performance (business.规模明细) ===
     if not _table_exists(conn, "规模明细", "business"):
@@ -145,3 +121,6 @@ def downgrade() -> None:
     ]:
         func_name = f"update_{domain}_updated_at"
         conn.execute(sa.text(f"DROP FUNCTION IF EXISTS {func_name}() CASCADE;"))
+
+    # Drop business schema (only if empty)
+    conn.execute(sa.text("DROP SCHEMA IF EXISTS business CASCADE;"))

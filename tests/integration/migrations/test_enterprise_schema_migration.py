@@ -20,11 +20,8 @@ These tests use the postgres_db_with_migrations fixture which:
 Story 7.1-9 Note: Updated to use postgres_db_with_migrations fixture
 to avoid production database access issues and simplify test setup.
 
-SKIP NOTICE: These tests are skipped pending migration script cleanup.
-The io/schema/migrations/versions/ directory contains redundant/invalid
-migration scripts that will be cleaned up according to the plan in
-docs/specific/migration/. Once the migration cleanup is complete,
-these tests should be reviewed and re-enabled.
+Story 7.2-4 Note: Skip decorators removed, tests aligned with new
+001/002/003 migration chain.
 """
 
 from __future__ import annotations
@@ -33,8 +30,17 @@ import pytest
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Engine
 
+from tests.conftest import (
+    _create_ephemeral_database,
+    _drop_database,
+    _validate_test_database,
+)
+from work_data_hub.io.schema import migration_runner
+
 
 SCHEMA_NAME = "enterprise"
+MIGRATION_REVISION = "20251228_000001"  # 001_initial_infrastructure
+DOWN_REVISION = None  # Base migration has no down_revision
 
 
 def get_engine_from_dsn(dsn: str) -> Engine:
@@ -53,7 +59,29 @@ def migrated_db(postgres_db_with_migrations: str) -> Engine:
     return get_engine_from_dsn(postgres_db_with_migrations)
 
 
-@pytest.mark.skip(reason="Pending migration cleanup - see docs/specific/migration/")
+@pytest.fixture
+def ephemeral_db() -> Engine:
+    """
+    Create a fresh temporary database for migration testing.
+
+    This fixture is for tests that need to run specific migrations
+    (idempotency, reversibility tests) rather than using the
+    fully-migrated postgres_db_with_migrations fixture.
+    """
+    from tests.conftest import _resolve_postgres_dsn
+
+    base_dsn = _resolve_postgres_dsn()
+    temp_dsn, temp_db, admin_dsn = _create_ephemeral_database(base_dsn)
+
+    engine = get_engine_from_dsn(temp_dsn)
+
+    yield engine
+
+    # Cleanup
+    _validate_test_database(temp_dsn)
+    _drop_database(admin_dsn, temp_db)
+
+
 class TestEnterpriseSchemaExists:
     """Test that enterprise schema and tables exist after migration."""
 
@@ -313,8 +341,100 @@ class TestEnterpriseSchemaExists:
             "idx_enrichment_requests_normalized partial unique index should exist"
         )
 
+    def test_年金客户_table_exists(self, migrated_db: Engine):
+        """Verify 年金客户 table exists with correct structure (Story 7.2-2)."""
+        inspector = inspect(migrated_db)
+        tables = inspector.get_table_names(schema="mapping")
+        assert "年金客户" in tables, "年金客户 table should exist in mapping schema"
 
-@pytest.mark.skip(reason="Pending migration cleanup - see docs/specific/migration/")
+        columns = {
+            c["name"] for c in inspector.get_columns("年金客户", schema="mapping")
+        }
+
+        # Expected 27 columns for 年金客户 table
+        expected_columns = {
+            "id",
+            "客户名称",
+            "统一社会信用代码",
+            "机构代码",
+            "企业类型",
+            "联系人",
+            "联系电话",
+            "注册地址",
+            "成立日期",
+            "注册资本",
+            "经营范围",
+            "备注",
+            "created_at",
+            "updated_at",
+            # ... plus 13 more columns for total of 27
+        }
+        assert len(columns) == 27, f"年金客户 expected 27 columns, got {len(columns)}"
+        assert expected_columns.issubset(columns), (
+            f"年金客户 missing columns: {expected_columns - columns}"
+        )
+
+    def test_产品明细_table_exists(self, migrated_db: Engine):
+        """Verify 产品明细 table exists with correct structure and seed data (Story 7.2-2)."""
+        inspector = inspect(migrated_db)
+        tables = inspector.get_table_names(schema="mapping")
+        assert "产品明细" in tables, "产品明细 table should exist in mapping schema"
+
+        columns = {
+            c["name"] for c in inspector.get_columns("产品明细", schema="mapping")
+        }
+
+        # Expected 4 columns for 产品明细 table
+        expected_columns = {
+            "id",
+            "产品代码",
+            "产品名称",
+            "产品线",
+        }
+        assert columns == expected_columns, (
+            f"产品明细 expected columns: {expected_columns}, got: {columns}"
+        )
+
+        # Verify seed data (18 rows inserted in 003_seed_static_data)
+        with migrated_db.connect() as conn:
+            result = conn.execute(text("SELECT COUNT(*) FROM mapping.产品明细"))
+            row_count = result.scalar()
+            assert row_count == 18, (
+                f"产品明细 expected 18 seed data rows, got {row_count}"
+            )
+
+    def test_利润指标_table_exists(self, migrated_db: Engine):
+        """Verify 利润指标 table exists with correct structure and seed data (Story 7.2-2)."""
+        inspector = inspect(migrated_db)
+        tables = inspector.get_table_names(schema="mapping")
+        assert "利润指标" in tables, "利润指标 table should exist in mapping schema"
+
+        columns = {
+            c["name"] for c in inspector.get_columns("利润指标", schema="mapping")
+        }
+
+        # Expected 6 columns for 利润指标 table
+        expected_columns = {
+            "id",
+            "指标代码",
+            "指标名称",
+            "计算方式",
+            "单位",
+            "说明",
+        }
+        assert columns == expected_columns, (
+            f"利润指标 expected columns: {expected_columns}, got: {columns}"
+        )
+
+        # Verify seed data (12 rows inserted in 003_seed_static_data)
+        with migrated_db.connect() as conn:
+            result = conn.execute(text("SELECT COUNT(*) FROM mapping.利润指标"))
+            row_count = result.scalar()
+            assert row_count == 12, (
+                f"利润指标 expected 12 seed data rows, got {row_count}"
+            )
+
+
 class TestMigrationIdempotency:
     """Test that migration operations are idempotent."""
 
@@ -326,33 +446,31 @@ class TestMigrationIdempotency:
             conn.commit()
 
 
-@pytest.mark.skip(reason="Pending migration cleanup - see docs/specific/migration/")
 class TestMigrationReversibility:
     """Test that downgrade removes objects created by the migration."""
 
-    def test_downgrade_removes_objects(self, db_engine: Engine):
+    def test_downgrade_removes_objects(self, ephemeral_db: Engine):
         """AC7/AC10: Upgrade then downgrade should remove tables/indexes."""
-        url = db_engine.url.render_as_string(hide_password=False)
+        url = ephemeral_db.url.render_as_string(hide_password=False)
         migration_runner.upgrade(url, MIGRATION_REVISION)
         _validate_test_database(url)  # Safety check: prevent production DB clearing
         migration_runner.downgrade(url, DOWN_REVISION)
 
-        inspector = inspect(db_engine)
+        inspector = inspect(ephemeral_db)
         tables = set(inspector.get_table_names(schema=SCHEMA_NAME))
 
         # All new tables should be removed
         assert "base_info" not in tables
         assert "business_info" not in tables
         assert "biz_label" not in tables
-        assert "company_mapping" not in tables
         assert "enrichment_requests" not in tables
-        # company_master was already removed, so shouldn't exist either
+        # company_mapping removed in Story 7.1-4 (Zero Legacy)
+        # company_master was already removed in 6.2-P7
 
         # Re-upgrade to ensure reversibility and idempotency
         migration_runner.upgrade(url, MIGRATION_REVISION)
 
 
-@pytest.mark.skip(reason="Pending migration cleanup - see docs/specific/migration/")
 class TestPipelineIndependence:
     """Test that existing pipelines don't depend on new tables (AC11)."""
 
@@ -370,34 +488,25 @@ class TestPipelineIndependence:
         assert CompanyIdResolver is not None
 
 
-@pytest.mark.skip(reason="Pending migration cleanup - see docs/specific/migration/")
 class TestFreshDatabaseMigration:
     """Test migration works on fresh database (critical for 6.2-P7)."""
 
-    def test_fresh_database_upgrade(self, db_engine: Engine):
+    def test_fresh_database_upgrade(self, ephemeral_db: Engine):
         """AC10: Migration should work on fresh database from scratch."""
-        allowed, reason = _allow_destructive_db_reset(db_engine)
-        if not allowed:
-            pytest.skip(reason)
+        url = ephemeral_db.url.render_as_string(hide_password=False)
 
-        url = db_engine.url.render_as_string(hide_password=False)
-
-        # Start from a clean state
-        _validate_test_database(url)  # Safety check: prevent production DB clearing
-        migration_runner.downgrade(url, "base")
-
-        # Upgrade to head
+        # Upgrade to head (ephemeral_db starts empty)
         migration_runner.upgrade(url, "head")
 
         # Verify all expected tables exist
-        inspector = inspect(db_engine)
+        inspector = inspect(ephemeral_db)
         tables = set(inspector.get_table_names(schema=SCHEMA_NAME))
 
+        # Note: company_mapping removed in Story 7.1-4 (Zero Legacy)
         expected_tables = {
             "base_info",
             "business_info",
             "biz_label",
-            "company_mapping",
             "enrichment_requests",
         }
 
@@ -405,7 +514,11 @@ class TestFreshDatabaseMigration:
             f"Missing tables after fresh upgrade: {expected_tables - tables}"
         )
 
-        # company_master should NOT exist
+        # company_master should NOT exist (removed in 6.2-P7)
         assert "company_master" not in tables, (
             "company_master should not exist after fresh upgrade"
+        )
+        # company_mapping should NOT exist (removed in Story 7.1-4)
+        assert "company_mapping" not in tables, (
+            "company_mapping should not exist after fresh upgrade (Zero Legacy)"
         )

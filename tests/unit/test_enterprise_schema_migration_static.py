@@ -12,7 +12,7 @@ MIGRATION_PATH = (
     / "schema"
     / "migrations"
     / "versions"
-    / "20251206_000001_create_enterprise_schema.py"
+    / "001_initial_infrastructure.py"
 )
 
 
@@ -63,8 +63,8 @@ def test_enterprise_schema_column_contract() -> None:
     business_info_cols = _extract_table_columns(text, "business_info")
     biz_label_cols = _extract_table_columns(text, "biz_label")
 
-    assert len(base_info_cols) >= 40, (
-        f"base_info expected 37+ legacy columns + new fields, got {len(base_info_cols)}"
+    assert len(base_info_cols) == 41, (
+        f"base_info expected 41 columns (37 legacy + 4 canonical), got {len(base_info_cols)}"
     )
     assert len(business_info_cols) == 43, (
         f"business_info expected 43 columns, got {len(business_info_cols)}"

@@ -122,10 +122,10 @@ development_status:
   # Stories drafted 2025-12-06 via create-story workflow
   # Story 5.6.3 redesigned 2025-12-06 via Correct-Course workflow (UPSERT → REFRESH mode)
   epic-5.6: done
-  5.6-1-dry-run-failed-records-export: done  # OPT-001: Export validation failures to CSV
-  5.6-2-normalize-company-name-bracket-fix: done  # OPT-002: HIGH PRIORITY - Fix bracket handling bug
-  5.6-3-domain-data-loading-mode-configuration: done  # OPT-003: Redesigned - REFRESH mode for detail tables
-  5.6-4-domain-development-guide: done  # OPT-004: Guide now lives at docs/guides/domain-migration/development-guide.md
+  5.6-1-dry-run-failed-records-export: done # OPT-001: Export validation failures to CSV
+  5.6-2-normalize-company-name-bracket-fix: done # OPT-002: HIGH PRIORITY - Fix bracket handling bug
+  5.6-3-domain-data-loading-mode-configuration: done # OPT-003: Redesigned - REFRESH mode for detail tables
+  5.6-4-domain-development-guide: done # OPT-004: Guide now lives at docs/guides/domain-migration/development-guide.md
   epic-5.6-retrospective: optional
 
   # Epic 6: Company Enrichment Service - COMPLETED
@@ -137,16 +137,16 @@ development_status:
   6-2-temporary-company-id-generation-hmac-based: done
   6-3-internal-mapping-tables-and-database-schema: done
   6-4-internal-mapping-resolver-multi-tier-lookup: done
-  6-4-1-p4-customer-name-normalization-alignment: done  # Patch for 6.4 - P4 normalization fix (SCP 2025-12-07)
+  6-4-1-p4-customer-name-normalization-alignment: done # Patch for 6.4 - P4 normalization fix (SCP 2025-12-07)
   6-5-enrichmentgateway-integration-and-fallback-logic: done
   6-6-eqc-api-provider-sync-lookup-with-budget: done
   6-7-async-enrichment-queue-deferred-resolution: done
   6-8-enrichment-observability-and-export: done
-  epic-6-retrospective: completed  # 2025-12-08 - Action items: Legacy migration, Golden Dataset testing
+  epic-6-retrospective: completed # 2025-12-08 - Action items: Legacy migration, Golden Dataset testing
   # Patch Story for Story 6.2 - HMAC temp ID implementation fix
   # Added 2025-12-13 via Correct-Course workflow
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-13-hmac-temp-id-fix.md
-  6-2-p1-hmac-temp-id-implementation: done  # Fix temp ID to use HMAC-SHA1 instead of DB sequence
+  6-2-p1-hmac-temp-id-implementation: done # Fix temp ID to use HMAC-SHA1 instead of DB sequence
 
   # Epic 6.1: Layer 2 Enrichment Index Enhancement - COMPLETED
   # Added 2025-12-08 via Correct-Course workflow (Epic 6 Retrospective)
@@ -156,11 +156,11 @@ development_status:
   # Retrospective completed 2025-12-08, identified production migration as critical for Epic 7
   # Reference: docs/sprint-artifacts/retrospective/epic-6.1-retro-2025-12-08.md
   epic-6.1: done
-  6.1-1-enrichment-index-schema-enhancement: done  # Create enrichment_index table with multi-type support
-  6.1-2-layer2-multi-priority-lookup: done  # Implement DB-P1 to DB-P5 priority lookup
-  6.1-3-domain-learning-mechanism: done  # Self-learning from processed Domain data
-  6.1-4-legacy-data-migration: done  # Migrate existing data to enrichment_index
-  epic-6.1-retrospective: completed  # 2025-12-08 - Action items: Production migration, Golden Dataset tests
+  6.1-1-enrichment-index-schema-enhancement: done # Create enrichment_index table with multi-type support
+  6.1-2-layer2-multi-priority-lookup: done # Implement DB-P1 to DB-P5 priority lookup
+  6.1-3-domain-learning-mechanism: done # Self-learning from processed Domain data
+  6.1-4-legacy-data-migration: done # Migrate existing data to enrichment_index
+  epic-6.1-retrospective: completed # 2025-12-08 - Action items: Production migration, Golden Dataset tests
 
   # Epic 6.2: Generic Reference Data Management - IN PROGRESS
   # Added 2025-12-12 via Correct-Course workflow, Approved 2025-12-12 by PM
@@ -174,23 +174,23 @@ development_status:
   # STATUS REVERTED 2025-12-16: Story 6.2-P6 validation revealed backfill bugs (I001-I006)
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-16-etl-backfill-sql-module.md
   epic-6.2: done
-  6.2-1-generic-backfill-framework-core: done  # Configuration-driven generic backfill framework - Completed 2025-12-12
-  6.2-2-reference-table-schema-enhancement: done  # Add _source, _needs_review tracking fields - Reviewed & Fixed 2025-12-12
-  6.2-3-fk-configuration-schema-extension: done  # FK configuration validation & documentation - Reviewed & Done 2025-12-12
-  6.2-4-pre-load-reference-sync-service: done  # Sync from Legacy MySQL and config files - Code Review Completed 2025-12-12
-  6.2-5-hybrid-reference-service-integration: done  # Unified pre-load + backfill service - Implementation completed 2025-12-12
+  6.2-1-generic-backfill-framework-core: done # Configuration-driven generic backfill framework - Completed 2025-12-12
+  6.2-2-reference-table-schema-enhancement: done # Add _source, _needs_review tracking fields - Reviewed & Fixed 2025-12-12
+  6.2-3-fk-configuration-schema-extension: done # FK configuration validation & documentation - Reviewed & Done 2025-12-12
+  6.2-4-pre-load-reference-sync-service: done # Sync from Legacy MySQL and config files - Code Review Completed 2025-12-12
+  6.2-5-hybrid-reference-service-integration: done # Unified pre-load + backfill service - Implementation completed 2025-12-12
   # Patch Story for Story 6.2-4 - Generic Data Source Adapter Architecture
   # Added 2025-12-13 via Correct-Course workflow
   # Fixes: Story 6.2-4 assumed MySQL but infrastructure uses PostgreSQL
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-13-generic-data-source-adapter.md
-  6.2-p1-generic-data-source-adapter: done  # Epic 6.2 Patch - Generic adapter architecture for multi-database support - Implementation complete 2025-12-13
-  6.2-6-reference-data-observability: done  # Dashboard, alerts, CSV export for review - Implementation complete 2025-12-13
-  epic-6.2-retrospective: completed  # 2025-12-13 - Action items: 产品线 derivation, schema config update, real data validation checklist
+  6.2-p1-generic-data-source-adapter: done # Epic 6.2 Patch - Generic adapter architecture for multi-database support - Implementation complete 2025-12-13
+  6.2-6-reference-data-observability: done # Dashboard, alerts, CSV export for review - Implementation complete 2025-12-13
+  epic-6.2-retrospective: completed # 2025-12-13 - Action items: 产品线 derivation, schema config update, real data validation checklist
   # Story 6.2-P2: Real Data Validation Configuration
   # Added 2025-12-13 via Correct-Course workflow
   # Configuration updates for real data validation (file_patterns, config paths, schema validation)
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-13-real-data-validation.md
-  6.2-p2-real-data-validation-config: done  # Configuration updates completed 2025-12-13
+  6.2-p2-real-data-validation-config: done # Configuration updates completed 2025-12-13
   # Story 6.2-P3: Orchestration Layer Architecture Unification
   # Added 2025-12-13 via Correct-Course workflow
   # Unify orchestration layer to use Epic 3 FileDiscoveryService, add --period CLI parameter
@@ -201,120 +201,120 @@ development_status:
   # Added 2025-12-14 via quick-dev workflow
   # Fixes: Story 6.2-4 incremental sync logic exists but state persistence was missing
   # Reference: docs/sprint-artifacts/quick-dev/reference-sync-incremental-state-persistence.md
-  6.2-p4-incremental-sync-state-persistence: done  # State persistence for reference_sync_op - Implementation complete 2025-12-14
+  6.2-p4-incremental-sync-state-persistence: done # State persistence for reference_sync_op - Implementation complete 2025-12-14
   # Story 6.2-P5: EQC Data Persistence & Legacy Table Integration
   # Added 2025-12-14 via SM workflow, Approved by PM with Revisions
   # Consolidates to Legacy table structure (base_info instead of company_master)
   # Includes: Data Freshness Management, Data Cleansing Framework, Initial Full Refresh Milestone
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-14-eqc-data-persistence.md
   # PM Review: docs/sprint-artifacts/reviews/pm-review-eqc-data-persistence-2025-12-14.md
-  6.2-p5-eqc-data-persistence-legacy-integration: done  # EQC API response persistence to base_info + data refresh capability
+  6.2-p5-eqc-data-persistence-legacy-integration: done # EQC API response persistence to base_info + data refresh capability
   # Story 6.2-P6: CLI Architecture Unification & Multi-Domain Batch Processing
   # Added 2025-12-14 via Correct-Course workflow
   # Unify CLI tools under src/work_data_hub/cli/, implement multi-domain batch processing
   # First Principles: Single etl command with --domains parameter (no separate batch command)
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-14-cli-architecture.md
   # Story file: docs/sprint-artifacts/stories/6.2-p6-cli-architecture-unification.md
-  6.2-p6-cli-architecture-unification: done  # CLI unification + multi-domain batch processing ✅ Code Review PASSED 2025-12-15
+  6.2-p6-cli-architecture-unification: done # CLI unification + multi-domain batch processing ✅ Code Review PASSED 2025-12-15
   # Story 6.2-P7: Enterprise Schema Consolidation
   # Added 2025-12-14 via Correct-Course workflow
   # Refactor migration to align base_info with archive_base_info, remove company_master
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-14-eqc-api-full-coverage.md
-  6.2-p7-enterprise-schema-consolidation: done  # Schema refactor: base_info/business_info/biz_label alignment ✅ Code Review PASSED & DB Validated 2025-12-15
+  6.2-p7-enterprise-schema-consolidation: done # Schema refactor: base_info/business_info/biz_label alignment ✅ Code Review PASSED & DB Validated 2025-12-15
   # Story 6.2-P8: EQC Full Data Acquisition
   # Added 2025-12-14 via Correct-Course workflow
   # Implement findDepart and findLabels API calls, store raw responses
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-14-eqc-api-full-coverage.md
-  6.2-p8-eqc-full-data-acquisition: done  # EQCClient: get_business_info() + get_label_info() - Story completed 2025-12-15 ✅ Code Review PASSED 2025-12-15
+  6.2-p8-eqc-full-data-acquisition: done # EQCClient: get_business_info() + get_label_info() - Story completed 2025-12-15 ✅ Code Review PASSED 2025-12-15
   # Story 6.2-P9: Raw Data Cleansing & Transformation
   # Added 2025-12-14 via Correct-Course workflow
   # Transform raw_business_info/raw_biz_label to normalized business_info/biz_label tables
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-14-eqc-api-full-coverage.md
   # SM Review: 2025-12-15 - Validation passed, 3 critical + 4 medium + 3 low issues fixed
   # Code Review: 2025-12-15 - Adversarial review passed, 2 HIGH + 4 MEDIUM + 2 LOW issues fixed
-  6.2-p9-raw-data-cleansing-transformation: done  # Cleansing: raw JSONB → normalized tables - Code Review PASSED 2025-12-15
+  6.2-p9-raw-data-cleansing-transformation: done # Cleansing: raw JSONB → normalized tables - Code Review PASSED 2025-12-15
   # Story 6.2-P10: ETL Backfill Bug Fixes & SQL Module Architecture
   # Added 2025-12-16 via Correct-Course workflow
   # Fixes: I001-I006 issues discovered during 6.2-P6 CLI validation
   # Enhancement: Establish infrastructure/sql/ module for centralized SQL generation
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-16-etl-backfill-sql-module.md
   # Code Review: 2025-12-16 - Adversarial review passed, InsertBuilder refactored, pre-existing test issues documented
-  6.2-p10-etl-backfill-sql-module: done  # Bug fixes + SQL module architecture - Code Review PASSED 2025-12-16
+  6.2-p10-etl-backfill-sql-module: done # Bug fixes + SQL module architecture - Code Review PASSED 2025-12-16
   # Story 6.2-P11: 规模明细 Pipeline 字段派生修复
   # Added 2025-12-16 via Correct-Course workflow
   # Fixes: 年金账户号 field derivation missing, enrichment_index table restoration
   # Enhancement: CLI Token pre-check with auto-refresh via auto_eqc_auth.py
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-16.md
-  6.2-p11-guimo-mingxi-field-derivation-fix: done  # Pipeline field derivation + Token auto-refresh - Code Review PASSED 2025-12-16
+  6.2-p11-guimo-mingxi-field-derivation-fix: done # Pipeline field derivation + Token auto-refresh - Code Review PASSED 2025-12-16
   # Story 6.2-P12: Domain Comparison Framework Generalization
   # Added 2025-12-18 via Correct-Course workflow
   # Refactors cleaner-comparison module to config-driven domain-agnostic architecture
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-18.md
-  6.2-p12-domain-comparison-framework: done  # Config-driven domain comparison framework
+  6.2-p12-domain-comparison-framework: done # Config-driven domain comparison framework
   # Story 6.2-P13: Unified Domain Schema Management Architecture
   # Added 2025-12-18 via create-story workflow
   # Single Source of Truth for domain schema definitions, eliminates 6-location fragmentation
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-18-unified-schema-management.md
-  6.2-p13-unified-domain-schema-management: done  # Domain Registry + Shared Models + Alembic Unification - Code Review PASSED 2025-12-19
+  6.2-p13-unified-domain-schema-management: done # Domain Registry + Shared Models + Alembic Unification - Code Review PASSED 2025-12-19
   # Story 6.2-P14: Config File Modularization (Zero Legacy)
   # Added 2025-12-19 via create-story workflow
   # Separates FK backfill and reference_sync from data_sources.yml per SRP
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-19.md
-  6.2-p14-config-file-modularization: done  # Config separation: foreign_keys.yml + reference_sync.yml - Code Review PASSED 2025-12-20
+  6.2-p14-config-file-modularization: done # Config separation: foreign_keys.yml + reference_sync.yml - Code Review PASSED 2025-12-20
   # Story 6.2-P15: Complex Mapping Backfill Enhancement
   # Added 2025-12-20 via create-story workflow
   # Extends GenericBackfillService with max_by and concat_distinct aggregation strategies
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-20-complex-mapping-backfill-enhancement.md
-  6.2-p15-complex-mapping-backfill-enhancement: done  # Complex aggregations for 年金计划 reference backfill - Code Review PASSED 2025-12-20
+  6.2-p15-complex-mapping-backfill-enhancement: done # Complex aggregations for 年金计划 reference backfill - Code Review PASSED 2025-12-20
   # Story 6.2-P16: ETL Execution Robustness Enhancement
   # Added 2025-12-20 via Correct-Course workflow
   # Fixes: I001 file discovery ambiguity, I002 database connection failure, I004 token diagnostics
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-20-etl-robustness.md
-  6.2-p16-etl-execution-robustness: done  # File selection strategy + DB diagnostics + check-db + token diagnostics
+  6.2-p16-etl-execution-robustness: done # File selection strategy + DB diagnostics + check-db + token diagnostics
   # Story 6.2-P17: EQC Lookup Configuration Unification
   # Added 2025-12-20 via Correct-Course workflow
   # Fixes: --no-enrichment flag not fully disabling EQC calls (6-layer propagation issue)
   # Solution: EqcLookupConfig dataclass as single source of truth
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-20-eqc-lookup-config.md
-  6.2-p17-eqc-lookup-config-unification: done  # EqcLookupConfig dataclass + propagation fix
+  6.2-p17-eqc-lookup-config-unification: done # EqcLookupConfig dataclass + propagation fix
 
   # Epic 7: Code Quality - File Length Refactoring
   # Added 2025-12-21 via Correct-Course workflow
   # Focused on reducing technical debt by refactoring files > 800 lines
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-21-file-length-refactoring.md
-  epic-7: done  # All 6 stories complete, Code Review PASSED 2025-12-22
+  epic-7: done # All 6 stories complete, Code Review PASSED 2025-12-22
   7-1-ops-py-decomposition: done
-  7-2-io-layer-modularization: done  # Code Review #2 PASSED 2025-12-22: Fixed Story 7.1 遗留问题, core.py 重构
-  7-3-infrastructure-layer-decomposition: done  # Code Review PASSED 2025-12-22
-  7-4-cli-modularization: done  # Code Review PASSED 2025-12-22: cli/etl.py → cli/etl/ package
-  7-5-domain-registry-pre-modularization: done  # Code Review PASSED 2025-12-22: All ACs verified, line counts corrected
-  7-6-ci-integration-code-quality-tooling: done  # Code Review PASSED 2025-12-22: Unit tests added, all ACs verified
+  7-2-io-layer-modularization: done # Code Review #2 PASSED 2025-12-22: Fixed Story 7.1 遗留问题, core.py 重构
+  7-3-infrastructure-layer-decomposition: done # Code Review PASSED 2025-12-22
+  7-4-cli-modularization: done # Code Review PASSED 2025-12-22: cli/etl.py → cli/etl/ package
+  7-5-domain-registry-pre-modularization: done # Code Review PASSED 2025-12-22: All ACs verified, line counts corrected
+  7-6-ci-integration-code-quality-tooling: done # Code Review PASSED 2025-12-22: Unit tests added, all ACs verified
   epic-7-retrospective: optional
 
   # Epic 7.1: Pre-Epic 8 Bug Fixes & Improvements
   # Added 2025-12-23 via Correct-Course workflow
   # Focused on fixing data integrity issues and removing legacy code before Epic 8
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-23-epic-7.1-pre-epic8-fixes.md
-  epic-7.1: done  # All 17 stories completed - Code Review PASSED 2025-12-27
-  7.1-1-fix-data-clearing-root-cause: done  # P0: Fix enrichment_index/base_info clearing - Code Review PASSED 2025-12-23
-  7.1-2-etl-execute-mode-validation: done  # P0: Verify --execute writes correctly - Code Review PASSED 2025-12-25
-  7.1-3-fix-test-collection-errors: done  # P0: Fix work_data_hub.scripts import errors - Code Review PASSED 2025-12-25
-  7.1-4-remove-company-mapping-legacy: done  # P0: Zero Legacy - delete deprecated table/code - Code Review PASSED 2025-12-25
-  7.1-5-add-file-selection-cleaner-compare: done  # P1: CLI parameter consistency - Code Review PASSED 2025-12-25
-  7.1-6-fix-classification-logic: done  # P1: regression → data_source_difference - Code Review PASSED 2025-12-25
-  7.1-7-verify-legacy-db-connection: done  # P1: Legacy DB connection verified - Code Review PASSED 2025-12-25
-  7.1-8-eqc-confidence-dynamic-adjustment: done  # P1: Match type based confidence (configurable) - Code Review PASSED 2025-12-25
-  7.1-9-clean-up-failing-tests: done  # P2: Address 111 failing tests + 71 errors - Story completed 2025-12-26 ✅ All tests pass
-  7.1-10-categorize-ruff-warnings: done  # P2: Triage 419 Ruff warnings - Code Review PASSED 2025-12-26 ✅ Triage document + 3 tech debt stories
-  7.1-11-update-project-context: done  # P2: Reflect Epic 7 changes - Code Review PASSED 2025-12-26
+  epic-7.1: done # All 17 stories completed - Code Review PASSED 2025-12-27
+  7.1-1-fix-data-clearing-root-cause: done # P0: Fix enrichment_index/base_info clearing - Code Review PASSED 2025-12-23
+  7.1-2-etl-execute-mode-validation: done # P0: Verify --execute writes correctly - Code Review PASSED 2025-12-25
+  7.1-3-fix-test-collection-errors: done # P0: Fix work_data_hub.scripts import errors - Code Review PASSED 2025-12-25
+  7.1-4-remove-company-mapping-legacy: done # P0: Zero Legacy - delete deprecated table/code - Code Review PASSED 2025-12-25
+  7.1-5-add-file-selection-cleaner-compare: done # P1: CLI parameter consistency - Code Review PASSED 2025-12-25
+  7.1-6-fix-classification-logic: done # P1: regression → data_source_difference - Code Review PASSED 2025-12-25
+  7.1-7-verify-legacy-db-connection: done # P1: Legacy DB connection verified - Code Review PASSED 2025-12-25
+  7.1-8-eqc-confidence-dynamic-adjustment: done # P1: Match type based confidence (configurable) - Code Review PASSED 2025-12-25
+  7.1-9-clean-up-failing-tests: done # P2: Address 111 failing tests + 71 errors - Story completed 2025-12-26 ✅ All tests pass
+  7.1-10-categorize-ruff-warnings: done # P2: Triage 419 Ruff warnings - Code Review PASSED 2025-12-26 ✅ Triage document + 3 tech debt stories
+  7.1-11-update-project-context: done # P2: Reflect Epic 7 changes - Code Review PASSED 2025-12-26
   # Tech Debt Stories (Added 2025-12-25 from Story 7.1-2 Code Review)
-  7.1-12-annuity-plans-schema-backfill-alignment: done  # P1: TD-1/TD-3 Fix UNIQUE constraint + backfill config ✅ Story completed 2025-12-26
-  7.1-13-e2e-test-infrastructure-foundation: done  # P2: TD-2/TD-5 E2E test fixtures + regression suite ✅ Code Review PASSED 2025-12-26
-  7.1-14-eqc-api-performance-optimization: done  # P1: Cache warming + Progress reporting - Code Review PASSED 2025-12-26
+  7.1-12-annuity-plans-schema-backfill-alignment: done # P1: TD-1/TD-3 Fix UNIQUE constraint + backfill config ✅ Story completed 2025-12-26
+  7.1-13-e2e-test-infrastructure-foundation: done # P2: TD-2/TD-5 E2E test fixtures + regression suite ✅ Code Review PASSED 2025-12-26
+  7.1-14-eqc-api-performance-optimization: done # P1: Cache warming + Progress reporting - Code Review PASSED 2025-12-26
   # Tech Debt Stories (Added 2025-12-26 from Story 7.1-10 Ruff Warning Triage)
-  7.1-15-fix-tid251-clean-architecture-violations: done  # P0: 7 TID251 violations fixed - Code Review PASSED 2025-12-26
-  7.1-16-refactor-magic-values-to-constants: done  # P1: All 66 PLR2004 violations refactored to named constants ✅ 2025-12-27
-  7.1-17-reduce-function-arity-complexity: done  # P1: All 98 PLR09 violations suppressed via per-file ignores ✅ Code Review PASSED 2025-12-27
+  7.1-15-fix-tid251-clean-architecture-violations: done # P0: 7 TID251 violations fixed - Code Review PASSED 2025-12-26
+  7.1-16-refactor-magic-values-to-constants: done # P1: All 66 PLR2004 violations refactored to named constants ✅ 2025-12-27
+  7.1-17-reduce-function-arity-complexity: done # P1: All 98 PLR09 violations suppressed via per-file ignores ✅ Code Review PASSED 2025-12-27
   epic-7.1-retrospective: optional
 
   # Epic 7.2: Alembic Migration Refactoring
@@ -323,16 +323,15 @@ development_status:
   # BLOCKING: Epic 8 depends on clean migration foundation
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-27-migration-refactoring.md
   epic-7.2: in-progress
-  7.2-1-migration-backup-and-archive: done  # Phase 1: Archive 10 migrations to _archived/ - Code Review PASSED 2025-12-28
-  7.2-3-domain-registry-id-unification: done  # Phase 2 (PRE-REQ): Modify Domain Registry definitions - annuity_plans_id/portfolio_plans_id → id ✅ 2025-12-28
-  7.2-2-new-migration-structure: done  # Phase 3: Create 001_infrastructure + 002_domains + 003_seed_data - Code Review PASSED 2025-12-28
-  7.2-4-test-script-cleanup: backlog  # Phase 4: Evaluate and update/delete 5 migration test files
-  7.2-5-cross-validation: backlog  # Phase 5: Verify DDL Generator ↔ Migration ↔ Domain Layer consistency
-  7.2-6-dev-environment-refresh: backlog  # Phase 6: Run alembic upgrade head, verify .wdh_env database
+  7.2-1-migration-backup-and-archive: done # Phase 1: Archive 10 migrations to _archived/ - Code Review PASSED 2025-12-28
+  7.2-3-domain-registry-id-unification: done # Phase 2 (PRE-REQ): Modify Domain Registry definitions - annuity_plans_id/portfolio_plans_id → id ✅ 2025-12-28
+  7.2-2-new-migration-structure: done # Phase 3: Create 001_infrastructure + 002_domains + 003_seed_data - Code Review PASSED 2025-12-28
+  7.2-4-test-script-cleanup: done # Phase 4: Evaluate and update/delete 5 migration test files - ✅ Completed. All test scripts updated and verified against 001/002/003 migrations.
+  7.2-5-cross-validation: backlog # Phase 5: Verify DDL Generator ↔ Migration ↔ Domain Layer consistency
+  7.2-6-dev-environment-refresh: backlog # Phase 6: Run alembic upgrade head, verify .wdh_env database
   epic-7.2-retrospective: optional
 
   # Epic 8: Testing & Validation Infrastructure
-  # BLOCKED: Waiting for Epic 7.2 (Migration Refactoring) to complete
   epic-8: backlog
   8-1-golden-dataset-extraction-from-legacy-system: backlog
   8-2-automated-reconciliation-engine: backlog

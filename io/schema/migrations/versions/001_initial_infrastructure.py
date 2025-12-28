@@ -6,7 +6,8 @@ Phase 2: Create 001_initial_infrastructure.py with 17 infrastructure tables
 This migration establishes the foundation tables for the WorkDataHub:
 - Public schema: Pipeline execution tracking and data quality metrics
 - Enterprise schema: Company information and enrichment infrastructure
-- Mapping schema: Reference data tables (产品线, 组织架构, 计划层规模, 年金客户, 产品明细, 利润指标)
+- Mapping schema: Reference data tables (产品线, 组织架构, 计划层规模, 年金客户,
+  产品明细, 利润指标)
 - System schema: Incremental sync state tracking
 
 All tables use idempotent IF NOT EXISTS pattern for safe re-execution.
@@ -44,7 +45,7 @@ def _table_exists(conn, table_name: str, schema: str) -> bool:
     return result.scalar()
 
 
-def upgrade() -> None:
+def upgrade() -> None:  # noqa: PLR0912, PLR0915
     """Create infrastructure tables across all schemas."""
     conn = op.get_bind()
 
@@ -245,6 +246,7 @@ def upgrade() -> None:
                 server_default=func.now(),
             ),
             sa.PrimaryKeyConstraint("company_id", name="base_info_pkey1"),
+            schema="enterprise",
             comment="Primary company information table (41 columns)",
         )
         # Indexes
@@ -343,6 +345,7 @@ def upgrade() -> None:
                 ["enterprise.base_info.company_id"],
                 name="fk_business_info_company_id",
             ),
+            schema="enterprise",
             comment="Company business details (43 columns)",
         )
         # Indexes
@@ -382,6 +385,7 @@ def upgrade() -> None:
                 ["enterprise.base_info.company_id"],
                 name="fk_biz_label_company_id",
             ),
+            schema="enterprise",
             comment="Company classification labels (9 columns)",
         )
         # Indexes
@@ -428,6 +432,7 @@ def upgrade() -> None:
                 server_default=func.now(),
             ),
             sa.PrimaryKeyConstraint("id", name="enrichment_requests_pkey"),
+            schema="enterprise",
             comment="Async enrichment queue for company ID resolution",
         )
         # Indexes
@@ -484,6 +489,7 @@ def upgrade() -> None:
             sa.UniqueConstraint(
                 "lookup_key", "lookup_type", name="uq_enrichment_index_key_type"
             ),
+            schema="enterprise",
             comment="Multi-priority company ID resolution cache (Layer 2)",
         )
         # Indexes
@@ -521,7 +527,8 @@ def upgrade() -> None:
             sa.PrimaryKeyConstraint(
                 "typeCode", name="company_types_classification_pkey"
             ),
-            comment="Static reference data: Company types classification (104 rows, structure only)",
+            comment="Static reference data: Company types classification "
+            "(104 rows, structure only)",
         )
 
     # === 9. industrial_classification ===
@@ -539,7 +546,9 @@ def upgrade() -> None:
             sa.Column("小类顺序码", sa.String(), nullable=True),
             sa.Column("说明", sa.String(), nullable=True),
             sa.PrimaryKeyConstraint("类别代码", name="industrial_classification_pkey"),
-            comment="Static reference data: GB/T 4754 industry classification (1,183 rows, structure only)",
+            schema="enterprise",
+            comment="Static reference data: GB/T 4754 industry classification "
+            "(1,183 rows, structure only)",
         )
 
     # === 10. validation_results ===
@@ -567,6 +576,7 @@ def upgrade() -> None:
             sa.Column("unite_code_match", sa.Boolean(), nullable=True),
             sa.Column("error_message", sa.Text(), nullable=True),
             sa.PrimaryKeyConstraint("id", name="validation_results_pkey"),
+            schema="enterprise",
             comment="Validation tracking for EQC API vs Archive data comparison",
         )
 
@@ -588,6 +598,7 @@ def upgrade() -> None:
             sa.Column("NO_产品线", sa.Integer(), nullable=True),
             sa.Column("NO_产品类别", sa.Integer(), nullable=True),
             sa.PrimaryKeyConstraint("产品线代码", name="产品线_pkey"),
+            schema="mapping",
             comment="Reference data: Product lines (12 rows, to be seeded)",
         )
 
@@ -605,6 +616,7 @@ def upgrade() -> None:
             sa.Column("新架构", sa.String(), nullable=True),
             sa.Column("行政域", sa.String(), nullable=True),
             sa.PrimaryKeyConstraint("机构代码", name="组织架构_pkey"),
+            schema="mapping",
             comment="Reference data: Organization structure (38 rows, to be seeded)",
         )
 
@@ -618,6 +630,7 @@ def upgrade() -> None:
             sa.Column("规模大类", sa.String(), nullable=True),
             sa.Column("NO_规模大类", sa.Integer(), nullable=True),
             sa.PrimaryKeyConstraint("规模分类代码", name="计划层规模_pkey"),
+            schema="mapping",
             comment="Reference data: Plan scale levels (7 rows, to be seeded)",
         )
 
@@ -652,6 +665,7 @@ def upgrade() -> None:
             sa.Column("关联计划数", sa.Integer(), nullable=True),
             sa.Column("备注", sa.Text(), nullable=True),
             sa.PrimaryKeyConstraint("company_id", name="年金客户_pkey"),
+            schema="mapping",
             comment="Reference table: Annuity customers (10,997 rows, manual DDL)",
         )
 
@@ -664,7 +678,9 @@ def upgrade() -> None:
             sa.Column("父产品ID", sa.String(), nullable=True),
             sa.Column("NO_产品明细", sa.Integer(), nullable=True),
             sa.PrimaryKeyConstraint("产品ID", name="产品明细_pkey"),
-            comment="Reference data: Product details (18 rows, to be seeded, manual DDL)",
+            schema="mapping",
+            comment="Reference data: Product details (18 rows, to be seeded, "
+            "manual DDL)",
         )
 
     # === 16. 利润指标 (Profit Indicators - seed data, not a domain) ===
@@ -678,7 +694,9 @@ def upgrade() -> None:
             sa.Column("指标大类", sa.String(), nullable=True),
             sa.Column("NO_指标名称", sa.Integer(), nullable=True),
             sa.PrimaryKeyConstraint("指标编码", name="利润指标_pkey"),
-            comment="Reference data: Profit indicators (12 rows, to be seeded, manual DDL)",
+            schema="mapping",
+            comment="Reference data: Profit indicators (12 rows, to be seeded, "
+            "manual DDL)",
         )
 
     # ========================================================================
@@ -714,6 +732,7 @@ def upgrade() -> None:
                 server_default=func.now(),
             ),
             sa.PrimaryKeyConstraint("job_name", "table_name", name="sync_state_pkey"),
+            schema="system",
             comment="Incremental sync state tracking for ETL jobs",
         )
         # Indexes

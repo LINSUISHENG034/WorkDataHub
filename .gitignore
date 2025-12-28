@@ -169,6 +169,7 @@ real_data/
 sample_data/
 monthly/
 scripts/migrations/legacy_db/
+config/seeds/
 
 # Reference and documentation
 reference/

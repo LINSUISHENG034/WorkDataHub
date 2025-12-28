@@ -12,11 +12,8 @@ to avoid production database access issues. Tests that need to run
 specific migrations (idempotency, reversibility) use a custom
 ephemeral_db fixture that creates a fresh temporary database.
 
-SKIP NOTICE: These tests are skipped pending migration script cleanup.
-The io/schema/migrations/versions/ directory contains redundant/invalid
-migration scripts that will be cleaned up according to the plan in
-docs/specific/migration/. Once the migration cleanup is complete,
-these tests should be reviewed and re-enabled.
+Story 7.2-4 Note: Skip decorators removed, tests aligned with new
+001/002/003 migration chain.
 """
 
 from __future__ import annotations
@@ -32,8 +29,10 @@ from work_data_hub.io.schema import migration_runner
 
 
 SCHEMA_NAME = "enterprise"
-MIGRATION_REVISION = "20251208_000001"
-DOWN_REVISION = "20251206_000001"
+MIGRATION_REVISION = (
+    "20251228_000001"  # 001_initial_infrastructure creates enrichment_index
+)
+DOWN_REVISION = None  # Base migration has no down_revision
 
 
 def get_engine_from_dsn(dsn: str) -> Engine:
@@ -86,7 +85,6 @@ def _validate_test_database(dsn: str) -> None:
     _validate_test_database(dsn)
 
 
-@pytest.mark.skip(reason="Pending migration cleanup - see docs/specific/migration/")
 class TestEnrichmentIndexTableExists:
     """Test that enrichment_index table exists after migration (AC1)."""
 
@@ -151,7 +149,6 @@ class TestEnrichmentIndexTableExists:
         assert "INTEGER" in str(columns["hit_count"]["type"]).upper()
 
 
-@pytest.mark.skip(reason="Pending migration cleanup - see docs/specific/migration/")
 class TestEnrichmentIndexConstraints:
     """Test enrichment_index constraints (AC2)."""
 
@@ -213,7 +210,6 @@ class TestEnrichmentIndexConstraints:
         )
 
 
-@pytest.mark.skip(reason="Pending migration cleanup - see docs/specific/migration/")
 class TestEnrichmentIndexIndexes:
     """Test enrichment_index indexes (AC3)."""
 
@@ -256,7 +252,6 @@ class TestEnrichmentIndexIndexes:
         )
 
 
-@pytest.mark.skip(reason="Pending migration cleanup - see docs/specific/migration/")
 class TestMigrationIdempotency:
     """Test that migration operations are idempotent (AC5)."""
 
@@ -276,7 +271,6 @@ class TestMigrationIdempotency:
         # Cleanup (fixture handles teardown)
 
 
-@pytest.mark.skip(reason="Pending migration cleanup - see docs/specific/migration/")
 class TestMigrationReversibility:
     """Test that downgrade removes objects created by the migration."""
 
@@ -322,7 +316,6 @@ class TestMigrationReversibility:
             assert len(indexes) == 0, "All enrichment_index indexes should be removed"
 
 
-@pytest.mark.skip(reason="Pending migration cleanup - see docs/specific/migration/")
 class TestEnrichmentIndexDataOperations:
     """Test basic data operations on enrichment_index table."""
 
