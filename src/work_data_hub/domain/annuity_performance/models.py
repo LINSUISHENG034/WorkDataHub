@@ -216,8 +216,9 @@ class AnnuityPerformanceIn(BaseModel):
         mode="before",
     )
     @classmethod
-    def clean_code_fields(cls, v: Any) -> Optional[str]:
+    def clean_code_field(cls, v: Any) -> Optional[str]:
         # Story 7.3-2: Use shared clean_code_field function
+        # Story 7.3-3: Renamed from clean_code_fields (plural) for consistency
         return clean_code_field(v)
 
     @property
@@ -339,8 +340,9 @@ class AnnuityPerformanceOut(BaseModel):
 
     @field_validator("计划代码", mode="after")
     @classmethod
-    def normalize_codes(cls, v: Optional[str]) -> Optional[str]:
+    def normalize_plan_code(cls, v: Optional[str]) -> Optional[str]:
         # Story 7.3-2: Use shared normalize_plan_code function
+        # Story 7.3-3: Renamed from normalize_codes for consistency
         # Note: annuity_performance allows null for 计划代码
         return normalize_plan_code(v, allow_null=True)
 

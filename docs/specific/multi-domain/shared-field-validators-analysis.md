@@ -34,12 +34,12 @@ This document analyzes the validation logic for four key fields (`计划代码`,
 |--------|---------------------|----------------|------------|
 | **Bronze (In)** | `Optional[str]` | `Optional[str]` | ✅ Same |
 | **Gold (Out)** | `str` (required) | `str` (required) | ✅ Same |
-| **Bronze Validator** | `clean_code_fields` | `clean_code_fields` | ✅ Same logic |
-| **Gold Validator** | `normalize_codes` | `normalize_plan_code` | ⚠️ Same logic, different name |
+| **Bronze Validator** | `clean_code_field` | `clean_code_field` | ✅ Same logic |
+| **Gold Validator** | `normalize_plan_code` | `normalize_plan_code` | ✅ Same (unified in Story 7.3-3) |
 
 #### Bronze Layer Validators (Both Identical)
 
-**Location:** `annuity_performance/models.py:211-226`, `annuity_income/models.py:153-166`
+**Location:** `annuity_performance/models.py:208-222`, `annuity_income/models.py:142-154`
 
 ```python
 # Both domains - AnnuityPerformanceIn / AnnuityIncomeIn
@@ -51,20 +51,20 @@ This document analyzes the validation logic for four key fields (`计划代码`,
     mode="before",
 )
 @classmethod
-def clean_code_fields(cls, v: Any) -> Optional[str]:
+def clean_code_field(cls, v: Any) -> Optional[str]:  # Unified in Story 7.3-3
     if v is None:
         return None
     s_val = str(v).strip()
     return s_val if s_val else None
 ```
 
-#### Gold Layer Validators (Same Logic, Different Names)
+#### Gold Layer Validators (Unified in Story 7.3-3)
 
-**annuity_performance/models.py:355-363:**
+**annuity_performance/models.py:340-346:**
 ```python
 @field_validator("计划代码", mode="after")
 @classmethod
-def normalize_codes(cls, v: Optional[str]) -> Optional[str]:
+def normalize_plan_code(cls, v: Optional[str]) -> Optional[str]:  # Renamed in Story 7.3-3
     if v is None:
         return v
     normalized = v.upper().replace("-", "").replace("_", "").replace(" ", "")
@@ -87,7 +87,7 @@ def normalize_plan_code(cls, v: str) -> str:
 **Issues Identified:**
 | Issue ID | Severity | Description |
 |----------|----------|-------------|
-| PC-001 | Low | Different validator function names (`normalize_codes` vs `normalize_plan_code`) |
+| PC-001 | ~~Low~~ | ~~Different validator function names~~ - **RESOLVED in Story 7.3-3** |
 | PC-002 | Medium | `annuity_performance` has null check, `annuity_income` doesn't (different return types) |
 
 ---
@@ -100,7 +100,7 @@ def normalize_plan_code(cls, v: str) -> str:
 |--------|---------------------|----------------|------------|
 | **Bronze (In)** | `Optional[str]` | `Optional[str]` | ✅ Same |
 | **Gold (Out)** | `Optional[str]` | `Optional[str]` | ✅ Same |
-| **Bronze Validator** | `clean_code_fields` | `clean_code_fields` | ✅ Same |
+| **Bronze Validator** | `clean_code_field` | `clean_code_field` | ✅ Same |
 | **Gold Validator** | None | None | ✅ Same (no gold validation) |
 
 **Status:** ✅ Consistent across domains (no issues)
@@ -290,10 +290,10 @@ Both `annuity_performance` and `annuity_income` define identical helper function
 
 | Validator | Purpose | Duplication |
 |-----------|---------|-------------|
-| `clean_code_fields` | Bronze code field cleanup | ~6 lines × 2 |
+| `clean_code_field` | Bronze code field cleanup | ~6 lines × 2 |
 | `clean_customer_name` | Customer name cleansing | ~12 lines × 2 |
 | `normalize_company_id` | Company ID validation | ~8 lines × 2 |
-| `normalize_codes/plan_code` | Plan code normalization | ~6 lines × 2 |
+| `normalize_plan_code` | Plan code normalization | ~6 lines × 2 |
 | `clean_numeric_fields` | Numeric field cleansing | ~20 lines × 2 |
 | `clean_decimal_fields_output` | Gold decimal cleansing | ~12 lines × 2 |
 
@@ -314,7 +314,7 @@ Both `annuity_performance` and `annuity_income` define identical helper function
 | CN-003 | Medium | 客户名称 | Pydantic | Duplicate `DEFAULT_COMPANY_RULES` constant |
 | CI-002 | Medium | company_id | Pydantic | Duplicate validator logic |
 | DR-003 | Info | company_id | Schema Mismatch | Pydantic `Optional` vs DB `NOT NULL` |
-| PC-001 | Low | 计划代码 | Pydantic | Different validator names for same logic |
+| PC-001 | ~~Low~~ | ~~计划代码~~ | ~~Pydantic~~ | ~~Different validator names for same logic~~ - **RESOLVED in Story 7.3-3** |
 | CN-004 | Low | 客户名称 | Pydantic | Same logic, different null handling |
 | SP-001 | Low | plan_code | Pydantic | Different validation rule (design choice) |
 
@@ -490,12 +490,12 @@ def apply_domain_rules(
 
 def create_code_field_cleaner() -> Callable:
     """Factory for bronze layer code field cleaners."""
-    def clean_code_fields(v: Any) -> Optional[str]:
+    def clean_code_field(v: Any) -> Optional[str]:  # Singular form (Story 7.3-3)
         if v is None:
             return None
         s_val = str(v).strip()
         return s_val if s_val else None
-    return clean_code_fields
+    return clean_code_field
 
 
 def create_customer_name_validator(
@@ -556,7 +556,7 @@ Create abstract base models with shared validators.
 |----------|-----------|-------------|--------|
 | P0 | CN-001, CI-001, DR-001 | Fix critical null handling in annuity_income + Domain Registry | 2 hours |
 | P1 | CN-002, CN-003, CI-002 | Extract shared validators to infrastructure | 4 hours |
-| P2 | PC-001, PC-002, DR-003 | Unify validator names and null handling | 2 hours |
+| P2 | ~~PC-001~~, PC-002, DR-003 | ~~Unify validator names~~ (RESOLVED in Story 7.3-3) and null handling | 2 hours |
 
 ---
 
@@ -601,3 +601,4 @@ Create abstract base models with shared validators.
 |------|--------|--------|
 | 2025-12-28 | Barry (Quick Flow) | Initial comprehensive analysis of four key fields |
 | 2025-12-28 | Barry (Quick Flow) | Added Domain Registry and Alembic migration analysis |
+| 2025-12-29 | Claude (Story 7.3-3) | Updated validator naming to reflect unified conventions |
