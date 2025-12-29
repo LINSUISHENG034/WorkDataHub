@@ -259,7 +259,7 @@ class Settings(BaseSettings):
     )
     enrich_enabled: bool = Field(
         default=True,
-        description="Enable/disable enrichment (AC6). When False, all companies get temp IDs",
+        description="Enable/disable enrichment (AC6). When False, all get temp IDs",
     )
 
     # Pipeline Framework Configuration - shared transformation pipeline settings
@@ -288,7 +288,8 @@ class Settings(BaseSettings):
         description="Requests per second during refresh",
     )
 
-    # Legacy MySQL Configuration - for reference data sync (retained for backward compatibility)
+    # Legacy MySQL Configuration - for reference data sync
+    # (retained for backward compatibility)
     legacy_mysql_host: str = Field(
         default="localhost",
         description="Legacy MySQL database host",
@@ -350,30 +351,62 @@ class Settings(BaseSettings):
     )
 
     def get_database_connection_string(self) -> str:
-        """Get PostgreSQL connection string from .env file only.
+        """Get PostgreSQL connection string from .wdh_env file ONLY.
 
-        Configuration is read exclusively from .env file to ensure single source
-        of truth.
-        Priority order:
-        1) WDH_DATABASE__URI (canonical, from .env)
-        2) WDH_DATABASE_URI (alternate, from .env)
-        3) Construct from individual WDH_DATABASE_* components (from .env)
+        Configuration is read EXCLUSIVELY from the .wdh_env file to ensure
+        single source of truth. System environment variables are IGNORED
+        to prevent accidental overrides from lingering shell variables.
+
+        Priority order (from .wdh_env file only):
+        1) WDH_DATABASE__URI (canonical)
+        2) WDH_DATABASE_URI (alternate)
+        3) Construct from individual WDH_DATABASE_* components
 
         Automatically corrects 'postgres://' scheme to 'postgresql://' for
         SQLAlchemy compatibility.
+
+        Returns:
+            PostgreSQL connection string (DSN)
+
+        Raises:
+            ValueError: If no database configuration found in .wdh_env
         """
-        env_uri = os.getenv("WDH_DATABASE__URI") or os.getenv("WDH_DATABASE_URI")
+        final_uri: str | None = None
 
-        final_uri = None
-        if env_uri:
-            final_uri = env_uri
-        elif self.database_uri:
-            final_uri = self.database_uri
-        else:
-            final_uri = self.database.get_connection_string()
+        # Step 1: Read ONLY from .wdh_env file (ignore system environment variables)
+        if isinstance(SETTINGS_ENV_FILE, Path) and SETTINGS_ENV_FILE.exists():
+            double_underscore_uri: str | None = None
+            single_underscore_uri: str | None = None
 
-        # Fix for SQLAlchemy compatibility (postgres:// is deprecated/unsupported in newer versions)
-        if final_uri and final_uri.startswith("postgres://"):
+            for line in SETTINGS_ENV_FILE.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.startswith("WDH_DATABASE__URI="):
+                    double_underscore_uri = line.split("=", 1)[1].strip()
+                elif line.startswith("WDH_DATABASE_URI="):
+                    single_underscore_uri = line.split("=", 1)[1].strip()
+
+            # Prefer double-underscore (canonical) over single-underscore
+            final_uri = double_underscore_uri or single_underscore_uri
+
+        # Step 2: Fallback to constructed URI from components
+        # (also from .wdh_env via pydantic)
+        if not final_uri:
+            if self.database_uri:
+                final_uri = self.database_uri
+            else:
+                final_uri = self.database.get_connection_string()
+
+        # Step 3: Validate we have a URI
+        if not final_uri:
+            raise ValueError(
+                f"No database configuration found. "
+                f"Please set WDH_DATABASE__URI in {SETTINGS_ENV_FILE}"
+            )
+
+        # Step 4: Fix for SQLAlchemy compatibility
+        if final_uri.startswith("postgres://"):
             final_uri = final_uri.replace("postgres://", "postgresql://", 1)
 
         return final_uri

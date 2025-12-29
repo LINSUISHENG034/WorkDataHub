@@ -50,6 +50,11 @@ register_domain(
             ColumnDef("组合代码", ColumnType.STRING, max_length=255),
             ColumnDef("产品线代码", ColumnType.STRING, max_length=255),
             ColumnDef("机构代码", ColumnType.STRING, max_length=255),
+            # Story 7.3-4: Add missing descriptive fields (matching annuity_performance)
+            ColumnDef("计划名称", ColumnType.STRING, nullable=True, max_length=255),
+            ColumnDef("组合类型", ColumnType.STRING, nullable=True, max_length=255),
+            ColumnDef("组合名称", ColumnType.STRING, nullable=True, max_length=255),
+            ColumnDef("机构名称", ColumnType.STRING, nullable=True, max_length=255),
             ColumnDef(
                 "固费",
                 ColumnType.DECIMAL,

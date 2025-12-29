@@ -59,6 +59,11 @@ class AnnuityIncomeIn(BaseModel):
     业务类型: Optional[str] = Field(None, description="Business type (业务类型)")
     计划类型: Optional[str] = Field(None, description="Plan type (计划类型)")
     组合代码: Optional[str] = Field(None, description="Portfolio code (组合代码)")
+    # Story 7.3-4: Add missing descriptive fields (matching annuity_performance)
+    计划名称: Optional[str] = Field(None, description="Plan name (计划名称)")
+    组合类型: Optional[str] = Field(None, description="Portfolio type (组合类型)")
+    组合名称: Optional[str] = Field(None, description="Portfolio name (组合名称)")
+    机构名称: Optional[str] = Field(None, description="Institution name (机构名称)")
     # Story 5.5.5: Four income fields instead of 收入金额
     固费: Optional[Union[Decimal, float, int, str]] = Field(
         None, description="Fixed fee income (固费)"
@@ -200,6 +205,13 @@ class AnnuityIncomeOut(BaseModel):
     业务类型: Optional[str] = Field(None, max_length=255, description="Business type")
     计划类型: Optional[str] = Field(None, max_length=255, description="Plan type")
     组合代码: Optional[str] = Field(None, max_length=255, description="Portfolio code")
+    # Story 7.3-4: Add missing descriptive fields (matching annuity_performance)
+    计划名称: Optional[str] = Field(None, max_length=255, description="Plan name")
+    组合类型: Optional[str] = Field(None, max_length=255, description="Portfolio type")
+    组合名称: Optional[str] = Field(None, max_length=255, description="Portfolio name")
+    机构名称: Optional[str] = Field(
+        None, max_length=255, description="Institution name"
+    )
     年金账户名: Optional[str] = Field(
         None, max_length=255, description="Pension account name (original 客户名称)"
     )

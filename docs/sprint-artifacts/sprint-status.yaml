@@ -336,10 +336,20 @@ development_status:
   # Fixes field validation inconsistencies between annuity_performance and annuity_income
   # BLOCKING: Epic 8 depends on consistent multi-domain validation
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-29-multi-domain-consistency.md
-  epic-7.3: done # All 3 stories complete, Code Review PASSED 2025-12-29
+  epic-7.3: done # All 5 stories complete, Story 7.3-5 added 2025-12-29 (config priority fix)
   7.3-1-fix-annuity-income-null-handling: done # P0: Fix 客户名称/company_id nullability (CN-001, CI-001, DR-001) - ✅ Code Review PASSED 2025-12-29
   7.3-2-extract-shared-validators: done # P1: Create infrastructure/cleansing/validators.py, eliminate ~120 LOC duplication - ✅ Code Review PASSED 2025-12-29
   7.3-3-unify-validator-naming: done # P2: Standardize validator function names across domains - ✅ Code Review PASSED 2025-12-29
+  # Story 7.3-4: Add missing fields to annuity_income domain
+  # Added 2025-12-29 via Correct-Course workflow
+  # Fixes: 4 missing fields (计划名称, 组合类型, 组合名称, 机构名称) discovered during multi-domain testing
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-29-domain-field-gap.md
+  7.3-4-annuity-income-field-completeness: done # P1: Add 4 missing descriptive fields to annuity_income - ✅ Implemented 2025-12-29
+  # Story 7.3-5: Fix Database URI Configuration Priority
+  # Added 2025-12-29 via Correct-Course workflow
+  # Fixes: System env var overrides .wdh_env file, causing wrong database connection
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-29-config-priority-fix.md
+  7.3-5-fix-database-uri-config-priority: done # P1: Force .wdh_env as single source of truth for DB config - ✅ Implemented 2025-12-29
   epic-7.3-retrospective: optional
 
   # Epic 8: Testing & Validation Infrastructure

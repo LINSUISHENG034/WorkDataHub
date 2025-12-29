@@ -74,6 +74,11 @@ register_domain(
             ColumnDef("产品线代码", ColumnType.STRING, max_length=255),
             ColumnDef("年金账户号", ColumnType.STRING, max_length=50),
             ColumnDef("年金账户名", ColumnType.STRING, max_length=255),
+            # Story 7.3-5: Add 4 missing fields for enterprise hierarchy
+            ColumnDef("子企业号", ColumnType.STRING, max_length=50),
+            ColumnDef("子企业名称", ColumnType.STRING, max_length=255),
+            ColumnDef("集团企业客户号", ColumnType.STRING, max_length=50),
+            ColumnDef("集团企业客户名称", ColumnType.STRING, max_length=255),
             ColumnDef("company_id", ColumnType.STRING, nullable=False, max_length=50),
         ],
         indexes=[
