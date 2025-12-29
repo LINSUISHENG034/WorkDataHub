@@ -19,7 +19,7 @@ register_domain(
         pg_table="规模明细",
         sheet_name="规模明细",
         primary_key="id",
-        delete_scope_key=["月度", "计划代码", "company_id"],
+        delete_scope_key=["月度", "业务类型", "计划类型"],
         composite_key=["月度", "计划代码", "组合代码", "company_id"],
         bronze_required=[
             "月度",

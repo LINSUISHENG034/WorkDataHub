@@ -21,6 +21,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from work_data_hub.infrastructure.settings.data_source_schema import (
     DataSourceConfigV2,
     DataSourcesValidationError,
+    _merge_with_defaults,
 )
 
 logger = structlog.get_logger(__name__)
@@ -539,7 +540,19 @@ class Settings(BaseSettings):
             raise DataSourcesValidationError(error_msg)
 
         # Validate using Pydantic schema
+        # Story 7.3-6: Apply defaults inheritance before validation
         try:
+            # Apply defaults/overrides to each domain before creating config
+            defaults = raw_config.get("defaults") or {}
+            domains_raw = raw_config.get("domains") or {}
+            if defaults and domains_raw:
+                merged_domains = {}
+                for domain_name, domain_config in domains_raw.items():
+                    merged_domains[domain_name] = _merge_with_defaults(
+                        domain_config or {}, defaults
+                    )
+                raw_config["domains"] = merged_domains
+
             self.data_sources = DataSourceConfigV2(**raw_config)
             logger.info(
                 "configuration.validated",

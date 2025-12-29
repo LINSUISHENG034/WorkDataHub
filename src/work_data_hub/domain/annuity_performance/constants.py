@@ -33,6 +33,10 @@ DEFAULT_ALLOWED_GOLD_COLUMNS: Sequence[str] = (
     "产品线代码",
     "年金账户号",
     "年金账户名",
+    "子企业号",
+    "子企业名称",
+    "集团企业客户号",
+    "集团企业客户名称",
     "company_id",
 )
 
@@ -48,10 +52,6 @@ DEFAULT_INSTITUTION_CODE: str = "G00"
 LEGACY_COLUMNS_TO_DELETE: Sequence[str] = (
     "id",
     "备注",
-    "子企业号",
-    "子企业名称",
-    "集团企业客户号",
-    "集团企业客户名称",
 )
 
 COLUMN_ALIAS_MAPPING: Dict[str, str] = {"流失(含待遇支付)": "流失_含待遇支付"}

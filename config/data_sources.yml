@@ -108,12 +108,11 @@ domains:
     # Output destination configuration
     output:
       table: "收入明细"
-      # Primary key for delete_insert mode (matches GOLD_COMPOSITE_KEY in schemas.py)
+      # Refresh key for delete_insert mode (matches delete_scope_key in schema definitions)
       pk:
         - "月度"
-        - "计划代码"
-        - "组合代码"
-        - "company_id"
+        - "业务类型"
+        - "计划类型"
 
   # Future domains (Epic 9) can be added here:
   # Minimal config using defaults inheritance:

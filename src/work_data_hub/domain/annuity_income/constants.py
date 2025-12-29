@@ -21,7 +21,6 @@ COLUMN_ALIAS_MAPPING: Dict[str, str] = {
 LEGACY_COLUMNS_TO_DELETE: Sequence[str] = (
     "id",
     "备注",
-    "机构名称",  # Used for mapping, then dropped
 )
 
 # AnnuityIncome-specific: Default institution code
@@ -46,6 +45,10 @@ DEFAULT_ALLOWED_GOLD_COLUMNS: Sequence[str] = (
     "组合代码",
     "产品线代码",
     "机构代码",
+    "计划名称",
+    "组合类型",
+    "组合名称",
+    "机构名称",
     "固费",
     "浮费",
     "回补",

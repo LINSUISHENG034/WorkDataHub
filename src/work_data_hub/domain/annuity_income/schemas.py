@@ -80,6 +80,11 @@ GoldAnnuityIncomeSchema = pa.DataFrameSchema(
         "组合代码": pa.Column(pa.String, nullable=True, coerce=True),
         "产品线代码": pa.Column(pa.String, nullable=True, coerce=True),
         "机构代码": pa.Column(pa.String, nullable=True, coerce=True),
+        # Story 7.3-4: Add missing descriptive fields (matching annuity_performance)
+        "计划名称": pa.Column(pa.String, nullable=True, coerce=True),
+        "组合类型": pa.Column(pa.String, nullable=True, coerce=True),
+        "组合名称": pa.Column(pa.String, nullable=True, coerce=True),
+        "机构名称": pa.Column(pa.String, nullable=True, coerce=True),
         # Story 5.5.5: Four income fields instead of 收入金额
         "固费": pa.Column(pa.Float, nullable=False, coerce=True),
         "浮费": pa.Column(pa.Float, nullable=False, coerce=True),
