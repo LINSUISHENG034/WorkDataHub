@@ -22,6 +22,12 @@ from work_data_hub.domain.annuity_income.pipeline_builder import (
     build_bronze_to_silver_pipeline,
     load_plan_override_mapping,
     _apply_portfolio_code_defaults,
+    _fill_customer_name,  # Story 7.3-6: Test null preservation
+    _apply_plan_code_defaults,  # Story 7.3-6: Test plan code defaults
+)
+from work_data_hub.domain.annuity_income.constants import (  # Story 7.3-6
+    PLAN_CODE_CORRECTIONS,
+    PLAN_CODE_DEFAULTS,
 )
 from work_data_hub.domain.pipelines.types import PipelineContext
 from work_data_hub.infrastructure.enrichment import EqcLookupConfig
@@ -54,8 +60,8 @@ class TestBuildBronzeToSilverPipeline:
             eqc_config=EqcLookupConfig.disabled()
         )
 
-        # Should have 12 steps as documented in Story 5.5.2 Task 6
-        assert len(pipeline.steps) == 12
+        # Story 7.3-6: Should have 14 steps (12 original + 2 plan code processing steps)
+        assert len(pipeline.steps) == 14
 
         # Verify step names
         step_names = [s.name.lower() for s in pipeline.steps]
@@ -73,7 +79,8 @@ class TestBuildBronzeToSilverPipeline:
         )
 
         assert isinstance(pipeline, Pipeline)
-        assert len(pipeline.steps) == 12
+        # Story 7.3-6: Should have 14 steps (12 original + 2 plan code processing steps)
+        assert len(pipeline.steps) == 14
 
     def test_pipeline_with_plan_override_mapping(self):
         """Pipeline uses plan override mapping for company ID resolution."""
@@ -402,3 +409,108 @@ class TestPipelineExecution:
         assert "机构代码" in result_df.columns
         assert "机构" not in result_df.columns
         assert result_df.loc[0, "机构代码"] == "G01"  # Derived from mapping
+
+
+class TestStory736PipelineAlignment:
+    """Story 7.3-6: Tests for pipeline processing alignment with annuity_performance."""
+
+    def test_fill_customer_name_preserves_nulls(self):
+        """Story 7.3-6 AC3: _fill_customer_name preserves null values (no plan name fallback)."""
+        df = pd.DataFrame(
+            {
+                "客户名称": [None, "公司A", pd.NA],
+                "计划名称": ["计划1", "计划2", "计划3"],  # Should NOT be used
+            }
+        )
+
+        result = _fill_customer_name(df)
+
+        # Verify nulls are preserved, not filled with plan names
+        assert pd.isna(result.iloc[0])
+        assert result.iloc[1] == "公司A"
+        assert pd.isna(result.iloc[2])
+
+    def test_fill_customer_name_handles_missing_column(self):
+        """_fill_customer_name handles missing 客户名称 column gracefully."""
+        df = pd.DataFrame({"计划名称": ["计划1", "计划2"]})
+
+        result = _fill_customer_name(df)
+
+        # Should return NA series when column is missing
+        assert len(result) == 2
+        assert all(pd.isna(result))
+
+    def test_apply_plan_code_defaults_collective(self):
+        """Story 7.3-6 AC10: Applies AN001 for 集合计划."""
+        df = pd.DataFrame(
+            {
+                "计划代码": [None, ""],
+                "计划类型": ["集合计划", "集合计划"],
+            }
+        )
+
+        result = _apply_plan_code_defaults(df)
+
+        assert result.iloc[0] == PLAN_CODE_DEFAULTS["集合计划"]
+        assert result.iloc[1] == PLAN_CODE_DEFAULTS["集合计划"]
+
+    def test_apply_plan_code_defaults_single(self):
+        """Story 7.3-6 AC10: Applies AN002 for 单一计划."""
+        df = pd.DataFrame(
+            {
+                "计划代码": [None, ""],
+                "计划类型": ["单一计划", "单一计划"],
+            }
+        )
+
+        result = _apply_plan_code_defaults(df)
+
+        assert result.iloc[0] == PLAN_CODE_DEFAULTS["单一计划"]
+        assert result.iloc[1] == PLAN_CODE_DEFAULTS["单一计划"]
+
+    def test_apply_plan_code_defaults_preserves_existing(self):
+        """Preserves existing valid plan codes."""
+        df = pd.DataFrame(
+            {
+                "计划代码": ["FP0001", "FP0002"],
+                "计划类型": ["集合计划", "单一计划"],
+            }
+        )
+
+        result = _apply_plan_code_defaults(df)
+
+        assert result.iloc[0] == "FP0001"
+        assert result.iloc[1] == "FP0002"
+
+    def test_plan_code_corrections_applied(self, make_context=make_context):
+        """Story 7.3-6 AC9: Pipeline applies plan code corrections (typo fixes)."""
+        # Use typo values that should be corrected
+        df = pd.DataFrame(
+            {
+                "月度": ["202412"],
+                "计划代码": ["1P0290"],  # Typo: should become P0290
+                "客户名称": ["测试公司"],
+                "业务类型": ["企年投资"],
+                "计划类型": ["单一计划"],
+                "机构名称": ["北京"],
+                "固费": [100.0],
+                "浮费": [50.0],
+                "回补": [25.0],
+                "税": [10.0],
+            }
+        )
+
+        pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=EqcLookupConfig.disabled()
+        )
+        context = make_context("test_corrections")
+        result_df = pipeline.execute(df, context)
+
+        # Verify correction applied: 1P0290 -> P0290
+        assert result_df.loc[0, "计划代码"] == PLAN_CODE_CORRECTIONS["1P0290"]
+
+    def test_constants_match_hardcoded_values(self):
+        """Story 7.3-6 M004 fix: Verify constants match expected values."""
+        # Ensure constants are what we expect (prevents accidental changes)
+        assert PLAN_CODE_CORRECTIONS == {"1P0290": "P0290", "1P0807": "P0807"}
+        assert PLAN_CODE_DEFAULTS == {"集合计划": "AN001", "单一计划": "AN002"}

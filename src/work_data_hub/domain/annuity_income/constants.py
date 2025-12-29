@@ -27,6 +27,12 @@ LEGACY_COLUMNS_TO_DELETE: Sequence[str] = (
 # AnnuityIncome-specific: Default institution code
 DEFAULT_INSTITUTION_CODE: str = "G00"
 
+# Story 7.3-6: Plan code corrections (typo fixes)
+PLAN_CODE_CORRECTIONS: Dict[str, str] = {"1P0290": "P0290", "1P0807": "P0807"}
+
+# Story 7.3-6: Plan code defaults (for empty values based on plan type)
+PLAN_CODE_DEFAULTS: Dict[str, str] = {"集合计划": "AN001", "单一计划": "AN002"}
+
 # AnnuityIncome-specific: Gold layer output columns
 # Story 5.5.5: Four income fields instead of 收入金额
 DEFAULT_ALLOWED_GOLD_COLUMNS: Sequence[str] = (
@@ -61,4 +67,6 @@ __all__: list[str] = [
     "LEGACY_COLUMNS_TO_DELETE",
     "DEFAULT_INSTITUTION_CODE",
     "DEFAULT_ALLOWED_GOLD_COLUMNS",
+    "PLAN_CODE_CORRECTIONS",  # Story 7.3-6
+    "PLAN_CODE_DEFAULTS",  # Story 7.3-6
 ]

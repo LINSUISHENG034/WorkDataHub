@@ -18,6 +18,7 @@ from work_data_hub.infrastructure.transforms import (
     DropStep,
     MappingStep,
     Pipeline,
+    ReplacementStep,  # Story 7.3-6: Import for plan code corrections
     TransformStep,
 )
 from work_data_hub.utils.date_parser import parse_chinese_date
@@ -29,6 +30,7 @@ from .constants import (
     DEFAULT_INSTITUTION_CODE,
     DEFAULT_PORTFOLIO_CODE_MAPPING,
     LEGACY_COLUMNS_TO_DELETE,
+    PLAN_CODE_CORRECTIONS,  # Story 7.3-6
     PORTFOLIO_QTAN003_BUSINESS_TYPES,
 )
 
@@ -39,16 +41,36 @@ logger = structlog.get_logger(__name__)
 
 
 def _fill_customer_name(df: pd.DataFrame) -> pd.Series:
-    """Fallback customer name to 计划名称, then UNKNOWN."""
+    """Keep customer name as-is, allow null (consistent with annuity_performance).
+
+    Story 7.3-6: Removed plan name fallback to match annuity_performance behavior.
+    """
     if "客户名称" in df.columns:
-        base = df["客户名称"]
+        return df["客户名称"]  # Keep as-is, including nulls
     else:
-        base = pd.Series([pd.NA] * len(df), index=df.index)
+        return pd.Series([pd.NA] * len(df), index=df.index)
 
-    plan_names = df.get("计划名称", pd.Series([pd.NA] * len(df), index=df.index))
-    base = base.combine_first(plan_names)
 
-    return base.fillna("UNKNOWN")
+def _apply_plan_code_defaults(df: pd.DataFrame) -> pd.Series:
+    """
+    Apply default plan codes based on plan type (consistent with annuity_performance).
+
+    Story 7.3-6: Copied from annuity_performance/domain/pipeline_builder.py
+    """
+    if "计划代码" not in df.columns:
+        return pd.Series([None] * len(df), index=df.index)
+
+    result = df["计划代码"].copy()
+
+    if "计划类型" in df.columns:
+        empty_mask = result.isna() | (result == "")
+        collective_mask = empty_mask & (df["计划类型"] == "集合计划")
+        single_mask = empty_mask & (df["计划类型"] == "单一计划")
+
+        result = result.mask(collective_mask, "AN001")
+        result = result.mask(single_mask, "AN002")
+
+    return result
 
 
 def _apply_portfolio_code_defaults(df: pd.DataFrame) -> pd.Series:
@@ -94,20 +116,17 @@ class CompanyIdResolutionStep(TransformStep):
 
     def __init__(
         self,
-        eqc_config: EqcLookupConfig = None,  # Story 6.2-P17: Accept EqcLookupConfig
+        eqc_config: EqcLookupConfig,  # Story 7.3-6: Make REQUIRED (not optional)
         enrichment_service: Optional["CompanyEnrichmentService"] = None,
         plan_override_mapping: Optional[Dict[str, str]] = None,
+        mapping_repository=None,  # Story 7.3-6: Add mapping_repository parameter
         generate_temp_ids: bool = True,
         sync_lookup_budget: int = 0,
     ) -> None:
         """Initialize CompanyIdResolutionStep.
 
-        Story 6.2-P17: eqc_config parameter (defaults to disabled for backward compat).
+        Story 7.3-6: eqc_config is REQUIRED, mapping_repository added.
         """
-        # Default to disabled if not provided
-        if eqc_config is None:
-            eqc_config = EqcLookupConfig.disabled()
-
         yaml_overrides = None
         if plan_override_mapping is not None:
             yaml_overrides = {
@@ -118,9 +137,10 @@ class CompanyIdResolutionStep(TransformStep):
                 "account_name": {},
             }
         self._resolver = CompanyIdResolver(
-            eqc_config=eqc_config,  # Story 6.2-P17
+            eqc_config=eqc_config,
             enrichment_service=enrichment_service,
             yaml_overrides=yaml_overrides,
+            mapping_repository=mapping_repository,  # Story 7.3-6
         )
         self._generate_temp_ids = generate_temp_ids
         self._sync_lookup_budget = max(sync_lookup_budget, 0)
@@ -159,9 +179,10 @@ class CompanyIdResolutionStep(TransformStep):
 
 
 def build_bronze_to_silver_pipeline(
-    eqc_config: EqcLookupConfig = None,  # Story 6.2-P17: Accept EqcLookupConfig
+    eqc_config: EqcLookupConfig,  # Story 7.3-6: Make REQUIRED (not optional)
     enrichment_service: Optional["CompanyEnrichmentService"] = None,
     plan_override_mapping: Optional[Dict[str, str]] = None,
+    mapping_repository=None,  # Story 7.3-6: Add mapping_repository parameter
     generate_temp_ids: bool = True,
     sync_lookup_budget: int = 0,
 ) -> Pipeline:
@@ -196,6 +217,10 @@ def build_bronze_to_silver_pipeline(
                 .str.upper(),
             }
         ),
+        # Step 2.5: Story 7.3-6 - Apply plan code corrections (typo fixes)
+        ReplacementStep({"计划代码": PLAN_CODE_CORRECTIONS}),
+        # Step 2.6: Story 7.3-6 - Apply plan code defaults (based on plan type)
+        CalculationStep({"计划代码": _apply_plan_code_defaults}),
         # Step 3: Institution code mapping (机构名称 → 机构代码)
         CalculationStep(
             {
@@ -265,11 +290,12 @@ def build_bronze_to_silver_pipeline(
         ),
         # Step 10: Data cleansing via CleansingRegistry (normalizes 客户名称)
         CleansingStep(domain="annuity_income"),
-        # Step 11: Company ID resolution (Story 6.2-P17: Pass eqc_config)
+        # Step 11: Company ID resolution (Story 7.3-6)
         CompanyIdResolutionStep(
             eqc_config=eqc_config,
             enrichment_service=enrichment_service,
             plan_override_mapping=plan_override_mapping,
+            mapping_repository=mapping_repository,  # Story 7.3-6
             generate_temp_ids=generate_temp_ids,
             sync_lookup_budget=sync_lookup_budget,
         ),

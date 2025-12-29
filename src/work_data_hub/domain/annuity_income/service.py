@@ -9,8 +9,13 @@ import pandas as pd
 import structlog
 
 from work_data_hub.config import get_domain_output_config
+from work_data_hub.config.settings import get_settings  # Story 7.3-6: For DB connection
 from work_data_hub.domain.pipelines.types import DomainPipelineResult, PipelineContext
 from work_data_hub.infrastructure.constants import DROP_RATE_THRESHOLD
+from work_data_hub.infrastructure.enrichment import EqcLookupConfig  # Story 7.3-6
+from work_data_hub.infrastructure.enrichment.mapping_repository import (  # Story 7.3-6
+    CompanyMappingRepository,
+)
 from work_data_hub.infrastructure.validation import export_error_csv
 
 from .helpers import (
@@ -229,11 +234,16 @@ def process_with_enrichment(
     3. Converts results to validated Pydantic models
     4. Exports unknown company names for manual review
 
+    Story 7.3-6: Added CompanyMappingRepository initialization for DB cache lookup,
+    and EqcLookupConfig derivation from sync_lookup_budget. Connection cleanup is
+    guaranteed via try/finally block.
+
     Parameters:
         rows: List of dictionaries from bronze layer (Excel rows)
         data_source: Source file identifier for logging/tracking
         enrichment_service: Optional external enrichment service
-        sync_lookup_budget: Max synchronous lookups for enrichment
+        sync_lookup_budget: Max synchronous lookups for enrichment. Used to derive
+            EqcLookupConfig which is the single source of truth (SSOT) for EQC behavior.
         export_unknown_names: Whether to export unresolved names to CSV
 
     Returns:
@@ -250,84 +260,128 @@ def process_with_enrichment(
             processing_time_ms=0,
         )
 
+    # Story 7.3-6: Initialize mapping_repository for database cache lookup
+    mapping_repository: Optional[CompanyMappingRepository] = None
+    repo_connection = None
+    try:
+        from sqlalchemy import create_engine
+
+        settings = get_settings()
+        engine = create_engine(settings.get_database_connection_string())
+        repo_connection = engine.connect()
+        mapping_repository = CompanyMappingRepository(repo_connection)
+    except Exception as e:
+        logger.bind(domain="annuity_income", step="mapping_repository").warning(
+            "Failed to init CompanyMappingRepository; proceeding without cache",
+            error=str(e),
+        )
+        mapping_repository = None
+        repo_connection = None
+
+    # Story 7.3-6: Derive eqc_config if not provided (Story 6.2-P17 pattern)
+    eqc_config = EqcLookupConfig(
+        enabled=sync_lookup_budget > 0,
+        sync_budget=max(sync_lookup_budget, 0),
+        auto_create_provider=True,
+        export_unknown_names=export_unknown_names,
+        auto_refresh_token=True,
+    )
+
     plan_overrides = load_plan_override_mapping()
-    pipeline = build_bronze_to_silver_pipeline(
-        enrichment_service=enrichment_service,
-        plan_override_mapping=plan_overrides,
-        sync_lookup_budget=sync_lookup_budget,
-    )
-    context = PipelineContext(
-        pipeline_name="bronze_to_silver",
-        execution_id=f"annuity_income-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
-        timestamp=datetime.now(timezone.utc),
-        config={"domain": "annuity_income", "data_source": data_source},
-        domain="annuity_income",
-        run_id=f"annuity_income-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
-        extra={"data_source": data_source},
-    )
-    start_time = time.perf_counter()
-    input_df = pd.DataFrame(rows)
-    result_df = pipeline.execute(input_df.copy(), context)
 
-    # Story 5.5.5: Enforce Gold schema validation (checks uniqueness of composite key)
-    # This catches issues that Pydantic row-by-row validation misses
-    result_df, _ = validate_gold_dataframe(result_df)
+    # Story 7.3-6: Wrap pipeline execution in try/finally for connection cleanup
+    try:
+        pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=eqc_config,  # Story 7.3-6: CRITICAL - Pass eqc_config
+            enrichment_service=enrichment_service,
+            plan_override_mapping=plan_overrides,
+            mapping_repository=mapping_repository,  # Story 7.3-6
+        )
+        context = PipelineContext(
+            pipeline_name="bronze_to_silver",
+            execution_id=f"annuity_income-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+            timestamp=datetime.now(timezone.utc),
+            config={"domain": "annuity_income", "data_source": data_source},
+            domain="annuity_income",
+            run_id=f"annuity_income-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+            extra={"data_source": data_source},
+        )
+        start_time = time.perf_counter()
+        input_df = pd.DataFrame(rows)
+        result_df = pipeline.execute(input_df.copy(), context)
 
-    records, unknown_names = convert_dataframe_to_models(result_df)
-    dropped_count = len(rows) - len(records)
-    if dropped_count > 0:
-        drop_rate = dropped_count / len(rows) if rows else 0
-        if drop_rate > DROP_RATE_THRESHOLD:
-            logger.bind(
-                domain="annuity_income", step="process_with_enrichment"
-            ).warning(
-                "High row drop rate during processing",
-                dropped=dropped_count,
-                total=len(rows),
-                rate=drop_rate,
-            )
-        # Export failed rows to CSV for debugging (Story 5.6.1)
-        success_pairs = {(r.计划代码, getattr(r, "组合代码", None)) for r in records}
-        if {"计划代码", "组合代码"}.issubset(input_df.columns):
-            key_series = pd.Series(
-                list(zip(input_df["计划代码"], input_df["组合代码"]))
-            )
-            failed_df = input_df[~key_series.isin(success_pairs)]
-        elif "计划代码" in input_df.columns:
-            success_codes = {pair[0] for pair in success_pairs}
-            failed_df = input_df[~input_df["计划代码"].isin(success_codes)]
-        else:
-            failed_df = input_df
-        if not failed_df.empty:
-            error_csv_path = export_error_csv(
-                failed_df,
-                filename_prefix=f"failed_records_{Path(data_source).stem}",
-                output_dir=Path("logs"),
-            )
-            logger.bind(domain="annuity_income", step="process_with_enrichment").info(
-                "Exported failed records to CSV",
-                csv_path=str(error_csv_path),
-                count=len(failed_df),
-            )
-    csv_path = export_unknown_names_csv(
-        unknown_names,
-        data_source,
-        export_enabled=export_unknown_names,
-    )
-    processing_time_ms = int((time.perf_counter() - start_time) * 1000)
-    enrichment_stats = summarize_enrichment(
-        total_rows=len(rows),
-        temp_ids=len(unknown_names),
-        processing_time_ms=processing_time_ms,
-    )
+        # Story 5.5.5: Enforce Gold schema validation (composite key check)
+        # This catches issues that Pydantic row-by-row validation misses
+        result_df, _ = validate_gold_dataframe(result_df)
 
-    return ProcessingResultWithEnrichment(
-        records=records,
-        enrichment_stats=enrichment_stats,
-        unknown_names_csv=csv_path,
-        data_source=data_source,
-        processing_time_ms=processing_time_ms,
-    )
+        records, unknown_names = convert_dataframe_to_models(result_df)
+
+        dropped_count = len(rows) - len(records)
+        if dropped_count > 0:
+            drop_rate = dropped_count / len(rows) if rows else 0
+            if drop_rate > DROP_RATE_THRESHOLD:
+                logger.bind(
+                    domain="annuity_income", step="process_with_enrichment"
+                ).warning(
+                    "High row drop rate during processing",
+                    dropped=dropped_count,
+                    total=len(rows),
+                    rate=drop_rate,
+                )
+            # Export failed rows to CSV for debugging (Story 5.6.1)
+            success_pairs = {
+                (r.计划代码, getattr(r, "组合代码", None)) for r in records
+            }
+            if {"计划代码", "组合代码"}.issubset(input_df.columns):
+                key_series = pd.Series(
+                    list(zip(input_df["计划代码"], input_df["组合代码"]))
+                )
+                failed_df = input_df[~key_series.isin(success_pairs)]
+            elif "计划代码" in input_df.columns:
+                success_codes = {pair[0] for pair in success_pairs}
+                failed_df = input_df[~input_df["计划代码"].isin(success_codes)]
+            else:
+                failed_df = input_df
+            if not failed_df.empty:
+                error_csv_path = export_error_csv(
+                    failed_df,
+                    filename_prefix=f"failed_records_{Path(data_source).stem}",
+                    output_dir=Path("logs"),
+                )
+                logger.bind(
+                    domain="annuity_income", step="process_with_enrichment"
+                ).info(
+                    "Exported failed records to CSV",
+                    csv_path=str(error_csv_path),
+                    count=len(failed_df),
+                )
+        csv_path = export_unknown_names_csv(
+            unknown_names,
+            data_source,
+            export_enabled=export_unknown_names,
+        )
+        processing_time_ms = int((time.perf_counter() - start_time) * 1000)
+        enrichment_stats = summarize_enrichment(
+            total_rows=len(rows),
+            temp_ids=len(unknown_names),
+            processing_time_ms=processing_time_ms,
+        )
+
+        return ProcessingResultWithEnrichment(
+            records=records,
+            enrichment_stats=enrichment_stats,
+            unknown_names_csv=csv_path,
+            data_source=data_source,
+            processing_time_ms=processing_time_ms,
+        )
+    finally:
+        # Story 7.3-6: ALWAYS cleanup connection
+        if repo_connection is not None:
+            try:
+                repo_connection.commit()
+            except Exception:
+                repo_connection.rollback()
+            repo_connection.close()
 
 
 def _records_to_dataframe(records: List[AnnuityIncomeOut]) -> pd.DataFrame:
