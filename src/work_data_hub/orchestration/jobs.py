@@ -8,6 +8,7 @@ respecting the Clean Architecture flow: domain ← io ← orchestration.
 
 import argparse
 import re
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 import yaml
@@ -37,6 +38,25 @@ from .ops import (
     validate_op,
 )
 from .reference_sync_jobs import reference_sync_job
+
+# ============================================================================
+# Story 7.4-1: Job Registry Pattern
+# ============================================================================
+
+
+@dataclass(frozen=True)
+class JobEntry:
+    """Registry entry for a domain's Dagster job(s).
+
+    Attributes:
+        job: The primary Dagster JobDefinition (required, must not be None)
+        multi_file_job: Optional job for max_files > 1 scenarios
+        supports_backfill: Whether domain has FK backfill configured in foreign_keys.yml
+    """
+
+    job: Any  # Dagster JobDefinition - MUST be a valid job, never None
+    multi_file_job: Optional[Any] = None  # For max_files > 1 scenarios
+    supports_backfill: bool = False  # Whether domain has FK backfill configured
 
 
 @job
@@ -248,6 +268,26 @@ def sample_pipeline_job() -> Any:
     raw_data = read_csv_op()
     validated = validate_op(raw_data)
     load_to_db_op(validated)
+
+
+# JOB_REGISTRY: Single source of truth for domain → job mapping
+# Story 7.4-1: Replaces if/elif dispatch chain with dictionary lookup
+# NOTE: Must be defined AFTER all job functions to avoid NameError
+JOB_REGISTRY: Dict[str, JobEntry] = {
+    "annuity_performance": JobEntry(
+        job=annuity_performance_job,
+        supports_backfill=True,
+    ),
+    "annuity_income": JobEntry(
+        job=annuity_income_job,
+        supports_backfill=True,  # Story 7.3-7 added backfill support
+    ),
+    "sandbox_trustee_performance": JobEntry(
+        job=sandbox_trustee_performance_job,
+        multi_file_job=sandbox_trustee_performance_multi_file_job,
+        supports_backfill=True,
+    ),
+}
 
 
 def _log_pipeline_metrics(logger: Any, result: DomainPipelineResult) -> None:

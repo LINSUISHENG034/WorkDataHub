@@ -16,9 +16,97 @@ import yaml
 
 from work_data_hub.cli.etl import build_run_config, main
 from work_data_hub.orchestration.jobs import (
+    JOB_REGISTRY,
+    JobEntry,
+    annuity_income_job,
+    annuity_performance_job,
     sandbox_trustee_performance_job,
     sandbox_trustee_performance_multi_file_job,
 )
+
+
+class TestJobEntry:
+    """Test JobEntry dataclass (Story 7.4-1)."""
+
+    def test_job_entry_creation(self):
+        """Test JobEntry dataclass can be instantiated."""
+        entry = JobEntry(
+            job=annuity_performance_job,
+            supports_backfill=True,
+        )
+        assert entry.job == annuity_performance_job
+        assert entry.multi_file_job is None
+        assert entry.supports_backfill is True
+
+    def test_job_entry_with_multi_file(self):
+        """Test JobEntry with multi_file_job specified."""
+        entry = JobEntry(
+            job=sandbox_trustee_performance_job,
+            multi_file_job=sandbox_trustee_performance_multi_file_job,
+            supports_backfill=True,
+        )
+        assert entry.job == sandbox_trustee_performance_job
+        assert entry.multi_file_job == sandbox_trustee_performance_multi_file_job
+        assert entry.supports_backfill is True
+
+    def test_job_entry_defaults(self):
+        """Test JobEntry default values."""
+        entry = JobEntry(job=annuity_income_job)
+        assert entry.job == annuity_income_job
+        assert entry.multi_file_job is None
+        assert entry.supports_backfill is False
+
+    def test_job_entry_frozen(self):
+        """Test JobEntry is frozen (immutable)."""
+        from dataclasses import FrozenInstanceError
+
+        entry = JobEntry(job=annuity_performance_job)
+        with pytest.raises(FrozenInstanceError):
+            entry.job = annuity_income_job
+
+
+class TestJobRegistry:
+    """Test JOB_REGISTRY dictionary (Story 7.4-1)."""
+
+    def test_job_registry_exists(self):
+        """Test JOB_REGISTRY is defined and is a dict."""
+        assert isinstance(JOB_REGISTRY, dict)
+        assert len(JOB_REGISTRY) > 0
+
+    def test_job_registry_has_all_domains(self):
+        """Test JOB_REGISTRY contains all expected domains."""
+        expected_domains = {
+            "annuity_performance",
+            "annuity_income",
+            "sandbox_trustee_performance",
+        }
+        assert set(JOB_REGISTRY.keys()) == expected_domains
+
+    def test_job_registry_entries_are_job_entry(self):
+        """Test all JOB_REGISTRY values are JobEntry instances."""
+        for entry in JOB_REGISTRY.values():
+            assert isinstance(entry, JobEntry)
+
+    def test_annuity_performance_registry_entry(self):
+        """Test annuity_performance registry entry configuration."""
+        entry = JOB_REGISTRY["annuity_performance"]
+        assert entry.job == annuity_performance_job
+        assert entry.multi_file_job is None
+        assert entry.supports_backfill is True
+
+    def test_annuity_income_registry_entry(self):
+        """Test annuity_income registry entry configuration."""
+        entry = JOB_REGISTRY["annuity_income"]
+        assert entry.job == annuity_income_job
+        assert entry.multi_file_job is None
+        assert entry.supports_backfill is True  # Story 7.3-7 added backfill support
+
+    def test_sandbox_trustee_performance_registry_entry(self):
+        """Test sandbox_trustee_performance registry entry configuration."""
+        entry = JOB_REGISTRY["sandbox_trustee_performance"]
+        assert entry.job == sandbox_trustee_performance_job
+        assert entry.multi_file_job == sandbox_trustee_performance_multi_file_job
+        assert entry.supports_backfill is True
 
 
 class TestSandboxTrusteePerformanceJob:
@@ -112,7 +200,8 @@ class TestSandboxTrusteePerformanceJob:
         # This verifies the job wiring is correct
         job_def = sandbox_trustee_performance_job
         assert job_def.name == "sandbox_trustee_performance_job"
-        assert len(job_def.nodes) == 4  # Four ops
+        # Epic 6.2/7.3: Job definition has 6 ops (discover, read, process, backfill, gate, load)
+        assert len(job_def.nodes) == 6  # Updated to reflect current implementation
 
 
 class TestBuildRunConfig:

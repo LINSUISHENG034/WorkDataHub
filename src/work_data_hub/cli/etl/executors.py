@@ -197,39 +197,29 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:  # noq
 
     domain_key = domain
 
-    if domain_key == "annuity_performance":
-        from work_data_hub.orchestration.jobs import annuity_performance_job
+    # Story 7.4-1: Use JOB_REGISTRY instead of if/elif chain
+    # Handle special non-standard domains first
+    if domain_key in ("company_lookup_queue", "reference_sync"):
+        if domain_key == "company_lookup_queue":
+            return _execute_queue_processing_job(args)
+        else:  # reference_sync
+            return _execute_reference_sync_job(args)
 
-        selected_job = annuity_performance_job
-        if max_files > 1:
+    # Lookup job in registry
+    from work_data_hub.orchestration.jobs import JOB_REGISTRY
+
+    job_entry = JOB_REGISTRY.get(domain_key)
+    if not job_entry:
+        supported = ", ".join(sorted(JOB_REGISTRY.keys()))
+        raise ValueError(f"Unsupported domain: {domain}. Supported: {supported}")
+
+    # Select job based on max_files parameter
+    selected_job = job_entry.job
+    if max_files > 1:
+        if job_entry.multi_file_job:
+            selected_job = job_entry.multi_file_job
+        else:
             print(f"Warning: max_files > 1 not yet supported for {domain}, using 1")
-    elif domain_key == "annuity_income":
-        from work_data_hub.orchestration.jobs import annuity_income_job
-
-        selected_job = annuity_income_job
-        if max_files > 1:
-            print(f"Warning: max_files > 1 not yet supported for {domain}, using 1")
-    elif domain_key == "sandbox_trustee_performance":
-        from work_data_hub.orchestration.jobs import (
-            sandbox_trustee_performance_job,
-            sandbox_trustee_performance_multi_file_job,
-        )
-
-        selected_job = (
-            sandbox_trustee_performance_multi_file_job
-            if max_files > 1
-            else sandbox_trustee_performance_job
-        )
-    elif domain_key == "company_lookup_queue":
-        return _execute_queue_processing_job(args)
-    elif domain_key == "reference_sync":
-        return _execute_reference_sync_job(args)
-    else:
-        raise ValueError(
-            f"Unsupported domain: {domain}. "
-            f"Supported: sandbox_trustee_performance, annuity_performance, annuity_income, "
-            f"company_lookup_queue, reference_sync"
-        )
 
     # Execute job with appropriate settings
     try:
@@ -293,7 +283,8 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:  # noq
                 for event in result.all_node_events:
                     if event.is_failure:
                         print(
-                            f"   Error in {event.node_name}: {event.event_specific_data}"
+                            f"   Error in {event.node_name}: "
+                            f"{event.event_specific_data}"
                         )
 
         return 0 if result.success else 1

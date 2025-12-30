@@ -364,8 +364,21 @@ development_status:
   7.3-7-fk-backfill-configuration-completion: done # P1: Add missing FK configs (BF-001, BF-002) - Code Review PASSED 2025-12-30
   epic-7.3-retrospective: optional
 
+  # Epic 7.4: Domain Registry Architecture
+  # Added 2025-12-30 via Correct-Course workflow
+  # Refactors hardcoded if/elif dispatch to configuration-driven registry pattern
+  # BLOCKING: Epic 8 depends on clean architecture foundation
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-30-domain-registry-architecture.md
+  epic-7.4: in-progress
+  7.4-1-job-registry-pattern: done # P0: Replace if/elif dispatch with JOB_REGISTRY dict - Code Review PASSED 2025-12-30
+  7.4-2-config-driven-backfill-list: backlog # P1: Move backfill domains to data_sources.yml
+  7.4-3-generic-process-domain-op: backlog # P1: Factory for domain-specific ops
+  7.4-4-domain-autodiscovery-validation: backlog # P2: Startup validation for config completeness
+  7.4-5-documentation-update: backlog # P2: Update architecture docs, mark checklist resolved
+  epic-7.4-retrospective: optional
+
   # Epic 8: Testing & Validation Infrastructure
-  # BLOCKED BY: Epic 7.3 Story 7.3-1 (P0 critical fix)
+  # BLOCKED BY: Epic 7.4 (Domain Registry Architecture)
   epic-8: backlog
   8-1-golden-dataset-extraction-from-legacy-system: backlog
   8-2-automated-reconciliation-engine: backlog
