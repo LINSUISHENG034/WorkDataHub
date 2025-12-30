@@ -97,6 +97,11 @@ business.收入明细 (annuity_income)
 | **BF-002** | High | annuity_income | No FK backfill configured (entire domain missing) |
 | BF-003 | Medium | Both | `年金客户` table not populated from ETL data |
 
+**Resolution Status (2025-12-30):**
+- ✅ BF-001: Resolved by Story 7.3-7 (added fk_customer to annuity_performance)
+- ✅ BF-002: Resolved by Story 7.3-7 (added complete annuity_income FK config)
+- ✅ BF-003: Resolved by Story 7.3-7 (both domains now populate 年金客户 table)
+
 ---
 
 ## Recommended Configuration
@@ -282,9 +287,11 @@ if args.domain in ["annuity_performance", "annuity_income", "sandbox_trustee_per
 
 | File | Change Type | Description |
 |------|-------------|-------------|
-| `config/foreign_keys.yml` | **MODIFY** | Add `fk_customer` to annuity_performance, add entire `annuity_income` section |
-| `cli/etl/config.py` | **MODIFY** | Add `annuity_income` to backfill domain list (L389) |
-| `orchestration/jobs.py` | **NO CHANGE** | Already has `generic_backfill_refs_op` for annuity_income |
+| `config/foreign_keys.yml` | **MODIFIED (2025-12-30)** | Added `fk_customer` to annuity_performance + complete `annuity_income` section |
+| `cli/etl/config.py` | **MODIFIED (2025-12-30)** | Added `annuity_income` to backfill domain list (L157) |
+| `orchestration/jobs.py` | **MODIFIED (2025-12-30)** | Updated `annuity_income_job()` to include backfill ops + updated `build_run_config` (L394) |
+
+**All changes completed via Story 7.3-7 (2025-12-30).**
 
 ---
 
@@ -301,3 +308,4 @@ if args.domain in ["annuity_performance", "annuity_income", "sandbox_trustee_per
 | Date | Author | Change |
 |------|--------|--------|
 | 2025-12-28 | Barry (Quick Flow) | Initial FK backfill gap analysis |
+| 2025-12-30 | Story 7.3-7 Implementation | All issues (BF-001, BF-002, BF-003) resolved |

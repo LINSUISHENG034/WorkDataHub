@@ -111,7 +111,7 @@ def annuity_performance_job() -> Any:
 
     # Epic 6.2: Generic reference backfill using configuration-driven approach
     # Replaces legacy derive_plan_refs_op + derive_portfolio_refs_op + backfill_refs_op
-    # Now handles all 4 FKs (年金计划, 组合计划, 产品线, 组织架构) via data_sources.yml config
+    # Now handles all 5 FKs via config/foreign_keys.yml
     backfill_result = generic_backfill_refs_op(processed_data)
 
     # Gate before loading facts (FK-safe ordering)
@@ -122,15 +122,16 @@ def annuity_performance_job() -> Any:
 @job
 def annuity_income_job() -> Any:
     """
-    End-to-end annuity income processing job.
+    End-to-end annuity income processing job with optional reference backfill.
+
+    Story 7.3-7: Added reference backfill support (parity with annuity_performance).
 
     This job orchestrates the complete ETL pipeline for Chinese "收入明细" data:
     1. Discover files matching domain patterns
     2. Read Excel data from discovered files (sheet="收入明细")
     3. Process data through annuity income domain service
-    4. Load fact data to database or generate execution plan
-
-    Note: This domain does not require reference backfill (simpler than annuity_performance).
+    4. Backfill missing references to mapping tables (if enabled)
+    5. Load fact data to database or generate execution plan
     """
     # Wire ops together - Dagster handles dependency graph
     discovered_paths = discover_files_op()
@@ -139,8 +140,12 @@ def annuity_income_job() -> Any:
     excel_rows = read_excel_op(discovered_paths)
     processed_data = process_annuity_income_op(excel_rows, discovered_paths)
 
-    # Load directly (no backfill needed for this domain)
-    load_op(processed_data)
+    # Story 7.3-7: Generic reference backfill (parity with annuity_performance)
+    backfill_result = generic_backfill_refs_op(processed_data)
+
+    # Gate before loading facts (FK-safe ordering)
+    gated_rows = gate_after_backfill(processed_data, backfill_result)
+    load_op(gated_rows)
 
 
 class AnnuityPipelineConfig(Config):
@@ -385,13 +390,17 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
 
     # Epic 6.2: Generic backfill configuration (configuration-driven approach)
     # Replaces legacy backfill_refs_op with generic_backfill_refs_op
-    # Only add for domains that require backfill (annuity_performance, sandbox_trustee_performance)
-    if args.domain in ["annuity_performance", "sandbox_trustee_performance"]:
+    # Only add for domains that require backfill
+    if args.domain in [
+        "annuity_performance",
+        "annuity_income",
+        "sandbox_trustee_performance",
+    ]:
         run_config["ops"]["generic_backfill_refs_op"] = {
             "config": {
                 "domain": args.domain,
                 "plan_only": effective_plan_only,
-                "add_tracking_fields": True,
+                "add_tracking_fields": False,  # mapping tables lack these
             }
         }
 
@@ -399,7 +408,7 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
     if args.domain == "annuity_performance":
         from work_data_hub.infrastructure.enrichment import EqcLookupConfig
 
-        # Story 6.2-P17: Build EqcLookupConfig from CLI args (SSOT, semantic enforcement).
+        # Story 6.2-P17: EqcLookupConfig from CLI args (SSOT).
         eqc_config = EqcLookupConfig.from_cli_args(args)
         run_config["ops"]["process_annuity_performance_op"] = {
             "config": {

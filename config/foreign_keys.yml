@@ -137,3 +137,130 @@ domains:
           - source: "机构"
             target: "机构"
             optional: true
+
+      # 年金客户 (Annuity Customer) reference table backfill
+      # Story 7.3-7: Add company_id → 年金客户 FK relationship (BF-001)
+      # Uses max_by aggregation (Story 6.2-P15) for 主拓机构代码/主拓机构
+      - name: "fk_customer"
+        source_column: "company_id"
+        target_table: "年金客户"
+        target_key: "company_id"
+        target_schema: "mapping"
+        mode: "insert_missing"
+        skip_blank_values: true  # Skip temp IDs (IN*)
+        backfill_columns:
+          - source: "company_id"
+            target: "company_id"
+          - source: "客户名称"
+            target: "客户名称"
+            optional: true
+          - source: "机构代码"
+            target: "主拓机构代码"
+            optional: true
+            aggregation:
+              type: "max_by"
+              order_column: "期末资产规模"
+          - source: "机构名称"
+            target: "主拓机构"
+            optional: true
+            aggregation:
+              type: "max_by"
+              order_column: "期末资产规模"
+          - source: "业务类型"
+            target: "管理资格"
+            optional: true
+            aggregation:
+              type: "concat_distinct"
+              separator: "+"
+              sort: true
+
+  # Annuity Income Domain
+  # Story 7.3-7: Add FK backfill configuration (parity with annuity_performance)
+  # Reference: docs/specific/multi-domain/fk-backfill-gap-analysis.md (BF-002)
+  # NOTE: fk_customer does NOT use max_by aggregation (期末资产规模 column not available)
+  annuity_income:
+    foreign_keys:
+      # 年金计划 (Annuity Plan) reference table backfill
+      - name: "fk_plan"
+        source_column: "计划代码"
+        target_table: "年金计划"
+        target_key: "年金计划号"
+        target_schema: "mapping"
+        mode: "insert_missing"
+        backfill_columns:
+          - source: "计划代码"
+            target: "年金计划号"
+          - source: "计划名称"
+            target: "计划全称"
+            optional: true
+          - source: "客户名称"
+            target: "客户名称"
+            optional: true
+          - source: "company_id"
+            target: "company_id"
+            optional: true
+
+      # 组合计划 (Portfolio Plan) reference table backfill
+      - name: "fk_portfolio"
+        source_column: "组合代码"
+        target_table: "组合计划"
+        target_key: "组合代码"
+        target_schema: "mapping"
+        mode: "insert_missing"
+        depends_on: ["fk_plan"]
+        backfill_columns:
+          - source: "组合代码"
+            target: "组合代码"
+          - source: "计划代码"
+            target: "年金计划号"
+          - source: "组合名称"
+            target: "组合名称"
+            optional: true
+          - source: "组合类型"
+            target: "组合类型"
+            optional: true
+
+      # 产品线 (Product Line) reference table backfill
+      - name: "fk_product_line"
+        source_column: "产品线代码"
+        target_table: "产品线"
+        target_key: "产品线代码"
+        target_schema: "mapping"
+        mode: "insert_missing"
+        backfill_columns:
+          - source: "产品线代码"
+            target: "产品线代码"
+          - source: "业务类型"
+            target: "产品线"
+            optional: true
+
+      # 组织架构 (Organization) reference table backfill
+      - name: "fk_organization"
+        source_column: "机构代码"
+        target_table: "组织架构"
+        target_key: "机构代码"
+        target_schema: "mapping"
+        mode: "insert_missing"
+        skip_blank_values: true
+        backfill_columns:
+          - source: "机构代码"
+            target: "机构代码"
+          - source: "机构名称"
+            target: "机构"
+            optional: true
+
+      # 年金客户 (Annuity Customer) reference table backfill
+      # NOTE: No max_by aggregation - 期末资产规模 not available in annuity_income
+      - name: "fk_customer"
+        source_column: "company_id"
+        target_table: "年金客户"
+        target_key: "company_id"
+        target_schema: "mapping"
+        mode: "insert_missing"
+        skip_blank_values: true
+        backfill_columns:
+          - source: "company_id"
+            target: "company_id"
+          - source: "客户名称"
+            target: "客户名称"
+            optional: true

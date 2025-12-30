@@ -51,7 +51,7 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:  
     )
 
     # Load table/pk from data_sources.yml with proper defaults inheritance
-    # Story 6.2-P14 Fix: Use get_domain_config_v2() to apply defaults/overrides mechanism
+    # Story 6.2-P14: Use get_domain_config_v2() for defaults/overrides
     from work_data_hub.config.settings import get_settings
     from work_data_hub.infrastructure.settings.data_source_schema import (
         DataSourcesValidationError,
@@ -154,12 +154,16 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:  
         run_config["ops"]["read_excel_op"] = {"config": {"sheet": sheet_cfg}}
 
     # Epic 6.2: Generic backfill configuration
-    if domain in ["annuity_performance", "sandbox_trustee_performance"]:
+    if domain in [
+        "annuity_performance",
+        "annuity_income",
+        "sandbox_trustee_performance",
+    ]:
         run_config["ops"]["generic_backfill_refs_op"] = {
             "config": {
                 "domain": domain,
                 "plan_only": effective_plan_only,
-                "add_tracking_fields": False,  # mapping schema tables don't have tracking fields
+                "add_tracking_fields": False,  # mapping tables lack these
             }
         }
 
@@ -167,7 +171,7 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:  
     if domain == "annuity_performance":
         from work_data_hub.infrastructure.enrichment import EqcLookupConfig
 
-        # Story 6.2-P17: Build EqcLookupConfig from CLI args (SSOT, semantic enforcement).
+        # Story 6.2-P17: EqcLookupConfig from CLI args (SSOT).
         eqc_config = EqcLookupConfig.from_cli_args(args)
         run_config["ops"]["process_annuity_performance_op"] = {
             "config": {
