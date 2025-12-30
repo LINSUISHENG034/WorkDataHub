@@ -18,7 +18,8 @@
 # Schema version for backward compatibility
 # Version 1.0: Initial schema with file discovery patterns
 # Version 1.1: Added defaults section with inheritance support
-schema_version: "1.1"
+# Version 1.2: Added requires_backfill field (Story 7.4-2)
+schema_version: "1.2"
 
 # ============================================================================
 # DEFAULTS - Applied to all domains unless overridden
@@ -36,6 +37,10 @@ defaults:
   # Default output schema
   output:
     schema_name: "business"
+
+  # Story 7.4-2: FK backfill enablement (defaults to true)
+  # Domains can override to false if they don't require FK backfill
+  requires_backfill: true
 
 # ============================================================================
 # DOMAINS - Only specify what differs from defaults

@@ -389,3 +389,73 @@ class TestIntegration:
         assert sample_config.output is not None
         assert sample_config.output.table == "sandbox_trustee_performance"
         assert sample_config.output.schema_name == "sandbox"
+
+
+class TestRequiresBackfillField:
+    """Test cases for Story 7.4-2: requires_backfill field validation."""
+
+    def test_requires_backfill_defaults_to_false(self):
+        """Test that requires_backfill defaults to False when not specified."""
+        config = DomainConfigV2(
+            base_path="reference/monthly/{YYYYMM}/test",
+            file_patterns=["*.xlsx"],
+            sheet_name=0,
+        )
+        assert config.requires_backfill is False
+
+    def test_requires_backfill_explicit_true(self):
+        """Test explicit requires_backfill=True is accepted."""
+        config = DomainConfigV2(
+            base_path="reference/monthly/{YYYYMM}/test",
+            file_patterns=["*.xlsx"],
+            sheet_name=0,
+            requires_backfill=True,
+        )
+        assert config.requires_backfill is True
+
+    def test_requires_backfill_explicit_false(self):
+        """Test explicit requires_backfill=False is accepted."""
+        config = DomainConfigV2(
+            base_path="reference/monthly/{YYYYMM}/test",
+            file_patterns=["*.xlsx"],
+            sheet_name=0,
+            requires_backfill=False,
+        )
+        assert config.requires_backfill is False
+
+    def test_real_config_domains_inherit_requires_backfill(self):
+        """Test that real data_sources.yml domains inherit requires_backfill from defaults."""
+        from src.work_data_hub.infrastructure.settings.data_source_schema import (
+            get_domain_config_v2,
+        )
+
+        # All 3 domains should inherit requires_backfill=True from defaults
+        for domain in [
+            "annuity_performance",
+            "annuity_income",
+            "sandbox_trustee_performance",
+        ]:
+            config = get_domain_config_v2(domain, "config/data_sources.yml")
+            assert config.requires_backfill is True, (
+                f"{domain} should have requires_backfill=True"
+            )
+
+    def test_schema_version_1_2_supported(self):
+        """Test that schema version 1.2 is accepted (Story 7.4-2 requirement)."""
+        from src.work_data_hub.infrastructure.settings.data_source_schema import (
+            DataSourceConfigV2,
+        )
+
+        config = DataSourceConfigV2(
+            schema_version="1.2",
+            domains={
+                "test_domain": {
+                    "base_path": "reference/{YYYYMM}/test",
+                    "file_patterns": ["*.xlsx"],
+                    "sheet_name": 0,
+                    "requires_backfill": True,
+                }
+            },
+        )
+        assert config.schema_version == "1.2"
+        assert config.domains["test_domain"].requires_backfill is True

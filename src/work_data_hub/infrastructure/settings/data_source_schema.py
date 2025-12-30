@@ -215,6 +215,11 @@ class DomainConfigV2(BaseModel):
         description="Output destination configuration (table, schema)",
     )
 
+    requires_backfill: bool = Field(
+        default=False,
+        description="Whether domain requires FK backfill (Story 7.4-2)",
+    )
+
     @field_validator("base_path")
     @classmethod
     def validate_base_path(cls, v: str) -> str:
@@ -311,7 +316,8 @@ class DataSourceConfigV2(BaseModel):
             ValueError: If schema version is not supported
         """
         # Story 6.2-P14: Added version 1.1 for defaults support
-        supported_versions = ["1.0", "1.1"]
+        # Story 7.4-2: Added version 1.2 for requires_backfill field
+        supported_versions = ["1.0", "1.1", "1.2"]
         if v not in supported_versions:
             raise ValueError(
                 f"Unsupported schema version '{v}'. "

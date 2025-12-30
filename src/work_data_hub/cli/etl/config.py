@@ -153,12 +153,15 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:  
             sheet_cfg = sheet_value
         run_config["ops"]["read_excel_op"] = {"config": {"sheet": sheet_cfg}}
 
-    # Epic 6.2: Generic backfill configuration
-    if domain in [
-        "annuity_performance",
-        "annuity_income",
-        "sandbox_trustee_performance",
-    ]:
+    # Epic 6.2: Generic backfill configuration (Story 7.4-2: config-driven)
+    # Check requires_backfill from domain config (defaults to false for safety)
+    try:
+        requires_backfill = getattr(domain_cfg, "requires_backfill", False)
+    except (NameError, AttributeError):
+        # domain_cfg might not be defined if exception occurred during loading
+        requires_backfill = False
+
+    if requires_backfill:
         run_config["ops"]["generic_backfill_refs_op"] = {
             "config": {
                 "domain": domain,

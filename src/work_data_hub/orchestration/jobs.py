@@ -19,6 +19,10 @@ from work_data_hub.domain.annuity_performance.service import (
     process_annuity_performance,
 )
 from work_data_hub.domain.pipelines.types import DomainPipelineResult
+from work_data_hub.infrastructure.settings.data_source_schema import (
+    DataSourcesValidationError,
+    get_domain_config_v2,
+)
 from work_data_hub.io.connectors.file_connector import FileDiscoveryService
 from work_data_hub.io.loader.warehouse_loader import WarehouseLoader
 
@@ -430,12 +434,17 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
 
     # Epic 6.2: Generic backfill configuration (configuration-driven approach)
     # Replaces legacy backfill_refs_op with generic_backfill_refs_op
-    # Only add for domains that require backfill
-    if args.domain in [
-        "annuity_performance",
-        "annuity_income",
-        "sandbox_trustee_performance",
-    ]:
+    # Story 7.4-2: Check requires_backfill from domain config
+    try:
+        domain_cfg = get_domain_config_v2(
+            args.domain, config_path=str(settings.data_sources_config)
+        )
+        requires_backfill = getattr(domain_cfg, "requires_backfill", False)
+    except (DataSourcesValidationError, Exception):
+        # Fallback to false if config loading fails (safe default)
+        requires_backfill = False
+
+    if requires_backfill:
         run_config["ops"]["generic_backfill_refs_op"] = {
             "config": {
                 "domain": args.domain,
