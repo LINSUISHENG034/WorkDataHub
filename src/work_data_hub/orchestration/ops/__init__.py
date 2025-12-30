@@ -60,6 +60,12 @@ from .company_enrichment import (
 
 # Demonstration/sample ops
 from .demo_ops import load_to_db_op, read_csv_op, validate_op
+
+# Generic domain processing (Story 7.4-3)
+from .domain_processing import (
+    ProcessDomainOpConfig,
+    process_domain_op,
+)
 from .file_processing import (
     DiscoverFilesConfig,
     ReadExcelConfig,
@@ -87,6 +93,8 @@ from .loading import (
 
 # Domain processing ops and configs
 from .pipeline_ops import (
+    DOMAIN_SERVICE_REGISTRY,
+    DomainServiceEntry,
     ProcessingConfig,
     process_annuity_income_op,
     process_annuity_performance_op,
@@ -148,4 +156,9 @@ __all__ = [
     "load_foreign_keys_config",
     "process_with_enrichment",
     "process_annuity_income_with_enrichment",
+    # Story 7.4-3: Domain Registry pattern
+    "DOMAIN_SERVICE_REGISTRY",
+    "DomainServiceEntry",
+    "ProcessDomainOpConfig",
+    "process_domain_op",
 ]

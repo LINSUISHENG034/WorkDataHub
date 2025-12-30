@@ -372,7 +372,7 @@ development_status:
   epic-7.4: in-progress
   7.4-1-job-registry-pattern: done # P0: Replace if/elif dispatch with JOB_REGISTRY dict - Code Review PASSED 2025-12-30
   7.4-2-config-driven-backfill-list: done # P1: Move backfill domains to data_sources.yml - Code Review PASSED 2025-12-30
-  7.4-3-generic-process-domain-op: backlog # P1: Factory for domain-specific ops
+  7.4-3-generic-process-domain-op: done # P1: Factory for domain-specific ops - Code Review PASSED 2025-12-30
   7.4-4-domain-autodiscovery-validation: backlog # P2: Startup validation for config completeness
   7.4-5-documentation-update: backlog # P2: Update architecture docs, mark checklist resolved
   epic-7.4-retrospective: optional

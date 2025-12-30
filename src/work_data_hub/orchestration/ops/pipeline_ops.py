@@ -8,7 +8,8 @@ This module contains ops for domain-specific data processing:
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional
 
 from dagster import Config, OpExecutionContext, op
 from pydantic import field_validator
@@ -28,13 +29,66 @@ from ._internal import _PSYCOPG2_NOT_LOADED, psycopg2
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class DomainServiceEntry:
+    """Registry entry for a domain's processing service.
+
+    This dataclass encapsulates the metadata and function needed to process
+    data for a specific domain. It enables a configuration-driven approach where
+    new domains can be added by registering entries instead of creating new
+    op functions.
+
+    Attributes:
+        service_fn: Callable that processes rows and returns models/results.
+            Expected signature: (rows: List[Dict], data_source: str, **kwargs) -> Any
+        supports_enrichment: Whether the domain supports company enrichment
+            (EQC lookup, cache queries, etc.)
+        domain_name: Human-readable domain name for logging and error messages
+
+    Example:
+        >>> entry = DomainServiceEntry(
+        ...     service_fn=process_with_enrichment,
+        ...     supports_enrichment=True,
+        ...     domain_name="Annuity Performance (规模明细)"
+        ... )
+        >>> result = entry.service_fn(rows, data_source="file.xlsx")
+    """
+
+    service_fn: Callable[[List[Dict[str, Any]], str], Any]
+    supports_enrichment: bool = False
+    domain_name: str = ""
+
+
+# Domain Service Registry (Story 7.4-3)
+# Maps domain keys to their processing service functions and metadata.
+# This registry enables the generic process_domain_op to delegate to the
+# appropriate domain service without hardcoded if/elif chains.
+DOMAIN_SERVICE_REGISTRY: Dict[str, DomainServiceEntry] = {
+    "annuity_performance": DomainServiceEntry(
+        service_fn=process_with_enrichment,
+        supports_enrichment=True,
+        domain_name="Annuity Performance (规模明细)",
+    ),
+    "annuity_income": DomainServiceEntry(
+        service_fn=process_annuity_income_with_enrichment,
+        supports_enrichment=False,  # No EQC enrichment (uses sync_lookup_budget param)
+        domain_name="Annuity Income (收入明细)",
+    ),
+    "sandbox_trustee_performance": DomainServiceEntry(
+        service_fn=process,
+        supports_enrichment=False,
+        domain_name="Sandbox Trustee Performance",
+    ),
+}
+
+
 class ProcessingConfig(Config):
     """Configuration for processing operations with optional enrichment."""
 
     enrichment_enabled: bool = False
     enrichment_sync_budget: int = 0
     # Story 6.2-P17: EqcLookupConfig serialized dict (preferred SSOT).
-    # Kept optional for transition; if missing, we derive from legacy fields with a warning.
+    # Kept optional for transition; if missing, we derive from legacy fields.
     eqc_lookup_config: Optional[Dict[str, Any]] = None
     export_unknown_names: bool = True
     plan_only: bool = True
@@ -133,7 +187,8 @@ def process_annuity_performance_op(
 
     try:
         # GUARD: Only setup enrichment in execute mode AND when explicitly enabled
-        # Story 6.2-P16: Fixed condition - enrichment requires BOTH CLI and settings to enable
+        # Story 6.2-P16: Fixed condition
+        # Enrichment requires BOTH CLI and settings to enable
         use_enrichment = (
             (not config.plan_only)
             and config.enrichment_enabled
@@ -270,7 +325,8 @@ def process_annuity_performance_op(
                 auto_refresh_token=True,
             )
 
-        # Guard: if enrichment isn't active, force-disable EQC to prevent any provider init/calls.
+        # Guard: if enrichment isn't active,
+        # force-disable EQC to prevent any provider init/calls.
         if not use_enrichment:
             eqc_config = EqcLookupConfig.disabled()
 
