@@ -37,7 +37,12 @@ from work_data_hub.config.settings import get_settings
 
 from .config import build_run_config
 from .diagnostics import _check_database_connection
-from .domain_validation import _load_configured_domains, _validate_domains
+from .domain_validation import (
+    SPECIAL_DOMAINS,
+    _load_configured_domains,
+    _validate_domains,
+    validate_domain_registry,
+)
 from .executors import _execute_single_domain
 from .main import main
 
@@ -46,6 +51,8 @@ __all__ = [
     "build_run_config",
     "_load_configured_domains",
     "_validate_domains",
+    "SPECIAL_DOMAINS",
+    "validate_domain_registry",
     "_execute_single_domain",
     "_check_database_connection",
     "get_settings",

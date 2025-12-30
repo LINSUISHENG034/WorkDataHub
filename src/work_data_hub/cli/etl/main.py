@@ -27,6 +27,7 @@ import work_data_hub.cli.etl as etl_module
 
 from .auth import _validate_and_refresh_token
 from .diagnostics import _check_database_connection
+from .domain_validation import SPECIAL_DOMAINS, validate_domain_registry
 
 
 def main(argv: Optional[List[str]] = None) -> int:  # noqa: PLR0911, PLR0912, PLR0915 - CLI entry point
@@ -245,6 +246,9 @@ def main(argv: Optional[List[str]] = None) -> int:  # noqa: PLR0911, PLR0912, PL
     if enrichment_enabled and any(d in enrichment_domains for d in domains_for_check):
         _validate_and_refresh_token(auto_refresh=auto_refresh_enabled)
 
+    # Story 7.4-4: Validate that configured domains have corresponding job definitions
+    validate_domain_registry()
+
     # Determine domains to process
     domains_to_process: List[str] = []
 
@@ -257,7 +261,7 @@ def main(argv: Optional[List[str]] = None) -> int:  # noqa: PLR0911, PLR0912, PL
 
         # Exclude special orchestration domains from --all-domains
         # Note: company_mapping removed in Story 7.1-4 (Zero Legacy)
-        SPECIAL_DOMAINS = {"company_lookup_queue", "reference_sync"}
+        # SPECIAL_DOMAINS imported from domain_validation module
         domains_to_process = [d for d in configured_domains if d not in SPECIAL_DOMAINS]
 
         print(f"📋 Processing all configured domains: {', '.join(domains_to_process)}")

@@ -8,6 +8,11 @@ from typing import List, Tuple
 
 import yaml
 
+# Special orchestration domains (not in data_sources.yml)
+# Note: company_mapping removed in Story 7.1-4 (Zero Legacy)
+# Story 7.4-4: Exposed as module-level constant for validate_domain_registry()
+SPECIAL_DOMAINS = {"company_lookup_queue", "reference_sync"}
+
 
 def _load_configured_domains() -> List[str]:
     """
@@ -44,10 +49,6 @@ def _validate_domains(
     Returns:
         Tuple of (valid_domains, invalid_domains)
     """
-    # Special orchestration domains (not in data_sources.yml)
-    # Note: company_mapping removed in Story 7.1-4 (Zero Legacy)
-    SPECIAL_DOMAINS = {"company_lookup_queue", "reference_sync"}
-
     # Load configured data domains
     configured_domains = set(_load_configured_domains())
 
@@ -63,3 +64,40 @@ def _validate_domains(
             invalid.append(domain)
 
     return valid, invalid
+
+
+# Story 7.4-4: Domain Registry Validation
+# SPECIAL_DOMAINS defined at module level (line 14)
+
+
+def validate_domain_registry() -> None:
+    """Validate that configured domains have corresponding job definitions.
+
+    Emits UserWarning for domains in data_sources.yml that lack JOB_REGISTRY entries.
+    Excludes SPECIAL_DOMAINS which intentionally have no jobs.
+
+    This validation runs at CLI startup to catch configuration/implementation
+    mismatches early, preventing silent runtime failures.
+    """
+    import warnings
+
+    from work_data_hub.orchestration.jobs import JOB_REGISTRY
+
+    try:
+        configured_domains: set[str] = set(_load_configured_domains())
+    except Exception:
+        # Config loading failed - already warned by _load_configured_domains()
+        return
+
+    registry_domains: set[str] = set(JOB_REGISTRY.keys())
+
+    # Exclude special domains that intentionally lack job definitions
+    domains_to_check = configured_domains - SPECIAL_DOMAINS
+
+    missing = domains_to_check - registry_domains
+    if missing:
+        warnings.warn(
+            f"Domains in data_sources.yml without jobs: {sorted(missing)}",
+            category=UserWarning,
+            stacklevel=2,
+        )
