@@ -1,13 +1,40 @@
 # Multi-Domain 测试问题检查清单
 
-> **文档类型:** 验收检查清单  
-> **创建日期:** 2025-12-30  
-> **来源文档:** `docs/specific/multi-domain/` 目录下所有分析文档  
+> **文档类型:** 验收检查清单
+> **创建日期:** 2025-12-30
+> **最后更新:** 2025-12-31 (代码实锤验证完成)
+> **来源文档:** `docs/specific/multi-domain/` 目录下所有分析文档
 > **适用范围:** `annuity_performance`、`annuity_income` 及未来新增域
 
 ---
 
-## 使用说明
+## 验证状态摘要
+
+**Epic 7.3 (Multi-Domain Consistency Fixes) & Epic 7.4 (Domain Registry Architecture)** 已全部完成。
+
+**2025-12-31 代码实锤验证:** 对所有声称"已修复"的问题进行了代码级验证，确认实际代码与问题清单状态一致。
+
+| 严重性        | 数量 | 已修复 | 待处理 | 修复率 |
+| ------------- | ---- | ------ | ------ | ------ |
+| **Critical**  | 3    | 3      | 0      | 100%  |
+| **High**      | 2    | 2      | 0      | 100%  |
+| **Medium**    | 12   | 12     | 0      | 100%  |
+| **Low**       | 5    | 5      | 0      | 100%  |
+| **Info/Debt** | 8    | 8      | 0      | 100%  |
+| **总计**      | 30   | 30     | 0      | 100%  |
+
+**已修复问题总数:** 30/30 (100%)
+
+**剩余问题:** 无
+
+**关键修复成果 (代码验证确认):**
+1. ✅ 所有 Critical 和 High 优先级问题已解决
+2. ✅ 数据一致性完全统一 (null 处理、字段验证) - 见 `models.py`、`validators.py`
+3. ✅ FK 回填配置完整 (annuity_income 与 annuity_performance 对等) - 见 `foreign_keys.yml`
+4. ✅ Pipeline 处理逻辑对齐 (company_id 解析、客户名称填充、计划代码修正) - 见 `pipeline_builder.py`
+5. ✅ 架构债务清零 (JOB_REGISTRY、config-driven backfill、通用 ops) - 见 `jobs.py`、`executors.py`
+
+---
 
 本清单整理自 multi-domain 测试过程中发现的全部问题。开发团队应在任务完成后逐项检查：
 
@@ -28,25 +55,25 @@
 
 | 编号       | 问题描述                                                                                                                                       | 预期修复方案                                                                                              | 预期修复结果                                                           | 实际进展 |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | -------- |
-| **CN-001** | `annuity_income` 的 `客户名称` 字段在 Pydantic 模型中定义为 `str` (required)，拒绝 null 值，与 `annuity_performance` 的 `Optional[str]` 不一致 | 将 `domain/annuity_income/models.py` 中 `客户名称` 改为 `Optional[str]`，并在 validator 中添加 null check | 两个 domain 的 `客户名称` 都允许 null 值，ETL 不再因 null 客户名称失败 |          |
-| **CI-001** | `annuity_income` 的 `company_id` 字段定义为 `str` (required)，而 `annuity_performance` 为 `Optional[str]`                                      | 统一两个 domain 的 `company_id` 处理逻辑，考虑业务需求决定是否统一为 Optional                             | 两个 domain 的 `company_id` null 处理语义一致                          |          |
-| **DR-001** | `annuity_income` Domain Registry 中 `客户名称` 配置为 `nullable=False`                                                                         | 修改 `infrastructure/schema/definitions/annuity_income.py`，将 `客户名称` 改为 `nullable=True`            | Domain Registry 与 Pydantic 模型 null 语义一致                         |          |
-| **DR-002** | `annuity_income` 的 `gold_required` 列表包含 `客户名称`                                                                                        | 从 `gold_required` 列表中移除 `客户名称`                                                                  | 允许 null `客户名称` 的记录通过 Gold 层验证                            |          |
+| **CN-001** | `annuity_income` 的 `客户名称` 字段在 Pydantic 模型中定义为 `str` (required)，拒绝 null 值，与 `annuity_performance` 的 `Optional[str]` 不一致 | 将 `domain/annuity_income/models.py` 中 `客户名称` 改为 `Optional[str]`，并在 validator 中添加 null check | 两个 domain 的 `客户名称` 都允许 null 值，ETL 不再因 null 客户名称失败 | ✅ Story 7.3-1 已修复 (代码验证: `models.py:58,186` 均为 `Optional[str]`) |
+| **CI-001** | `annuity_income` 的 `company_id` 字段定义为 `str` (required)，而 `annuity_performance` 为 `Optional[str]`                                      | 统一两个 domain 的 `company_id` 处理逻辑，考虑业务需求决定是否统一为 Optional                             | 两个 domain 的 `company_id` null 处理语义一致                          | ✅ Story 7.3-1 已修复 (代码验证: `models.py:86,178-183` 均为 `Optional[str]`) |
+| **DR-001** | `annuity_income` Domain Registry 中 `客户名称` 配置为 `nullable=False`                                                                         | 修改 `infrastructure/schema/definitions/annuity_income.py`，将 `客户名称` 改为 `nullable=True`            | Domain Registry 与 Pydantic 模型 null 语义一致                         | ✅ Story 7.3-1 已修复 (代码验证: `annuity_income.py:46` `nullable=True`) |
+| **DR-002** | `annuity_income` 的 `gold_required` 列表包含 `客户名称`                                                                                        | 从 `gold_required` 列表中移除 `客户名称`                                                                  | 允许 null `客户名称` 的记录通过 Gold 层验证                            | ✅ Story 7.3-1 已修复 (代码验证: `annuity_income.py:33-40` 不含 `客户名称`) |
 
 ### 1.2 验证器命名与逻辑统一
 
 | 编号       | 问题描述                                                                            | 预期修复方案                                   | 预期修复结果                           | 实际进展              |
 | ---------- | ----------------------------------------------------------------------------------- | ---------------------------------------------- | -------------------------------------- | --------------------- |
-| **PC-001** | ~~两个 domain 的计划代码 validator 命名不同~~                                       | ~~统一为 `normalize_plan_code`~~               | ~~代码可读性和一致性提升~~             | ✅ Story 7.3-3 已修复 |
-| **PC-002** | `annuity_performance` 的 `normalize_plan_code` 有 null check，`annuity_income` 没有 | 统一添加 null check 逻辑，或使用共享 validator | 两个 domain 的计划代码处理逻辑完全一致 |                       |
+| **PC-001** | ~~两个 domain 的计划代码 validator 命名不同~~                                       | ~~统一为 `normalize_plan_code`~~               | ~~代码可读性和一致性提升~~             | ✅ Story 7.3-3 已修复 (代码验证: `validators.py:113-154` 共享函数) |
+| **PC-002** | `annuity_performance` 的 `normalize_plan_code` 有 null check，`annuity_income` 没有 | 统一添加 null check 逻辑，或使用共享 validator | 两个 domain 的计划代码处理逻辑完全一致 | ✅ Story 7.3-2 已修复 (代码验证: `validators.py:146-149` `allow_null` 参数控制) |
 
 ### 1.3 代码重复提取
 
-| 编号        | 问题描述                                                                                         | 预期修复方案                                    | 预期修复结果             | 实际进展 |
-| ----------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------- | ------------------------ | -------- |
-| **DUP-001** | `apply_domain_rules()` 函数在两个 domain 中重复定义 (~9 行 × 2)                                  | 提取到 `infrastructure/cleansing/validators.py` | 消除 ~18 行重复代码      |          |
-| **DUP-002** | `DEFAULT_COMPANY_RULES`、`DEFAULT_NUMERIC_RULES` 等常量重复定义 (~30 行 × 2)                     | 提取到 `infrastructure/cleansing/validators.py` | 消除 ~60 行重复常量定义  |          |
-| **DUP-003** | `clean_code_field`、`clean_customer_name`、`normalize_company_id` 等 validator 重复 (~64 行 × 2) | 提取共享 validator 工厂函数到 infrastructure 层 | 消除 ~128 行重复验证逻辑 |          |
+| 编号        | 问题描述                                                                                         | 预期修复方案                                    | 预期修复结果             | 实际进展              |
+| ----------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------- | ------------------------ | --------------------- |
+| **DUP-001** | `apply_domain_rules()` 函数在两个 domain 中重复定义 (~9 行 × 2)                                  | 提取到 `infrastructure/cleansing/validators.py` | 消除 ~18 行重复代码      | ✅ Story 7.3-2 已修复 (代码验证: `validators.py:47-82`) |
+| **DUP-002** | `DEFAULT_COMPANY_RULES`、`DEFAULT_NUMERIC_RULES` 等常量重复定义 (~30 行 × 2)                     | 提取到 `infrastructure/cleansing/validators.py` | 消除 ~60 行重复常量定义  | ✅ Story 7.3-2 已修复 (代码验证: `validators.py:24-34`) |
+| **DUP-003** | `clean_code_field`、`clean_customer_name`、`normalize_company_id` 等 validator 重复 (~64 行 × 2) | 提取共享 validator 工厂函数到 infrastructure 层 | 消除 ~128 行重复验证逻辑 | ✅ Story 7.3-2 已修复 (代码验证: `validators.py:85-234`) |
 
 ---
 
@@ -58,19 +85,19 @@
 
 | 编号       | 问题描述                          | 预期修复方案                                                                                                            | 预期修复结果                                 | 实际进展              |
 | ---------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | --------------------- |
-| **DF-001** | `收入明细` 表缺失 `计划名称` 字段 | 在 `infrastructure/schema/definitions/annuity_income.py` 添加 `ColumnDef("计划名称", ColumnType.STRING, nullable=True)` | 表结构包含 21 列，`计划名称` 存在且可为 NULL | ✅ Story 7.3-4 已修复 |
-| **DF-002** | `收入明细` 表缺失 `组合类型` 字段 | 同上，添加 `ColumnDef("组合类型", ...)`                                                                                 | `组合类型` 字段存在                          | ✅ Story 7.3-4 已修复 |
-| **DF-003** | `收入明细` 表缺失 `组合名称` 字段 | 同上，添加 `ColumnDef("组合名称", ...)`                                                                                 | `组合名称` 字段存在                          | ✅ Story 7.3-4 已修复 |
-| **DF-004** | `收入明细` 表缺失 `机构名称` 字段 | 同上，添加 `ColumnDef("机构名称", ...)`                                                                                 | `机构名称` 字段存在                          | ✅ Story 7.3-4 已修复 |
+| **DF-001** | `收入明细` 表缺失 `计划名称` 字段 | 在 `infrastructure/schema/definitions/annuity_income.py` 添加 `ColumnDef("计划名称", ColumnType.STRING, nullable=True)` | 表结构包含 21 列，`计划名称` 存在且可为 NULL | ✅ Story 7.3-4 已修复 (代码验证: `annuity_income.py:54`) |
+| **DF-002** | `收入明细` 表缺失 `组合类型` 字段 | 同上，添加 `ColumnDef("组合类型", ...)`                                                                                 | `组合类型` 字段存在                          | ✅ Story 7.3-4 已修复 (代码验证: `annuity_income.py:55`) |
+| **DF-003** | `收入明细` 表缺失 `组合名称` 字段 | 同上，添加 `ColumnDef("组合名称", ...)`                                                                                 | `组合名称` 字段存在                          | ✅ Story 7.3-4 已修复 (代码验证: `annuity_income.py:56`) |
+| **DF-004** | `收入明细` 表缺失 `机构名称` 字段 | 同上，添加 `ColumnDef("机构名称", ...)`                                                                                 | `机构名称` 字段存在                          | ✅ Story 7.3-4 已修复 (代码验证: `annuity_income.py:57`) |
 
 ### 2.2 annuity_performance 缺失字段
 
 | 编号       | 问题描述                                  | 预期修复方案                                                                                                                                | 预期修复结果                | 实际进展      |
 | ---------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ------------- |
-| **DF-005** | `规模明细` 表缺失 `子企业号` 字段         | 在 `infrastructure/schema/definitions/annuity_performance.py` 添加 `ColumnDef("子企业号", ColumnType.STRING, nullable=True, max_length=50)` | `子企业号` 字段存在         | ✅ 已验证包含 |
-| **DF-006** | `规模明细` 表缺失 `子企业名称` 字段       | 同上，添加对应 ColumnDef                                                                                                                    | `子企业名称` 字段存在       | ✅ 已验证包含 |
-| **DF-007** | `规模明细` 表缺失 `集团企业客户号` 字段   | 同上，添加对应 ColumnDef                                                                                                                    | `集团企业客户号` 字段存在   | ✅ 已验证包含 |
-| **DF-008** | `规模明细` 表缺失 `集团企业客户名称` 字段 | 同上，添加对应 ColumnDef                                                                                                                    | `集团企业客户名称` 字段存在 | ✅ 已验证包含 |
+| **DF-005** | `规模明细` 表缺失 `子企业号` 字段         | 在 `infrastructure/schema/definitions/annuity_performance.py` 添加 `ColumnDef("子企业号", ColumnType.STRING, nullable=True, max_length=50)` | `子企业号` 字段存在         | ✅ 已验证包含 (代码验证: `annuity_performance.py:78`) |
+| **DF-006** | `规模明细` 表缺失 `子企业名称` 字段       | 同上，添加对应 ColumnDef                                                                                                                    | `子企业名称` 字段存在       | ✅ 已验证包含 (代码验证: `annuity_performance.py:79`) |
+| **DF-007** | `规模明细` 表缺失 `集团企业客户号` 字段   | 同上，添加对应 ColumnDef                                                                                                                    | `集团企业客户号` 字段存在   | ✅ 已验证包含 (代码验证: `annuity_performance.py:80`) |
+| **DF-008** | `规模明细` 表缺失 `集团企业客户名称` 字段 | 同上，添加对应 ColumnDef                                                                                                                    | `集团企业客户名称` 字段存在 | ✅ 已验证包含 (代码验证: `annuity_performance.py:81`) |
 
 ---
 
@@ -82,25 +109,25 @@
 
 | 编号       | 问题描述                                                                          | 预期修复方案                                                                                 | 预期修复结果                             | 实际进展              |
 | ---------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------- | --------------------- |
-| **BF-001** | `annuity_performance` 缺失 `fk_customer` 配置 (`company_id` → `mapping.年金客户`) | 在 `config/foreign_keys.yml` 的 `annuity_performance.foreign_keys` 下添加 `fk_customer` 配置 | ETL 完成后 `年金客户` 表自动回填客户信息 | ✅ Story 7.3-7 已修复 |
+| **BF-001** | `annuity_performance` 缺失 `fk_customer` 配置 (`company_id` → `mapping.年金客户`) | 在 `config/foreign_keys.yml` 的 `annuity_performance.foreign_keys` 下添加 `fk_customer` 配置 | ETL 完成后 `年金客户` 表自动回填客户信息 | ✅ Story 7.3-7 已修复 (代码验证: `foreign_keys.yml:144-175`) |
 
 ### 3.2 annuity_income FK 配置 (整体缺失)
 
 | 编号        | 问题描述                                                 | 预期修复方案                                                    | 预期修复结果                                                     | 实际进展              |
 | ----------- | -------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------- |
-| **BF-002**  | `annuity_income` 完全缺失 FK backfill 配置               | 在 `config/foreign_keys.yml` 添加完整的 `annuity_income` 配置节 | `annuity_income` 具有与 `annuity_performance` 同等的 FK 回填能力 | ✅ Story 7.3-7 已修复 |
-| **BF-002a** | 缺失 `fk_plan` (`计划代码` → `mapping.年金计划`)         | 添加到 `foreign_keys.yml` 中 `annuity_income` 节下              | 计划代码自动回填到年金计划表                                     | ✅ Story 7.3-7 已修复 |
-| **BF-002b** | 缺失 `fk_portfolio` (`组合代码` → `mapping.组合计划`)    | 同上                                                            | 组合代码自动回填到组合计划表                                     | ✅ Story 7.3-7 已修复 |
-| **BF-002c** | 缺失 `fk_product_line` (`产品线代码` → `mapping.产品线`) | 同上                                                            | 产品线代码自动回填                                               | ✅ Story 7.3-7 已修复 |
-| **BF-002d** | 缺失 `fk_organization` (`机构代码` → `mapping.组织架构`) | 同上                                                            | 机构代码自动回填                                                 | ✅ Story 7.3-7 已修复 |
-| **BF-002e** | 缺失 `fk_customer` (`company_id` → `mapping.年金客户`)   | 同上                                                            | 客户信息自动回填                                                 | ✅ Story 7.3-7 已修复 |
+| **BF-002**  | `annuity_income` 完全缺失 FK backfill 配置               | 在 `config/foreign_keys.yml` 添加完整的 `annuity_income` 配置节 | `annuity_income` 具有与 `annuity_performance` 同等的 FK 回填能力 | ✅ Story 7.3-7 已修复 (代码验证: `foreign_keys.yml:177-267`) |
+| **BF-002a** | 缺失 `fk_plan` (`计划代码` → `mapping.年金计划`)         | 添加到 `foreign_keys.yml` 中 `annuity_income` 节下              | 计划代码自动回填到年金计划表                                     | ✅ Story 7.3-7 已修复 (代码验证: `foreign_keys.yml:183-201`) |
+| **BF-002b** | 缺失 `fk_portfolio` (`组合代码` → `mapping.组合计划`)    | 同上                                                            | 组合代码自动回填到组合计划表                                     | ✅ Story 7.3-7 已修复 (代码验证: `foreign_keys.yml:203-221`) |
+| **BF-002c** | 缺失 `fk_product_line` (`产品线代码` → `mapping.产品线`) | 同上                                                            | 产品线代码自动回填                                               | ✅ Story 7.3-7 已修复 (代码验证: `foreign_keys.yml:223-235`) |
+| **BF-002d** | 缺失 `fk_organization` (`机构代码` → `mapping.组织架构`) | 同上                                                            | 机构代码自动回填                                                 | ✅ Story 7.3-7 已修复 (代码验证: `foreign_keys.yml:237-250`) |
+| **BF-002e** | 缺失 `fk_customer` (`company_id` → `mapping.年金客户`)   | 同上                                                            | 客户信息自动回填                                                 | ✅ Story 7.3-7 已修复 (代码验证: `foreign_keys.yml:252-266`) |
 
 ### 3.3 相关代码更新
 
 | 编号       | 问题描述                                                            | 预期修复方案                                   | 预期修复结果                                 | 实际进展              |
 | ---------- | ------------------------------------------------------------------- | ---------------------------------------------- | -------------------------------------------- | --------------------- |
-| **BF-003** | `cli/etl/config.py` 未将 `annuity_income` 加入 backfill 域列表      | 修改 L157 的条件判断，加入 `annuity_income`    | CLI 执行 `annuity_income` ETL 时触发 FK 回填 | ✅ Story 7.3-7 已修复 |
-| **BF-004** | `orchestration/jobs.py` 的 `annuity_income_job` 未包含 backfill ops | 更新 job 定义，添加 `generic_backfill_refs_op` | Job 执行时包含回填步骤                       | ✅ Story 7.3-7 已修复 |
+| **BF-003** | `cli/etl/config.py` 未将 `annuity_income` 加入 backfill 域列表      | 修改 L157 的条件判断，加入 `annuity_income`    | CLI 执行 `annuity_income` ETL 时触发 FK 回填 | ✅ Story 7.3-7 已修复 (代码验证: `config.py:157-164` 使用 `requires_backfill` 配置驱动) |
+| **BF-004** | `orchestration/jobs.py` 的 `annuity_income_job` 未包含 backfill ops | 更新 job 定义，添加 `generic_backfill_refs_op` | Job 执行时包含回填步骤                       | ✅ Story 7.3-7 已修复 (代码验证: `jobs.py:168` `generic_backfill_refs_op(processed_data)`) |
 
 ---
 
@@ -112,30 +139,30 @@
 
 | 编号         | 问题描述                                                                                         | 预期修复方案                                                                              | 预期修复结果                                  | 实际进展                |
 | ------------ | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- | --------------------------------------------- | ----------------------- |
-| **PIPE-001** | `annuity_income` 的 `company_id` 缺少多优先级匹配策略，全部生成临时 ID                           | 在 `annuity_income/service.py` 初始化 `CompanyMappingRepository`，传递给 pipeline builder | ETL 后 `company_id` 混合使用缓存 ID 和临时 ID | ✅ Story 7.3-6 Proposed |
-| **PIPE-002** | `annuity_income/pipeline_builder.py` 的 `CompanyIdResolutionStep` 缺少 `mapping_repository` 参数 | 添加参数并传递给 `CompanyIdResolver`                                                      | 启用数据库缓存查找优先级                      | ✅ Story 7.3-6 Proposed |
-| **PIPE-003** | `build_bronze_to_silver_pipeline()` 缺少 `mapping_repository` 参数                               | 添加参数到函数签名                                                                        | Pipeline 支持数据库缓存查找                   | ✅ Story 7.3-6 Proposed |
+| **PIPE-001** | `annuity_income` 的 `company_id` 缺少多优先级匹配策略，全部生成临时 ID                           | 在 `annuity_income/service.py` 初始化 `CompanyMappingRepository`，传递给 pipeline builder | ETL 后 `company_id` 混合使用缓存 ID 和临时 ID | ✅ Story 7.3-6 已修复 (代码验证: `service.py:263-278` 初始化 `CompanyMappingRepository`) |
+| **PIPE-002** | `annuity_income/pipeline_builder.py` 的 `CompanyIdResolutionStep` 缺少 `mapping_repository` 参数 | 添加参数并传递给 `CompanyIdResolver`                                                      | 启用数据库缓存查找优先级                      | ✅ Story 7.3-6 已修复 (代码验证: `pipeline_builder.py:122,143`) |
+| **PIPE-003** | `build_bronze_to_silver_pipeline()` 缺少 `mapping_repository` 参数                               | 添加参数到函数签名                                                                        | Pipeline 支持数据库缓存查找                   | ✅ Story 7.3-6 已修复 (代码验证: `pipeline_builder.py:185,298`) |
 
 ### 4.2 客户名称填充问题 (High)
 
 | 编号         | 问题描述                                                                                            | 预期修复方案                                        | 预期修复结果                                       | 实际进展                |
 | ------------ | --------------------------------------------------------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------- | ----------------------- |
-| **PIPE-004** | `annuity_income` 的 `_fill_customer_name` 错误地使用 `计划名称` 作为 fallback，然后填充 `"UNKNOWN"` | 修改为保留 null 值（与 `annuity_performance` 一致） | `客户名称` 为 null 时保持 null，不被替换为计划名称 | ✅ Story 7.3-6 Proposed |
+| **PIPE-004** | `annuity_income` 的 `_fill_customer_name` 错误地使用 `计划名称` 作为 fallback，然后填充 `"UNKNOWN"` | 修改为保留 null 值（与 `annuity_performance` 一致） | `客户名称` 为 null 时保持 null，不被替换为计划名称 | ✅ Story 7.3-6 已修复 (代码验证: `pipeline_builder.py:43-51` 仅返回 `df["客户名称"]`，无 fallback) |
 
 ### 4.3 计划代码处理问题 (Medium)
 
-| 编号         | 问题描述                                                          | 预期修复方案                                                                                           | 预期修复结果                   | 实际进展 |
-| ------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------ | -------- |
-| **PIPE-005** | `annuity_income` 缺少 `PLAN_CODE_CORRECTIONS` 常量和处理步骤      | 在 `annuity_income/constants.py` 添加 `PLAN_CODE_CORRECTIONS = {"1P0290": "P0290", "1P0807": "P0807"}` | 计划代码错误自动修正           |          |
-| **PIPE-006** | `annuity_income` 缺少 `PLAN_CODE_DEFAULTS` 常量和处理步骤         | 添加 `PLAN_CODE_DEFAULTS = {"集合计划": "AN001", "单一计划": "AN002"}`                                 | 空计划代码自动分配默认值       |          |
-| **PIPE-007** | `annuity_income` pipeline 缺少 `ReplacementStep` 处理计划代码修正 | 在 pipeline 中添加 `ReplacementStep({"计划代码": PLAN_CODE_CORRECTIONS})`                              | Pipeline 具有计划代码修正能力  |          |
-| **PIPE-008** | `annuity_income` 缺少 `_apply_plan_code_defaults` 函数            | 从 `annuity_performance` 复制或提取共享函数                                                            | 空计划代码根据计划类型自动填充 |          |
+| 编号         | 问题描述                                                          | 预期修复方案                                                                                           | 预期修复结果                   | 实际进展                |
+| ------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------ | ----------------------- |
+| **PIPE-005** | `annuity_income` 缺少 `PLAN_CODE_CORRECTIONS` 常量和处理步骤      | 在 `annuity_income/constants.py` 添加 `PLAN_CODE_CORRECTIONS = {"1P0290": "P0290", "1P0807": "P0807"}` | 计划代码错误自动修正           | ✅ Story 7.3-6 已修复 (代码验证: `constants.py:30`) |
+| **PIPE-006** | `annuity_income` 缺少 `PLAN_CODE_DEFAULTS` 常量和处理步骤         | 添加 `PLAN_CODE_DEFAULTS = {"集合计划": "AN001", "单一计划": "AN002"}`                                 | 空计划代码自动分配默认值       | ✅ Story 7.3-6 已修复 (代码验证: `constants.py:33`) |
+| **PIPE-007** | `annuity_income` pipeline 缺少 `ReplacementStep` 处理计划代码修正 | 在 pipeline 中添加 `ReplacementStep({"计划代码": PLAN_CODE_CORRECTIONS})`                              | Pipeline 具有计划代码修正能力  | ✅ Story 7.3-6 已修复 (代码验证: `pipeline_builder.py:221`) |
+| **PIPE-008** | `annuity_income` 缺少 `_apply_plan_code_defaults` 函数            | 从 `annuity_performance` 复制或提取共享函数                                                            | 空计划代码根据计划类型自动填充 | ✅ Story 7.3-6 已修复 (代码验证: `pipeline_builder.py:54-73`) |
 
 ### 4.4 组合代码处理差异 (Low)
 
 | 编号         | 问题描述                                                                                                         | 预期修复方案                                                | 预期修复结果         | 实际进展 |
 | ------------ | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | -------------------- | -------- |
-| **PIPE-009** | `annuity_performance` 使用 `_clean_portfolio_code()` 函数，`annuity_income` 使用内联 pandas 方法，大小写处理不同 | (可选) 提取共享函数到 infrastructure 层，或记录为可接受差异 | 组合代码处理逻辑统一 |          |
+| **PIPE-009** | `annuity_performance` 使用 `_clean_portfolio_code()` 函数，`annuity_income` 使用内联 pandas 方法，大小写处理不同 | (可选) 提取共享函数到 infrastructure 层，或记录为可接受差异 | 组合代码处理逻辑统一 | ✅ 可接受差异 (代码验证: `pipeline_builder.py:76-111` 使用 `_apply_portfolio_code_defaults` 函数，逻辑独立但完整) |
 
 ---
 
@@ -145,7 +172,7 @@
 
 | 编号        | 问题描述                                                                       | 预期修复方案                                                                                     | 预期修复结果                           | 实际进展              |
 | ----------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | -------------------------------------- | --------------------- |
-| **CFG-001** | PowerShell 环境变量优先级高于 `.wdh_env` 文件，导致 Alembic 迁移连接错误数据库 | 方案 A: 修改 `get_database_connection_string()` 强制从 `.wdh_env` 读取；或方案 B: 文档化当前行为 | 配置来源单一明确，避免环境变量意外覆盖 | ✅ Story 7.3-5 已修复 |
+| **CFG-001** | PowerShell 环境变量优先级高于 `.wdh_env` 文件，导致 Alembic 迁移连接错误数据库 | 方案 A: 修改 `get_database_connection_string()` 强制从 `.wdh_env` 读取；或方案 B: 文档化当前行为 | 配置来源单一明确，避免环境变量意外覆盖 | ✅ Story 7.3-5 已修复 (代码验证: `settings.py:354-413` 直接解析 `.wdh_env` 文件，注释明确 "System environment variables are IGNORED") |
 
 ---
 
@@ -155,17 +182,17 @@
 
 ### 6.1 硬编码分派问题
 
-| 编号       | 问题描述                                                      | 预期修复方案                                                   | 预期修复结果                       | 实际进展 |
-| ---------- | ------------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------- | -------- |
-| **MD-001** | `cli/etl/executors.py` L200-232 使用硬编码 if/elif 链分派 job | 实现 `JOB_REGISTRY: Dict[str, JobDefinition]` 注册表模式       | 新增 domain 无需修改 executor 代码 |          |
-| **MD-002** | `cli/etl/config.py` L157 的 backfill 域列表硬编码             | 将 `requires_backfill` 配置移至 `data_sources.yml` 元数据      | 通过配置声明 domain 能力           |          |
-| **MD-003** | 每个 domain 都需要专门的 `process_{domain}_op` 函数           | 创建通用 `process_generic_domain_op` 动态代理到 domain service | 减少重复 op 定义                   |          |
-| **MD-004** | 错误消息中支持的 domain 列表手动维护                          | 从 registry 或配置动态生成                                     | 错误消息自动更新                   |          |
-| **MD-005** | 无法验证 `data_sources.yml` 中的 domain 是否有对应 job        | 添加启动时校验逻辑                                             | 配置错误提前发现                   |          |
+| 编号       | 问题描述                                                      | 预期修复方案                                                   | 预期修复结果                       | 实际进展              |
+| ---------- | ------------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------- | --------------------- |
+| **MD-001** | `cli/etl/executors.py` L200-232 使用硬编码 if/elif 链分派 job | 实现 `JOB_REGISTRY: Dict[str, JobDefinition]` 注册表模式       | 新增 domain 无需修改 executor 代码 | ✅ Story 7.4-1 已修复 (代码验证: `executors.py:200-214` 使用 `JOB_REGISTRY.get(domain_key)`) |
+| **MD-002** | `cli/etl/config.py` L157 的 backfill 域列表硬编码             | 将 `requires_backfill` 配置移至 `data_sources.yml` 元数据      | 通过配置声明 domain 能力           | ✅ Story 7.4-2 已修复 (代码验证: `config.py:157-164` 使用 `requires_backfill` 配置) |
+| **MD-003** | 每个 domain 都需要专门的 `process_{domain}_op` 函数           | 创建通用 `process_generic_domain_op` 动态代理到 domain service | 减少重复 op 定义                   | ✅ Story 7.4-3 已修复 (代码验证: `domain_processing.py:57` `process_domain_op` + `DOMAIN_SERVICE_REGISTRY`) |
+| **MD-004** | 错误消息中支持的 domain 列表手动维护                          | 从 registry 或配置动态生成                                     | 错误消息自动更新                   | ✅ Story 7.4-1 已修复 (代码验证: `executors.py:213` `sorted(JOB_REGISTRY.keys())`) |
+| **MD-005** | 无法验证 `data_sources.yml` 中的 domain 是否有对应 job        | 添加启动时校验逻辑                                             | 配置错误提前发现                   | ✅ Story 7.4-4 已修复 (代码验证: `main.py:250` `validate_domain_registry()`) |
 
 ### 6.2 新增 Domain 所需改动清单
 
-当前架构下，新增一个 **简单 domain** (无 backfill/enrichment) 需要修改：
+**Epic 7.4 前** (旧架构) - 新增一个 **简单 domain** (无 backfill/enrichment) 需要修改：
 
 | #   | 文件                                | 修改类型                   | 状态 |
 | --- | ----------------------------------- | -------------------------- | ---- |
@@ -181,6 +208,27 @@
 | --- | ------------------------- | ------------ | ---- |
 | 6   | `cli/etl/config.py`       | 添加条件分支 | 必须 |
 | 7   | `config/foreign_keys.yml` | 添加 FK 配置 | 必须 |
+
+---
+
+**Epic 7.4 后** (新架构 - Job Registry Pattern) - **简化清单:**
+
+| #   | 文件                          | 修改类型               | 状态           |
+| --- | ----------------------------- | ---------------------- | -------------- |
+| 1   | `domain/{new_domain}/`        | 创建包                 | 必须           |
+| 2   | `config/data_sources.yml`     | 添加 domain 配置       | 必须           |
+| 3   | `config/foreign_keys.yml`     | (可选) 添加 FK 配置     | 复杂 domain    |
+
+**Epic 7.4 改进 (Story 7.4-1, 7.4-2, 7.4-3):**
+- ✅ `orchestration/ops/pipeline_ops.py` - 使用 `process_generic_domain_op` (无需手动添加)
+- ✅ `orchestration/jobs.py` - 使用 `JOB_REGISTRY` 自动注册 (无需手动添加)
+- ✅ `cli/etl/executors.py` - 自动从 registry 发现 (无需 if/elif)
+- ✅ `cli/etl/config.py` - `requires_backfill` 从 `data_sources.yml` 读取 (无需硬编码)
+
+**新架构优势:**
+- 新增简单 domain 只需 2 处修改 (domain 包 + 配置文件)
+- 新增复杂 domain 只需 3 处修改 (domain 包 + 配置文件 + FK 配置)
+- 零代码修改即可添加新 domain 的 CLI 支持
 
 ---
 
@@ -229,12 +277,14 @@ WHERE "月度" = '2025-10-01' AND "客户名称" IS NULL;
 
 | 严重性        | 数量 | 已修复 | 待处理 |
 | ------------- | ---- | ------ | ------ |
-| **Critical**  | 3    | 0      | 3      |
-| **High**      | 2    | 0      | 2      |
-| **Medium**    | 12   | 5      | 7      |
-| **Low**       | 5    | 1      | 4      |
-| **Info/Debt** | 8    | 0      | 8      |
-| **总计**      | 30   | 6      | 24     |
+| **Critical**  | 3    | 3      | 0      |
+| **High**      | 2    | 2      | 0      |
+| **Medium**    | 12   | 12     | 0      |
+| **Low**       | 5    | 5      | 0      |
+| **Info/Debt** | 8    | 8      | 0      |
+| **总计**      | 30   | 30     | 0      |
+
+**最后更新:** 2025-12-31 (代码实锤验证完成 - 100% 修复率确认)
 
 ---
 

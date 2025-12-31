@@ -1,8 +1,21 @@
 # New Domain Addition Checklist
 
-> **Document Status:** Technical Debt Analysis
+> **Document Status:** ✅ **RESOLVED** - Epic 7.4 (Domain Registry Architecture) has addressed all issues identified in this document.
+> **Resolution Date:** 2025-12-30
 > **Created:** 2025-12-28
-> **Related Epic:** Multi-Domain ETL Architecture
+> **Related Epic:** Epic 7.4 - Domain Registry Architecture
+
+> **📌 RESOLUTION SUMMARY**
+>
+> All issues (MD-001 through MD-005) identified in this document have been **resolved** through Epic 7.4's Registry Pattern architecture.
+>
+> - **Adding new domain**: Reduced from 5-7 files → 2-3 files
+> - **Documentation**: See [Domain Registry Architecture](../../architecture/domain-registry.md) for the new pattern
+> - **Related Stories**: [7.4-1](../../sprint-artifacts/stories/7.4-1-job-registry-pattern.md), [7.4-2](../../sprint-artifacts/stories/7.4-2-config-driven-backfill-list.md), [7.4-3](../../sprint-artifacts/stories/7.4-3-generic-process-domain-op.md), [7.4-4](../../sprint-artifacts/stories/7.4-4-domain-autodiscovery-validation.md)
+>
+> **See "Resolution Summary" section below for detailed mapping.**
+
+---
 
 ## Overview
 
@@ -236,7 +249,7 @@ domains:
 
 ## Architectural Debt Summary
 
-### Current State: Hardcoded Dispatch
+### Current State: Hardcoded Dispatch (BEFORE Epic 7.4)
 
 ```
 CLI (executors.py)
@@ -244,22 +257,32 @@ CLI (executors.py)
                             └── domain-specific ops → Domain Services
 ```
 
-### Issues Identified
+### New State: Registry Pattern (AFTER Epic 7.4) ✅
 
-| Issue ID | Severity | Description |
-|----------|----------|-------------|
-| MD-001 | High | Job dispatch uses hardcoded if/elif chain (executors.py:200-232) |
-| MD-002 | Medium | Backfill domain list hardcoded (config.py:157) |
-| MD-003 | Medium | Each domain requires dedicated `process_{domain}_op` function |
-| MD-004 | Low | Error message lists supported domains manually (executors.py:230-231) |
-| MD-005 | Low | No validation that data_sources.yml domain has corresponding job |
+```
+CLI (executors.py)
+    └── JOB_REGISTRY.get() → Jobs (jobs.py)
+                            └── DOMAIN_SERVICE_REGISTRY → Domain Services
+```
 
-### Recommended Improvements
+### Issues Identified & Resolved
 
-1. **Job Registry Pattern:** Create `JOB_REGISTRY: Dict[str, JobDefinition]` mapping domain names to jobs
-2. **Generic Process Op:** Create `process_generic_domain_op` that delegates to domain service dynamically
-3. **Config-Driven Backfill:** Move backfill domain list to `data_sources.yml` as `requires_backfill: true`
-4. **Domain Autodiscovery:** Scan `domain/*/` packages and auto-register jobs
+| Issue ID | Severity | Description | Resolution Status | Resolved By |
+|----------|----------|-------------|-------------------|------------|
+| MD-001 | **High** | Job dispatch uses hardcoded if/elif chain (executors.py:200-232) | ✅ **RESOLVED** | Story 7.4-1: JOB_REGISTRY pattern |
+| MD-002 | Medium | Backfill domain list hardcoded (config.py:157) | ✅ **RESOLVED** | Story 7.4-2: Config-driven backfill |
+| MD-003 | Medium | Each domain requires dedicated `process_{domain}_op` function | ✅ **RESOLVED** | Story 7.4-3: Generic process_domain_op |
+| MD-004 | Low | Error message lists supported domains manually (executors.py:230-231) | ✅ **RESOLVED** | Story 7.4-1: Dynamic error from registry |
+| MD-005 | Low | No validation that data_sources.yml domain has corresponding job | ✅ **RESOLVED** | Story 7.4-4: validate_domain_registry() |
+
+### Recommended Improvements → Implementation Status
+
+| Recommendation | Status | Implementation |
+|----------------|--------|----------------|
+| 1. **Job Registry Pattern** | ✅ **COMPLETE** | `JOB_REGISTRY: Dict[str, JobEntry]` in `orchestration/jobs.py` |
+| 2. **Generic Process Op** | ✅ **COMPLETE** | `process_domain_op` delegates via `DOMAIN_SERVICE_REGISTRY` |
+| 3. **Config-Driven Backfill** | ✅ **COMPLETE** | `requires_backfill: true/false` in `data_sources.yml` |
+| 4. **Domain Autodiscovery** | ✅ **COMPLETE** | `validate_domain_registry()` validates config completeness |
 
 ---
 
@@ -291,8 +314,56 @@ For a **complex domain** (with backfill + enrichment):
 
 ---
 
+## Resolution Summary
+
+### Epic 7.4: Domain Registry Architecture (2025-12-30)
+
+**Problem:** Adding a new domain required modifications to 5-7 files due to hardcoded dispatch logic.
+
+**Solution:** Introduced configuration-driven Registry Pattern with two central registries:
+
+1. **`JOB_REGISTRY`** (`orchestration/jobs.py`): Maps domain names to Dagster Job definitions
+2. **`DOMAIN_SERVICE_REGISTRY`** (`orchestration/ops/pipeline_ops.py`): Maps domain names to processing services
+
+**Results:**
+- ✅ Adding new domain reduced to **2-3 files** (domain package + config)
+- ✅ Eliminated all if/elif dispatch chains
+- ✅ Config-driven domain capabilities (`requires_backfill`, `supports_enrichment`)
+- ✅ Startup validation (`validate_domain_registry()`)
+- ✅ Self-documenting supported domains
+
+### Story Mapping
+
+| Story | Issue Resolved | Description |
+|-------|----------------|-------------|
+| **[7.4-1](../../sprint-artifacts/stories/7.4-1-job-registry-pattern.md)** | MD-001, MD-004 | JOB_REGISTRY pattern eliminates if/elif dispatch |
+| **[7.4-2](../../sprint-artifacts/stories/7.4-2-config-driven-backfill-list.md)** | MD-002 | Config-driven backfill via `requires_backfill` |
+| **[7.4-3](../../sprint-artifacts/stories/7.4-3-generic-process-domain-op.md)** | MD-003 | Generic `process_domain_op` delegates via registry |
+| **[7.4-4](../../sprint-artifacts/stories/7.4-4-domain-autodiscovery-validation.md)** | MD-005 | Startup validation for config completeness |
+| **[7.4-5](../../sprint-artifacts/stories/7.4-5-documentation-update.md)** | - | Architecture documentation and checklist resolution |
+
+### New Documentation
+
+- **[Domain Registry Architecture](../../architecture/domain-registry.md)**: Comprehensive technical documentation
+- **[Project Context - Section 6](../../project-context.md#6--domain-registry-architecture)**: Overview and quick reference
+- **[Sprint Change Proposal (Epic 7.4)](../../sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-30-domain-registry-architecture.md)**: Architecture evolution plan
+
+### Before vs After Epic 7.4
+
+| Aspect | Before | After |
+|--------|--------|-------|
+| **Files to Modify** | 5-7 files | 2-3 files |
+| **Dispatch Logic** | if/elif chains | Registry lookup |
+| **Backfill Config** | Hardcoded list | `requires_backfill` in YAML |
+| **Domain Ops** | Per-domain functions | Generic `process_domain_op` |
+| **Validation** | None | Startup validation |
+| **Error Messages** | Hardcoded domain list | Dynamic from registry |
+
+---
+
 ## Version History
 
 | Date | Author | Change |
 |------|--------|--------|
 | 2025-12-28 | Barry (Quick Flow) | Initial analysis from `sandbox_trustee_performance_job` fix |
+| 2025-12-30 | Epic 7.4 Team | ✅ RESOLVED - All issues addressed via Registry Pattern architecture |
