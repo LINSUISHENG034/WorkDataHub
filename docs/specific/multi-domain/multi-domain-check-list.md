@@ -16,14 +16,14 @@
 
 | 严重性        | 数量 | 已修复 | 待处理 | 修复率 |
 | ------------- | ---- | ------ | ------ | ------ |
-| **Critical**  | 3    | 3      | 0      | 100%  |
+| **Critical**  | 4    | 4      | 0      | 100%  |
 | **High**      | 2    | 2      | 0      | 100%  |
-| **Medium**    | 12   | 12     | 0      | 100%  |
+| **Medium**    | 14   | 14     | 0      | 100%  |
 | **Low**       | 5    | 5      | 0      | 100%  |
-| **Info/Debt** | 8    | 8      | 0      | 100%  |
-| **总计**      | 30   | 30     | 0      | 100%  |
+| **Info/Debt** | 10   | 10     | 0      | 100%  |
+| **总计**      | 35   | 35     | 0      | 100%  |
 
-**已修复问题总数:** 30/30 (100%)
+**已修复问题总数:** 35/35 (100%)
 
 **剩余问题:** 无
 
@@ -273,18 +273,48 @@ WHERE "月度" = '2025-10-01' AND "客户名称" IS NULL;
 
 ---
 
+## 八、Mapping 表 ID 列设计问题 (Story 7.5)
+
+> **来源:** `mapping-table-id-column-issue.md`
+> **发现日期:** 2025-12-31
+> **严重性:** Critical (阻塞 ETL 执行)
+
+### 8.1 问题描述
+
+ETL 执行 FK backfill 时报错 `NotNullViolation: null value in column "id"`。
+
+| 编号       | 问题描述                                                          | 预期修复方案                                                      | 预期修复结果                        | 实际进展                 |
+| ---------- | ----------------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------- | ------------------------ |
+| **ID-001** | `年金客户.id` 定义为 `NOT NULL` 但无 IDENTITY，FK backfill 无法提供值 | 修改迁移脚本，添加 `sa.Identity(always=True)`                      | id 列自动生成                        | ✅ Story 7.5 已修复       |
+| **ID-002** | `年金计划` 主键为 `id` 而非业务键 `年金计划号`                     | 修改 Domain Registry，`primary_key="年金计划号"`                   | 主键为业务键                        | ✅ Story 7.5 已修复       |
+| **ID-003** | `组合计划` 主键为 `id` 而非业务键 `组合代码`                       | 修改 Domain Registry，`primary_key="组合代码"`                     | 主键为业务键                        | ✅ Story 7.5 已修复       |
+| **ID-004** | DDL 生成器硬编码 INTEGER IDENTITY PRIMARY KEY，不支持字符串主键   | 修改 `ddl_generator.py` 支持业务键作为主键                        | 业务键主键正确生成                  | ✅ Story 7.5 已修复       |
+| **ID-005** | Seed 脚本未将 `年金客户` 加入 id 排除列表                          | 修改 `003_seed_static_data.py` 添加 `年金客户` 到排除列表          | Seed 数据正确加载                   | ✅ Story 7.5 已修复       |
+
+### 8.2 修复后验证结果
+
+| 表名 | 主键列 | id 列 IDENTITY | ETL 状态 |
+|------|--------|----------------|----------|
+| `年金客户` | `company_id` | YES (ALWAYS) | ✅ |
+| `年金计划` | `年金计划号` | YES (ALWAYS) | ✅ |
+| `组合计划` | `组合代码` | YES (ALWAYS) | ✅ |
+
+**参考文档:** [mapping-table-id-column-issue.md](./mapping-table-id-column-issue.md)
+
+---
+
 ## 附录：问题严重性统计
 
 | 严重性        | 数量 | 已修复 | 待处理 |
 | ------------- | ---- | ------ | ------ |
-| **Critical**  | 3    | 3      | 0      |
+| **Critical**  | 4    | 4      | 0      |
 | **High**      | 2    | 2      | 0      |
-| **Medium**    | 12   | 12     | 0      |
+| **Medium**    | 14   | 14     | 0      |
 | **Low**       | 5    | 5      | 0      |
-| **Info/Debt** | 8    | 8      | 0      |
-| **总计**      | 30   | 30     | 0      |
+| **Info/Debt** | 10   | 10     | 0      |
+| **总计**      | 35   | 35     | 0      |
 
-**最后更新:** 2025-12-31 (代码实锤验证完成 - 100% 修复率确认)
+**最后更新:** 2025-12-31 (Story 7.5 Mapping 表 ID 列设计问题修复 - 100% 修复率确认)
 
 ---
 
@@ -297,3 +327,4 @@ WHERE "月度" = '2025-10-01' AND "客户名称" IS NULL;
 - [config-priority-issue.md](./config-priority-issue.md) - 配置优先级问题
 - [new-domain-checklist.md](./new-domain-checklist.md) - 新增域检查清单
 - [priority-roadmap.md](./priority-roadmap.md) - 修复优先级路线图
+- [mapping-table-id-column-issue.md](./mapping-table-id-column-issue.md) - Mapping 表 ID 列设计问题 (Story 7.5)

@@ -13,7 +13,7 @@ register_domain(
         pg_schema="mapping",
         pg_table="年金计划",
         sheet_name="年金计划",
-        primary_key="id",
+        primary_key="年金计划号",  # Story 7.5: Changed from id to business key
         delete_scope_key=["年金计划号", "company_id"],
         composite_key=["年金计划号", "company_id"],
         bronze_required=["年金计划号"],

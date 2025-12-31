@@ -46,7 +46,7 @@ domains:
           - source: "计划代码"
             target: "年金计划号"
           - source: "计划名称"
-            target: "计划全称"  # Fixed: actual column name
+            target: "计划全称" # Fixed: actual column name
             optional: true
           - source: "计划类型"
             target: "计划类型"
@@ -91,12 +91,12 @@ domains:
         target_key: "组合代码"
         target_schema: "mapping"
         mode: "insert_missing"
-        depends_on: ["fk_plan"]  # Portfolio depends on Plan
+        depends_on: ["fk_plan"] # Portfolio depends on Plan
         backfill_columns:
           - source: "组合代码"
             target: "组合代码"
           - source: "计划代码"
-            target: "年金计划号"  # Foreign key to 年金计划
+            target: "年金计划号" # Foreign key to 年金计划
           - source: "组合名称"
             target: "组合名称"
             optional: true
@@ -130,7 +130,7 @@ domains:
         target_key: "机构代码"
         target_schema: "mapping"
         mode: "insert_missing"
-        skip_blank_values: true  # Skip "(空白)" and empty values
+        skip_blank_values: true # Skip "(空白)" and empty values
         backfill_columns:
           - source: "机构代码"
             target: "机构代码"
@@ -147,7 +147,7 @@ domains:
         target_key: "company_id"
         target_schema: "mapping"
         mode: "insert_missing"
-        skip_blank_values: true  # Skip temp IDs (IN*)
+        skip_blank_values: true # Skip temp IDs (IN*)
         backfill_columns:
           - source: "company_id"
             target: "company_id"

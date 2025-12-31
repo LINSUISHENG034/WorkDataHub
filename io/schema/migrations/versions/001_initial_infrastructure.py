@@ -636,10 +636,17 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
         )
 
     # === 14. 年金客户 (Annuity Customers - reference table, not a domain) ===
+    # Story 7.5: id column changed to IDENTITY for FK backfill compatibility
+    # Story 7.5-1: Replace 更新时间 with created_at/updated_at for audit consistency
     if not _table_exists(conn, "年金客户", "mapping"):
         op.create_table(
             "年金客户",
-            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column(
+                "id",
+                sa.Integer(),
+                sa.Identity(always=True),
+                nullable=False,
+            ),
             sa.Column("company_id", sa.String(), nullable=False),
             sa.Column("客户名称", sa.String(), nullable=True),
             sa.Column("年金客户标签", sa.String(), nullable=True),
@@ -650,7 +657,7 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
             sa.Column("主拓机构", sa.String(), nullable=True),
             sa.Column("其他年金计划", sa.String(), nullable=True),
             sa.Column("客户简称", sa.String(), nullable=True),
-            sa.Column("更新时间", sa.Date(), nullable=True),
+            # Story 7.5-1: Removed 更新时间, will be added via migration
             sa.Column("最新受托规模", sa.Float(), nullable=True),
             sa.Column("最新投管规模", sa.Float(), nullable=True),
             sa.Column("管理资格", sa.String(), nullable=True),
@@ -665,6 +672,9 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
             sa.Column("计划状态", sa.String(), nullable=True),
             sa.Column("关联计划数", sa.Integer(), nullable=True),
             sa.Column("备注", sa.Text(), nullable=True),
+            # Story 7.5-1: Add audit columns for consistency with domain tables
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False, server_default=func.now()),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), nullable=False, server_default=func.now()),
             sa.PrimaryKeyConstraint("company_id", name="年金客户_pkey"),
             schema="mapping",
             comment="Reference table: Annuity customers (10,997 rows, manual DDL)",

@@ -40,7 +40,13 @@ def _column_type_to_sql(col: ColumnDef) -> str:
 
 
 def generate_create_table_ddl(domain_name: str, if_not_exists: bool = False) -> str:
-    """Generate just the CREATE TABLE statement."""
+    """Generate just the CREATE TABLE statement.
+
+    Story 7.5: Updated to support non-id primary keys.
+    - If primary_key is "id", generates INTEGER IDENTITY PRIMARY KEY
+    - Otherwise, generates business key as PRIMARY KEY with correct type,
+      and adds "id" as a separate IDENTITY column for internal use
+    """
     schema = get_domain(domain_name)
     qualified_table = qualify_table(schema.pg_table, schema.pg_schema)
     quoted_pk = quote_identifier(schema.primary_key)
@@ -50,10 +56,29 @@ def generate_create_table_ddl(domain_name: str, if_not_exists: bool = False) -> 
 
     exists_clause = "IF NOT EXISTS " if if_not_exists else ""
     lines.append(f"CREATE TABLE {exists_clause}{qualified_table} (")
-    lines.append(f"  {quoted_pk} INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,")
+
+    # Story 7.5: Handle both id-based and business-key-based primary keys
+    if schema.primary_key == "id":
+        # Standard id-based primary key with IDENTITY
+        lines.append(f"  {quoted_pk} INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,")
+    else:
+        # Business key as primary key - add id column for internal use first
+        lines.append('  "id" INTEGER GENERATED ALWAYS AS IDENTITY,')
+        # Find the primary key column definition to get its type
+        pk_col = next((c for c in schema.columns if c.name == schema.primary_key), None)
+        if pk_col:
+            pk_sql_type = _column_type_to_sql(pk_col)
+            lines.append(f"  {quoted_pk} {pk_sql_type} NOT NULL PRIMARY KEY,")
+        else:
+            # Fallback: assume STRING if not found in columns
+            lines.append(f"  {quoted_pk} VARCHAR NOT NULL PRIMARY KEY,")
+
     lines.append("")
     lines.append("  -- Business columns")
     for col in schema.columns:
+        # Skip primary key column if it's a business key (already added above)
+        if col.name == schema.primary_key and schema.primary_key != "id":
+            continue
         quoted_name = quote_identifier(col.name)
         sql_type = _column_type_to_sql(col)
         nullable_str = "" if col.nullable else " NOT NULL"
