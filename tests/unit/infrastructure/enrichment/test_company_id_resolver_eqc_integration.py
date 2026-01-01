@@ -195,9 +195,14 @@ def test_resolver_backflow_existing_column(monkeypatch) -> None:
     assert result.statistics.existing_column_hits == 1
     assert repo.backflow_payloads, "Backflow payloads should be recorded"
     backflow = repo.backflow_payloads[0]
-    # Should contain three entries: account (raw), name (normalized), account_name (raw)
-    assert len(backflow) == 3
-    # Check normalized entry
+    # Story 7.5-1: Should contain four entries: plan (raw), account (raw), name (normalized), account_name (raw)
+    assert len(backflow) == 4
+    # Check plan_code entry (P1)
+    plan_entry = [m for m in backflow if m["match_type"] == "plan"][0]
+    assert plan_entry["alias_name"] == "P1"
+    assert plan_entry["priority"] == 1
+    assert plan_entry["canonical_id"] == "CID123"
+    # Check normalized entry (P4)
     normalized_entry = [m for m in backflow if m["match_type"] == "name"][0]
     assert normalized_entry["alias_name"] == "normalized_name"
     assert normalized_entry["canonical_id"] == "CID123"

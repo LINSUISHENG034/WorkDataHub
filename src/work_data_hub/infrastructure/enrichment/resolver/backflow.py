@@ -14,10 +14,9 @@ import pandas as pd
 # Import normalize functions via facade for monkeypatch compatibility
 # Tests patch company_id_resolver.normalize_* (Story 7.3 AC-4)
 from work_data_hub.infrastructure.enrichment import company_id_resolver as _facade
+from work_data_hub.infrastructure.enrichment.normalizer import generate_temp_company_id
+from work_data_hub.infrastructure.enrichment.types import ResolutionStrategy
 from work_data_hub.utils.logging import get_logger
-
-from ..normalizer import generate_temp_company_id
-from ..types import ResolutionStrategy
 
 if TYPE_CHECKING:
     from work_data_hub.infrastructure.enrichment.mapping_repository import (
@@ -42,6 +41,9 @@ def backflow_new_mappings(
     Story 6.4.1: P4 (customer_name) uses normalized values for backflow,
     while P2 (account_number), P5 (account_name) use RAW values.
 
+    Story 7.5-1: P1 (plan_code) added for backflow support, enabling
+    subsequent ETL executions to hit enrichment_index cache for plan_code lookups.
+
     Args:
         df: DataFrame with resolved company IDs.
         resolved_indices: Indices of rows resolved via existing column.
@@ -53,7 +55,9 @@ def backflow_new_mappings(
     """
     new_mappings: List[Dict[str, Any]] = []
     # Story 6.4.1: P4 (customer_name) needs normalization, others use RAW values
+    # Story 7.5-1: P1 (plan_code) added for backflow support
     backflow_fields = [
+        (strategy.plan_code_column, "plan", 1, False),  # P1: RAW (plan_code)
         (strategy.account_number_column, "account", 2, False),  # P2: RAW
         (strategy.customer_name_column, "name", 4, True),  # P4: NORMALIZED
         (strategy.account_name_column, "account_name", 5, False),  # P5: RAW

@@ -383,7 +383,7 @@ development_status:
   # BLOCKING: Epic 8 depends on data quality improvements
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2026-01-01-empty-customer-name-handling.md
   epic-7.5: in-progress
-  7.5-1-backflow-plan-code-support: ready-for-dev # P0: Add plan_code to backflow_fields - Story created 2026-01-01
+  7.5-1-backflow-plan-code-support: done # P0: Add plan_code to backflow_fields - ✅ Code Review PASSED 2026-01-01
   7.5-2-plan-name-fallback-single-plan: backlog # P1: Extract company name from plan name for single-plan
   7.5-3-empty-customer-name-null-handling: backlog # P2: Return NULL instead of temp ID for empty names
 
