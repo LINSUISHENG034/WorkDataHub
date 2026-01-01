@@ -22,7 +22,7 @@ from work_data_hub.domain.annuity_income.pipeline_builder import (
     build_bronze_to_silver_pipeline,
     load_plan_override_mapping,
     _apply_portfolio_code_defaults,
-    _fill_customer_name,  # Story 7.3-6: Test null preservation
+    _fill_customer_name_from_plan_name,  # Story 7.5-2: Plan name extraction
     _apply_plan_code_defaults,  # Story 7.3-6: Test plan code defaults
 )
 from work_data_hub.domain.annuity_income.constants import (  # Story 7.3-6
@@ -414,32 +414,6 @@ class TestPipelineExecution:
 class TestStory736PipelineAlignment:
     """Story 7.3-6: Tests for pipeline processing alignment with annuity_performance."""
 
-    def test_fill_customer_name_preserves_nulls(self):
-        """Story 7.3-6 AC3: _fill_customer_name preserves null values (no plan name fallback)."""
-        df = pd.DataFrame(
-            {
-                "客户名称": [None, "公司A", pd.NA],
-                "计划名称": ["计划1", "计划2", "计划3"],  # Should NOT be used
-            }
-        )
-
-        result = _fill_customer_name(df)
-
-        # Verify nulls are preserved, not filled with plan names
-        assert pd.isna(result.iloc[0])
-        assert result.iloc[1] == "公司A"
-        assert pd.isna(result.iloc[2])
-
-    def test_fill_customer_name_handles_missing_column(self):
-        """_fill_customer_name handles missing 客户名称 column gracefully."""
-        df = pd.DataFrame({"计划名称": ["计划1", "计划2"]})
-
-        result = _fill_customer_name(df)
-
-        # Should return NA series when column is missing
-        assert len(result) == 2
-        assert all(pd.isna(result))
-
     def test_apply_plan_code_defaults_collective(self):
         """Story 7.3-6 AC10: Applies AN001 for 集合计划."""
         df = pd.DataFrame(
@@ -514,3 +488,157 @@ class TestStory736PipelineAlignment:
         # Ensure constants are what we expect (prevents accidental changes)
         assert PLAN_CODE_CORRECTIONS == {"1P0290": "P0290", "1P0807": "P0807"}
         assert PLAN_CODE_DEFAULTS == {"集合计划": "AN001", "单一计划": "AN002"}
+
+
+class TestFillCustomerNameFromPlanName:
+    """Tests for _fill_customer_name_from_plan_name function (Story 7.5-2)."""
+
+    def test_extracts_company_name_from_plan_name(self):
+        """Extracts company name by removing 企业年金计划 suffix."""
+        df = pd.DataFrame(
+            {
+                "客户名称": [None],
+                "计划名称": ["中关村发展集团股份有限公司企业年金计划"],
+                "计划类型": ["单一计划"],
+            }
+        )
+
+        result = _fill_customer_name_from_plan_name(df)
+
+        assert result[0] == "中关村发展集团股份有限公司"
+
+    def test_single_plan_gets_extracted_name(self):
+        """Single-plan records with empty customer name get extracted name."""
+        df = pd.DataFrame(
+            {
+                "客户名称": [None, "", "0"],
+                "计划名称": [
+                    "A公司企业年金计划",
+                    "B公司企业年金计划",
+                    "C公司企业年金计划",
+                ],
+                "计划类型": ["单一计划", "单一计划", "单一计划"],
+            }
+        )
+
+        result = _fill_customer_name_from_plan_name(df)
+
+        assert result[0] == "A公司"
+        assert result[1] == "B公司"
+        assert result[2] == "C公司"
+
+    def test_collective_plan_skipped(self):
+        """Collective-plan records are skipped (customer name remains empty)."""
+        df = pd.DataFrame(
+            {
+                "客户名称": [None, None],
+                "计划名称": ["平安相伴今生企业年金集合计划", "A公司企业年金计划"],
+                "计划类型": ["集合计划", "单一计划"],
+            }
+        )
+
+        result = _fill_customer_name_from_plan_name(df)
+
+        assert pd.isna(result[0])  # Collective - skipped
+        assert result[1] == "A公司"  # Single - extracted
+
+    def test_collective_plan_with_matching_suffix_still_skipped(self):
+        """Collective plan with 企业年金计划 suffix is still skipped (type check first)."""
+        df = pd.DataFrame(
+            {
+                "客户名称": [None],
+                "计划名称": [
+                    "某品牌企业年金计划"
+                ],  # Ends with suffix but is collective
+                "计划类型": ["集合计划"],
+            }
+        )
+
+        result = _fill_customer_name_from_plan_name(df)
+
+        assert pd.isna(result[0])  # Skipped because 计划类型 == 集合计划
+
+    def test_preserves_existing_customer_name(self):
+        """Existing non-empty customer names are preserved."""
+        df = pd.DataFrame(
+            {
+                "客户名称": ["已有客户"],
+                "计划名称": ["某公司企业年金计划"],
+                "计划类型": ["单一计划"],
+            }
+        )
+
+        result = _fill_customer_name_from_plan_name(df)
+
+        assert result[0] == "已有客户"  # Preserved
+
+    def test_plan_name_without_suffix_returns_null(self):
+        """Plan names without 企业年金计划 suffix return NULL (not the plan name)."""
+        df = pd.DataFrame(
+            {
+                "客户名称": [None],
+                "计划名称": ["其他类型计划"],
+                "计划类型": ["单一计划"],
+            }
+        )
+
+        result = _fill_customer_name_from_plan_name(df)
+
+        # CRITICAL: Must return NULL, NOT the plan name
+        assert pd.isna(result[0])
+
+    def test_handles_none_plan_name(self):
+        """NULL plan name is handled gracefully."""
+        df = pd.DataFrame(
+            {
+                "客户名称": [None],
+                "计划名称": [None],
+                "计划类型": ["单一计划"],
+            }
+        )
+
+        result = _fill_customer_name_from_plan_name(df)
+
+        assert pd.isna(result[0])
+
+    def test_handles_empty_string_plan_name(self):
+        """Empty string plan name is handled gracefully."""
+        df = pd.DataFrame(
+            {
+                "客户名称": [None],
+                "计划名称": [""],
+                "计划类型": ["单一计划"],
+            }
+        )
+
+        result = _fill_customer_name_from_plan_name(df)
+
+        assert pd.isna(result[0])
+
+    def test_handles_suffix_only_plan_name(self):
+        """Plan name that is only the suffix returns NULL."""
+        df = pd.DataFrame(
+            {
+                "客户名称": [None],
+                "计划名称": ["企业年金计划"],  # Suffix only, no company name
+                "计划类型": ["单一计划"],
+            }
+        )
+
+        result = _fill_customer_name_from_plan_name(df)
+
+        assert pd.isna(result[0])  # No company name extracted
+
+    def test_handles_whitespace_plan_name(self):
+        """Whitespace-only plan name is handled gracefully."""
+        df = pd.DataFrame(
+            {
+                "客户名称": [None],
+                "计划名称": ["   "],
+                "计划类型": ["单一计划"],
+            }
+        )
+
+        result = _fill_customer_name_from_plan_name(df)
+
+        assert pd.isna(result[0])

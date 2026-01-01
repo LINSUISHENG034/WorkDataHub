@@ -40,15 +40,69 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 
 
-def _fill_customer_name(df: pd.DataFrame) -> pd.Series:
-    """Keep customer name as-is, allow null (consistent with annuity_performance).
+def _fill_customer_name_from_plan_name(df: pd.DataFrame) -> pd.Series:
+    """Fill customer name from plan name for single-plan records only.
 
-    Story 7.3-6: Removed plan name fallback to match annuity_performance behavior.
+    Story 7.5-2: For '单一计划' records with empty customer name,
+    extract company name from plan name by removing suffix '企业年金计划'.
+
+    Extraction rules:
+    - Single plan with matching suffix: "{CompanyName}企业年金计划" → "{CompanyName}"
+    - Single plan without matching suffix: Keep NULL (do NOT use plan name as-is)
+    - Collective plan: Skip (belongs to multiple customers)
+
+    Args:
+        df: DataFrame with columns 客户名称, 计划名称, 计划类型
+
+    Returns:
+        pd.Series: Customer names (extracted or original)
     """
-    if "客户名称" in df.columns:
-        return df["客户名称"]  # Keep as-is, including nulls
-    else:
+    if "客户名称" not in df.columns:
         return pd.Series([pd.NA] * len(df), index=df.index)
+
+    result = df["客户名称"].copy()
+
+    # Check required columns for extraction
+    if "计划类型" not in df.columns or "计划名称" not in df.columns:
+        return result  # Keep as-is if missing columns
+
+    # Build mask: single-plan + empty customer name + valid plan name
+    # Note: "0" is a known empty placeholder in source data
+    empty_mask = result.isna() | (result == "") | (result == "0")
+    single_plan_mask = df["计划类型"] == "单一计划"
+    has_plan_name = df["计划名称"].notna() & (df["计划名称"] != "")
+    target_mask = empty_mask & single_plan_mask & has_plan_name
+
+    # Extract company name from plan name (only if suffix matches)
+    suffix = "企业年金计划"
+
+    def extract_company_name(plan_name: str) -> object:
+        """Extract company name if plan name matches pattern, else return NA."""
+        if not isinstance(plan_name, str):
+            return pd.NA
+        if plan_name.endswith(suffix):
+            extracted = plan_name[: -len(suffix)].strip()
+            # Guard: suffix-only plan name (e.g., "企业年金计划") returns NA
+            return extracted if extracted else pd.NA
+        # No suffix match: return NA (do NOT use plan name as customer name)
+        return pd.NA
+
+    extracted = df.loc[target_mask, "计划名称"].apply(extract_company_name)
+    result.loc[target_mask] = extracted
+
+    # Structured logging for operational visibility
+    extracted_count = extracted.notna().sum()
+    skipped_no_match = extracted.isna().sum()
+    collective_count = ((df["计划类型"] == "集合计划") & empty_mask).sum()
+
+    logger.bind(domain="annuity_income", step="fill_customer_name").info(
+        "Plan name extraction complete",
+        extracted=extracted_count,
+        skipped_no_match=skipped_no_match,
+        skipped_collective=collective_count,
+    )
+
+    return result
 
 
 def _apply_plan_code_defaults(df: pd.DataFrame) -> pd.Series:
@@ -195,8 +249,8 @@ def build_bronze_to_silver_pipeline(
     3. CalculationStep: 机构代码 from 机构名称 via COMPANY_BRANCH_MAPPING
     4. CalculationStep: Date parsing for 月度 (parse_chinese_date)
     5. CalculationStep: 机构代码 default to 'G00' (replace 'null' string + fillna)
-    6. CalculationStep: Customer/income defaults (客户名称 fallback to 计划名称,
-       income nulls → 0)
+    6. CalculationStep: Customer/income defaults (客户名称 from 计划名称,
+       income nulls → 0) - Story 7.5-2
     7. CalculationStep: 组合代码 regex replace '^F' → '' + conditional default
     8. CalculationStep: 产品线代码 from 业务类型 via BUSINESS_TYPE_CODE_MAPPING
     9. CalculationStep: Preserve 年金账户名 = 客户名称 (BEFORE normalization)
@@ -247,10 +301,10 @@ def build_bronze_to_silver_pipeline(
                 else pd.Series([DEFAULT_INSTITUTION_CODE] * len(df)),
             }
         ),
-        # Step 6: Customer/income defaults (fallback names + zero missing income)
+        # Step 6: Customer/income defaults (extract names + zero missing income)
         CalculationStep(
             {
-                "客户名称": _fill_customer_name,
+                "客户名称": _fill_customer_name_from_plan_name,
                 "固费": lambda df: df["固费"].fillna(0)
                 if "固费" in df.columns
                 else pd.Series([0] * len(df)),
