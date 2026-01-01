@@ -377,8 +377,18 @@ development_status:
   7.4-5-documentation-update: done # P2: Update architecture docs, mark checklist resolved - Code Review PASSED 2025-12-30
   epic-7.4-retrospective: optional
 
+  # Epic 7.5: Empty Customer Name Handling Enhancement
+  # Added 2026-01-01 via Correct-Course workflow
+  # Fixes: BF-001 (Backflow plan_code gap), PN-001 (Plan name fallback), CP-001 (Empty name → NULL)
+  # BLOCKING: Epic 8 depends on data quality improvements
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2026-01-01-empty-customer-name-handling.md
+  epic-7.5: in-progress
+  7.5-1-backflow-plan-code-support: ready-for-dev # P0: Add plan_code to backflow_fields - Story created 2026-01-01
+  7.5-2-plan-name-fallback-single-plan: backlog # P1: Extract company name from plan name for single-plan
+  7.5-3-empty-customer-name-null-handling: backlog # P2: Return NULL instead of temp ID for empty names
+
   # Epic 8: Testing & Validation Infrastructure
-  # BLOCKED BY: Epic 7.4 (Domain Registry Architecture)
+  # BLOCKED BY: Epic 7.5 (Empty Customer Name Handling)
   epic-8: backlog
   8-1-golden-dataset-extraction-from-legacy-system: backlog
   8-2-automated-reconciliation-engine: backlog
