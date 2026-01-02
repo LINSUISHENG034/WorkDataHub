@@ -7,6 +7,8 @@ from work_data_hub.infrastructure.mappings import (
     BUSINESS_TYPE_CODE_MAPPING,
     COMPANY_BRANCH_MAPPING,
     DEFAULT_PORTFOLIO_CODE_MAPPING,
+    PLAN_CODE_CORRECTIONS,  # Story 7.4-6
+    PLAN_CODE_DEFAULTS,  # Story 7.4-6
     PORTFOLIO_QTAN003_BUSINESS_TYPES,
 )
 
@@ -40,12 +42,10 @@ DEFAULT_ALLOWED_GOLD_COLUMNS: Sequence[str] = (
     "company_id",
 )
 
-PLAN_CODE_CORRECTIONS: Dict[str, str] = {"1P0290": "P0290", "1P0807": "P0807"}
-PLAN_CODE_DEFAULTS: Dict[str, str] = {"集合计划": "AN001", "单一计划": "AN002"}
-
 # Note: BUSINESS_TYPE_CODE_MAPPING, DEFAULT_PORTFOLIO_CODE_MAPPING,
+# PLAN_CODE_CORRECTIONS, PLAN_CODE_DEFAULTS,
 # PORTFOLIO_QTAN003_BUSINESS_TYPES, and COMPANY_BRANCH_MAPPING are now
-# imported from infrastructure.mappings (Story 5.5.4 extraction)
+# imported from infrastructure.mappings (Story 5.5.4 and 7.4-6 extraction)
 
 DEFAULT_INSTITUTION_CODE: str = "G00"
 
@@ -75,12 +75,12 @@ DEFAULT_UPSERT_KEYS: Sequence[str] = ("月度", "计划代码", "组合代码", 
 
 __all__: list[str] = [
     "DEFAULT_ALLOWED_GOLD_COLUMNS",
-    "PLAN_CODE_CORRECTIONS",
-    "PLAN_CODE_DEFAULTS",
-    "BUSINESS_TYPE_CODE_MAPPING",
-    "DEFAULT_PORTFOLIO_CODE_MAPPING",
-    "PORTFOLIO_QTAN003_BUSINESS_TYPES",
-    "COMPANY_BRANCH_MAPPING",
+    "PLAN_CODE_CORRECTIONS",  # Re-exported from infrastructure for backward compatibility
+    "PLAN_CODE_DEFAULTS",  # Re-exported from infrastructure for backward compatibility
+    "BUSINESS_TYPE_CODE_MAPPING",  # Re-exported from infrastructure for backward compatibility
+    "DEFAULT_PORTFOLIO_CODE_MAPPING",  # Re-exported from infrastructure for backward compatibility
+    "PORTFOLIO_QTAN003_BUSINESS_TYPES",  # Re-exported from infrastructure for backward compatibility
+    "COMPANY_BRANCH_MAPPING",  # Re-exported from infrastructure for backward compatibility
     "DEFAULT_INSTITUTION_CODE",
     "LEGACY_COLUMNS_TO_DELETE",
     "COLUMN_ALIAS_MAPPING",

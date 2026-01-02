@@ -40,6 +40,20 @@ DEFAULT_PORTFOLIO_CODE_MAPPING: Dict[str, str] = {
 # Used by: annuity_performance, annuity_income
 PORTFOLIO_QTAN003_BUSINESS_TYPES: Sequence[str] = ("职年受托", "职年投资")
 
+# Plan code typo corrections (Story 7.4-6)
+# Used by: annuity_performance, annuity_income
+PLAN_CODE_CORRECTIONS: Dict[str, str] = {
+    "1P0290": "P0290",
+    "1P0807": "P0807",
+}
+
+# Plan code defaults based on plan type (Story 7.4-6)
+# Used by: annuity_performance, annuity_income
+PLAN_CODE_DEFAULTS: Dict[str, str] = {
+    "集合计划": "AN001",
+    "单一计划": "AN002",
+}
+
 # Company branch name to institution code mapping
 # CRITICAL: Complete mapping including:
 # 1. All 38 mappings from legacy.mapping."组织架构" database table
@@ -104,5 +118,7 @@ __all__ = [
     "BUSINESS_TYPE_CODE_MAPPING",
     "COMPANY_BRANCH_MAPPING",
     "DEFAULT_PORTFOLIO_CODE_MAPPING",
+    "PLAN_CODE_CORRECTIONS",
+    "PLAN_CODE_DEFAULTS",
     "PORTFOLIO_QTAN003_BUSINESS_TYPES",
 ]

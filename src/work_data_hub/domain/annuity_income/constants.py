@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from typing import Dict, Sequence
 
-# Shared mappings imported from infrastructure (Story 5.5.4 extraction)
+# Shared mappings imported from infrastructure (Story 5.5.4 and 7.4-6 extraction)
 from work_data_hub.infrastructure.mappings import (
     BUSINESS_TYPE_CODE_MAPPING,
     COMPANY_BRANCH_MAPPING,
     DEFAULT_PORTFOLIO_CODE_MAPPING,
+    PLAN_CODE_CORRECTIONS,  # Story 7.4-6
+    PLAN_CODE_DEFAULTS,  # Story 7.4-6
     PORTFOLIO_QTAN003_BUSINESS_TYPES,
 )
 
@@ -26,11 +28,10 @@ LEGACY_COLUMNS_TO_DELETE: Sequence[str] = (
 # AnnuityIncome-specific: Default institution code
 DEFAULT_INSTITUTION_CODE: str = "G00"
 
-# Story 7.3-6: Plan code corrections (typo fixes)
-PLAN_CODE_CORRECTIONS: Dict[str, str] = {"1P0290": "P0290", "1P0807": "P0807"}
-
-# Story 7.3-6: Plan code defaults (for empty values based on plan type)
-PLAN_CODE_DEFAULTS: Dict[str, str] = {"集合计划": "AN001", "单一计划": "AN002"}
+# Note: BUSINESS_TYPE_CODE_MAPPING, DEFAULT_PORTFOLIO_CODE_MAPPING,
+# PLAN_CODE_CORRECTIONS, PLAN_CODE_DEFAULTS,
+# PORTFOLIO_QTAN003_BUSINESS_TYPES, and COMPANY_BRANCH_MAPPING are now
+# imported from infrastructure.mappings (Story 5.5.4 and 7.4-6 extraction)
 
 # AnnuityIncome-specific: Gold layer output columns
 # Story 5.5.5: Four income fields instead of 收入金额
@@ -62,14 +63,16 @@ DEFAULT_ALLOWED_GOLD_COLUMNS: Sequence[str] = (
 # difference for Story 5.5.3 parity validation.
 
 __all__: list[str] = [
+    # Re-exported from infrastructure (backward compatibility)
     "BUSINESS_TYPE_CODE_MAPPING",
     "DEFAULT_PORTFOLIO_CODE_MAPPING",
     "PORTFOLIO_QTAN003_BUSINESS_TYPES",
     "COMPANY_BRANCH_MAPPING",
+    "PLAN_CODE_CORRECTIONS",  # Story 7.4-6
+    "PLAN_CODE_DEFAULTS",  # Story 7.4-6
+    # Domain-specific constants
     "COLUMN_ALIAS_MAPPING",
     "LEGACY_COLUMNS_TO_DELETE",
     "DEFAULT_INSTITUTION_CODE",
     "DEFAULT_ALLOWED_GOLD_COLUMNS",
-    "PLAN_CODE_CORRECTIONS",  # Story 7.3-6
-    "PLAN_CODE_DEFAULTS",  # Story 7.3-6
 ]

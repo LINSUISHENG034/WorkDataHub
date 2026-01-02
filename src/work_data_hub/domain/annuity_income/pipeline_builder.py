@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING, Dict, Optional
 
 import pandas as pd
@@ -12,14 +11,18 @@ from work_data_hub.infrastructure.enrichment import (
     EqcLookupConfig,
     ResolutionStrategy,
 )
+from work_data_hub.infrastructure.mappings import PLAN_CODE_CORRECTIONS  # Story 7.4-6
 from work_data_hub.infrastructure.transforms import (
     CalculationStep,
     CleansingStep,
     DropStep,
     MappingStep,
     Pipeline,
-    ReplacementStep,  # Story 7.3-6: Import for plan code corrections
+    ReplacementStep,
     TransformStep,
+    # Story 7.4-6: Import shared helpers from infrastructure
+    apply_plan_code_defaults,
+    apply_portfolio_code_defaults,
 )
 from work_data_hub.utils.date_parser import parse_chinese_date
 
@@ -28,16 +31,18 @@ from .constants import (
     COLUMN_ALIAS_MAPPING,
     COMPANY_BRANCH_MAPPING,
     DEFAULT_INSTITUTION_CODE,
-    DEFAULT_PORTFOLIO_CODE_MAPPING,
     LEGACY_COLUMNS_TO_DELETE,
-    PLAN_CODE_CORRECTIONS,  # Story 7.3-6
-    PORTFOLIO_QTAN003_BUSINESS_TYPES,
+    # Story 7.4-6: PLAN_CODE_CORRECTIONS now imported from infrastructure.mappings
 )
 
 if TYPE_CHECKING:
     from work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
 
 logger = structlog.get_logger(__name__)
+
+
+# Story 7.4-6: Local _apply_plan_code_defaults and _apply_portfolio_code_defaults
+# removed - now using shared helpers from infrastructure.transforms
 
 
 def _fill_customer_name_from_plan_name(df: pd.DataFrame) -> pd.Series:
@@ -101,66 +106,6 @@ def _fill_customer_name_from_plan_name(df: pd.DataFrame) -> pd.Series:
         skipped_no_match=skipped_no_match,
         skipped_collective=collective_count,
     )
-
-    return result
-
-
-def _apply_plan_code_defaults(df: pd.DataFrame) -> pd.Series:
-    """
-    Apply default plan codes based on plan type (consistent with annuity_performance).
-
-    Story 7.3-6: Copied from annuity_performance/domain/pipeline_builder.py
-    """
-    if "计划代码" not in df.columns:
-        return pd.Series([None] * len(df), index=df.index)
-
-    result = df["计划代码"].copy()
-
-    if "计划类型" in df.columns:
-        empty_mask = result.isna() | (result == "")
-        collective_mask = empty_mask & (df["计划类型"] == "集合计划")
-        single_mask = empty_mask & (df["计划类型"] == "单一计划")
-
-        result = result.mask(collective_mask, "AN001")
-        result = result.mask(single_mask, "AN002")
-
-    return result
-
-
-def _apply_portfolio_code_defaults(df: pd.DataFrame) -> pd.Series:
-    """
-    Apply default portfolio codes based on business type and plan type.
-
-    AnnuityIncome-specific logic:
-    1. Remove '^F' prefix from existing codes
-    2. If empty: 职年受托/职年投资 → 'QTAN003'
-    3. Else: DEFAULT_PORTFOLIO_CODE_MAPPING.get(计划类型)
-    """
-    if "组合代码" not in df.columns:
-        result = pd.Series([None] * len(df), index=df.index)
-    else:
-        result = df["组合代码"].astype("string")
-        # Step 1: Remove 'F' prefix (case-insensitive regex '^F')
-        result = result.str.replace("^f", "", regex=True, flags=re.IGNORECASE)
-        # Normalize empty placeholders to None
-        result = result.replace({"nan": None, "None": None, "": None, pd.NA: None})
-        # Standardize to uppercase strings for downstream comparisons
-        result = result.str.upper()
-
-    if "业务类型" in df.columns and "计划类型" in df.columns:
-        empty_mask = result.isna()
-
-        # QTAN003 for 职年受托/职年投资
-        qtan003_mask = empty_mask & df["业务类型"].isin(
-            PORTFOLIO_QTAN003_BUSINESS_TYPES
-        )
-        result = result.mask(qtan003_mask, "QTAN003")
-
-        # Default based on plan type for remaining empty values (including 职业年金)
-        still_empty = result.isna()
-        for plan_type, default_code in DEFAULT_PORTFOLIO_CODE_MAPPING.items():
-            type_mask = still_empty & (df["计划类型"] == plan_type)
-            result = result.mask(type_mask, default_code)
 
     return result
 
@@ -273,8 +218,8 @@ def build_bronze_to_silver_pipeline(
         ),
         # Step 2.5: Story 7.3-6 - Apply plan code corrections (typo fixes)
         ReplacementStep({"计划代码": PLAN_CODE_CORRECTIONS}),
-        # Step 2.6: Story 7.3-6 - Apply plan code defaults (based on plan type)
-        CalculationStep({"计划代码": _apply_plan_code_defaults}),
+        # Step 2.6: Story 7.4-6 - Apply plan code defaults (using shared helper)
+        CalculationStep({"计划代码": apply_plan_code_defaults}),
         # Step 3: Institution code mapping (机构名称 → 机构代码)
         CalculationStep(
             {
@@ -320,9 +265,10 @@ def build_bronze_to_silver_pipeline(
             }
         ),
         # Step 7: Portfolio code processing (regex '^F' removal + conditional defaults)
+        # Story 7.4-6: Now using shared helper from infrastructure.transforms
         CalculationStep(
             {
-                "组合代码": lambda df: _apply_portfolio_code_defaults(df),
+                "组合代码": lambda df: apply_portfolio_code_defaults(df),
             }
         ),
         # Step 8: Product line code derivation (业务类型 → 产品线代码)

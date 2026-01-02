@@ -17,6 +17,7 @@ Components:
 - CleansingStep: Data cleansing integration
 - DropStep: Column removal
 - RenameStep: Column renaming (alias for MappingStep)
+- plan_portfolio_helpers: Plan/portfolio code normalization helpers (Story 7.4-6)
 
 Example:
     >>> from work_data_hub.infrastructure.transforms import (
@@ -32,6 +33,11 @@ Example:
 
 from .base import Pipeline, TransformStep
 from .cleansing_step import CleansingStep
+from .plan_portfolio_helpers import (
+    _clean_portfolio_code,
+    apply_plan_code_defaults,
+    apply_portfolio_code_defaults,
+)
 from .standard_steps import (
     CalculationStep,
     DropStep,
@@ -55,4 +61,8 @@ __all__ = [
     "DropStep",
     "RenameStep",
     "coerce_numeric_columns",
+    # Plan/Portfolio helpers (Story 7.4-6)
+    "apply_plan_code_defaults",
+    "apply_portfolio_code_defaults",
+    "_clean_portfolio_code",
 ]

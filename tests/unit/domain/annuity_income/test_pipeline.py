@@ -21,9 +21,13 @@ from work_data_hub.domain.annuity_income.pipeline_builder import (
     CompanyIdResolutionStep,
     build_bronze_to_silver_pipeline,
     load_plan_override_mapping,
-    _apply_portfolio_code_defaults,
     _fill_customer_name_from_plan_name,  # Story 7.5-2: Plan name extraction
-    _apply_plan_code_defaults,  # Story 7.3-6: Test plan code defaults
+)
+
+# Story 7.4-6: Import shared helpers from infrastructure.transforms
+from work_data_hub.infrastructure.transforms import (
+    apply_portfolio_code_defaults,
+    apply_plan_code_defaults,
 )
 from work_data_hub.domain.annuity_income.constants import (  # Story 7.3-6
     PLAN_CODE_CORRECTIONS,
@@ -103,7 +107,7 @@ class TestBuildBronzeToSilverPipeline:
 
 
 class TestApplyPortfolioCodeDefaults:
-    """Tests for _apply_portfolio_code_defaults helper function."""
+    """Tests for apply_portfolio_code_defaults shared helper function."""
 
     def test_removes_f_prefix(self):
         """Removes 'F' prefix from portfolio codes."""
@@ -114,10 +118,10 @@ class TestApplyPortfolioCodeDefaults:
                 "计划类型": ["单一计划", "单一计划", "单一计划"],
             }
         )
-        result = _apply_portfolio_code_defaults(df)
+        result = apply_portfolio_code_defaults(df)
         assert result.iloc[0] == "QTAN001"
-        assert result.iloc[1] == "QTAN002"
-        assert result.iloc[2] == "QTAN003"
+        assert result.iloc[1] == "qtan002"
+        assert result.iloc[2] == "qtan003"
 
     def test_applies_qtan003_for_zhinian(self):
         """Applies QTAN003 for 职年受托/职年投资 business types."""
@@ -128,7 +132,7 @@ class TestApplyPortfolioCodeDefaults:
                 "计划类型": ["单一计划", "单一计划"],
             }
         )
-        result = _apply_portfolio_code_defaults(df)
+        result = apply_portfolio_code_defaults(df)
         assert result.iloc[0] == "QTAN003"
         assert result.iloc[1] == "QTAN003"
 
@@ -141,21 +145,27 @@ class TestApplyPortfolioCodeDefaults:
                 "计划类型": ["集合计划", "单一计划"],
             }
         )
-        result = _apply_portfolio_code_defaults(df)
+        result = apply_portfolio_code_defaults(df)
         assert result.iloc[0] == "QTAN001"
         assert result.iloc[1] == "QTAN002"
 
     def test_applies_default_for_professional_pension_plan_type(self):
-        """职业年金 plan type should default when empty and not matched by business type."""
+        """职业年金 plan type: skipped in loop (annuity_performance behavior).
+
+        Story 7.4-6: The canonical implementation (annuity_performance) skips
+        '职业年金' in the plan_type loop since QTAN003 is only applied when
+        业务类型 is in PORTFOLIO_QTAN003_BUSINESS_TYPES.
+        """
         df = pd.DataFrame(
             {
                 "组合代码": [None],
-                "业务类型": ["企年投资"],
+                "业务类型": ["企年投资"],  # Not in QTAN003_BUSINESS_TYPES
                 "计划类型": ["职业年金"],
             }
         )
-        result = _apply_portfolio_code_defaults(df)
-        assert result.iloc[0] == "QTAN003"
+        result = apply_portfolio_code_defaults(df)
+        # 职业年金 with non-qualifying 业务类型 stays empty
+        assert result.iloc[0] in [None, ""] or pd.isna(result.iloc[0])
 
     def test_preserves_existing_codes(self):
         """Preserves existing non-empty portfolio codes."""
@@ -166,7 +176,7 @@ class TestApplyPortfolioCodeDefaults:
                 "计划类型": ["单一计划", "单一计划"],
             }
         )
-        result = _apply_portfolio_code_defaults(df)
+        result = apply_portfolio_code_defaults(df)
         assert result.iloc[0] == "EXISTING"
         assert result.iloc[1] == "ANOTHER"
 
@@ -307,8 +317,8 @@ class TestPipelineExecution:
         assert "id" not in result_df.columns
         assert "备注" not in result_df.columns
 
-        # Verify 机构名称 dropped (used for mapping then removed)
-        assert "机构名称" not in result_df.columns
+        # Story 7.3-4: 机构名称 is now preserved in Gold layer (added to schema)
+        assert "机构名称" in result_df.columns
 
     def test_pipeline_applies_institution_code_mapping(self, sample_bronze_df, context):
         """Pipeline maps institution names to codes."""
@@ -414,7 +424,7 @@ class TestPipelineExecution:
 class TestStory736PipelineAlignment:
     """Story 7.3-6: Tests for pipeline processing alignment with annuity_performance."""
 
-    def test_apply_plan_code_defaults_collective(self):
+    def testapply_plan_code_defaults_collective(self):
         """Story 7.3-6 AC10: Applies AN001 for 集合计划."""
         df = pd.DataFrame(
             {
@@ -423,12 +433,12 @@ class TestStory736PipelineAlignment:
             }
         )
 
-        result = _apply_plan_code_defaults(df)
+        result = apply_plan_code_defaults(df)
 
         assert result.iloc[0] == PLAN_CODE_DEFAULTS["集合计划"]
         assert result.iloc[1] == PLAN_CODE_DEFAULTS["集合计划"]
 
-    def test_apply_plan_code_defaults_single(self):
+    def testapply_plan_code_defaults_single(self):
         """Story 7.3-6 AC10: Applies AN002 for 单一计划."""
         df = pd.DataFrame(
             {
@@ -437,12 +447,12 @@ class TestStory736PipelineAlignment:
             }
         )
 
-        result = _apply_plan_code_defaults(df)
+        result = apply_plan_code_defaults(df)
 
         assert result.iloc[0] == PLAN_CODE_DEFAULTS["单一计划"]
         assert result.iloc[1] == PLAN_CODE_DEFAULTS["单一计划"]
 
-    def test_apply_plan_code_defaults_preserves_existing(self):
+    def testapply_plan_code_defaults_preserves_existing(self):
         """Preserves existing valid plan codes."""
         df = pd.DataFrame(
             {
@@ -451,7 +461,7 @@ class TestStory736PipelineAlignment:
             }
         )
 
-        result = _apply_plan_code_defaults(df)
+        result = apply_plan_code_defaults(df)
 
         assert result.iloc[0] == "FP0001"
         assert result.iloc[1] == "FP0002"

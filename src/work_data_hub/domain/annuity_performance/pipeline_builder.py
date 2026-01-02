@@ -11,6 +11,7 @@ from work_data_hub.infrastructure.enrichment import (
     EqcLookupConfig,
     ResolutionStrategy,
 )
+from work_data_hub.infrastructure.mappings import PLAN_CODE_CORRECTIONS  # Story 7.4-6
 from work_data_hub.infrastructure.transforms import (
     CalculationStep,
     CleansingStep,
@@ -19,6 +20,9 @@ from work_data_hub.infrastructure.transforms import (
     Pipeline,
     ReplacementStep,
     TransformStep,
+    # Story 7.4-6: Import shared helpers from infrastructure
+    apply_plan_code_defaults,
+    apply_portfolio_code_defaults,
 )
 from work_data_hub.utils.date_parser import parse_chinese_date
 
@@ -26,10 +30,9 @@ from .constants import (
     BUSINESS_TYPE_CODE_MAPPING,
     COLUMN_MAPPING,
     COMPANY_BRANCH_MAPPING,
-    DEFAULT_PORTFOLIO_CODE_MAPPING,
     LEGACY_COLUMNS_TO_DELETE,
-    PLAN_CODE_CORRECTIONS,
-    PORTFOLIO_QTAN003_BUSINESS_TYPES,
+    # Story 7.4-6: PLAN_CODE_CORRECTIONS now imported from infrastructure.mappings
+    # via infrastructure.transforms for consistency
 )
 
 if TYPE_CHECKING:
@@ -38,102 +41,8 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 
 
-def _apply_plan_code_defaults(df: pd.DataFrame) -> pd.Series:
-    """Apply default plan codes based on plan type (legacy parity)."""
-    if "计划代码" not in df.columns:
-        return pd.Series([None] * len(df), index=df.index)
-
-    result = df["计划代码"].copy()
-
-    if "计划类型" in df.columns:
-        # Empty/null plan codes get defaults based on plan type
-        # Note: Legacy only checks for isna() and empty string, NOT string "None"
-        empty_mask = result.isna() | (result == "")
-        collective_mask = empty_mask & (df["计划类型"] == "集合计划")
-        single_mask = empty_mask & (df["计划类型"] == "单一计划")
-
-        result = result.mask(collective_mask, "AN001")
-        result = result.mask(single_mask, "AN002")
-
-    return result
-
-
-def _apply_portfolio_code_defaults(df: pd.DataFrame) -> pd.Series:
-    """Apply default portfolio codes based on business type and plan type.
-
-    Improvements over Legacy:
-    1. Preserves numeric portfolio codes (e.g., 12345 stays 12345, not NaN)
-    2. Handles mixed data types robustly
-    3. Strips whitespace and handles edge cases
-    4. Better data type consistency
-    """
-    if "组合代码" not in df.columns:
-        result = pd.Series([None] * len(df), index=df.index)
-    else:
-        result = df["组合代码"].copy()
-
-        # Improved processing: handle each value type appropriately
-        result = result.apply(lambda x: _clean_portfolio_code(x))
-
-    if "业务类型" in df.columns and "计划类型" in df.columns:
-        # Check for empty/invalid codes
-        empty_mask = result.isna() | (result == "")
-
-        # QTAN003 for 职年受托/职年投资 (highest priority)
-        qtan003_mask = empty_mask & df["业务类型"].isin(
-            PORTFOLIO_QTAN003_BUSINESS_TYPES
-        )
-        result = result.mask(qtan003_mask, "QTAN003")
-
-        # Default based on plan type for remaining empty values
-        still_empty = result.isna() | (result == "")
-        for plan_type, default_code in DEFAULT_PORTFOLIO_CODE_MAPPING.items():
-            if plan_type != "职业年金":  # Already handled by QTAN003
-                type_mask = still_empty & (df["计划类型"] == plan_type)
-                result = result.mask(type_mask, default_code)
-
-    return result
-
-
-def _clean_portfolio_code(value) -> Optional[str]:
-    """Clean and normalize portfolio code value.
-
-    Args:
-        value: Raw portfolio code value
-
-    Returns:
-        Cleaned portfolio code or None if invalid
-    """
-    # Handle None values
-    if pd.isna(value):
-        return None
-
-    # Handle numeric values - preserve them as strings
-    if isinstance(value, (int, float)):
-        return (
-            str(int(value))
-            if isinstance(value, float) and value.is_integer()
-            else str(value)
-        )
-
-    # Handle string values
-    if isinstance(value, str):
-        # Strip whitespace
-        cleaned = value.strip()
-
-        # Handle empty string after strip
-        if not cleaned:
-            return None
-
-        # Remove 'F' or 'f' prefix if present (Legacy behavior, case-insensitive)
-        if cleaned.upper().startswith("F"):
-            cleaned = cleaned[1:]
-
-        # Return cleaned value
-        return cleaned if cleaned else None
-
-    # Return None for any other type
-    return None
+# Story 7.4-6: Local functions _apply_plan_code_defaults, _apply_portfolio_code_defaults,
+# and _clean_portfolio_code removed - now using shared helpers from infrastructure.transforms
 
 
 class CompanyIdResolutionStep(TransformStep):
@@ -235,9 +144,10 @@ def build_bronze_to_silver_pipeline(
         # Step 3: Plan code corrections
         ReplacementStep({"计划代码": PLAN_CODE_CORRECTIONS}),
         # Step 4: Plan code defaults (empty → AN001 for 集合计划, AN002 for 单一计划)
+        # Story 7.4-6: Now using shared helper from infrastructure.transforms
         CalculationStep(
             {
-                "计划代码": lambda df: _apply_plan_code_defaults(df),
+                "计划代码": lambda df: apply_plan_code_defaults(df),
             }
         ),
         # Step 5: Institution code mapping (机构名称 → 机构代码)
@@ -268,9 +178,10 @@ def build_bronze_to_silver_pipeline(
             }
         ),
         # Step 8: Portfolio code defaults (QTAN001/QTAN002/QTAN003)
+        # Story 7.4-6: Now using shared helper from infrastructure.transforms
         CalculationStep(
             {
-                "组合代码": lambda df: _apply_portfolio_code_defaults(df),
+                "组合代码": lambda df: apply_portfolio_code_defaults(df),
             }
         ),
         # Step 9: Clean Group Enterprise Customer Number (lstrip "C")

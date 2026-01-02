@@ -313,8 +313,10 @@ class TestAnnuityAccountNumberDerivation:
         assert "年金账户号" in result_df.columns
         assert result_df.loc[0, "年金账户号"] == "12345678"
 
-        # 集团企业客户号 should be dropped (legacy column)
-        assert "集团企业客户号" not in result_df.columns
+        # 集团企业客户号 should be preserved (update field, not legacy)
+        # Story 7.4-6 Code Review: Field is used for updates, not dropped
+        assert "集团企业客户号" in result_df.columns
+        assert result_df.loc[0, "集团企业客户号"] == "12345678"  # 'C' prefix stripped
 
     def test_annuity_account_number_handles_missing_column(self, context):
         """Missing 集团企业客户号 → 年金账户号 is None.
