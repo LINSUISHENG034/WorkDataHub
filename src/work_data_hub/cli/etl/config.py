@@ -119,8 +119,7 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:  
                     "pk": pk,
                     "plan_only": effective_plan_only,
                     "skip": getattr(args, "skip_facts", False),
-                    # Note: session_id NOT passed here - LoadConfig doesn't support it
-                    # session_id is only used by processing ops (e.g. process_annuity_performance_op)
+                    # session_id only used by processing ops, not LoadConfig
                 }
             },
         }
@@ -191,7 +190,17 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:  
                 "eqc_lookup_config": eqc_config.to_dict(),
                 "plan_only": effective_plan_only,
                 "use_pipeline": getattr(args, "use_pipeline", None),
-                # Note: session_id NOT passed here - ProcessingConfig doesn't support it
+                # Story 7.5-5: Session ID for unified failure logging
+                "session_id": session_id,
+            }
+        }
+
+    # Story 7.5-5: Add session_id for annuity_income domain
+    if domain == "annuity_income":
+        run_config["ops"]["process_annuity_income_op"] = {
+            "config": {
+                "plan_only": effective_plan_only,
+                "session_id": session_id,
             }
         }
 

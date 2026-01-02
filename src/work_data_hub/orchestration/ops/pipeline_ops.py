@@ -95,6 +95,8 @@ class ProcessingConfig(Config):
     use_pipeline: Optional[bool] = (
         None  # CLI override for pipeline framework (None=respect setting)
     )
+    # Story 7.5-5: Session ID for unified failure logging
+    session_id: Optional[str] = None
 
     @field_validator("enrichment_sync_budget")
     @classmethod
@@ -332,12 +334,14 @@ def process_annuity_performance_op(
 
         # Call service with enrichment metadata support
         # Story 6.2-P17: Pass eqc_config instead of sync_lookup_budget
+        # Story 7.5-5: Pass session_id for unified failure logging
         result = process_with_enrichment(
             excel_rows,
             data_source=file_path,
             eqc_config=eqc_config,
             enrichment_service=enrichment_service,
             export_unknown_names=eqc_config.export_unknown_names,
+            session_id=config.session_id,
         )
 
         # Serialize only the records for downstream compatibility
@@ -441,8 +445,9 @@ def process_annuity_income_op(
 
     try:
         # Call domain service (no enrichment for annuity_income)
+        # Story 7.5-5: Pass session_id for unified failure logging
         processing_result = process_annuity_income_with_enrichment(
-            excel_rows, data_source=file_path
+            excel_rows, data_source=file_path, session_id=config.session_id
         )
 
         # Convert Pydantic models to JSON-serializable dicts

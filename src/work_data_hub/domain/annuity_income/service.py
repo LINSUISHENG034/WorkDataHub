@@ -16,7 +16,11 @@ from work_data_hub.infrastructure.enrichment import EqcLookupConfig  # Story 7.3
 from work_data_hub.infrastructure.enrichment.mapping_repository import (  # Story 7.3-6
     CompanyMappingRepository,
 )
-from work_data_hub.infrastructure.validation import export_error_csv
+from work_data_hub.infrastructure.validation import (
+    ErrorType,
+    FailedRecord,
+    FailureExporter,
+)
 
 from .helpers import (
     FileDiscoveryProtocol,
@@ -224,6 +228,7 @@ def process_with_enrichment(
     enrichment_service: Optional["CompanyEnrichmentService"] = None,
     sync_lookup_budget: int = 0,
     export_unknown_names: bool = True,
+    session_id: Optional[str] = None,  # Story 7.5-5: Unified failure logging
 ) -> ProcessingResultWithEnrichment:
     """
     Process raw rows through the bronze-to-silver pipeline with optional enrichment.
@@ -342,18 +347,27 @@ def process_with_enrichment(
                 failed_df = input_df[~input_df["计划代码"].isin(success_codes)]
             else:
                 failed_df = input_df
-            if not failed_df.empty:
-                error_csv_path = export_error_csv(
-                    failed_df,
-                    filename_prefix=f"failed_records_{Path(data_source).stem}",
-                    output_dir=Path("logs"),
-                )
+            if not failed_df.empty and session_id:
+                # Story 7.5-5: Use unified FailureExporter instead of legacy export
+                failed_records = [
+                    FailedRecord.from_validation_error(
+                        session_id=session_id,
+                        domain="annuity_income",
+                        source_file=Path(data_source).name,
+                        row_index=idx,
+                        error_type=ErrorType.DROPPED_IN_PIPELINE,
+                        raw_row=row.to_dict(),
+                    )
+                    for idx, row in failed_df.iterrows()
+                ]
+                exporter = FailureExporter(session_id=session_id)
+                error_csv_path = exporter.export(failed_records)
                 logger.bind(
                     domain="annuity_income", step="process_with_enrichment"
                 ).info(
-                    "Exported failed records to CSV",
+                    "Exported failed records to unified CSV",
                     csv_path=str(error_csv_path),
-                    count=len(failed_df),
+                    count=len(failed_records),
                 )
         csv_path = export_unknown_names_csv(
             unknown_names,
