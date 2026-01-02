@@ -7,7 +7,7 @@ Story 6.1.1: Enrichment Index Schema Enhancement
 Story 7.3: Infrastructure Layer Decomposition
 """
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import ARRAY, NUMERIC, TEXT
@@ -319,6 +319,75 @@ class EnrichmentIndexOpsMixin:
         return InsertBatchResult(
             inserted_count=affected_count,
             skipped_count=len(records) - affected_count,
+        )
+
+    def insert_batch_with_conflict_check(
+        self,
+        mappings: List[Dict[str, Any]],
+    ) -> InsertBatchResult:
+        """
+        Insert backflow mappings with conflict handling (Story 7.5-1 adapter).
+
+        This is an adapter method that converts the dict format from backflow.py
+        to EnrichmentIndexRecord objects and delegates to insert_enrichment_index_batch.
+
+        Args:
+            mappings: List of dict with keys:
+                - alias_name: The lookup key value
+                - canonical_id: The company ID to map to
+                - match_type: Type of match ("plan", "account", "name", "account_name")
+                - priority: Priority level (1-5)
+                - source: Source string (e.g., "pipeline_backflow")
+
+        Returns:
+            InsertBatchResult with inserted_count, skipped_count, and conflicts list.
+        """
+        from decimal import Decimal
+
+        from ..types import EnrichmentIndexRecord, LookupType, SourceType
+
+        if not mappings:
+            return InsertBatchResult(inserted_count=0, skipped_count=0, conflicts=[])
+
+        # Map match_type to LookupType
+        match_type_map = {
+            "plan": LookupType.PLAN_CODE,
+            "account": LookupType.ACCOUNT_NUMBER,
+            "name": LookupType.CUSTOMER_NAME,
+            "account_name": LookupType.ACCOUNT_NAME,
+        }
+
+        records: List[EnrichmentIndexRecord] = []
+        for m in mappings:
+            lookup_type = match_type_map.get(m["match_type"])
+            if lookup_type is None:
+                logger.warning(
+                    "insert_batch_with_conflict_check.unknown_match_type",
+                    match_type=m["match_type"],
+                )
+                continue
+
+            records.append(
+                EnrichmentIndexRecord(
+                    lookup_key=m["alias_name"],
+                    lookup_type=lookup_type,
+                    company_id=m["canonical_id"],
+                    source=SourceType.BACKFLOW,
+                    confidence=Decimal("1.00"),
+                    source_domain=None,
+                    source_table=None,
+                )
+            )
+
+        if not records:
+            return InsertBatchResult(inserted_count=0, skipped_count=0, conflicts=[])
+
+        result = self.insert_enrichment_index_batch(records)
+        # Return with empty conflicts list for compatibility
+        return InsertBatchResult(
+            inserted_count=result.inserted_count,
+            skipped_count=result.skipped_count,
+            conflicts=[],
         )
 
     def update_hit_count(

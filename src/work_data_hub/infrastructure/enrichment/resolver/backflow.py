@@ -204,26 +204,43 @@ def enqueue_for_async_enrichment(
         return 0
 
 
-def generate_temp_id(customer_name: Optional[str], salt: str) -> str:
+# Known empty placeholders in source data (Excel exports).
+# These values indicate missing/unknown customer names and should return None
+# instead of generating temp IDs. See Story 7.5-3 and INVALID_PLACEHOLDERS in normalizer.py.
+#
+# IMPORTANT: If adding new placeholders, also update:
+# - src/work_data_hub/infrastructure/enrichment/normalizer.py INVALID_PLACEHOLDERS list
+# - Test coverage in TestGenerateTempId class
+#
+# History:
+# - Story 7.5-3 (2026-01-02): Initial constant with ("0", "空白")
+# - CRITICAL-002 fix: Removed incorrect (空白) → 600866980 mapping from enrichment_index.csv
+EMPTY_PLACEHOLDERS = ("0", "空白")
+
+
+def generate_temp_id(customer_name: Optional[str], salt: str) -> Optional[str]:
     """
     Generate temporary company ID using HMAC-SHA1.
 
-    Delegates to the normalizer module which handles legacy-compatible
-    name normalization before hashing.
+    Story 7.5-3: Returns None for empty customer names instead of
+    a shared temp ID. This ensures proper semantics: temp IDs represent
+    "unresolved but known company names", while NULL represents
+    "no company information available".
 
     Args:
         customer_name: Customer name to generate ID for.
         salt: Salt for HMAC generation.
 
     Returns:
-        Temporary ID in format "IN<16-char-Base32>".
+        Temporary ID in format "IN<16-char-Base32>", or None for empty names.
     """
+    # Story 7.5-3: Return None for empty/unknown customer names
     if (
         customer_name is None
         or pd.isna(customer_name)
         or not str(customer_name).strip()
+        or str(customer_name).strip() in EMPTY_PLACEHOLDERS
     ):
-        # For empty names, use a placeholder
-        customer_name = "__EMPTY__"
+        return None
 
     return generate_temp_company_id(str(customer_name), salt)

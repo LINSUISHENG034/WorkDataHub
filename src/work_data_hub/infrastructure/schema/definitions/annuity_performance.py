@@ -79,7 +79,8 @@ register_domain(
             ColumnDef("子企业名称", ColumnType.STRING, max_length=255),
             ColumnDef("集团企业客户号", ColumnType.STRING, max_length=50),
             ColumnDef("集团企业客户名称", ColumnType.STRING, max_length=255),
-            ColumnDef("company_id", ColumnType.STRING, nullable=False, max_length=50),
+            # Story 7.5-3: company_id nullable for empty customer name records
+            ColumnDef("company_id", ColumnType.STRING, nullable=True, max_length=50),
         ],
         indexes=[
             IndexDef(["月度"]),

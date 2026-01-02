@@ -462,8 +462,19 @@ class CompanyIdResolver:
                 mask_still_missing, strategy.customer_name_column
             ].apply(lambda x: generate_temp_id(x, self.salt))
 
-            stats.temp_ids_generated = mask_still_missing.sum()
-            temp_id_indices = list(result_df[mask_still_missing].index)
+            # Story 7.5-3 CRITICAL FIX: Only include rows that actually received a temp ID
+            # generate_temp_id() now returns None for empty customer names, so we must
+            # re-check the mask after generation to exclude those rows from async queue.
+            # Before this fix, all rows in mask_still_missing were added to temp_id_indices,
+            # even if generate_temp_id() returned None (empty names).
+            mask_received_temp_id = result_df[mask_still_missing][
+                strategy.output_column
+            ].notna()
+            temp_id_indices = list(
+                result_df[mask_still_missing][mask_received_temp_id].index
+            )
+
+            stats.temp_ids_generated = mask_received_temp_id.sum()
 
             logger.debug(
                 "company_id_resolver.temp_ids_generated",
