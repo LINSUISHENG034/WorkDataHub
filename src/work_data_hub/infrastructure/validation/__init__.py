@@ -46,16 +46,20 @@ Usage:
 
 # Types
 # Error handling
-# Domain validators (Story 6.2-P13)
-from work_data_hub.infrastructure.validation.domain_validators import (
-    validate_bronze_dataframe,
-    validate_bronze_layer,
-    validate_gold_dataframe,
-    validate_gold_layer,
-)
 from work_data_hub.infrastructure.validation.error_handler import (
     collect_error_details,
+    export_failed_records,
     handle_validation_errors,
+)
+
+# Unified failure logging (Story 7.5-5)
+from work_data_hub.infrastructure.validation.failed_record import (
+    ErrorType,
+    FailedRecord,
+)
+from work_data_hub.infrastructure.validation.failure_exporter import (
+    FailureExporter,
+    generate_session_id,
 )
 
 # Report generation
@@ -77,6 +81,32 @@ from work_data_hub.infrastructure.validation.types import (
     ValidationThresholdExceeded,
 )
 
+# Domain validators (Story 6.2-P13) - Lazy import to avoid circular dependency
+# These are imported via __getattr__ to break the import cycle
+
+
+def __getattr__(name: str):
+    """Lazy import domain_validators to avoid circular import.
+
+    The domain_validators module imports transforms, which imports domain.pipelines,
+    which imports domain.pipelines.validation, creating a circular dependency.
+    By importing lazily, we break this cycle.
+
+    Story 7.5-5: Fixed circular import exposed by new validation infrastructure.
+    """
+    if name in {
+        "validate_bronze_dataframe",
+        "validate_bronze_layer",
+        "validate_gold_dataframe",
+        "validate_gold_layer",
+    }:
+        from work_data_hub.infrastructure.validation import domain_validators
+
+        return getattr(domain_validators, name)
+
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 __all__ = [
     # Types
     "ValidationErrorDetail",
@@ -85,6 +115,12 @@ __all__ = [
     # Error handling
     "handle_validation_errors",
     "collect_error_details",
+    "export_failed_records",
+    # Unified failure logging (Story 7.5-5)
+    "ErrorType",
+    "FailedRecord",
+    "FailureExporter",
+    "generate_session_id",
     # Report generation
     "export_error_csv",
     "export_error_details_csv",

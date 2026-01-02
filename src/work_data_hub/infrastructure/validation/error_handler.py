@@ -28,6 +28,12 @@ from typing import TYPE_CHECKING, Any, List, Sequence, Union, cast
 
 import structlog
 
+from work_data_hub.infrastructure.validation.failed_record import (
+    FailedRecord,
+)
+from work_data_hub.infrastructure.validation.failure_exporter import (
+    FailureExporter,
+)
 from work_data_hub.infrastructure.validation.types import (
     ValidationErrorDetail,
     ValidationSummary,
@@ -402,7 +408,43 @@ def _is_nan(value: Any) -> bool:
     return False
 
 
+def export_failed_records(
+    records: list[FailedRecord],
+    session_id: str,
+    output_dir: str = "logs",
+) -> str:
+    """Export failed records to session-based CSV file.
+
+    Convenience function for domain services to export collected failed
+    records without directly instantiating FailureExporter. Handles CSV
+    export with append mode support.
+
+    Args:
+        records: List of FailedRecord objects to export
+        session_id: ETL session identifier (from generate_session_id())
+        output_dir: Output directory path (default: "logs")
+
+    Returns:
+        Absolute path to generated CSV file as string
+
+    Example:
+        >>> from work_data_hub.infrastructure.validation import (
+        ...     export_failed_records,
+        ...     FailedRecord,
+        ... )
+        >>> records = [FailedRecord(...)]
+        >>> csv_path = export_failed_records(records, "etl_20260102_181530_a1b2c3")
+        >>> print(f"Failures exported to {csv_path}")
+    """
+    from pathlib import Path
+
+    exporter = FailureExporter(session_id=session_id, output_dir=Path(output_dir))
+    output_path = exporter.export(records)
+    return str(output_path.resolve())
+
+
 __all__ = [
     "handle_validation_errors",
     "collect_error_details",
+    "export_failed_records",
 ]

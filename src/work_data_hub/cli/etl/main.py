@@ -266,6 +266,11 @@ def main(argv: Optional[List[str]] = None) -> int:  # noqa: PLR0911, PLR0912, PL
     # Story 7.4-4: Validate that configured domains have corresponding job definitions
     validate_domain_registry()
 
+    # Story 7.5-5: Generate session_id for unified failure logging
+    from work_data_hub.infrastructure.validation import generate_session_id
+
+    session_id = generate_session_id()
+
     # Determine domains to process
     domains_to_process: List[str] = []
 
@@ -335,6 +340,9 @@ def main(argv: Optional[List[str]] = None) -> int:  # noqa: PLR0911, PLR0912, PL
             domains_to_process = valid
 
     # Task 2.2: Execute domains sequentially
+    # Story 7.5-5: Attach session_id to args for unified failure logging
+    args.session_id = session_id
+
     if len(domains_to_process) == 1:
         # Single domain execution
         return etl_module._execute_single_domain(args, domains_to_process[0])

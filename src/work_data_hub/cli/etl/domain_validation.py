@@ -11,7 +11,8 @@ import yaml
 # Special orchestration domains (not in data_sources.yml)
 # Note: company_mapping removed in Story 7.1-4 (Zero Legacy)
 # Story 7.4-4: Exposed as module-level constant for validate_domain_registry()
-SPECIAL_DOMAINS = {"company_lookup_queue", "reference_sync"}
+# sandbox_trustee_performance: Test domain, skipped in --all-domains batch processing
+SPECIAL_DOMAINS = {"company_lookup_queue", "reference_sync", "sandbox_trustee_performance"}
 
 
 def _load_configured_domains() -> List[str]:

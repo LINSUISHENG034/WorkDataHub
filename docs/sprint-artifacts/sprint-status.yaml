@@ -369,7 +369,7 @@ development_status:
   # Refactors hardcoded if/elif dispatch to configuration-driven registry pattern
   # BLOCKING: Epic 8 depends on clean architecture foundation
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-30-domain-registry-architecture.md
-  epic-7.4: in-progress # Reopened 2026-01-02: Story 7.4-6 added via Correct-Course workflow
+  epic-7.4: done # All 6 stories complete, Code Review PASSED 2026-01-02
   7.4-1-job-registry-pattern: done # P0: Replace if/elif dispatch with JOB_REGISTRY dict - Code Review PASSED 2025-12-30
   7.4-2-config-driven-backfill-list: done # P1: Move backfill domains to data_sources.yml - Code Review PASSED 2025-12-30
   7.4-3-generic-process-domain-op: done # P1: Factory for domain-specific ops - Code Review PASSED 2025-12-30
@@ -379,7 +379,7 @@ development_status:
   # Added 2026-01-02 via Correct-Course workflow
   # Eliminates ~120 LOC duplication between annuity_performance and annuity_income
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2026-01-02-plan-code-consistency.md
-  7.4-6-plan-portfolio-code-consolidation: drafted # P1: Extract shared constants and functions to infrastructure layer
+  7.4-6-plan-portfolio-code-consolidation: done # P1: Extract shared constants and functions to infrastructure layer - Code Review PASSED 2026-01-02
   epic-7.4-retrospective: optional
 
   # Epic 7.5: Empty Customer Name Handling Enhancement
@@ -392,7 +392,7 @@ development_status:
   7.5-2-plan-name-fallback-single-plan: done # P1: Extract company name from plan name for single-plan - ✅ Code Review PASSED 2026-01-01
   7.5-3-empty-customer-name-null-handling: done # P2: Return NULL instead of temp ID for empty names - ✅ Code review PASSED 2026-01-02
   7.5-4-rich-terminal-ux-enhancement: done # Rich CLI output with progress display + CI auto-detection - ✅ Code Review PASSED 2026-01-02
-  7.5-5-unified-failed-records-logging: ready-for-dev # Session-based unified failure CSV (depends_on: 7.5-4)
+  7.5-5-unified-failed-records-logging: done # Session-based unified failure CSV ✅ Code Review PASSED 2026-01-02
 
   # Epic 8: Testing & Validation Infrastructure
   # BLOCKED BY: Epic 7.5 (Empty Customer Name Handling)

@@ -281,6 +281,21 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:  # noq
         # Report results
         console.print(f"✅ Job completed successfully: {result.success}")
 
+        # Story 7.5-5: Display hyperlink to failure log if failures occurred
+        if result.success:
+            # Check if failure CSV was generated
+            from pathlib import Path
+
+            session_id = getattr(args, "session_id", None)
+            if session_id:
+                failure_log_path = Path("logs") / f"wdh_etl_failures_{session_id}.csv"
+                if failure_log_path.exists():
+                    link_text = console.hyperlink(
+                        f"Saved failure log to {failure_log_path.name}",
+                        failure_log_path,
+                    )
+                    console.print(f"📄 {link_text}")
+
         if result.success:
             # Extract and display execution summary
             try:

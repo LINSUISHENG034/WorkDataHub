@@ -106,6 +106,9 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:  
     if hasattr(args, "file_selection") and args.file_selection:
         discover_config["selection_strategy"] = args.file_selection
 
+    # Story 7.5-5: Extract session_id for unified failure logging
+    session_id = getattr(args, "session_id", None)
+
     run_config: Dict[str, Any] = {
         "ops": {
             "discover_files_op": {"config": discover_config},
@@ -116,6 +119,8 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:  
                     "pk": pk,
                     "plan_only": effective_plan_only,
                     "skip": getattr(args, "skip_facts", False),
+                    # Note: session_id NOT passed here - LoadConfig doesn't support it
+                    # session_id is only used by processing ops (e.g. process_annuity_performance_op)
                 }
             },
         }
@@ -186,6 +191,7 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:  
                 "eqc_lookup_config": eqc_config.to_dict(),
                 "plan_only": effective_plan_only,
                 "use_pipeline": getattr(args, "use_pipeline", None),
+                # Note: session_id NOT passed here - ProcessingConfig doesn't support it
             }
         }
 
