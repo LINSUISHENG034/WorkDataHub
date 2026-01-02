@@ -240,7 +240,9 @@ def bind_context(**kwargs: Any) -> Any:
     return structlog.get_logger().bind(**kwargs)
 
 
-def reconfigure_for_console(debug: bool = False) -> None:
+def reconfigure_for_console(
+    debug: bool = False, verbose: bool = False, quiet: bool = False
+) -> None:
     """Reconfigure structlog for console mode (Rich) vs JSON mode.
 
     This function allows switching between JSON rendering (default) and
@@ -248,18 +250,56 @@ def reconfigure_for_console(debug: bool = False) -> None:
     CLI startup, before first log emission.
 
     Story: 7.5-4-rich-terminal-ux-enhancement (AC-4: Console Mode)
+    Story: 7.5-6-cli-output-ux-optimization (AC-1, AC-2: Verbosity levels)
 
     Args:
-        debug: If True, use ConsoleRenderer for human-readable colored output.
-                If False, use JSONRenderer for machine parsing.
+        debug: If True, use ConsoleRenderer for human-readable colored output
+               and enable DEBUG-level logging including Dagster internals.
+        verbose: If True, show INFO-level diagnostic logs (structlog).
+                 If False (default), suppress INFO logs for clean UX.
+        quiet: If True, show only ERROR-level logs (minimal output mode).
+               Errors and final summary only.
+
+    Verbosity Levels:
+        - Quiet (quiet=True): ERROR+ only, minimal output
+        - Default (debug=False, verbose=False): WARNING+ only, Dagster suppressed
+        - Verbose (verbose=True): INFO+ structlog logs shown
+        - Debug (debug=True): Full DEBUG output including Dagster internals
 
     Example:
         >>> from work_data_hub.utils.logging import reconfigure_for_console
         >>> # In CLI main() before logging
-        >>> reconfigure_for_console(debug=args.debug)
+        >>> reconfigure_for_console(debug=args.debug, verbose=args.verbose, quiet=args.quiet)
         >>> logger = get_logger(__name__)
-        >>> logger.info("Processing started")  # Colored output if debug=True
+        >>> logger.info("Processing started")  # Only shown if verbose/debug
     """
+    # Story 7.5-6 AC-1: Suppress Dagster DEBUG in default mode
+    # Configure Dagster's logging level based on debug mode
+    dagster_logger = logging.getLogger("dagster")
+    if debug:
+        dagster_logger.setLevel(logging.DEBUG)
+    else:
+        # Suppress Dagster DEBUG/INFO to reduce terminal noise
+        dagster_logger.setLevel(logging.WARNING)
+
+    # Determine root log level based on verbosity
+    # Priority: debug > verbose > default > quiet
+    if debug:
+        root_level = logging.DEBUG
+    elif verbose:
+        root_level = logging.INFO
+    elif quiet:
+        # Story 7.5-6 AC-2: --quiet shows only errors and final summary
+        root_level = logging.ERROR
+    else:
+        # Default: Only WARNING and above for clean output
+        root_level = logging.WARNING
+
+    # Update root logger level
+    logging.root.setLevel(root_level)
+    for handler in logging.root.handlers:
+        handler.setLevel(root_level)
+
     # Get existing processors minus the renderer
     base_processors: list[Processor] = [
         structlog.stdlib.add_log_level,
@@ -288,3 +328,4 @@ def reconfigure_for_console(debug: bool = False) -> None:
         logger_factory=structlog.stdlib.LoggerFactory(),
         cache_logger_on_first_use=False,  # Allow reconfiguration
     )
+

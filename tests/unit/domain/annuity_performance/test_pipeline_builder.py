@@ -200,14 +200,23 @@ class TestLoadPlanOverrideMapping:
 
         assert result == {}
 
-    def test_returns_empty_dict_when_plan_overrides_key_missing(self, tmp_path):
-        """Returns empty dict when plan_overrides key is missing."""
-        mapping_file = tmp_path / "no_key.yml"
-        mapping_file.write_text("other_key:\n  FP0001: '614810477'\n")
+    def test_returns_empty_dict_when_yaml_is_not_dict(self, tmp_path):
+        """Returns empty dict when YAML content is not a dict (e.g., a list)."""
+        mapping_file = tmp_path / "list_format.yml"
+        mapping_file.write_text("- FP0001\n- FP0002\n")
 
         result = load_plan_override_mapping(str(mapping_file))
 
         assert result == {}
+
+    def test_loads_flat_format_yaml_file(self, tmp_path):
+        """Loads mapping from flat format YAML file (actual production format)."""
+        mapping_file = tmp_path / "test_mapping.yml"
+        mapping_file.write_text("FP0001: '614810477'\nFP0002: '123456789'\n")
+
+        result = load_plan_override_mapping(str(mapping_file))
+
+        assert result == {"FP0001": "614810477", "FP0002": "123456789"}
 
 
 class TestPipelineExecution:

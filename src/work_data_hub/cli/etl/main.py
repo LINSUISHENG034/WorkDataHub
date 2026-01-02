@@ -189,6 +189,22 @@ def main(argv: Optional[List[str]] = None) -> int:  # noqa: PLR0911, PLR0912, PL
         help="Export unknown company names to CSV for manual review",
     )
 
+    # Story 7.5-6: Verbosity levels for CLI output optimization
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        default=False,
+        help="Show diagnostic information (INFO-level logs)",
+    )
+    parser.add_argument(
+        "--quiet",
+        "-q",
+        action="store_true",
+        default=False,
+        help="Minimal output (errors and final summary only)",
+    )
+
     # Advanced options
     parser.add_argument(
         "--debug",
@@ -231,9 +247,12 @@ def main(argv: Optional[List[str]] = None) -> int:  # noqa: PLR0911, PLR0912, PL
     args = parser.parse_args(argv)
 
     # Story 7.5-4 AC-4: Reconfigure logging for console mode based on --debug flag
+    # Story 7.5-6: Add verbosity levels (--verbose, --quiet)
     # Must be called early, before any logging occurs
     debug_mode = getattr(args, "debug", False)
-    reconfigure_for_console(debug=debug_mode)
+    verbose_mode = getattr(args, "verbose", False)
+    quiet_mode = getattr(args, "quiet", False)
+    reconfigure_for_console(debug=debug_mode, verbose=verbose_mode, quiet=quiet_mode)
 
     # Story 6.2-P16 AC-2: --check-db diagnostic mode
     if getattr(args, "check_db", False):

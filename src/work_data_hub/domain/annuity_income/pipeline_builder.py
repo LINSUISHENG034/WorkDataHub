@@ -336,7 +336,13 @@ def load_plan_override_mapping(mapping_path: Optional[str] = None) -> Dict[str, 
         with path.open("r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
-        mapping = data.get("plan_overrides", {})
+        # Support both flat format (key: value) and nested format (plan_overrides: {key: value})
+        # Flat format is used by company_id_overrides_plan.yml (actual production YAML file)
+        if isinstance(data, dict) and "plan_overrides" in data:
+            mapping = data.get("plan_overrides", {})
+        else:
+            # Flat format: data is already the mapping dict
+            mapping = data if isinstance(data, dict) else {}
         if not isinstance(mapping, dict):
             logger.bind(domain="annuity_income", step="load_plan_override").warning(
                 "Plan override mapping is not a dict", path=mapping_path
