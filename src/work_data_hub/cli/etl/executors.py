@@ -2,11 +2,28 @@
 Job executors for ETL CLI.
 
 Story 7.4: CLI Layer Modularization - Domain and job execution utilities.
+Story 7.5-4: Rich Terminal UX Enhancement - Console abstraction integration.
 """
 
 import argparse
 
 from .config import build_run_config
+from .console import get_console
+
+
+def _get_console_from_args(args: argparse.Namespace):
+    """Get console instance from CLI arguments.
+
+    Story 7.5-4: Factory function for console selection based on --no-rich flag.
+
+    Args:
+        args: Parsed CLI arguments
+
+    Returns:
+        BaseConsole instance (RichConsole or PlainConsole)
+    """
+    no_rich = getattr(args, "no_rich", False)
+    return get_console(no_rich=no_rich)
 
 
 def _execute_queue_processing_job(args: argparse.Namespace) -> int:
@@ -17,14 +34,15 @@ def _execute_queue_processing_job(args: argparse.Namespace) -> int:
         process_company_lookup_queue_job,
     )
 
+    console = _get_console_from_args(args)
     effective_plan_only = not args.execute if hasattr(args, "execute") else True
 
-    print("🚀 Starting company lookup queue processing...")
-    print(f"   Domain: {args.domains}")
-    print(f"   Batch size: {args.batch_size}")
-    print(f"   Execute: {args.execute}")
-    print(f"   Plan-only: {effective_plan_only}")
-    print("=" * 50)
+    console.print("🚀 Starting company lookup queue processing...")
+    console.print(f"   Domain: {args.domains}")
+    console.print(f"   Batch size: {args.batch_size}")
+    console.print(f"   Execute: {args.execute}")
+    console.print(f"   Plan-only: {effective_plan_only}")
+    console.print("=" * 50)
 
     try:
         # Build run config for queue processing
@@ -46,27 +64,27 @@ def _execute_queue_processing_job(args: argparse.Namespace) -> int:
         )
 
         # Report results
-        print(f"✅ Job completed successfully: {result.success}")
+        console.print(f"✅ Job completed successfully: {result.success}")
 
         if result.success:
             queue_result = result.output_for_node("process_company_lookup_queue_op")
 
-            print("\n📊 Queue Processing Summary:")
-            print(f"   Processed: {queue_result.get('processed', 0)} requests")
-            print(f"   Successful: {queue_result.get('successful', 0)}")
-            print(f"   Failed: {queue_result.get('failed', 0)}")
-            print(f"   Remaining: {queue_result.get('remaining', 0)}")
+            console.print("\n📊 Queue Processing Summary:")
+            console.print(f"   Processed: {queue_result.get('processed', 0)} requests")
+            console.print(f"   Successful: {queue_result.get('successful', 0)}")
+            console.print(f"   Failed: {queue_result.get('failed', 0)}")
+            console.print(f"   Remaining: {queue_result.get('remaining', 0)}")
 
         else:
-            print("❌ Job completed with failures")
+            console.print("❌ Job completed with failures")
 
         return 0 if result.success else 1
 
     except KeyboardInterrupt:
-        print("⚠️ Queue processing interrupted by user")
+        console.print("⚠️ Queue processing interrupted by user")
         return 130
     except Exception as e:
-        print(f"❌ Unexpected queue processing failure: {e}")
+        console.print(f"❌ Unexpected queue processing failure: {e}")
         if args.raise_on_error:
             raise
         return 1
@@ -81,13 +99,14 @@ def _execute_reference_sync_job(args: argparse.Namespace) -> int:  # noqa: PLR09
     )
     from work_data_hub.orchestration.reference_sync_ops import ReferenceSyncOpConfig
 
+    console = _get_console_from_args(args)
     effective_plan_only = not args.execute if hasattr(args, "execute") else True
 
-    print("🚀 Starting reference sync from authoritative sources...")
-    print(f"   Domain: {args.domains}")
-    print(f"   Execute: {args.execute}")
-    print(f"   Plan-only: {effective_plan_only}")
-    print("=" * 50)
+    console.print("🚀 Starting reference sync from authoritative sources...")
+    console.print(f"   Domain: {args.domains}")
+    console.print(f"   Execute: {args.execute}")
+    console.print(f"   Plan-only: {effective_plan_only}")
+    console.print("=" * 50)
 
     try:
         # Build run config for reference sync
@@ -108,7 +127,7 @@ def _execute_reference_sync_job(args: argparse.Namespace) -> int:  # noqa: PLR09
         )
 
         # Report results
-        print(f"✅ Job completed successfully: {result.success}")
+        console.print(f"✅ Job completed successfully: {result.success}")
 
         if result.success:
             output_data = result.output_for_node("reference_sync_op")
@@ -119,40 +138,42 @@ def _execute_reference_sync_job(args: argparse.Namespace) -> int:  # noqa: PLR09
                 failed_count = output_data.get("failed_count", 0)
                 table_count = output_data.get("table_count", 0)
 
-                print("\nREFERENCE SYNC RESULTS:")
-                print(f"  Status: {status}")
-                print(f"  Tables processed: {table_count}")
-                print(f"  Rows synced: {total_synced}")
-                print(f"  Rows deleted: {total_deleted}")
-                print(f"  Failed tables: {failed_count}")
+                console.print("\nREFERENCE SYNC RESULTS:")
+                console.print(f"  Status: {status}")
+                console.print(f"  Tables processed: {table_count}")
+                console.print(f"  Rows synced: {total_synced}")
+                console.print(f"  Rows deleted: {total_deleted}")
+                console.print(f"  Failed tables: {failed_count}")
 
                 # Show per-table results if available
                 results_list = output_data.get("results", [])
                 if results_list:
-                    print("\n  Per-table breakdown:")
+                    console.print("\n  Per-table breakdown:")
                     for r in results_list:
                         table = r.get("table", "unknown")
                         synced = r.get("rows_synced", 0)
                         deleted = r.get("rows_deleted", 0)
                         error = r.get("error")
                         if error:
-                            print(f"    ❌ {table}: ERROR - {error}")
+                            console.print(f"    ❌ {table}: ERROR - {error}")
                         else:
-                            print(f"    ✓ {table}: {synced} synced, {deleted} deleted")
+                            console.print(
+                                f"    ✓ {table}: {synced} synced, {deleted} deleted"
+                            )
 
-        print("=" * 50)
+        console.print("=" * 50)
         if effective_plan_only:
-            print("✅ Reference sync plan complete - no database changes made")
+            console.print("✅ Reference sync plan complete - no database changes made")
         else:
-            print("🎉 REFERENCE SYNC SUCCESS - Authoritative data loaded")
-        print("=" * 50)
+            console.print("🎉 REFERENCE SYNC SUCCESS - Authoritative data loaded")
+        console.print("=" * 50)
         return 0
 
     except KeyboardInterrupt:
-        print("⚠️ Reference sync interrupted by user")
+        console.print("⚠️ Reference sync interrupted by user")
         return 130
     except Exception as e:
-        print(f"❌ Unexpected reference sync failure: {e}")
+        console.print(f"❌ Unexpected reference sync failure: {e}")
         if args.raise_on_error:
             raise
         return 1
@@ -169,6 +190,8 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:  # noq
     Returns:
         Exit code (0 for success, non-zero for failure)
     """
+    console = _get_console_from_args(args)
+
     # Calculate effective execution mode
     effective_plan_only = (
         not args.execute
@@ -179,18 +202,36 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:  # noq
     # Build run configuration
     run_config = build_run_config(args, domain)
 
-    print(f"🚀 Starting {domain} job...")
-    print(f"   Domain: {domain}")
-    print(f"   Mode: {args.mode}")
-    print(f"   Execute: {args.execute}")
-    print(f"   Plan-only: {effective_plan_only}")
-    print(f"   Sheet: {args.sheet}")
-    print(f"   Max files: {args.max_files}")
-    print(f"   Skip facts: {getattr(args, 'skip_facts', False)}")
+    console.print(f"🚀 Starting {domain} job...")
+    console.print(f"   Domain: {domain}")
+    console.print(f"   Mode: {args.mode}")
+    console.print(f"   Execute: {args.execute}")
+    console.print(f"   Plan-only: {effective_plan_only}")
+    console.print(f"   Sheet: {args.sheet}")
+    console.print(f"   Max files: {args.max_files}")
+    console.print(f"   Skip facts: {getattr(args, 'skip_facts', False)}")
     if hasattr(args, "backfill_refs") and args.backfill_refs:
-        print(f"   Backfill refs: {args.backfill_refs}")
-        print(f"   Backfill mode: {args.backfill_mode}")
-    print("=" * 50)
+        console.print(f"   Backfill refs: {args.backfill_refs}")
+        console.print(f"   Backfill mode: {args.backfill_mode}")
+    console.print("=" * 50)
+
+    # Story 7.5-4 AC-2: Display file discovery tree (if files are in run_config)
+    files_list = (
+        run_config.get("ops", {})
+        .get("discover_files_op", {})
+        .get("config", {})
+        .get("files_list", [])
+    )
+    if files_list and console.is_rich_enabled():
+        from pathlib import Path
+
+        tree = console.tree(f"📂 {domain}")
+        for file_path in files_list:
+            # Story 7.5-4 AC-3: Add clickable hyperlink for file paths
+            file_link = console.hyperlink(file_path, Path(file_path).name)
+            tree.add(f"📄 {file_link}")
+        console.print(tree)
+        console.print("")
 
     # Select appropriate job based on domain and max_files parameter
     max_files = getattr(args, "max_files", 1)
@@ -219,7 +260,9 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:  # noq
         if job_entry.multi_file_job:
             selected_job = job_entry.multi_file_job
         else:
-            print(f"Warning: max_files > 1 not yet supported for {domain}, using 1")
+            console.print(
+                f"Warning: max_files > 1 not yet supported for {domain}, using 1"
+            )
 
     # Execute job with appropriate settings
     try:
@@ -227,12 +270,16 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:  # noq
 
         instance = DagsterInstance.ephemeral() if args.debug else None
 
-        result = selected_job.execute_in_process(
-            run_config=run_config, instance=instance, raise_on_error=args.raise_on_error
-        )
+        # Story 7.5-4 AC-2: Live status display during job execution
+        with console.status(f"[bold green]Processing {domain}..."):
+            result = selected_job.execute_in_process(
+                run_config=run_config,
+                instance=instance,
+                raise_on_error=args.raise_on_error,
+            )
 
         # Report results
-        print(f"✅ Job completed successfully: {result.success}")
+        console.print(f"✅ Job completed successfully: {result.success}")
 
         if result.success:
             # Extract and display execution summary
@@ -244,45 +291,47 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:  # noq
             load_result = result.output_for_node("load_op")
 
             if effective_plan_only and "sql_plans" in load_result:
-                print("\n📋 SQL Execution Plan:")
-                print("-" * 30)
+                console.print("\n📋 SQL Execution Plan:")
+                console.print("-" * 30)
                 for i, (op_type, sql, params) in enumerate(load_result["sql_plans"], 1):
-                    print(f"{i}. {op_type}:")
-                    print(f"   {sql}")
+                    console.print(f"{i}. {op_type}:")
+                    console.print(f"   {sql}")
                     if params:
-                        print(f"   Parameters: {len(params)} values")
-                    print()
+                        console.print(f"   Parameters: {len(params)} values")
+                    console.print("")
 
             # Display backfill execution statistics
             if backfill_result:
-                print("\n📥 Reference Backfill Summary:")
-                print(f"   Plan-only: {backfill_result.get('plan_only', False)}")
+                console.print("\n📥 Reference Backfill Summary:")
+                console.print(
+                    f"   Plan-only: {backfill_result.get('plan_only', False)}"
+                )
                 ops = backfill_result.get("operations", []) or []
                 if not ops:
-                    print("   Operations: 0 (skipped or no candidates)")
+                    console.print("   Operations: 0 (skipped or no candidates)")
                 for op in ops:
                     table = op.get("table")
                     inserted = op.get("inserted")
                     updated = op.get("updated")
                     if inserted is not None:
-                        print(f"   {table}: inserted={inserted}")
+                        console.print(f"   {table}: inserted={inserted}")
                     if updated is not None:
-                        print(f"   {table}: updated={updated}")
+                        console.print(f"   {table}: updated={updated}")
 
             # Display execution statistics for facts
-            print("\n📊 Execution Summary:")
-            print(f"   Table: {load_result.get('table', 'N/A')}")
-            print(f"   Mode: {load_result.get('mode', 'N/A')}")
-            print(f"   Deleted: {load_result.get('deleted', 0)} rows")
-            print(f"   Inserted: {load_result.get('inserted', 0)} rows")
-            print(f"   Batches: {load_result.get('batches', 0)}")
+            console.print("\n📊 Execution Summary:")
+            console.print(f"   Table: {load_result.get('table', 'N/A')}")
+            console.print(f"   Mode: {load_result.get('mode', 'N/A')}")
+            console.print(f"   Deleted: {load_result.get('deleted', 0)} rows")
+            console.print(f"   Inserted: {load_result.get('inserted', 0)} rows")
+            console.print(f"   Batches: {load_result.get('batches', 0)}")
 
         else:
-            print("❌ Job completed with failures")
+            console.print("❌ Job completed with failures")
             if not args.raise_on_error:
                 for event in result.all_node_events:
                     if event.is_failure:
-                        print(
+                        console.print(
                             f"   Error in {event.node_name}: "
                             f"{event.event_specific_data}"
                         )
@@ -290,10 +339,10 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:  # noq
         return 0 if result.success else 1
 
     except Exception as e:
-        print(f"💥 Job execution failed: {e}")
+        console.print(f"💥 Job execution failed: {e}")
         if args.debug:
             import traceback
 
-            print("\n🐛 Full traceback:")
+            console.print("\n🐛 Full traceback:")
             traceback.print_exc()
         return 1

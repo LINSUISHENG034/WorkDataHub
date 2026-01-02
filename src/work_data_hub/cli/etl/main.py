@@ -24,6 +24,7 @@ from typing import List, Optional
 # Import the package module for dynamic lookup of patchable functions.
 # This allows tests to patch work_data_hub.cli.etl._execute_single_domain etc.
 import work_data_hub.cli.etl as etl_module
+from work_data_hub.utils.logging import reconfigure_for_console
 
 from .auth import _validate_and_refresh_token
 from .diagnostics import _check_database_connection
@@ -192,7 +193,18 @@ def main(argv: Optional[List[str]] = None) -> int:  # noqa: PLR0911, PLR0912, PL
     parser.add_argument(
         "--debug",
         action="store_true",
-        help="Enable debug logging and persist run in Dagster UI",
+        help=(
+            "Enable debug logging with verbose console output and persist run in Dagster UI. "
+            "In Rich mode, also enables structlog ConsoleRenderer for human-readable logs."
+        ),
+    )
+    parser.add_argument(
+        "--no-rich",
+        action="store_true",
+        help=(
+            "Disable Rich rendering, produce plain text output. "
+            "Automatically enabled in non-TTY environments (CI/CD)."
+        ),
     )
     parser.add_argument(
         "--raise-on-error",
@@ -217,6 +229,11 @@ def main(argv: Optional[List[str]] = None) -> int:  # noqa: PLR0911, PLR0912, PL
     )
 
     args = parser.parse_args(argv)
+
+    # Story 7.5-4 AC-4: Reconfigure logging for console mode based on --debug flag
+    # Must be called early, before any logging occurs
+    debug_mode = getattr(args, "debug", False)
+    reconfigure_for_console(debug=debug_mode)
 
     # Story 6.2-P16 AC-2: --check-db diagnostic mode
     if getattr(args, "check_db", False):

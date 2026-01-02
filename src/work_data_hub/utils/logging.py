@@ -238,3 +238,53 @@ def bind_context(**kwargs: Any) -> Any:
         #         "row_id": 456, "event": "processing_row", ...}
     """
     return structlog.get_logger().bind(**kwargs)
+
+
+def reconfigure_for_console(debug: bool = False) -> None:
+    """Reconfigure structlog for console mode (Rich) vs JSON mode.
+
+    This function allows switching between JSON rendering (default) and
+    human-readable ConsoleRenderer for debug mode. Must be called early in
+    CLI startup, before first log emission.
+
+    Story: 7.5-4-rich-terminal-ux-enhancement (AC-4: Console Mode)
+
+    Args:
+        debug: If True, use ConsoleRenderer for human-readable colored output.
+                If False, use JSONRenderer for machine parsing.
+
+    Example:
+        >>> from work_data_hub.utils.logging import reconfigure_for_console
+        >>> # In CLI main() before logging
+        >>> reconfigure_for_console(debug=args.debug)
+        >>> logger = get_logger(__name__)
+        >>> logger.info("Processing started")  # Colored output if debug=True
+    """
+    # Get existing processors minus the renderer
+    base_processors: list[Processor] = [
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.add_logger_name,
+        structlog.processors.TimeStamper(fmt="iso"),
+        sanitization_processor,
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+    ]
+
+    # Choose renderer based on debug mode
+    if debug:
+        # Human-readable colored output for development
+        # Story 7.5-4 AC-4: --debug enables verbose console output
+        renderer: Processor = structlog.dev.ConsoleRenderer(colors=True)
+    else:
+        # JSON for machine parsing (default)
+        # Story 7.5-4 AC-4: Default mode hides INFO-level structlog output
+        renderer = structlog.processors.JSONRenderer()
+
+    # Reconfigure structlog with new renderer
+    structlog.configure(
+        processors=[*base_processors, renderer],
+        wrapper_class=structlog.stdlib.BoundLogger,
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        cache_logger_on_first_use=False,  # Allow reconfiguration
+    )

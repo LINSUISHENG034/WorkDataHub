@@ -36,6 +36,7 @@ Usage:
 from work_data_hub.config.settings import get_settings
 
 from .config import build_run_config
+from .console import get_console
 from .diagnostics import _check_database_connection
 from .domain_validation import (
     SPECIAL_DOMAINS,
@@ -56,4 +57,5 @@ __all__ = [
     "_execute_single_domain",
     "_check_database_connection",
     "get_settings",
+    "get_console",
 ]
