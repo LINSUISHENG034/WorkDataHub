@@ -386,7 +386,8 @@ class EqcProvider:
 
         Returns:
             Tuple of (CompanyInfo, raw_search_json) if found, (None, None) otherwise.
-            Additional raw responses (business_info, labels) are passed via _cache_result.
+            Additional raw responses (business_info, labels) are passed via
+            _cache_result.
         """
         if not self.client:
             return None, None
@@ -469,7 +470,7 @@ class EqcProvider:
 
         Writes to both:
         1. enterprise.enrichment_index (Epic 6.1 cache)
-        2. enterprise.base_info (Story 6.2-P5 persistence)
+        2. enterprise.base_info (Story 6.2-P5 persistence with parsed fields)
 
         Args:
             company_name: Original company name query.
@@ -477,6 +478,10 @@ class EqcProvider:
             raw_json: Raw API response for persistence (Story 6.2-P5).
         """
         try:
+            from work_data_hub.infrastructure.enrichment.base_info_parser import (
+                BaseInfoParser,
+                build_upsert_kwargs,
+            )
             from work_data_hub.infrastructure.enrichment.types import (
                 EnrichmentIndexRecord,
                 LookupType,
@@ -485,6 +490,26 @@ class EqcProvider:
 
             # Normalize using the same method as Layer 2 lookup for consistency
             normalized = normalize_for_temp_id(company_name) or company_name.strip()
+
+            # Parse fields from raw responses using BaseInfoParser
+            raw_business_info = getattr(self, "_raw_business_info", None)
+            raw_biz_label = getattr(self, "_raw_biz_label", None)
+
+            parsed = None
+            if raw_json is not None:
+                try:
+                    parsed = BaseInfoParser.parse_from_search_response(
+                        raw_json=raw_json,
+                        raw_business_info=raw_business_info,
+                        search_key_word=company_name,
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "eqc_provider.parse_failed",
+                        msg="Failed to parse raw response - falling back to "
+                        "basic fields",
+                        error_type=type(e).__name__,
+                    )
 
             # Story 7.1-8: Check minimum confidence threshold before caching
             if result.confidence < self.eqc_confidence_config.min_confidence_for_cache:
@@ -498,23 +523,27 @@ class EqcProvider:
                 # But skip enrichment_index cache
                 if raw_json is not None and self.mapping_repository:
                     try:
+                        upsert_kwargs = build_upsert_kwargs(parsed)
                         self.mapping_repository.upsert_base_info(
                             company_id=result.company_id,
                             search_key_word=company_name,
                             company_full_name=result.official_name,
                             unite_code=result.unified_credit_code,
                             raw_data=raw_json,
-                            raw_business_info=getattr(self, "_raw_business_info", None),
-                            raw_biz_label=getattr(self, "_raw_biz_label", None),
+                            raw_business_info=raw_business_info,
+                            raw_biz_label=raw_biz_label,
+                            **upsert_kwargs,
                         )
                         logger.debug(
                             "eqc_provider.persisted_to_base_info_only",
-                            msg="Persisted EQC result to base_info only (below cache threshold)",
+                            msg="Persisted EQC result to base_info only (below "
+                            "cache threshold)",
                         )
                     except Exception as e:
                         logger.warning(
                             "eqc_provider.base_info_persistence_failed",
-                            msg="Failed to persist to base_info - continuing without persistence",
+                            msg="Failed to persist to base_info - continuing without "
+                            "persistence",
                             error_type=type(e).__name__,
                         )
                 return
@@ -537,22 +566,23 @@ class EqcProvider:
             )
 
             # Story 6.2-P5/P8: Write to enterprise.base_info with all raw API responses
-            # This is best-effort persistence - failure must not fail the lookup
+            # Now includes parsed fields from BaseInfoParser
             if raw_json is not None and self.mapping_repository:
                 try:
-                    # Story 6.2-P8: Pass all raw data to repository
+                    upsert_kwargs = build_upsert_kwargs(parsed)
                     self.mapping_repository.upsert_base_info(
                         company_id=result.company_id,
                         search_key_word=company_name,
                         company_full_name=result.official_name,
                         unite_code=result.unified_credit_code,
                         raw_data=raw_json,
-                        raw_business_info=getattr(self, "_raw_business_info", None),
-                        raw_biz_label=getattr(self, "_raw_biz_label", None),
+                        raw_business_info=raw_business_info,
+                        raw_biz_label=raw_biz_label,
+                        **upsert_kwargs,
                     )
                     logger.debug(
                         "eqc_provider.persisted_to_base_info",
-                        msg="Persisted EQC result to base_info table with full data",
+                        msg="Persisted EQC result to base_info table with parsed fields",
                     )
                 except Exception as e:
                     # Non-blocking: log and continue

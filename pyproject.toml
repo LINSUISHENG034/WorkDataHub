@@ -31,6 +31,7 @@ dependencies = [
     "dukpy>=0.5.0",
     "python-dotenv>=1.0.0",
     "rich>=13.0.0",
+    "pyperclip>=1.11.0",
 ]
  
 [tool.setuptools.packages.find]
@@ -43,6 +44,10 @@ dev = [
     "pytest-postgresql",
     "ruff>=0.12.12",
     "mypy>=1.17.1",
+]
+gui = [
+    "PyQt6>=6.6.0",
+    "pyqt6-fluent-widgets>=1.7.5",
 ]
 
 [tool.ruff]
@@ -101,6 +106,8 @@ extend-select = ["TID"]  # Clean Architecture enforcement (Story 1.6)
 # PLR09xx: Orchestration jobs define multi-step pipelines (Story 7.1-17)
 "src/work_data_hub/orchestration/jobs.py" = ["PLR0912", "PLR0915"]
 "src/work_data_hub/domain/annuity_performance/*.py" = ["E501"]  # Legacy long lines (to fix in Story 7.1-15)
+# GUI layer: display methods have many visual parameters (EQC Query UX Optimization)
+"src/work_data_hub/gui/**/*.py" = ["PLR0913"]
 "src/work_data_hub/scripts/**/*.py" = ["TID251"]  # Scripts can import from IO layer
 "scripts/**/*.py" = ["TID251"]  # Root scripts can import from IO layer
 "tests/**/*.py" = ["ALL"]  # Test files exempt from all rules

@@ -169,28 +169,15 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
             sa.Column("company_nature", sa.String(255), nullable=True),
             sa.Column("_score", sa.Float(), nullable=True),
             sa.Column("type", sa.String(255), nullable=True),
-            sa.Column(
-                "registeredStatus",
-                sa.String(255),
-                nullable=True,
-                comment="Legacy (camelCase)",
-            ),
             sa.Column("organization_code", sa.String(255), nullable=True),
             sa.Column("le_rep", sa.Text(), nullable=True),
             sa.Column("reg_cap", sa.Float(), nullable=True),
             sa.Column("is_pa_relatedparty", sa.Integer(), nullable=True),
             sa.Column("province", sa.String(255), nullable=True),
             sa.Column(
-                "companyFullName",
-                sa.String(255),
-                nullable=True,
-                comment="Canonical (quoted)",
-            ),
-            sa.Column(
                 "est_date", sa.String(255), nullable=True, comment="Legacy (raw string)"
             ),
             sa.Column("company_short_name", sa.String(255), nullable=True),
-            sa.Column("id", sa.String(255), nullable=True, comment="Legacy"),
             sa.Column("is_debt", sa.Integer(), nullable=True),
             sa.Column(
                 "unite_code",
@@ -209,15 +196,18 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
             sa.Column("company_former_name", sa.String(255), nullable=True),
             sa.Column("is_rank_list", sa.Integer(), nullable=True),
             sa.Column("trade_register_code", sa.String(255), nullable=True),
-            sa.Column(
-                "companyId", sa.String(255), nullable=True, comment="Legacy (camelCase)"
-            ),
             sa.Column("is_normal", sa.Integer(), nullable=True),
             sa.Column(
                 "company_full_name",
                 sa.String(255),
                 nullable=True,
-                comment="Legacy (compatibility)",
+                comment="Official company name",
+            ),
+            sa.Column(
+                "data_source",
+                sa.String(20),
+                nullable=True,
+                comment="Origin: search, direct_id, refresh",
             ),
             # JSONB fields for raw API responses
             sa.Column(
@@ -673,8 +663,18 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
             sa.Column("关联计划数", sa.Integer(), nullable=True),
             sa.Column("备注", sa.Text(), nullable=True),
             # Story 7.5-1: Add audit columns for consistency with domain tables
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False, server_default=func.now()),
-            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), nullable=False, server_default=func.now()),
+            sa.Column(
+                "created_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=False,
+                server_default=func.now(),
+            ),
+            sa.Column(
+                "updated_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=False,
+                server_default=func.now(),
+            ),
             sa.PrimaryKeyConstraint("company_id", name="年金客户_pkey"),
             schema="mapping",
             comment="Reference table: Annuity customers (10,997 rows, manual DDL)",

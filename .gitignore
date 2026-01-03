@@ -155,6 +155,7 @@ tests/.performance_baseline.json
 
 logs/
 *.log
+temp.md
 
 # ============================================================================
 # Project-Specific Directories

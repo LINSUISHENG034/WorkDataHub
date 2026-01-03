@@ -11,14 +11,18 @@ Available commands:
     etl          - Run ETL jobs (single or multi-domain)
     auth         - Authentication operations
     eqc-refresh  - EQC data refresh operations
+    eqc-gui      - Launch EQC quick query GUI (Tkinter)
+    eqc-gui-fluent - Launch EQC quick query GUI (Fluent/Modern)
     cleanse      - Data cleansing operations
 
 Examples:
     # Single domain ETL
-    python -m work_data_hub.cli etl --domains annuity_performance --period 202411 --execute
+    python -m work_data_hub.cli etl --domains annuity_performance --period 202411 \
+        --execute
 
     # Multi-domain ETL
-    python -m work_data_hub.cli etl --domains annuity_performance,annuity_income --period 202411 --execute
+    python -m work_data_hub.cli etl \
+        --domains annuity_performance,annuity_income --period 202411 --execute
 
     # All domains ETL
     python -m work_data_hub.cli etl --all-domains --period 202411 --execute
@@ -28,6 +32,12 @@ Examples:
 
     # EQC refresh
     python -m work_data_hub.cli eqc-refresh --status
+
+    # EQC quick query GUI (Tkinter)
+    python -m work_data_hub.cli eqc-gui
+
+    # EQC quick query GUI (Fluent/Modern)
+    python -m work_data_hub.cli eqc-gui-fluent
 
     # Data cleansing
     python -m work_data_hub.cli cleanse --table business_info --domain eqc_business_info
@@ -84,7 +94,7 @@ Examples:
     )
 
     # ETL command (delegate all argument parsing to etl.py)
-    etl_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "etl",
         help="Run ETL jobs (single or multi-domain)",
         description="Execute ETL jobs for one or more data domains",
@@ -92,7 +102,7 @@ Examples:
     )
 
     # Auth command (delegate to auth module)
-    auth_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "auth",
         help="Authentication operations",
         description="Manage authentication tokens and credentials",
@@ -100,15 +110,29 @@ Examples:
     )
 
     # EQC refresh command (delegate to existing module)
-    eqc_refresh_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "eqc-refresh",
         help="EQC data refresh operations",
         description="Refresh EQC data from API",
         add_help=False,  # Let the delegated module handle help
     )
 
+    # EQC GUI command (Tkinter)
+    subparsers.add_parser(
+        "eqc-gui",
+        help="Launch EQC quick query GUI (Tkinter version)",
+        description="Launch Tkinter-based graphical interface for quick EQC lookups",
+    )
+
+    # EQC GUI Fluent command (PyQt)
+    subparsers.add_parser(
+        "eqc-gui-fluent",
+        help="Launch EQC quick query GUI (Fluent/Modern version)",
+        description="Launch modern Fluent-style GUI with dark mode support",
+    )
+
     # Cleanse command (delegate to existing module)
-    cleanse_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "cleanse",
         help="Data cleansing operations",
         description="Cleanse data in database tables",
@@ -142,6 +166,20 @@ Examples:
         # Reconstruct argv for the delegated module
         delegated_argv = remaining_args if remaining_args else []
         return eqc_refresh_main(delegated_argv)
+
+    elif args.command == "eqc-gui":
+        # Launch EQC Query GUI (Tkinter)
+        from work_data_hub.gui.eqc_query.app import launch_gui
+
+        launch_gui()
+        return 0
+
+    elif args.command == "eqc-gui-fluent":
+        # Launch EQC Query GUI (Fluent/PyQt)
+        from work_data_hub.gui.eqc_query_fluent.app import launch_gui
+
+        launch_gui()
+        return 0
 
     elif args.command == "cleanse":
         # Delegate to existing cleanse_data module
