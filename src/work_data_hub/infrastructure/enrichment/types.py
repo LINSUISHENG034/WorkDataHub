@@ -126,6 +126,7 @@ class ResolutionStatistics:
             "account_number": 0,
             "customer_name": 0,
             "plan_customer": 0,
+            "former_name": 0,
             # Note: legacy (company_mapping) removed in Story 7.1-4 (Zero Legacy)
         }
     )
@@ -230,6 +231,7 @@ class LookupType(Enum):
     ACCOUNT_NUMBER = "account_number"
     CUSTOMER_NAME = "customer_name"
     PLAN_CUSTOMER = "plan_customer"
+    FORMER_NAME = "former_name"  # DB-P6: Company former names
 
 
 class SourceType(Enum):

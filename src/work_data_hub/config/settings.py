@@ -194,7 +194,11 @@ class Settings(BaseSettings):
     )
 
     eqc_rate_limit: int = Field(
-        default=10, description="EQC API rate limit (requests per minute)"
+        default=10, description="EQC API rate limit (requests per window)"
+    )
+
+    eqc_rate_limit_window: int = Field(
+        default=60, description="EQC API rate limit sliding window in seconds"
     )
 
     eqc_retry_max: int = Field(
