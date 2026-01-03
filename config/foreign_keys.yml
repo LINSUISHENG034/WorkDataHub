@@ -1,14 +1,15 @@
 # WorkDataHub Foreign Key Backfill Configuration
 # Story 6.2-P14: Config File Modularization
 # Story 6.2-P15: Complex Mapping Backfill Enhancement (added aggregation support)
+# Story 6.2-P18: Advanced Aggregation Capabilities (template, count_distinct, lambda)
 # Created: 2025-12-19
-# Updated: 2025-12-20
+# Updated: 2026-01-03
 #
 # This file contains foreign key backfill configurations extracted from
 # data_sources.yml to follow Single Responsibility Principle (SRP).
 #
 # Previously: config/data_sources.yml → domains.*.foreign_keys sections
-# Schema Version: 1.1 (Story 6.2-P15 added aggregation field)
+# Schema Version: 1.2 (Story 6.2-P18 added advanced aggregations)
 #
 # Usage: Loaded by work_data_hub.domain.reference_backfill.config_loader
 #
@@ -19,14 +20,28 @@
 # - depends_on: List of FK names to process first
 # - skip_blank_values: Skip "(空白)" and empty values
 #
-# Aggregation Types (Story 6.2-P15):
+# Aggregation Types:
+#
+# Story 6.2-P15 (Basic):
 # - first: Default, takes first non-null value per group
 # - max_by: Select value from row with maximum order_column value
 #     Required: order_column (column to order by)
 # - concat_distinct: Concatenate distinct values with separator
 #     Optional: separator (default "+"), sort (default true)
+#
+# Story 6.2-P18 (Advanced):
+# - template: Construct composite text from static template with placeholders
+#     Required: template (string with {field} placeholders)
+#     Optional: template_fields (list of field names, auto-extracted if omitted)
+#     Example: template: "新建客户_{月度}"
+# - count_distinct: Count unique non-null/non-blank values per group
+#     No additional fields required
+# - lambda: Execute custom Python lambda expression on each group
+#     Required: code (Python lambda expression string)
+#     Example: code: 'lambda g: g["月度"].iloc[0][:4]'
+#     Note: Config files are developer-controlled (trusted source)
 
-schema_version: "1.1"
+schema_version: "1.2"
 
 domains:
   # Annuity Performance Domain
@@ -173,6 +188,57 @@ domains:
               type: "concat_distinct"
               separator: "+"
               sort: true
+          - source: "计划类型"
+            target: "年金计划类型"
+            optional: true
+            aggregation:
+              type: "concat_distinct"
+              separator: "/"
+              sort: true
+          - source: "计划代码"
+            target: "关键年金计划"
+            optional: true
+            aggregation:
+              type: "max_by"
+              order_column: "期末资产规模"
+          - source: "计划代码"
+            target: "其他年金计划"
+            optional: true
+            aggregation:
+              type: "concat_distinct"
+              separator: ","
+              sort: true
+          - source: "计划代码"
+            target: "关联计划数"
+            optional: true
+            aggregation:
+              type: "count_distinct"
+          - source: "机构名称"
+            target: "关联机构数"
+            optional: true
+            aggregation:
+              type: "count_distinct"
+          - source: "机构名称"
+            target: "其他开拓机构"
+            optional: true
+            aggregation:
+              type: "concat_distinct"
+              separator: ","
+              sort: true
+          - source: "月度"
+            target: "年金客户标签"
+            optional: true
+            aggregation:
+              # 日期格式化: "2025-10-01" → strftime("%y%m") → "2510新建"
+              type: "lambda"
+              code: 'lambda g: pd.to_datetime(g["月度"].dropna().iloc[0]).strftime("%y%m") + "新建" if len(g["月度"].dropna()) > 0 else ""'
+          # 固定值场景：template 无占位符 = 常量赋值（最简洁方式）
+          - source: "月度"
+            target: "年金客户类型"
+            optional: true
+            aggregation:
+              type: "template"
+              template: "新客"
 
   # Annuity Income Domain
   # Story 7.3-7: Add FK backfill configuration (parity with annuity_performance)
@@ -264,3 +330,59 @@ domains:
           - source: "客户名称"
             target: "客户名称"
             optional: true
+          - source: "机构代码"
+            target: "主拓机构代码"
+            optional: true
+            aggregation:
+              type: "max_by"
+              order_column: "固费"
+          - source: "机构名称"
+            target: "主拓机构"
+            optional: true
+            aggregation:
+              type: "max_by"
+              order_column: "固费"
+          - source: "计划代码"
+            target: "关键年金计划"
+            optional: true
+            aggregation:
+              type: "max_by"
+              order_column: "固费"
+          - source: "计划代码"
+            target: "其他年金计划"
+            optional: true
+            aggregation:
+              type: "concat_distinct"
+              separator: ","
+              sort: true
+          - source: "计划代码"
+            target: "关联计划数"
+            optional: true
+            aggregation:
+              type: "count_distinct"
+          - source: "机构名称"
+            target: "关联机构数"
+            optional: true
+            aggregation:
+              type: "count_distinct"
+          - source: "机构名称"
+            target: "其他开拓机构"
+            optional: true
+            aggregation:
+              type: "concat_distinct"
+              separator: ","
+              sort: true
+          - source: "月度"
+            target: "年金客户标签"
+            optional: true
+            aggregation:
+              # 日期格式化: "2025-10-01" → strftime("%y%m") → "2510新建"
+              type: "lambda"
+              code: 'lambda g: pd.to_datetime(g["月度"].dropna().iloc[0]).strftime("%y%m") + "新建" if len(g["月度"].dropna()) > 0 else ""'
+          # 固定值场景：template 无占位符 = 常量赋值（最简洁方式）
+          - source: "月度"
+            target: "年金客户类型"
+            optional: true
+            aggregation:
+              type: "template"
+              template: "新客*"

@@ -7,6 +7,7 @@ idempotent operations.
 """
 
 import logging
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -335,6 +336,35 @@ class GenericBackfillService:
                     ].to_numpy()
                 else:
                     candidates_df[col_mapping.target] = None
+            elif col_mapping.aggregation.type == AggregationType.TEMPLATE:
+                # Story 6.2-P18: template aggregation
+                candidates_df[col_mapping.target] = (
+                    self._aggregate_template(
+                        source_df, config.source_column, col_mapping
+                    )
+                    .reindex(grouped_first.index)
+                    .to_numpy()
+                )
+            elif col_mapping.aggregation.type == AggregationType.COUNT_DISTINCT:
+                # Story 6.2-P18: count_distinct aggregation
+                result = self._aggregate_count_distinct(
+                    source_df, config.source_column, col_mapping
+                )
+                if result.empty:
+                    candidates_df[col_mapping.target] = None
+                else:
+                    # Preserve Int64 type through reindex (avoid float conversion)
+                    reindexed = result.reindex(grouped_first.index)
+                    candidates_df[col_mapping.target] = pd.array(
+                        reindexed, dtype="Int64"
+                    )
+            elif col_mapping.aggregation.type == AggregationType.LAMBDA:
+                # Story 6.2-P18: lambda aggregation
+                candidates_df[col_mapping.target] = (
+                    self._aggregate_lambda(source_df, config.source_column, col_mapping)
+                    .reindex(grouped_first.index)
+                    .to_numpy()
+                )
 
         # Match legacy behavior: optional missing values are represented as Python None
         for col_mapping in config.backfill_columns:
@@ -454,6 +484,110 @@ class GenericBackfillService:
             return sep.join(str_values)
 
         return df.groupby(group_col, sort=False)[mapping.source].agg(concat_func)
+
+    def _aggregate_template(
+        self, df: pd.DataFrame, group_col: str, mapping: BackfillColumnMapping
+    ) -> pd.Series:
+        """
+        Apply template string with field placeholders.
+
+        Story 6.2-P18: Advanced Aggregation Capabilities
+
+        Template format: "prefix_{field1}_suffix_{field2}"
+        Placeholders are replaced with first non-null value from each group.
+
+        Args:
+            df: Source DataFrame
+            group_col: Column to group by
+            mapping: Column mapping with template config
+
+        Returns:
+            Series with formatted template strings per group
+
+        Raises:
+            ValueError: If template references non-existent field
+        """
+        template = mapping.aggregation.template
+        template_fields = mapping.aggregation.template_fields or []
+
+        # Auto-extract fields from template if not explicitly provided
+        if not template_fields:
+            template_fields = re.findall(r"\{(\w+)\}", template)
+
+        # Validate all template fields exist in DataFrame
+        missing_fields = [f for f in template_fields if f not in df.columns]
+        if missing_fields:
+            raise ValueError(f"Template references missing fields: {missing_fields}")
+
+        def apply_template(group: pd.DataFrame) -> str:
+            values = {}
+            for field in template_fields:
+                # Get first non-null value
+                non_null = group[field].dropna()
+                values[field] = str(non_null.iloc[0]) if len(non_null) > 0 else ""
+            return template.format(**values)
+
+        return df.groupby(group_col, sort=False).apply(
+            apply_template, include_groups=False
+        )
+
+    def _aggregate_count_distinct(
+        self, df: pd.DataFrame, group_col: str, mapping: BackfillColumnMapping
+    ) -> pd.Series:
+        """
+        Count distinct non-null values per group.
+
+        Story 6.2-P18: Advanced Aggregation Capabilities
+
+        Args:
+            df: Source DataFrame
+            group_col: Column to group by
+            mapping: Column mapping configuration
+
+        Returns:
+            Series with count of distinct values per group
+        """
+        source_col = mapping.source
+        if source_col not in df.columns:
+            self.logger.warning(
+                f"Source column '{source_col}' not found for count_distinct"
+            )
+            return pd.Series(dtype="Int64")
+
+        # Filter out null/blank values before counting (per Sprint Change Proposal)
+        valid_mask = self._non_blank_mask(df[source_col])
+        filtered_df = df[valid_mask]
+
+        if filtered_df.empty:
+            return pd.Series(dtype="Int64")
+
+        # Returns Int64 to ensure PostgreSQL integer compatibility
+        result = filtered_df.groupby(group_col, sort=False)[source_col].nunique()
+        return result.astype("Int64")
+
+    def _aggregate_lambda(
+        self, df: pd.DataFrame, group_col: str, mapping: BackfillColumnMapping
+    ) -> pd.Series:
+        """
+        Execute user-defined lambda expression on each group.
+
+        Story 6.2-P18: Advanced Aggregation Capabilities
+
+        Args:
+            df: Source DataFrame
+            group_col: Column to group by
+            mapping: Column mapping with lambda code
+
+        Returns:
+            Series with lambda results per group
+        """
+        code = mapping.aggregation.code
+        # Compile and evaluate the lambda expression
+        lambda_func = eval(code)  # noqa: S307
+
+        return df.groupby(group_col, sort=False).apply(
+            lambda_func, include_groups=False
+        )
 
     def backfill_table(
         self,

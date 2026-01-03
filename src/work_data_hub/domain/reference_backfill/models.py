@@ -21,11 +21,19 @@ class AggregationType(str, Enum):
     - FIRST: Default behavior - takes first non-null value per group
     - MAX_BY: Select value from row with maximum order_column value
     - CONCAT_DISTINCT: Concatenate distinct values with separator
+
+    Story 6.2-P18: Advanced Aggregation Capabilities
+    - TEMPLATE: Construct composite text from static template with field placeholders
+    - COUNT_DISTINCT: Count unique non-null values per group
+    - LAMBDA: Execute user-defined Python lambda expression on each group
     """
 
     FIRST = "first"
     MAX_BY = "max_by"
     CONCAT_DISTINCT = "concat_distinct"
+    TEMPLATE = "template"
+    COUNT_DISTINCT = "count_distinct"
+    LAMBDA = "lambda"
 
 
 class AggregationConfig(BaseModel):
@@ -44,12 +52,29 @@ class AggregationConfig(BaseModel):
           type: concat_distinct
           separator: "+"
           sort: true
+
+    Story 6.2-P18: Advanced Aggregation Capabilities
+
+    Example for template (construct composite text):
+        aggregation:
+          type: template
+          template: "新建客户_{月度}"
+
+    Example for count_distinct (count unique values):
+        aggregation:
+          type: count_distinct
+
+    Example for lambda (custom Python expression):
+        aggregation:
+          type: lambda
+          code: 'lambda g: g["月度"].iloc[0][:4]'
     """
 
     model_config = ConfigDict(extra="forbid")
 
     type: AggregationType = Field(
-        ..., description="Aggregation strategy: first, max_by, or concat_distinct"
+        ...,
+        description="Aggregation strategy: first, max_by, concat_distinct, template, count_distinct, or lambda",
     )
     order_column: Optional[str] = Field(
         default=None, description="Column to order by for max_by aggregation"
@@ -61,14 +86,31 @@ class AggregationConfig(BaseModel):
         default=True,
         description="Whether to sort values before concatenating (concat_distinct)",
     )
+    # Story 6.2-P18: New fields for advanced aggregations
+    template: Optional[str] = Field(
+        default=None,
+        description="Template string with {field} placeholders for template aggregation",
+    )
+    template_fields: List[str] = Field(
+        default_factory=list,
+        description="List of field names to extract values for template substitution",
+    )
+    code: Optional[str] = Field(
+        default=None,
+        description="Python lambda expression string (e.g., \"lambda g: g['col'].max()\")",
+    )
 
     @model_validator(mode="after")
-    def validate_max_by_requires_order_column(self):
-        """Validate that max_by aggregation type has order_column defined."""
+    def validate_aggregation_config(self):
+        """Validate aggregation type-specific required fields."""
         if self.type == AggregationType.MAX_BY and not self.order_column:
             raise ValueError(
                 "aggregation.order_column is required when type is 'max_by'"
             )
+        if self.type == AggregationType.TEMPLATE and not self.template:
+            raise ValueError("template is required when type is 'template'")
+        if self.type == AggregationType.LAMBDA and not self.code:
+            raise ValueError("code is required when type is 'lambda'")
         return self
 
 

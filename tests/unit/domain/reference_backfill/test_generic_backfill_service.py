@@ -1090,3 +1090,436 @@ class TestAggregationEdgeCases:
         assert p001["主拓代码"] == "ORG-B"
         # P002: fallback to first (ORG-X) since all order_column are NULL
         assert p002["主拓代码"] == "ORG-X"
+
+
+# Story 6.2-P18: Advanced Aggregation Capabilities Tests
+
+
+class TestAdvancedAggregationConfigValidation:
+    """Test validation for new aggregation types (Story 6.2-P18)."""
+
+    def test_template_requires_template_field(self):
+        """template type must have template string defined."""
+        with pytest.raises(ValueError) as exc_info:
+            AggregationConfig(type="template")
+        assert "template is required when type is 'template'" in str(exc_info.value)
+
+    def test_template_with_template_string(self):
+        """template with template string should succeed."""
+        config = AggregationConfig(type="template", template="新建客户_{月度}")
+        assert config.type == AggregationType.TEMPLATE
+        assert config.template == "新建客户_{月度}"
+
+    def test_template_with_explicit_fields(self):
+        """template can have explicit template_fields list."""
+        config = AggregationConfig(
+            type="template",
+            template="客户_{客户名称}_{月度}",
+            template_fields=["客户名称", "月度"],
+        )
+        assert config.template_fields == ["客户名称", "月度"]
+
+    def test_lambda_requires_code_field(self):
+        """lambda type must have code string defined."""
+        with pytest.raises(ValueError) as exc_info:
+            AggregationConfig(type="lambda")
+        assert "code is required when type is 'lambda'" in str(exc_info.value)
+
+    def test_lambda_with_code_string(self):
+        """lambda with code string should succeed."""
+        config = AggregationConfig(
+            type="lambda", code='lambda g: g["月度"].iloc[0][:4]'
+        )
+        assert config.type == AggregationType.LAMBDA
+        assert config.code == 'lambda g: g["月度"].iloc[0][:4]'
+
+    def test_count_distinct_no_extra_fields_required(self):
+        """count_distinct should not require extra fields."""
+        config = AggregationConfig(type="count_distinct")
+        assert config.type == AggregationType.COUNT_DISTINCT
+
+
+class TestTemplateAggregation:
+    """Test template aggregation strategy (Story 6.2-P18)."""
+
+    def test_template_basic_substitution(self):
+        """template should substitute field placeholders with first non-null values."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_customer",
+            source_column="company_id",
+            target_table="年金客户",
+            target_key="company_id",
+            backfill_columns=[
+                BackfillColumnMapping(source="company_id", target="company_id"),
+                BackfillColumnMapping(
+                    source="月度",
+                    target="年金客户标签",
+                    optional=True,
+                    aggregation=AggregationConfig(
+                        type="template", template="新建客户_{月度}"
+                    ),
+                ),
+            ],
+        )
+
+        df = pd.DataFrame(
+            [
+                {"company_id": "C001", "月度": "202501"},
+                {"company_id": "C001", "月度": "202502"},
+                {"company_id": "C002", "月度": "202503"},
+            ]
+        )
+
+        candidates = service.derive_candidates(df, config)
+        c001 = candidates[candidates["company_id"] == "C001"].iloc[0]
+        c002 = candidates[candidates["company_id"] == "C002"].iloc[0]
+
+        assert c001["年金客户标签"] == "新建客户_202501"
+        assert c002["年金客户标签"] == "新建客户_202503"
+
+    def test_template_multiple_placeholders(self):
+        """template should handle multiple field placeholders."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_customer",
+            source_column="company_id",
+            target_table="年金客户",
+            target_key="company_id",
+            backfill_columns=[
+                BackfillColumnMapping(source="company_id", target="company_id"),
+                BackfillColumnMapping(
+                    source="月度",
+                    target="复合标签",
+                    optional=True,
+                    aggregation=AggregationConfig(
+                        type="template",
+                        template="客户_{客户名称}_{月度}",
+                        template_fields=["客户名称", "月度"],
+                    ),
+                ),
+            ],
+        )
+
+        df = pd.DataFrame(
+            [
+                {"company_id": "C001", "客户名称": "测试公司", "月度": "202501"},
+            ]
+        )
+
+        candidates = service.derive_candidates(df, config)
+        assert candidates.iloc[0]["复合标签"] == "客户_测试公司_202501"
+
+    def test_template_missing_field_raises_error(self):
+        """template should raise ValueError when field is missing from DataFrame."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_customer",
+            source_column="company_id",
+            target_table="年金客户",
+            target_key="company_id",
+            backfill_columns=[
+                BackfillColumnMapping(source="company_id", target="company_id"),
+                BackfillColumnMapping(
+                    source="月度",
+                    target="标签",
+                    aggregation=AggregationConfig(
+                        type="template", template="标签_{不存在的字段}"
+                    ),
+                ),
+            ],
+        )
+
+        df = pd.DataFrame([{"company_id": "C001", "月度": "202501"}])
+
+        with pytest.raises(ValueError) as exc_info:
+            service.derive_candidates(df, config)
+        assert "missing fields" in str(exc_info.value).lower()
+
+    def test_template_null_field_uses_empty_string(self):
+        """template should use empty string for NULL field values."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_customer",
+            source_column="company_id",
+            target_table="年金客户",
+            target_key="company_id",
+            backfill_columns=[
+                BackfillColumnMapping(source="company_id", target="company_id"),
+                BackfillColumnMapping(
+                    source="月度",
+                    target="标签",
+                    optional=True,
+                    aggregation=AggregationConfig(
+                        type="template", template="前缀_{月度}_后缀"
+                    ),
+                ),
+            ],
+        )
+
+        df = pd.DataFrame(
+            [
+                {"company_id": "C001", "月度": None},
+            ]
+        )
+
+        candidates = service.derive_candidates(df, config)
+        assert candidates.iloc[0]["标签"] == "前缀__后缀"
+
+
+class TestCountDistinctAggregation:
+    """Test count_distinct aggregation strategy (Story 6.2-P18)."""
+
+    def test_count_distinct_basic(self):
+        """count_distinct should count unique non-null values per group."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_customer",
+            source_column="company_id",
+            target_table="年金客户",
+            target_key="company_id",
+            backfill_columns=[
+                BackfillColumnMapping(source="company_id", target="company_id"),
+                BackfillColumnMapping(
+                    source="计划代码",
+                    target="关联计划数",
+                    optional=True,
+                    aggregation=AggregationConfig(type="count_distinct"),
+                ),
+            ],
+        )
+
+        df = pd.DataFrame(
+            [
+                {"company_id": "C001", "计划代码": "P001"},
+                {"company_id": "C001", "计划代码": "P002"},
+                {"company_id": "C001", "计划代码": "P003"},
+                {"company_id": "C002", "计划代码": "P001"},
+            ]
+        )
+
+        candidates = service.derive_candidates(df, config)
+        c001 = candidates[candidates["company_id"] == "C001"].iloc[0]
+        c002 = candidates[candidates["company_id"] == "C002"].iloc[0]
+
+        assert c001["关联计划数"] == 3
+        assert c002["关联计划数"] == 1
+
+    def test_count_distinct_ignores_duplicates(self):
+        """count_distinct should not count duplicate values."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_customer",
+            source_column="company_id",
+            target_table="年金客户",
+            target_key="company_id",
+            backfill_columns=[
+                BackfillColumnMapping(source="company_id", target="company_id"),
+                BackfillColumnMapping(
+                    source="计划代码",
+                    target="关联计划数",
+                    optional=True,
+                    aggregation=AggregationConfig(type="count_distinct"),
+                ),
+            ],
+        )
+
+        df = pd.DataFrame(
+            [
+                {"company_id": "C001", "计划代码": "P001"},
+                {"company_id": "C001", "计划代码": "P001"},  # Duplicate
+                {"company_id": "C001", "计划代码": "P002"},
+            ]
+        )
+
+        candidates = service.derive_candidates(df, config)
+        assert candidates.iloc[0]["关联计划数"] == 2
+
+    def test_count_distinct_ignores_nulls(self):
+        """count_distinct should not count NULL values."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_customer",
+            source_column="company_id",
+            target_table="年金客户",
+            target_key="company_id",
+            backfill_columns=[
+                BackfillColumnMapping(source="company_id", target="company_id"),
+                BackfillColumnMapping(
+                    source="计划代码",
+                    target="关联计划数",
+                    optional=True,
+                    aggregation=AggregationConfig(type="count_distinct"),
+                ),
+            ],
+        )
+
+        df = pd.DataFrame(
+            [
+                {"company_id": "C001", "计划代码": "P001"},
+                {"company_id": "C001", "计划代码": None},
+                {"company_id": "C001", "计划代码": "P002"},
+            ]
+        )
+
+        candidates = service.derive_candidates(df, config)
+        assert candidates.iloc[0]["关联计划数"] == 2
+
+    def test_count_distinct_missing_column_returns_empty(self):
+        """count_distinct should return 0 when source column is missing."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_customer",
+            source_column="company_id",
+            target_table="年金客户",
+            target_key="company_id",
+            backfill_columns=[
+                BackfillColumnMapping(source="company_id", target="company_id"),
+                BackfillColumnMapping(
+                    source="不存在的列",
+                    target="关联计划数",
+                    optional=True,
+                    aggregation=AggregationConfig(type="count_distinct"),
+                ),
+            ],
+        )
+
+        df = pd.DataFrame([{"company_id": "C001"}])
+
+        candidates = service.derive_candidates(df, config)
+        # Missing column should result in None for optional field
+        assert candidates.iloc[0]["关联计划数"] is None or pd.isna(
+            candidates.iloc[0]["关联计划数"]
+        )
+
+
+class TestLambdaAggregation:
+    """Test lambda aggregation strategy (Story 6.2-P18)."""
+
+    def test_lambda_basic_expression(self):
+        """lambda should execute custom expression on each group."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_customer",
+            source_column="company_id",
+            target_table="年金客户",
+            target_key="company_id",
+            backfill_columns=[
+                BackfillColumnMapping(source="company_id", target="company_id"),
+                BackfillColumnMapping(
+                    source="月度",
+                    target="年份",
+                    optional=True,
+                    aggregation=AggregationConfig(
+                        type="lambda",
+                        code='lambda g: g["月度"].iloc[0][:4]',
+                    ),
+                ),
+            ],
+        )
+
+        df = pd.DataFrame(
+            [
+                {"company_id": "C001", "月度": "202501"},
+                {"company_id": "C001", "月度": "202502"},
+            ]
+        )
+
+        candidates = service.derive_candidates(df, config)
+        assert candidates.iloc[0]["年份"] == "2025"
+
+    def test_lambda_syntax_error_raises_value_error(self):
+        """Lambda with syntax error should raise during eval."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_customer",
+            source_column="company_id",
+            target_table="年金客户",
+            target_key="company_id",
+            backfill_columns=[
+                BackfillColumnMapping(source="company_id", target="company_id"),
+                BackfillColumnMapping(
+                    source="月度",
+                    target="标签",
+                    aggregation=AggregationConfig(
+                        type="lambda",
+                        code="lambda g: g['月度'].iloc[0",  # Missing bracket
+                    ),
+                ),
+            ],
+        )
+
+        df = pd.DataFrame([{"company_id": "C001", "月度": "202501"}])
+
+        with pytest.raises(SyntaxError):
+            service.derive_candidates(df, config)
+
+    def test_lambda_execution_error_raises_exception(self):
+        """Lambda runtime error should propagate as exception."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_customer",
+            source_column="company_id",
+            target_table="年金客户",
+            target_key="company_id",
+            backfill_columns=[
+                BackfillColumnMapping(source="company_id", target="company_id"),
+                BackfillColumnMapping(
+                    source="月度",
+                    target="标签",
+                    aggregation=AggregationConfig(
+                        type="lambda",
+                        code='lambda g: g["不存在的列"].iloc[0]',  # KeyError
+                    ),
+                ),
+            ],
+        )
+
+        df = pd.DataFrame([{"company_id": "C001", "月度": "202501"}])
+
+        with pytest.raises(KeyError):
+            service.derive_candidates(df, config)
+
+    def test_count_distinct_ignores_blank_strings(self):
+        """count_distinct should not count empty/blank string values."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_customer",
+            source_column="company_id",
+            target_table="年金客户",
+            target_key="company_id",
+            backfill_columns=[
+                BackfillColumnMapping(source="company_id", target="company_id"),
+                BackfillColumnMapping(
+                    source="计划代码",
+                    target="关联计划数",
+                    optional=True,
+                    aggregation=AggregationConfig(type="count_distinct"),
+                ),
+            ],
+        )
+
+        df = pd.DataFrame(
+            [
+                {"company_id": "C001", "计划代码": "P001"},
+                {"company_id": "C001", "计划代码": ""},  # Blank
+                {"company_id": "C001", "计划代码": "   "},  # Whitespace only
+                {"company_id": "C001", "计划代码": "P002"},
+            ]
+        )
+
+        candidates = service.derive_candidates(df, config)
+        # Should only count P001, P002 (blanks excluded)
+        assert candidates.iloc[0]["关联计划数"] == 2

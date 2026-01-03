@@ -277,6 +277,11 @@ development_status:
   # Solution: EqcLookupConfig dataclass as single source of truth
   # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-20-eqc-lookup-config.md
   6.2-p17-eqc-lookup-config-unification: done # EqcLookupConfig dataclass + propagation fix
+  # Story 6.2-P18: Advanced Aggregation Capabilities for Backfill Mechanism
+  # Added 2026-01-03 via create-story workflow
+  # Extends GenericBackfillService with template, count_distinct, lambda aggregation strategies
+  # Reference: docs/sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2026-01-03-6.2-p18-advanced-aggregation.md
+  6.2-p18-advanced-aggregation-capabilities: review # Template + Count Distinct + Lambda aggregation types
 
   # Epic 7: Code Quality - File Length Refactoring
   # Added 2025-12-21 via Correct-Course workflow
