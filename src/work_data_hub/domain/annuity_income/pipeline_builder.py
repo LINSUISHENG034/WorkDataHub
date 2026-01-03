@@ -315,16 +315,27 @@ def build_bronze_to_silver_pipeline(
 
 
 def load_plan_override_mapping(mapping_path: Optional[str] = None) -> Dict[str, str]:
-    """Load plan code → company ID overrides from YAML."""
+    """Load plan code → company ID overrides from YAML.
+
+    Story 7.x: Refactored to use unified settings loader, eliminating hardcoded paths.
+    """
     from pathlib import Path
 
     import yaml
 
     if mapping_path is None:
-        # Default path for plan override mappings
-        # Story 6.x: Reorganized to company_id/ subdirectory
-        mapping_path = "data/mappings/company_id/company_id_overrides_plan.yml"
+        # Use unified settings loader (no hardcoded path)
+        from work_data_hub.infrastructure.settings import load_company_id_overrides_plan
 
+        try:
+            return load_company_id_overrides_plan()
+        except Exception as e:
+            logger.bind(domain="annuity_income", step="load_plan_override").warning(
+                "Failed to load plan override mapping via settings loader", error=str(e)
+            )
+            return {}
+
+    # Custom path provided - load directly
     path = Path(mapping_path)
     if not path.exists():
         logger.bind(domain="annuity_income", step="load_plan_override").debug(
@@ -336,12 +347,10 @@ def load_plan_override_mapping(mapping_path: Optional[str] = None) -> Dict[str, 
         with path.open("r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
-        # Support both flat format (key: value) and nested format (plan_overrides: {key: value})
-        # Flat format is used by company_id_overrides_plan.yml (actual production YAML file)
+        # Support flat (key: value) or nested (plan_overrides: {...}) format
         if isinstance(data, dict) and "plan_overrides" in data:
             mapping = data.get("plan_overrides", {})
         else:
-            # Flat format: data is already the mapping dict
             mapping = data if isinstance(data, dict) else {}
         if not isinstance(mapping, dict):
             logger.bind(domain="annuity_income", step="load_plan_override").warning(

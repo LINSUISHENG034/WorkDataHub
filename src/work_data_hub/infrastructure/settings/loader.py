@@ -43,17 +43,17 @@ def get_mappings_dir() -> Path:
                 f"WDH_MAPPINGS_DIR not found or not a directory: {env_dir}"
             )
         return p
-    # New default: project root / data / mappings (Story 5.3)
+    # Default: project root / config / mappings (migrated from data/)
     # Robustly find project root by looking for pyproject.toml
     current_path = Path(__file__).resolve()
     for parent in current_path.parents:
         if (parent / "pyproject.toml").exists():
-            return parent / "data" / "mappings"
+            return parent / "config" / "mappings"
 
     # Fallback if pyproject.toml not found (e.g. installed package context)
     # Assume standard structure:
     # src/work_data_hub/infrastructure/settings/loader.py -> root
-    return Path(__file__).parents[4] / "data" / "mappings"
+    return Path(__file__).parents[4] / "config" / "mappings"
 
 
 def load_yaml_mapping(path: str) -> Dict[str, str]:

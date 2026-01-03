@@ -26,8 +26,8 @@ import yaml
 logger = structlog.get_logger(__name__)
 
 # Default mappings directory relative to project root
-# Story 6.x: Reorganized to data/mappings/company_id/ subdirectory
-DEFAULT_MAPPINGS_DIR = Path("data/mappings/company_id")
+# Story 7.x: Migrated from data/mappings to config/mappings
+DEFAULT_MAPPINGS_DIR = Path("config/mappings/company_id")
 
 # Priority level file suffixes (in priority order)
 # New Pipeline Priority Order (per company-enrichment-service.md):
