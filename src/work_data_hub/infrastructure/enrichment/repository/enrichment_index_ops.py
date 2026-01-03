@@ -433,3 +433,120 @@ class EnrichmentIndexOpsMixin:
         )
 
         return updated
+
+    def delete_conflicting_former_names(
+        self,
+        lookup_key: str,
+    ) -> int:
+        """
+        Delete all former_name records for a given lookup_key.
+
+        Called when conflict detected (same former name, different company_id).
+        This implements the "delete on conflict" strategy for former names.
+
+        Args:
+            lookup_key: The normalized former name lookup key.
+
+        Returns:
+            Number of records deleted.
+        """
+        query = text("""
+            DELETE FROM enterprise.enrichment_index
+            WHERE lookup_key = :lookup_key
+              AND lookup_type = 'former_name'
+        """)
+
+        result = self.connection.execute(query, {"lookup_key": lookup_key})
+        deleted_count = result.rowcount
+
+        if deleted_count > 0:
+            logger.warning(
+                "mapping_repository.delete_conflicting_former_names",
+                lookup_key=lookup_key,
+                deleted_count=deleted_count,
+            )
+
+        return deleted_count
+
+    def insert_former_name_with_conflict_check(
+        self,
+        records: List[EnrichmentIndexRecord],
+    ) -> InsertBatchResult:
+        """
+        Insert former_name records with conflict detection.
+
+        If same lookup_key exists with different company_id:
+        1. Delete all existing records for this lookup_key
+        2. Skip inserting the new record
+        3. Log warning about conflict
+
+        This prevents ambiguous former names from being used for resolution.
+
+        Args:
+            records: List of EnrichmentIndexRecord with lookup_type=FORMER_NAME.
+
+        Returns:
+            InsertBatchResult with inserted/skipped counts and conflicts list.
+        """
+        if not records:
+            return InsertBatchResult(inserted_count=0, skipped_count=0, conflicts=[])
+
+        inserted_count = 0
+        skipped_count = 0
+        conflicts: List[str] = []
+
+        for record in records:
+            if record.lookup_type != LookupType.FORMER_NAME:
+                logger.warning(
+                    "insert_former_name_with_conflict_check.wrong_lookup_type",
+                    lookup_type=record.lookup_type.value,
+                )
+                skipped_count += 1
+                continue
+
+            normalized_key = self._normalize_lookup_key(
+                record.lookup_key, record.lookup_type
+            )
+
+            # Check for existing record with same lookup_key
+            existing = self.lookup_enrichment_index(
+                normalized_key, LookupType.FORMER_NAME
+            )
+
+            if existing is not None:
+                if existing.company_id != record.company_id:
+                    # Conflict: same former name, different company_id
+                    # Delete the existing record and skip the new one
+                    self.delete_conflicting_former_names(normalized_key)
+                    conflicts.append(normalized_key)
+                    logger.warning(
+                        "insert_former_name_with_conflict_check.conflict_detected",
+                        lookup_key=normalized_key,
+                        existing_company_id=existing.company_id,
+                        new_company_id=record.company_id,
+                    )
+                    skipped_count += 1
+                    continue
+                else:
+                    # Same company_id: update (increment hit_count)
+                    self.update_hit_count(normalized_key, LookupType.FORMER_NAME)
+                    inserted_count += 1
+                    continue
+
+            # No existing record: insert new
+            result = self.insert_enrichment_index_batch([record])
+            inserted_count += result.inserted_count
+
+        logger.info(
+            "insert_former_name_with_conflict_check.completed",
+            total_records=len(records),
+            inserted=inserted_count,
+            skipped=skipped_count,
+            conflicts=len(conflicts),
+        )
+
+        return InsertBatchResult(
+            inserted_count=inserted_count,
+            skipped_count=skipped_count,
+            conflicts=conflicts,
+        )

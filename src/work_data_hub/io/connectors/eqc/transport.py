@@ -38,6 +38,7 @@ class EQCTransport:
         timeout: Optional[int] = None,
         retry_max: Optional[int] = None,
         rate_limit: Optional[int] = None,
+        rate_limit_window: Optional[int] = None,
         base_url: Optional[str] = None,
     ):
         """
@@ -48,8 +49,9 @@ class EQCTransport:
                 environment variable
             timeout: Request timeout in seconds. If None, uses settings default
             retry_max: Maximum retry attempts. If None, uses settings default
-            rate_limit: Requests per minute limit. If None, uses settings
-                default
+            rate_limit: Requests per window limit. If None, uses settings default
+            rate_limit_window: Sliding window size in seconds. If None, uses
+                settings default
             base_url: EQC API base URL. If None, uses settings default
         """
         # Load settings for configuration defaults
@@ -70,6 +72,11 @@ class EQCTransport:
         )
         self.rate_limit = (
             rate_limit if rate_limit is not None else self.settings.eqc_rate_limit
+        )
+        self.rate_limit_window = (
+            rate_limit_window
+            if rate_limit_window is not None
+            else self.settings.eqc_rate_limit_window
         )
         self.base_url = base_url if base_url is not None else self.settings.eqc_base_url
 
@@ -96,6 +103,7 @@ class EQCTransport:
                 "timeout": self.timeout,
                 "retry_max": self.retry_max,
                 "rate_limit": self.rate_limit,
+                "rate_limit_window": self.rate_limit_window,
                 "has_token": bool(self.token),
             },
         )
@@ -112,22 +120,24 @@ class EQCTransport:
         Enforce rate limiting using sliding window approach.
 
         Tracks request timestamps and sleeps if rate limit would be exceeded.
-        Uses a sliding window of 60 seconds to determine current request rate.
+        Uses a configurable sliding window to determine current request rate.
         """
         now = time.time()
+        window = self.rate_limit_window
 
-        # Remove timestamps older than 60 seconds (sliding window)
-        while self.request_times and self.request_times[0] <= now - 60:
+        # Remove timestamps older than window seconds (sliding window)
+        while self.request_times and self.request_times[0] <= now - window:
             self.request_times.popleft()
 
         # If at rate limit, sleep until oldest request expires
         if len(self.request_times) >= self.rate_limit:
-            sleep_time = 60 - (now - self.request_times[0]) + 0.1  # Small buffer
+            sleep_time = window - (now - self.request_times[0]) + 0.1  # Small buffer
             logger.debug(
                 "Rate limit reached, sleeping",
                 extra={
                     "sleep_seconds": round(sleep_time, 1),
                     "rate_limit": self.rate_limit,
+                    "rate_limit_window": window,
                 },
             )
             time.sleep(sleep_time)

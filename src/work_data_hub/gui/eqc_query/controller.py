@@ -521,6 +521,14 @@ class EqcQueryController:
 
             self._repository.insert_enrichment_index_batch([record])
 
+            # Write former names to enrichment_index (DB-P6) with conflict detection
+            if parsed and parsed.company_former_name:
+                self._write_former_names_to_enrichment_index(
+                    former_names_str=parsed.company_former_name,
+                    company_id=result.company_id,
+                    base_confidence=result.confidence,
+                )
+
             # Save to base_info with ALL three raw API responses + parsed fields
             # Use build_upsert_kwargs helper to avoid code duplication
             from work_data_hub.infrastructure.enrichment.base_info_parser import (
@@ -557,6 +565,7 @@ class EqcQueryController:
                 has_raw_data=raw_search is not None,
                 has_raw_business_info=raw_business_info is not None,
                 has_raw_biz_label=raw_biz_label is not None,
+                has_former_names=bool(parsed and parsed.company_former_name),
             )
             return True
         except Exception as e:
@@ -593,3 +602,66 @@ class EqcQueryController:
                     self._repository.connection.close()
             except Exception:
                 pass
+
+    def _write_former_names_to_enrichment_index(
+        self,
+        former_names_str: str,
+        company_id: str,
+        base_confidence: float,
+    ) -> None:
+        """
+        Split and write company former names to enrichment_index.
+
+        Uses conflict-aware insert to handle cases where the same former name
+        is used by multiple companies (deletes on conflict).
+
+        Args:
+            former_names_str: Comma-separated former company names.
+            company_id: Company ID to associate with these former names.
+            base_confidence: Base confidence score (will be multiplied by 0.9).
+        """
+        from decimal import Decimal
+
+        from work_data_hub.infrastructure.enrichment.normalizer import (
+            normalize_for_temp_id,
+        )
+        from work_data_hub.infrastructure.enrichment.types import (
+            EnrichmentIndexRecord,
+            LookupType,
+            SourceType,
+        )
+
+        # Split comma-separated former names
+        former_names = [n.strip() for n in former_names_str.split(",") if n.strip()]
+
+        if not former_names:
+            return
+
+        records = []
+        for name in former_names:
+            normalized = normalize_for_temp_id(name) or name.strip()
+            if not normalized:
+                continue
+
+            # Use 0.9x confidence for former names
+            record = EnrichmentIndexRecord(
+                lookup_key=normalized,
+                lookup_type=LookupType.FORMER_NAME,
+                company_id=company_id,
+                confidence=Decimal(str(base_confidence * 0.9)),
+                source=SourceType.EQC_API,
+                source_domain="eqc_gui_former_name",
+            )
+            records.append(record)
+
+        if records:
+            # Use conflict-aware insert for former names
+            result = self._repository.insert_former_name_with_conflict_check(records)
+            logger.info(
+                "eqc_query_controller.save.former_names_written",
+                company_id=company_id,
+                total_names=len(records),
+                inserted=result.inserted_count,
+                skipped=result.skipped_count,
+                conflicts=len(result.conflicts) if result.conflicts else 0,
+            )

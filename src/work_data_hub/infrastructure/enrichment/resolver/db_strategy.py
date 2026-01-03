@@ -89,6 +89,7 @@ def _resolve_via_enrichment_index(
         LookupType.ACCOUNT_NUMBER: set(),
         LookupType.CUSTOMER_NAME: set(),
         LookupType.PLAN_CUSTOMER: set(),
+        LookupType.FORMER_NAME: set(),  # DB-P6: Company former names
     }
 
     for idx in df[mask_unresolved].index:
@@ -126,6 +127,7 @@ def _resolve_via_enrichment_index(
                 "account_number": 0,
                 "customer_name": 0,
                 "plan_customer": 0,
+                "former_name": 0,
             },
         )
 
@@ -137,6 +139,7 @@ def _resolve_via_enrichment_index(
         "account_number": 0,
         "customer_name": 0,
         "plan_customer": 0,
+        "former_name": 0,
     }
     decision_paths: Dict[int, str] = {}
 
@@ -159,6 +162,7 @@ def _resolve_via_enrichment_index(
         LookupType.ACCOUNT_NUMBER,
         LookupType.CUSTOMER_NAME,
         LookupType.PLAN_CUSTOMER,
+        LookupType.FORMER_NAME,  # DB-P6: Lowest priority
     ]
     label_by_type = {
         LookupType.PLAN_CODE: "plan_code",
@@ -166,6 +170,7 @@ def _resolve_via_enrichment_index(
         LookupType.ACCOUNT_NUMBER: "account_number",
         LookupType.CUSTOMER_NAME: "customer_name",
         LookupType.PLAN_CUSTOMER: "plan_customer",
+        LookupType.FORMER_NAME: "former_name",
     }
     path_label_by_type = {
         LookupType.PLAN_CODE: "DB-P1",
@@ -173,6 +178,7 @@ def _resolve_via_enrichment_index(
         LookupType.ACCOUNT_NUMBER: "DB-P3",
         LookupType.CUSTOMER_NAME: "DB-P4",
         LookupType.PLAN_CUSTOMER: "DB-P5",
+        LookupType.FORMER_NAME: "DB-P6",
     }
 
     for idx in df[mask_unresolved].index:
