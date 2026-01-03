@@ -269,7 +269,9 @@ def reconfigure_for_console(
     Example:
         >>> from work_data_hub.utils.logging import reconfigure_for_console
         >>> # In CLI main() before logging
-        >>> reconfigure_for_console(debug=args.debug, verbose=args.verbose, quiet=args.quiet)
+        >>> reconfigure_for_console(
+        ...     debug=args.debug, verbose=args.verbose, quiet=args.quiet
+        ... )
         >>> logger = get_logger(__name__)
         >>> logger.info("Processing started")  # Only shown if verbose/debug
     """
@@ -284,16 +286,19 @@ def reconfigure_for_console(
 
     # Determine root log level based on verbosity
     # Priority: debug > verbose > default > quiet
+    # Story 7.5-6: Aligned with dagster_logging.py levels
     if debug:
         root_level = logging.DEBUG
     elif verbose:
-        root_level = logging.INFO
-    elif quiet:
-        # Story 7.5-6 AC-2: --quiet shows only errors and final summary
-        root_level = logging.ERROR
-    else:
-        # Default: Only WARNING and above for clean output
+        # verbose: Show WARNING+ for diagnostic information
         root_level = logging.WARNING
+    elif quiet:
+        # quiet: Show only CRITICAL for silent operation
+        root_level = logging.CRITICAL
+    else:
+        # Default: Only ERROR+ for clean terminal output
+        # Suppresses WARNING-level structlog messages (e.g., columns_not_found)
+        root_level = logging.ERROR
 
     # Update root logger level
     logging.root.setLevel(root_level)
@@ -328,4 +333,3 @@ def reconfigure_for_console(
         logger_factory=structlog.stdlib.LoggerFactory(),
         cache_logger_on_first_use=False,  # Allow reconfiguration
     )
-

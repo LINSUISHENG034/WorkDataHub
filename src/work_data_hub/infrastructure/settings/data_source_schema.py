@@ -381,7 +381,8 @@ def validate_data_sources_config_v2(
     try:
         # Validate using Epic 3 Pydantic schema
         config = DataSourceConfigV2(**data)
-        logger.info(
+        # Story 7.5-6: Use DEBUG level to avoid terminal noise in default mode
+        logger.debug(
             "configuration.validated",
             extra={
                 "schema_version": "v2",

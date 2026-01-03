@@ -9,6 +9,7 @@ import argparse
 
 from .config import build_run_config
 from .console import get_console
+from .dagster_logging import merge_logger_config
 
 
 def _get_console_from_args(args: argparse.Namespace):
@@ -57,8 +58,16 @@ def _execute_queue_processing_job(args: argparse.Namespace) -> int:
             }
         }
 
+        # Story 7.5-6: Apply Dagster logger configuration
+        debug_mode = getattr(args, "debug", False)
+        verbose_mode = getattr(args, "verbose", False)
+        quiet_mode = getattr(args, "quiet", False)
+        run_config = merge_logger_config(
+            run_config, debug=debug_mode, verbose=verbose_mode, quiet=quiet_mode
+        )
+
         # Execute job
-        instance = DagsterInstance.ephemeral() if args.debug else None
+        instance = DagsterInstance.ephemeral() if debug_mode else None
         result = process_company_lookup_queue_job.execute_in_process(
             run_config=run_config, instance=instance, raise_on_error=args.raise_on_error
         )
@@ -120,8 +129,16 @@ def _execute_reference_sync_job(args: argparse.Namespace) -> int:  # noqa: PLR09
             }
         }
 
+        # Story 7.5-6: Apply Dagster logger configuration
+        debug_mode = getattr(args, "debug", False)
+        verbose_mode = getattr(args, "verbose", False)
+        quiet_mode = getattr(args, "quiet", False)
+        run_config = merge_logger_config(
+            run_config, debug=debug_mode, verbose=verbose_mode, quiet=quiet_mode
+        )
+
         # Execute job
-        instance = DagsterInstance.ephemeral() if args.debug else None
+        instance = DagsterInstance.ephemeral() if debug_mode else None
         result = reference_sync_job.execute_in_process(
             run_config=run_config, instance=instance, raise_on_error=args.raise_on_error
         )
@@ -268,7 +285,15 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:  # noq
     try:
         from dagster import DagsterInstance
 
-        instance = DagsterInstance.ephemeral() if args.debug else None
+        # Story 7.5-6: Apply Dagster logger configuration based on CLI flags
+        debug_mode = getattr(args, "debug", False)
+        verbose_mode = getattr(args, "verbose", False)
+        quiet_mode = getattr(args, "quiet", False)
+        run_config = merge_logger_config(
+            run_config, debug=debug_mode, verbose=verbose_mode, quiet=quiet_mode
+        )
+
+        instance = DagsterInstance.ephemeral() if debug_mode else None
 
         # Story 7.5-4 AC-2: Live status display during job execution
         with console.status(f"[bold green]Processing {domain}..."):

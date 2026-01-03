@@ -554,12 +554,12 @@ class Settings(BaseSettings):
                 raw_config["domains"] = merged_domains
 
             self.data_sources = DataSourceConfigV2(**raw_config)
-            logger.info(
-                "configuration.validated",
-                schema_version=self.data_sources.schema_version,
-                domain_count=len(self.data_sources.domains),
-                domains=list(self.data_sources.domains.keys()),
-                config_path=str(config_path),
+            # Story 7.5-6: Use print() to match Rich terminal output style
+            # (structlog not reconfigured yet at this point in startup)
+            domain_list = ", ".join(self.data_sources.domains.keys())
+            print(
+                f"📦 Configuration loaded: {len(self.data_sources.domains)} domains "
+                f"({domain_list})"
             )
         except Exception as e:
             error_msg = f"Configuration validation failed: {e}"
