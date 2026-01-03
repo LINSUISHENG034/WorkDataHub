@@ -173,6 +173,8 @@ class ReadExcelConfig(Config):
 
     # Accept sheet index (int) or sheet name (str)
     sheet: Any = 0
+    # Data sampling in 'index/count' format (1-indexed), e.g., '1/10' for first 10%
+    sample: Optional[str] = None
 
     @field_validator("sheet")
     @classmethod
@@ -192,6 +194,18 @@ class ReadExcelConfig(Config):
             raise ValueError("Sheet index must be non-negative")
         return iv
 
+    @field_validator("sample")
+    @classmethod
+    def validate_sample(cls, v: Optional[str]) -> Optional[str]:
+        """Validate sample format if provided."""
+        if v is None:
+            return None
+        # Validate format by trying to parse
+        from work_data_hub.cli.etl.sample_parser import parse_sample
+
+        parse_sample(v)  # Raises ValueError if invalid
+        return v
+
 
 @op
 def read_excel_op(
@@ -200,9 +214,11 @@ def read_excel_op(
     """
     Read Excel file from first discovered path and return rows as list of dictionaries.
 
+    Supports data sampling via --sample parameter for quick ETL validation.
+
     Args:
         context: Dagster execution context
-        config: Configuration with sheet parameter
+        config: Configuration with sheet and optional sample parameters
         file_paths: List of discovered file paths (uses first one for MVP)
 
     Returns:
@@ -216,7 +232,28 @@ def read_excel_op(
     file_path = file_paths[0]
 
     try:
+        # Read all rows first (needed for sample calculation)
         rows = read_excel_rows(file_path, sheet=config.sheet)
+        total_rows = len(rows)
+
+        # Apply sampling if configured
+        if config.sample and rows:
+            from work_data_hub.cli.etl.sample_parser import (
+                calculate_slice_range,
+                parse_sample,
+            )
+
+            sample_config = parse_sample(config.sample)
+            skip_rows, max_rows = calculate_slice_range(total_rows, sample_config)
+
+            # Apply slice
+            rows = rows[skip_rows : skip_rows + max_rows]
+
+            context.log.info(
+                f"Data sampling applied - sample: {config.sample}, "
+                f"total_rows: {total_rows}, skip: {skip_rows}, "
+                f"sampled: {len(rows)}"
+            )
 
         context.log.info(
             f"Excel reading completed - file: {file_path}, "

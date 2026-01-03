@@ -205,6 +205,18 @@ def main(argv: Optional[List[str]] = None) -> int:  # noqa: PLR0911, PLR0912, PL
         help="Minimal output (errors and final summary only)",
     )
 
+    # Data sampling for quick validation
+    parser.add_argument(
+        "--sample",
+        type=str,
+        default=None,
+        help=(
+            "Sample data slice in 'index/count' format (1-indexed). "
+            "Example: '1/10' reads the first 10%% of rows, "
+            "'3/10' reads rows 20%%-30%%. Useful for quick ETL validation."
+        ),
+    )
+
     # Advanced options
     parser.add_argument(
         "--debug",

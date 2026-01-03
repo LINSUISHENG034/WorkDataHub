@@ -69,10 +69,12 @@ def resolve_via_yaml_overrides(
         lookup_values = df.loc[mask_unresolved, column].map(mappings)
         new_hits = lookup_values.notna()
 
-        # Update resolved series
-        resolved.loc[mask_unresolved] = resolved.loc[mask_unresolved].fillna(
-            lookup_values
-        )
+        # Update resolved series with new values (avoid deprecated fillna downcasting)
+        # Only update where lookup_values is not NA
+        resolved_subset = resolved.loc[mask_unresolved].copy()
+        update_mask = lookup_values.notna()
+        resolved_subset.loc[update_mask] = lookup_values.loc[update_mask]
+        resolved.loc[mask_unresolved] = resolved_subset
         hits_by_priority[priority] = int(new_hits.sum())
 
     return resolved, hits_by_priority

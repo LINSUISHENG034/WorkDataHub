@@ -155,7 +155,12 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:  
             sheet_cfg = int(sheet_value)
         except Exception:
             sheet_cfg = sheet_value
-        run_config["ops"]["read_excel_op"] = {"config": {"sheet": sheet_cfg}}
+        # Build read_excel_op config with optional sample parameter
+        read_excel_config: Dict[str, Any] = {"sheet": sheet_cfg}
+        sample_value = getattr(args, "sample", None)
+        if sample_value:
+            read_excel_config["sample"] = sample_value
+        run_config["ops"]["read_excel_op"] = {"config": read_excel_config}
 
     # Epic 6.2: Generic backfill configuration (Story 7.4-2: config-driven)
     # Check requires_backfill from domain config (defaults to false for safety)
