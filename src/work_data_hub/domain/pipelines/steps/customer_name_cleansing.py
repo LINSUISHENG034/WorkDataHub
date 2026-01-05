@@ -3,24 +3,32 @@ Customer name cleansing step for cleaning company/customer names.
 
 This module provides a reusable transformation step that cleans
 customer names by removing common suffixes and normalizing format.
+
+.. deprecated:: 2026-01-05
+    The clean_company_name function now delegates to normalize_customer_name
+    from infrastructure.cleansing.normalizers for unified behavior.
 """
 
-import re
+import warnings
 from typing import Any, Dict, List
 
 import structlog
 
 from work_data_hub.domain.pipelines.types import Row, StepResult, TransformStep
+from work_data_hub.infrastructure.cleansing.normalizers import (
+    normalize_customer_name,
+)
 
 logger = structlog.get_logger(__name__)
 
 
 def clean_company_name(name: str) -> str:
     """
-    Basic company name cleaning - simplified from legacy common_utils.
+    Basic company name cleaning.
 
-    This function replicates the core company name cleaning logic,
-    removing common suffixes and normalizing whitespace.
+    .. deprecated:: 2026-01-05
+        This function now delegates to normalize_customer_name from
+        infrastructure.cleansing.normalizers for unified behavior.
 
     Args:
         name: The company name to clean
@@ -31,43 +39,17 @@ def clean_company_name(name: str) -> str:
     Example:
         >>> clean_company_name("某某公司及下属子企业")
         '某某公司'
-        >>> clean_company_name("某公司已转出")
-        '某公司'
     """
     if not name:
         return ""
 
-    # Remove extra spaces
-    name = re.sub(r"\s+", "", name)
-
-    # Remove specified characters
-    name = re.sub(r"及下属子企业", "", name)
-    name = re.sub(r"(?:\(团托\)|-[A-Za-z]+|-\d+|-养老|-福利)$", "", name)
-
-    # Simple cleanup for common suffixes
-    suffixes_to_remove = [
-        "已转出",
-        "待转出",
-        "终止",
-        "转出",
-        "转移终止",
-        "已作废",
-        "已终止",
-        "保留",
-        "保留账户",
-        "存量",
-        "已转移终止",
-        "本部",
-        "未使用",
-        "集合",
-        "原",
-    ]
-
-    for suffix in suffixes_to_remove:
-        if name.endswith(suffix):
-            name = name[: -len(suffix)]
-
-    return name
+    warnings.warn(
+        "clean_company_name is deprecated. "
+        "Use normalize_customer_name from infrastructure.cleansing.normalizers instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return normalize_customer_name(name)
 
 
 class CustomerNameCleansingStep(TransformStep):

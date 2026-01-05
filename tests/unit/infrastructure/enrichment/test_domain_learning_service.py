@@ -3,7 +3,7 @@ Unit tests for DomainLearningService (Story 6.1.3).
 
 Tests cover:
 - AC1: DomainLearningService creation and configuration
-- AC2: Multi-type learning (all 5 lookup types)
+- AC2: Multi-type learning (plan_code, customer_name, plan_customer)
 - AC3: Confidence levels per lookup type
 - AC4: Source metadata (domain_learning source)
 - AC5: Minimum records threshold
@@ -114,19 +114,17 @@ class TestDomainLearningConfig:
         """Test default confidence levels per lookup type (AC3)."""
         config = DomainLearningConfig()
         assert config.confidence_levels["plan_code"] == 0.95
-        assert config.confidence_levels["account_name"] == 0.90
-        assert config.confidence_levels["account_number"] == 0.95
         assert config.confidence_levels["customer_name"] == 0.85
         assert config.confidence_levels["plan_customer"] == 0.90
+        assert config.confidence_levels["former_name"] == 0.90
 
     def test_default_enabled_lookup_types(self):
         """Test all lookup types enabled by default."""
         config = DomainLearningConfig()
         assert config.enabled_lookup_types["plan_code"] is True
-        assert config.enabled_lookup_types["account_name"] is True
-        assert config.enabled_lookup_types["account_number"] is True
         assert config.enabled_lookup_types["customer_name"] is True
         assert config.enabled_lookup_types["plan_customer"] is True
+        assert config.enabled_lookup_types["former_name"] is True
 
     def test_default_thresholds(self):
         """Test default threshold values."""
@@ -261,7 +259,7 @@ class TestLearnFromDomain:
     def test_extracts_all_lookup_types(
         self, service, mock_repository, sample_dataframe
     ):
-        """Test extraction of all 5 lookup types (AC2)."""
+        """Test extraction of simplified lookup types (AC2)."""
         service.learn_from_domain(
             domain_name="annuity_performance",
             table_name="annuity_performance_new",
@@ -272,13 +270,12 @@ class TestLearnFromDomain:
         call_args = mock_repository.insert_enrichment_index_batch.call_args
         records = call_args[0][0]
 
-        # Check all lookup types are present
+        # Check simplified lookup types are present
         lookup_types = {r.lookup_type for r in records}
         assert LookupType.PLAN_CODE in lookup_types
-        assert LookupType.ACCOUNT_NAME in lookup_types
-        assert LookupType.ACCOUNT_NUMBER in lookup_types
         assert LookupType.CUSTOMER_NAME in lookup_types
         assert LookupType.PLAN_CUSTOMER in lookup_types
+        # account_name and account_number removed in simplification
 
 
 class TestTempIdFiltering:
@@ -432,10 +429,6 @@ class TestConfidenceLevels:
         for record in records:
             if record.lookup_type == LookupType.PLAN_CODE:
                 assert record.confidence == Decimal("0.95")
-            elif record.lookup_type == LookupType.ACCOUNT_NAME:
-                assert record.confidence == Decimal("0.90")
-            elif record.lookup_type == LookupType.ACCOUNT_NUMBER:
-                assert record.confidence == Decimal("0.95")
             elif record.lookup_type == LookupType.CUSTOMER_NAME:
                 assert record.confidence == Decimal("0.85")
             elif record.lookup_type == LookupType.PLAN_CUSTOMER:
@@ -480,10 +473,9 @@ class TestLookupTypeGating:
         config = DomainLearningConfig(
             enabled_lookup_types={
                 "plan_code": True,
-                "account_name": False,  # Disabled
-                "account_number": True,
                 "customer_name": False,  # Disabled
                 "plan_customer": True,
+                "former_name": True,
             }
         )
         service = DomainLearningService(repository=mock_repository, config=config)
@@ -491,8 +483,6 @@ class TestLookupTypeGating:
         df = pd.DataFrame(
             {
                 "计划代码": ["FP0001"] * 10,
-                "年金账户名": ["账户A"] * 10,
-                "年金账户号": ["ACC001"] * 10,
                 "客户名称": ["中国平安"] * 10,
                 "company_id": ["614810477"] * 10,
             }
@@ -509,8 +499,6 @@ class TestLookupTypeGating:
 
         lookup_types = {r.lookup_type for r in records}
         assert LookupType.PLAN_CODE in lookup_types
-        assert LookupType.ACCOUNT_NAME not in lookup_types  # Disabled
-        assert LookupType.ACCOUNT_NUMBER in lookup_types
         assert LookupType.CUSTOMER_NAME not in lookup_types  # Disabled
         assert LookupType.PLAN_CUSTOMER in lookup_types
 
@@ -524,10 +512,9 @@ class TestMinConfidenceForCache:
             min_confidence_for_cache=0.92,  # Higher than customer_name (0.85)
             confidence_levels={
                 "plan_code": 0.95,
-                "account_name": 0.90,
-                "account_number": 0.95,
                 "customer_name": 0.85,  # Below threshold
                 "plan_customer": 0.90,
+                "former_name": 0.90,
             },
         )
         service = DomainLearningService(repository=mock_repository, config=config)
@@ -535,8 +522,6 @@ class TestMinConfidenceForCache:
         df = pd.DataFrame(
             {
                 "计划代码": ["FP0001"] * 10,
-                "年金账户名": ["账户A"] * 10,
-                "年金账户号": ["ACC001"] * 10,
                 "客户名称": ["中国平安"] * 10,
                 "company_id": ["614810477"] * 10,
             }
@@ -553,10 +538,8 @@ class TestMinConfidenceForCache:
 
         lookup_types = {r.lookup_type for r in records}
         assert LookupType.PLAN_CODE in lookup_types
-        assert LookupType.ACCOUNT_NUMBER in lookup_types
         # Below min_confidence_for_cache
         assert LookupType.CUSTOMER_NAME not in lookup_types
-        assert LookupType.ACCOUNT_NAME not in lookup_types
         assert LookupType.PLAN_CUSTOMER not in lookup_types
 
 
@@ -625,8 +608,6 @@ class TestStatisticsTracking:
         assert result.inserted == 10
         assert result.updated == 5
         assert "plan_code" in result.extracted
-        assert "account_name" in result.extracted
-        assert "account_number" in result.extracted
         assert "customer_name" in result.extracted
         assert "plan_customer" in result.extracted
 
@@ -676,5 +657,5 @@ class TestDuplicateHandling:
         call_args = mock_repository.insert_enrichment_index_batch.call_args
         records = call_args[0][0]
 
-        # Should only have 5 unique records (one per lookup type)
-        assert len(records) == 5
+        # Should only have 3 unique records (one per lookup type: plan_code, customer_name, plan_customer)
+        assert len(records) == 3

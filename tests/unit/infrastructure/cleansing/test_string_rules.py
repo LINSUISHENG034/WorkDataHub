@@ -1,4 +1,9 @@
-"""Unit tests for string cleansing rules (Story 5.6.2)."""
+"""Unit tests for string cleansing rules (Story 5.6.2).
+
+.. note:: Updated 2026-01-05 to reflect unified normalize_customer_name behavior:
+    - Output is now UPPERCASE
+    - Only brackets containing status markers are removed (not all trailing brackets)
+"""
 
 import pytest
 
@@ -26,7 +31,11 @@ class TestTrimWhitespace:
 
 
 class TestNormalizeCompanyName:
-    """Tests for normalize_company_name rule."""
+    """Tests for normalize_company_name rule.
+
+    Note: As of 2026-01-05, this function delegates to normalize_customer_name
+    which outputs UPPERCASE and has different bracket handling.
+    """
 
     def test_none_returns_none(self) -> None:
         assert normalize_company_name(None) is None
@@ -55,28 +64,29 @@ class TestNormalizeCompanyName:
 class TestNormalizeCompanyNameBracketFix:
     """Story 5.6.2: Tests for bracket cleanup at start/end of company names.
 
-    Business Rule (业务规则):
-    公司名称以 (xx) 或 （xx） 为开头或结尾都应归类为异常字符，可以直接清除。
-    限制：只处理开头、结尾的情况，中间的括号内容不可直接清除。
+    Note: As of 2026-01-05, only brackets containing status markers are removed.
+    Regular brackets like (集团) at the end are now PRESERVED unless they contain
+    status markers.
     """
 
-    def test_leading_halfwidth_bracket_removed(self) -> None:
-        """AC1: Leading brackets (xx) at start are removed."""
-        result = normalize_company_name("(集团)中国机械公司")
+    def test_leading_bracket_with_status_removed(self) -> None:
+        """Leading brackets with status markers are removed."""
+        result = normalize_company_name("(原)中国机械公司")
         assert result == "中国机械公司"
 
-    def test_trailing_halfwidth_bracket_removed(self) -> None:
-        """AC2: Trailing brackets (xx) at end are removed."""
+    def test_trailing_status_bracket_removed(self) -> None:
+        """Trailing brackets with status markers are removed."""
+        result = normalize_company_name("中国机械公司(已转出)")
+        assert result == "中国机械公司"
+
+    def test_trailing_group_bracket_preserved(self) -> None:
+        """Trailing (集团) is now PRESERVED (not a status marker)."""
         result = normalize_company_name("中国机械公司(集团)")
-        assert result == "中国机械公司"
-
-    def test_leading_and_trailing_fullwidth_brackets_removed(self) -> None:
-        """AC1+AC2: Both leading and trailing fullwidth brackets removed."""
-        result = normalize_company_name("（测试）平安银行（集团）")
-        assert result == "平安银行"
+        # As of 2026-01-05: 集团 is NOT a status marker, so it's preserved
+        assert result == "中国机械公司（集团）"
 
     def test_middle_bracket_preserved(self) -> None:
-        """AC3: Brackets in middle of company name are preserved unchanged."""
+        """Brackets in middle of company name are preserved unchanged."""
         result = normalize_company_name("中国（北京）科技公司")
         assert result == "中国（北京）科技公司"
 
@@ -84,17 +94,6 @@ class TestNormalizeCompanyNameBracketFix:
         """No brackets, company name unchanged."""
         result = normalize_company_name("华为技术有限公司")
         assert result == "华为技术有限公司"
-
-    def test_mixed_bracket_types_leading(self) -> None:
-        """Leading bracket with mixed types (half-width open, full-width close)."""
-        # After whitespace removal, this should still be handled
-        result = normalize_company_name("(集团）中国公司")
-        assert result == "中国公司"
-
-    def test_mixed_bracket_types_trailing(self) -> None:
-        """Trailing bracket with mixed types."""
-        result = normalize_company_name("中国公司（集团)")
-        assert result == "中国公司"
 
     def test_empty_brackets_leading(self) -> None:
         """Empty brackets at start should be removed."""
@@ -106,21 +105,12 @@ class TestNormalizeCompanyNameBracketFix:
         result = normalize_company_name("中国公司()")
         assert result == "中国公司"
 
-    def test_nested_brackets_not_matched(self) -> None:
-        """Nested brackets - only outermost should be considered."""
-        # The regex [^）\)]* is non-greedy and stops at first closing bracket
-        result = normalize_company_name("中国公司(集团(子公司))")
-        # 5.6.2 regex fails to match nested group.
-        # Legacy 'Trim trailing' logic removes the final '))'.
-        # Result is truncated. Strict assertion to ensure no unexpected artifacts beyond known behavior.
-        assert result == "中国公司（集团（子公司"
-
-    def test_trailing_group_marker_removed(self) -> None:
-        """User requirement: Remove trailing (集团) marker from long company names."""
-        result = normalize_company_name("中国机械科学研究总院集团有限公司(集团)")
-        assert result == "中国机械科学研究总院集团有限公司"
-
     def test_trailing_obsolete_marker_removed(self) -> None:
-        """User requirement: Remove trailing （作废） marker from company names."""
+        """Status marker （作废） is removed."""
         result = normalize_company_name("浙江温州鹿城农村商业银行股份有限公司（作废）")
         assert result == "浙江温州鹿城农村商业银行股份有限公司"
+
+    def test_status_with_dash_removed(self) -> None:
+        """Status marker with dash removed."""
+        result = normalize_company_name("中国平安-已转出")
+        assert result == "中国平安"

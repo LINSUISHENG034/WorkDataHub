@@ -42,6 +42,9 @@ from work_data_hub.infrastructure.cleansing.integrations.pydantic_adapter import
     decimal_fields_cleaner,
     simple_field_validator,
 )
+from work_data_hub.infrastructure.cleansing.normalizers import (
+    normalize_customer_name,
+)
 from work_data_hub.infrastructure.cleansing.registry import (
     CleansingRegistry,
     CleansingRule,
@@ -105,6 +108,7 @@ __all__: list[str] = [
     "convert_chinese_amount_units",
     "trim_whitespace",
     "normalize_company_name",
+    "normalize_customer_name",  # Unified function (replaces all three legacy functions)
     "parse_chinese_date_value",
     # 预配置清洗器
     "annuity_decimal_cleaner",

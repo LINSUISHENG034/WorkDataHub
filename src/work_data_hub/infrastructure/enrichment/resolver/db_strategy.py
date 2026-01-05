@@ -78,33 +78,27 @@ def _resolve_via_enrichment_index(
     mapping_repository: "CompanyMappingRepository",
 ) -> Tuple[pd.Series, Dict[str, int]]:
     """
-    Resolve company_id via enrichment_index (DB-P1..P5).
+    Resolve company_id via enrichment_index.
 
-    Priority order: plan_code → account_name → account_number →
-    customer_name (normalized) → plan_customer (plan|normalized_customer).
+    Simplified priority order: plan_code → customer_name → plan_customer → former_name.
+
+    Note: account_name and account_number removed - account_name merged with
+    customer_name (same semantic), account_number unreliable for matching.
     """
     keys_by_type: Dict[LookupType, set[str]] = {
         LookupType.PLAN_CODE: set(),
-        LookupType.ACCOUNT_NAME: set(),
-        LookupType.ACCOUNT_NUMBER: set(),
         LookupType.CUSTOMER_NAME: set(),
         LookupType.PLAN_CUSTOMER: set(),
-        LookupType.FORMER_NAME: set(),  # DB-P6: Company former names
+        LookupType.FORMER_NAME: set(),
     }
 
     for idx in df[mask_unresolved].index:
         row = df.loc[idx]
         plan_code = row.get(strategy.plan_code_column)
-        account_name = row.get(strategy.account_name_column)
-        account_number = row.get(strategy.account_number_column)
         customer_name = row.get(strategy.customer_name_column)
 
         if pd.notna(plan_code):
             keys_by_type[LookupType.PLAN_CODE].add(str(plan_code))
-        if pd.notna(account_name):
-            keys_by_type[LookupType.ACCOUNT_NAME].add(str(account_name))
-        if pd.notna(account_number):
-            keys_by_type[LookupType.ACCOUNT_NUMBER].add(str(account_number))
         if pd.notna(customer_name):
             normalized_customer = normalize_for_temp_id(str(customer_name))
             if normalized_customer:
@@ -123,8 +117,6 @@ def _resolve_via_enrichment_index(
             pd.Series(pd.NA, index=df.index, dtype=object),
             {
                 "plan_code": 0,
-                "account_name": 0,
-                "account_number": 0,
                 "customer_name": 0,
                 "plan_customer": 0,
                 "former_name": 0,
@@ -135,8 +127,6 @@ def _resolve_via_enrichment_index(
     used_keys: list[tuple[LookupType, str]] = []
     hits_by_priority: Dict[str, int] = {
         "plan_code": 0,
-        "account_name": 0,
-        "account_number": 0,
         "customer_name": 0,
         "plan_customer": 0,
         "former_name": 0,
@@ -158,34 +148,26 @@ def _resolve_via_enrichment_index(
     # Apply priority order per row
     priority_order = [
         LookupType.PLAN_CODE,
-        LookupType.ACCOUNT_NAME,
-        LookupType.ACCOUNT_NUMBER,
         LookupType.CUSTOMER_NAME,
         LookupType.PLAN_CUSTOMER,
-        LookupType.FORMER_NAME,  # DB-P6: Lowest priority
+        LookupType.FORMER_NAME,
     ]
     label_by_type = {
         LookupType.PLAN_CODE: "plan_code",
-        LookupType.ACCOUNT_NAME: "account_name",
-        LookupType.ACCOUNT_NUMBER: "account_number",
         LookupType.CUSTOMER_NAME: "customer_name",
         LookupType.PLAN_CUSTOMER: "plan_customer",
         LookupType.FORMER_NAME: "former_name",
     }
     path_label_by_type = {
         LookupType.PLAN_CODE: "DB-P1",
-        LookupType.ACCOUNT_NAME: "DB-P2",
-        LookupType.ACCOUNT_NUMBER: "DB-P3",
-        LookupType.CUSTOMER_NAME: "DB-P4",
-        LookupType.PLAN_CUSTOMER: "DB-P5",
-        LookupType.FORMER_NAME: "DB-P6",
+        LookupType.CUSTOMER_NAME: "DB-P2",
+        LookupType.PLAN_CUSTOMER: "DB-P3",
+        LookupType.FORMER_NAME: "DB-P4",
     }
 
     for idx in df[mask_unresolved].index:
         row = df.loc[idx]
         plan_code = row.get(strategy.plan_code_column)
-        account_name = row.get(strategy.account_name_column)
-        account_number = row.get(strategy.account_number_column)
         customer_name = row.get(strategy.customer_name_column)
         normalized_customer = (
             normalize_for_temp_id(str(customer_name)) if pd.notna(customer_name) else ""
@@ -193,16 +175,11 @@ def _resolve_via_enrichment_index(
 
         candidate_keys = {
             LookupType.PLAN_CODE: str(plan_code) if pd.notna(plan_code) else None,
-            LookupType.ACCOUNT_NAME: str(account_name)
-            if pd.notna(account_name)
-            else None,
-            LookupType.ACCOUNT_NUMBER: str(account_number)
-            if pd.notna(account_number)
-            else None,
             LookupType.CUSTOMER_NAME: normalized_customer or None,
             LookupType.PLAN_CUSTOMER: f"{plan_code}|{normalized_customer}"
             if pd.notna(plan_code) and normalized_customer
             else None,
+            LookupType.FORMER_NAME: normalized_customer or None,
         }
 
         path_segments: List[str] = []

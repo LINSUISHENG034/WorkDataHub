@@ -68,7 +68,7 @@ def sample_enrichment_index_rows():
         ),
         MockEnrichmentIndexRow(
             lookup_key="账户A",
-            lookup_type="account_name",
+            lookup_type="customer_name",  # Simplified: account_name merged into customer_name
             company_id="614810477",
             confidence=Decimal("1.00"),
             source="eqc_api",
@@ -98,7 +98,7 @@ def sample_enrichment_records():
         ),
         EnrichmentIndexRecord(
             lookup_key="账户A",
-            lookup_type=LookupType.ACCOUNT_NAME,
+            lookup_type=LookupType.CUSTOMER_NAME,  # Simplified: account_name merged
             company_id="614810477",
             source=SourceType.EQC_API,
         ),
@@ -122,12 +122,12 @@ class TestLookupType:
     """Test cases for LookupType enum (Story 6.1.1)."""
 
     def test_lookup_type_values(self):
-        """LookupType has correct values for DB-P1 to DB-P5."""
+        """LookupType has correct simplified values: plan_code, customer_name, plan_customer, former_name."""
         assert LookupType.PLAN_CODE.value == "plan_code"
-        assert LookupType.ACCOUNT_NAME.value == "account_name"
-        assert LookupType.ACCOUNT_NUMBER.value == "account_number"
         assert LookupType.CUSTOMER_NAME.value == "customer_name"
         assert LookupType.PLAN_CUSTOMER.value == "plan_customer"
+        assert LookupType.FORMER_NAME.value == "former_name"
+        # account_name and account_number removed in simplification
 
     def test_lookup_type_from_string(self):
         """LookupType can be created from string value."""
@@ -306,12 +306,14 @@ class TestLookupEnrichmentIndex:
         mock_result.fetchone.return_value = None
         mock_connection.execute.return_value = mock_result
 
-        repository.lookup_enrichment_index("TEST_KEY", LookupType.ACCOUNT_NUMBER)
+        repository.lookup_enrichment_index("TEST_KEY", LookupType.CUSTOMER_NAME)
 
         call_args = mock_connection.execute.call_args
         params = call_args[0][1]
-        assert params["lookup_key"] == "TEST_KEY"
-        assert params["lookup_type"] == "account_number"
+        assert (
+            params["lookup_key"] == "test_key"
+        )  # normalized (lowercase, underscore preserved)
+        assert params["lookup_type"] == "customer_name"
 
 
 # =============================================================================
@@ -332,15 +334,17 @@ class TestLookupEnrichmentIndexBatch:
 
         keys_by_type = {
             LookupType.PLAN_CODE: ["FP0001"],
-            LookupType.ACCOUNT_NAME: ["账户A"],
-            LookupType.CUSTOMER_NAME: ["中国平安"],
+            LookupType.CUSTOMER_NAME: [
+                "账户A",
+                "中国平安",
+            ],  # Merged account_name into customer_name
         }
 
         results = repository.lookup_enrichment_index_batch(keys_by_type)
 
         assert len(results) == 3
         assert (LookupType.PLAN_CODE, "FP0001") in results
-        assert (LookupType.ACCOUNT_NAME, "账户A") in results
+        assert (LookupType.CUSTOMER_NAME, "账户A") in results
         assert (LookupType.CUSTOMER_NAME, "中国平安") in results
         mock_connection.execute.assert_called_once()
 
@@ -531,8 +535,8 @@ class TestInsertEnrichmentIndexBatch:
 
         call_args = mock_connection.execute.call_args
         params = call_args[0][1]
-        assert params["lookup_keys"] == ["FP0001", "账户A", "中国平安"]
-        assert params["lookup_types"] == ["plan_code", "account_name", "customer_name"]
+        assert params["lookup_keys"] == ["FP0001", "账户a", "中国平安"]  # normalized
+        assert params["lookup_types"] == ["plan_code", "customer_name", "customer_name"]
         assert params["company_ids"] == ["614810477", "614810477", "600866980"]
         assert params["sources"] == ["yaml", "eqc_api", "domain_learning"]
 

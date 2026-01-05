@@ -142,6 +142,7 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
     if not _table_exists(conn, "base_info", "enterprise"):
         op.create_table(
             "base_info",
+            sa.Column("id", sa.Integer(), sa.Identity(always=False), nullable=False),
             # Primary Key
             sa.Column(
                 "company_id",
@@ -260,7 +261,7 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
     if not _table_exists(conn, "business_info", "enterprise"):
         op.create_table(
             "business_info",
-            sa.Column("id", sa.Integer(), nullable=False, autoincrement=False),
+            sa.Column("id", sa.Integer(), sa.Identity(always=False), nullable=False),
             sa.Column("company_id", sa.String(255), nullable=False),
             sa.Column(
                 "registered_date", sa.Date(), nullable=True, comment="Normalized"
@@ -350,7 +351,7 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
     if not _table_exists(conn, "biz_label", "enterprise"):
         op.create_table(
             "biz_label",
-            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("id", sa.Integer(), sa.Identity(always=False), nullable=False),
             sa.Column("company_id", sa.String(255), nullable=False),
             sa.Column("type", sa.String(100), nullable=True, comment="Label type"),
             sa.Column("lv1_name", sa.String(255), nullable=True, comment="Level 1"),
@@ -393,7 +394,7 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
     if not _table_exists(conn, "enrichment_requests", "enterprise"):
         op.create_table(
             "enrichment_requests",
-            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("id", sa.Integer(), sa.Identity(always=False), nullable=False),
             sa.Column("raw_name", sa.String(255), nullable=False, comment="原始名称"),
             sa.Column(
                 "normalized_name", sa.String(255), nullable=False, comment="规范化名称"
@@ -437,7 +438,7 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
     if not _table_exists(conn, "enrichment_index", "enterprise"):
         op.create_table(
             "enrichment_index",
-            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("id", sa.Integer(), sa.Identity(always=False), nullable=False),
             sa.Column("lookup_key", sa.String(255), nullable=False),
             sa.Column(
                 "lookup_type",
@@ -546,7 +547,7 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
     if not _table_exists(conn, "validation_results", "enterprise"):
         op.create_table(
             "validation_results",
-            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("id", sa.Integer(), sa.Identity(always=False), nullable=False),
             sa.Column(
                 "validated_at",
                 sa.TIMESTAMP(timezone=True),
@@ -634,7 +635,7 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
             sa.Column(
                 "id",
                 sa.Integer(),
-                sa.Identity(always=True),
+                sa.Identity(always=False),
                 nullable=False,
             ),
             sa.Column("company_id", sa.String(), nullable=False),

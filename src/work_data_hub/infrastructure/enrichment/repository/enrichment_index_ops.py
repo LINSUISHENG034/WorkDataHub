@@ -350,11 +350,10 @@ class EnrichmentIndexOpsMixin:
             return InsertBatchResult(inserted_count=0, skipped_count=0, conflicts=[])
 
         # Map match_type to LookupType
+        # Note: account and account_name removed - simplified to 3 match types
         match_type_map = {
             "plan": LookupType.PLAN_CODE,
-            "account": LookupType.ACCOUNT_NUMBER,
             "name": LookupType.CUSTOMER_NAME,
-            "account_name": LookupType.ACCOUNT_NAME,
         }
 
         records: List[EnrichmentIndexRecord] = []

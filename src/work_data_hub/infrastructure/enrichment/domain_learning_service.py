@@ -10,8 +10,8 @@ Architecture Reference:
 - docs/guides/company-enrichment-service.md#2.3 Domain Self-Learning
 
 Key Features:
-- Multi-type learning: Extracts all 5 lookup types (plan_code, account_name,
-  account_number, customer_name, plan_customer)
+- Multi-type learning: Extracts lookup types (plan_code, customer_name, plan_customer,
+  former_name)
 - Configurable confidence levels per lookup type
 - Filters out temporary IDs (IN_*) and null values
 - Idempotent operation via ON CONFLICT DO UPDATE
@@ -309,8 +309,6 @@ class DomainLearningService:
         # Extract mappings for each enabled lookup type
         lookup_type_configs = [
             ("plan_code", LookupType.PLAN_CODE, False),
-            ("account_name", LookupType.ACCOUNT_NAME, False),
-            ("account_number", LookupType.ACCOUNT_NUMBER, False),
             ("customer_name", LookupType.CUSTOMER_NAME, True),  # needs normalization
             ("plan_customer", LookupType.PLAN_CUSTOMER, True),  # needs normalization
         ]
@@ -599,8 +597,6 @@ class DomainLearningService:
         # Extract each lookup type
         lookup_configs = [
             ("plan_code", LookupType.PLAN_CODE, False),
-            ("account_name", LookupType.ACCOUNT_NAME, False),
-            ("account_number", LookupType.ACCOUNT_NUMBER, False),
             ("customer_name", LookupType.CUSTOMER_NAME, True),
         ]
 

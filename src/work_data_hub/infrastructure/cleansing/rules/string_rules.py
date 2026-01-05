@@ -1,45 +1,19 @@
-"""字符串清洗规则集合（Story 2.3）。"""
+"""字符串清洗规则集合（Story 2.3）。
+
+.. deprecated:: 2026-01-05
+    The normalize_company_name function now delegates to normalize_customer_name
+    from infrastructure.cleansing.normalizers for unified behavior.
+"""
 
 from __future__ import annotations
 
-import re
+import warnings
 from typing import Any
 
-from work_data_hub.infrastructure.cleansing.constants import (
-    FULLWIDTH_CHAR_END,
-    FULLWIDTH_CHAR_START,
-    FULLWIDTH_TO_HALFWIDTH_OFFSET,
+from work_data_hub.infrastructure.cleansing.normalizers import (
+    normalize_customer_name,
 )
 from work_data_hub.infrastructure.cleansing.registry import RuleCategory, rule
-
-_DECORATIVE_CHARS = (
-    '「」『』"'  # Note: 《》 are valid chars in company names, preserved
-)
-
-# Legacy parity: suffixes / markers to remove from company names
-_COMPANY_NAME_SUFFIXES_TO_REMOVE = (
-    "已转出",
-    "待转出",
-    "终止",
-    "转出",
-    "转移终止",
-    "已作废",
-    "已终止",
-    "保留",
-    "保留账户",
-    "存量",
-    "已转移终止",
-    "本部",
-    "未使用",
-    "集合",
-    "原",
-)
-
-# Legacy parity: marker set used by legacy common_utils.clean_company_name
-_CORE_REPLACE_STRING = set(_COMPANY_NAME_SUFFIXES_TO_REMOVE)
-
-# Optimization: Pre-sort suffixes by length (descending) once at module level
-_SORTED_CORE_SUFFIXES = sorted(_CORE_REPLACE_STRING, key=lambda s: -len(s))
 
 
 @rule(
@@ -62,15 +36,15 @@ def trim_whitespace(value: Any) -> Any:
 @rule(
     name="normalize_company_name",
     category=RuleCategory.STRING,
-    description="公司名称规范化：去装饰字符、压缩多余空格、半角括号转全角、移除特定后缀",
+    description="公司名称规范化：使用统一的 normalize_customer_name 函数",
 )
 def normalize_company_name(value: Any) -> Any:
     """
-    Legacy-compatible公司名称规范化（对齐
-    legacy/annuity_hub/common_utils.clean_company_name）。
+    公司名称规范化。
 
-    Story 5.6.2: 清理开头/结尾的括号内容 (xx) 或 （xx）
-    业务规则：公司名称以括号为开头或结尾都应归类为异常字符，可以直接清除。
+    .. deprecated:: 2026-01-05
+        This function now delegates to normalize_customer_name from
+        infrastructure.cleansing.normalizers for unified behavior.
     """
     if value is None:
         return None
@@ -78,55 +52,13 @@ def normalize_company_name(value: Any) -> Any:
     if not isinstance(value, str):
         return value
 
-    # Collapse whitespace to single spaces (legacy compatibility expects preserved token
-    # gaps)
-    normalized = re.sub(r"\s+", " ", value.replace("\u3000", " ")).strip()
-    for char in _DECORATIVE_CHARS:
-        normalized = normalized.replace(char, "")
-
-    # Story 5.6.2: 清理开头的括号内容 (xx) 或 （xx）
-    normalized = re.sub(r"^[（\(][^）\)]*[）\)]", "", normalized)
-
-    # Story 5.6.2: 清理结尾的括号内容 (xx) 或 （xx）
-    normalized = re.sub(r"[（\(][^）\)]*[）\)]$", "", normalized)
-
-    # Remove specific patterns from legacy cleaner
-    normalized = re.sub(r"及下属子企业", "", normalized)
-    normalized = re.sub(r"(?:\(团托\)|-[A-Za-z]+|-\d+|-养老|-福利)$", "", normalized)
-
-    # Remove core status markers from start/end (sorted desc by length)
-    for core_str in _SORTED_CORE_SUFFIXES:
-        pattern_start = (
-            rf"^([\(\（]?){re.escape(core_str)}([\)\）]?)(?=[^\u4e00-\u9fff]|$)"
-        )
-        normalized = re.sub(pattern_start, "", normalized)
-
-        pattern_end = (
-            rf"(?<![\u4e00-\u9fff])([\-\(\（]?){re.escape(core_str)}([\)\）]?)"
-            r"[\-\(\（\)\）]*$"
-        )
-        normalized = re.sub(pattern_end, "", normalized)
-
-    # Trim trailing hyphens/brackets
-    normalized = re.sub(r"[\-\(\（\)\）]+$", "", normalized)
-
-    # Convert full-width ASCII to half-width (legacy default to_fullwidth=False)
-    normalized = "".join(
-        [
-            chr(ord(char) - FULLWIDTH_TO_HALFWIDTH_OFFSET)
-            if FULLWIDTH_CHAR_START <= ord(char) <= FULLWIDTH_CHAR_END
-            else char
-            for char in normalized
-        ]
+    warnings.warn(
+        "normalize_company_name is deprecated. "
+        "Use normalize_customer_name from infrastructure.cleansing.normalizers instead.",
+        DeprecationWarning,
+        stacklevel=2,
     )
-
-    # Normalize parentheses to full-width (Chinese standard)
-    normalized = normalized.replace("(", "（").replace(")", "）")
-
-    # Final cleanup: collapse any whitespace introduced by removals
-    normalized = re.sub(r"\s+", " ", normalized).strip()
-
-    return normalized
+    return normalize_customer_name(value)
 
 
 __all__ = ["trim_whitespace", "normalize_company_name"]

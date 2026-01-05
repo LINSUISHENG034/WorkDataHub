@@ -39,15 +39,16 @@ class MatchTypePriority(Enum):
     Match type priority levels for company ID resolution.
 
     Lower number = higher priority.
+
+    Note: ACCOUNT removed - account_name merged with customer_name,
+    account_number was unreliable.
     """
 
     PLAN = 1
-    ACCOUNT = 2
-    HARDCODE = 3
-    NAME = 4
-    ACCOUNT_NAME = 5
-    EQC = 6
-    TEMP = 7
+    HARDCODE = 2
+    NAME = 3
+    EQC = 4
+    TEMP = 5
 
 
 @dataclass
@@ -122,12 +123,10 @@ class ResolutionStatistics:
     db_cache_hits: Dict[str, int] = field(
         default_factory=lambda: {
             "plan_code": 0,
-            "account_name": 0,
-            "account_number": 0,
             "customer_name": 0,
             "plan_customer": 0,
             "former_name": 0,
-            # Note: legacy (company_mapping) removed in Story 7.1-4 (Zero Legacy)
+            # Note: account_name, account_number removed - simplified to 3 match types
         }
     )
     db_decision_path_counts: Dict[str, int] = field(default_factory=dict)
@@ -154,11 +153,9 @@ class ResolutionStatistics:
         """Ensure db_cache_hits contains all expected keys."""
         defaults = {
             "plan_code": 0,
-            "account_name": 0,
-            "account_number": 0,
             "customer_name": 0,
             "plan_customer": 0,
-            "legacy": 0,
+            "former_name": 0,
         }
         for key, value in defaults.items():
             self.db_cache_hits.setdefault(key, value)
@@ -216,22 +213,25 @@ class LookupType(Enum):
     """
     Lookup type for enrichment_index table (Story 6.1.1).
 
-    Maps to DB-P1 through DB-P5 priority levels in Layer 2 cache.
+    Simplified to 3 core match types with clear priority:
+    - DB-P1: plan_code (highest priority)
+    - DB-P2: customer_name (normalized)
+    - DB-P3: former_name (company historical names)
+
+    Note: account_name and account_number removed - account_name merged with
+    customer_name (same semantic), account_number unreliable for matching.
 
     Attributes:
         PLAN_CODE: DB-P1 - Plan code lookup (highest priority)
-        ACCOUNT_NAME: DB-P2 - Annuity account name lookup
-        ACCOUNT_NUMBER: DB-P3 - Annuity account number lookup (集团企业客户号)
-        CUSTOMER_NAME: DB-P4 - Customer name lookup (normalized)
-        PLAN_CUSTOMER: DB-P5 - Plan + Customer combo lookup (lowest priority)
+        CUSTOMER_NAME: DB-P2 - Customer name lookup (normalized)
+        PLAN_CUSTOMER: Plan + Customer combo lookup (for disambiguation)
+        FORMER_NAME: DB-P3 - Company former names (lowest priority)
     """
 
     PLAN_CODE = "plan_code"
-    ACCOUNT_NAME = "account_name"
-    ACCOUNT_NUMBER = "account_number"
     CUSTOMER_NAME = "customer_name"
     PLAN_CUSTOMER = "plan_customer"
-    FORMER_NAME = "former_name"  # DB-P6: Company former names
+    FORMER_NAME = "former_name"
 
 
 class SourceType(Enum):
@@ -383,19 +383,17 @@ class DomainLearningConfig:
     confidence_levels: Dict[str, float] = field(
         default_factory=lambda: {
             "plan_code": 0.95,
-            "account_name": 0.90,
-            "account_number": 0.95,
             "customer_name": 0.85,
             "plan_customer": 0.90,
+            "former_name": 0.90,
         }
     )
     enabled_lookup_types: Dict[str, bool] = field(
         default_factory=lambda: {
             "plan_code": True,
-            "account_name": True,
-            "account_number": True,
             "customer_name": True,
             "plan_customer": True,
+            "former_name": True,
         }
     )
     min_records_for_learning: int = 10
@@ -404,15 +402,11 @@ class DomainLearningConfig:
         default_factory=lambda: {
             "annuity_performance": {
                 "plan_code": "计划代码",
-                "account_name": "年金账户名",
-                "account_number": "年金账户号",
                 "customer_name": "客户名称",
                 "company_id": "company_id",
             },
             "annuity_income": {
                 "plan_code": "计划代码",
-                "account_name": "年金账户名",
-                "account_number": "年金账户号",
                 "customer_name": "客户名称",
                 "company_id": "company_id",
             },

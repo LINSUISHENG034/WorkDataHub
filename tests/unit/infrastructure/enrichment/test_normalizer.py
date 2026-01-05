@@ -70,15 +70,15 @@ class TestNormalizeForTempId:
 
     def test_fullwidth_to_halfwidth(self):
         """Test full-width characters are converted to half-width."""
-        # Full-width A (Ａ) should become half-width a
+        # Full-width A (Ａ) should become half-width A (UPPERCASE as of 2026-01-05)
         result = normalize_for_temp_id("中国平安Ａ")
         assert "Ａ" not in result
-        assert "a" in result  # lowercase after conversion
+        assert "A" in result  # UPPERCASE after conversion
 
-    def test_lowercase_conversion(self):
-        """Test result is lowercased."""
-        result = normalize_for_temp_id("ABC公司")
-        assert result == "abc公司"
+    def test_uppercase_conversion(self):
+        """Test result is UPPERCASED (changed from lowercase 2026-01-05)."""
+        result = normalize_for_temp_id("abc公司")
+        assert result == "ABC公司"
 
     def test_trailing_punctuation_removal(self):
         """Test trailing punctuation is removed."""
@@ -238,5 +238,5 @@ class TestLegacyParity:
     def test_normalization_parity(self, original, expected_normalized):
         """Test normalization matches expected legacy behavior."""
         result = normalize_for_temp_id(original)
-        # Note: We add .lower() which legacy doesn't have
-        assert result == expected_normalized.lower()
+        # Note: We now use .upper() (changed from .lower() 2026-01-05)
+        assert result == expected_normalized.upper()

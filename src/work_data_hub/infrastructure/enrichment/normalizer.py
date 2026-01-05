@@ -2,114 +2,38 @@
 Legacy-compatible company name normalization for temporary ID generation.
 
 This module provides name normalization functions that ensure consistent
-temporary ID generation across different name variants. The normalization
-logic is based on the legacy clean_company_name implementation.
+temporary ID generation across different name variants.
+
+.. deprecated:: 2026-01-05
+    Use `normalize_customer_name` from `infrastructure.cleansing.normalizers` instead.
+    The `normalize_for_temp_id` function is maintained for backwards compatibility
+    but will be removed in a future version.
 
 Architecture Reference:
 - AD-002: Legacy-Compatible Temporary Company ID Generation
-- Legacy Analysis: docs/supplement/03_clean_company_name_logic.md
-
-CRITICAL: Name normalization MUST be applied before hashing to ensure
-the same customer receives the same temporary ID regardless of:
-- Trailing/leading whitespace
-- Bracket variations (Chinese vs English)
-- Status markers (已转出, 待转出, etc.)
-- Full-width vs half-width characters
+- Refactor: docs/specific/customer/customer-name-normalization-refactor.md
 """
 
 import base64
 import hashlib
 import hmac
-import re
-from typing import List
+import warnings
 
-from work_data_hub.infrastructure.cleansing.constants import (
-    FULLWIDTH_CHAR_END,
-    FULLWIDTH_CHAR_START,
-    FULLWIDTH_TO_HALFWIDTH_OFFSET,
+from work_data_hub.infrastructure.cleansing.normalizers import (
+    normalize_customer_name,
 )
 
-# Status markers from legacy (29 patterns) + additional patterns from edge cases
-# These indicate company status changes and should be stripped for ID generation
-CORE_REPLACE_STRING: List[str] = [
-    # Original 29 patterns
-    "已转出",
-    "待转出",
-    "待转移",  # Added: variant of 待转出
-    "终止",
-    "转出",
-    "转移",  # Added: base form
-    "保留",
-    "暂停",
-    "注销",
-    "清算",
-    "解散",
-    "吊销",
-    "撤销",
-    "停业",
-    "歇业",
-    "关闭",
-    "迁出",
-    "迁入",
-    "变更",
-    "合并",
-    "分立",
-    "破产",
-    "重整",
-    "托管",
-    "接管",
-    "整顿",
-    "清盘",
-    "退出",
-    "终结",
-    "结束",
-    "完结",
-    # Additional patterns from edge case testing
-    "已作废",
-    "作废",
-    "存量",
-    "原",  # Prefix marker like (原)
-]
-
-# Redundant suffix markers that appear in brackets at end of name
-# These are not status markers but redundant organizational info
-REDUNDANT_SUFFIX_MARKERS: List[str] = [
-    "集团",  # e.g., "XX集团有限公司(集团)" - redundant
-]
-
-# Invalid placeholder values that should be treated as empty
-# These are data entry placeholders, not real company names
-INVALID_PLACEHOLDERS: List[str] = [
-    "null",
-    "NULL",
-    "空白",
-    "无",
-    "N/A",
-    "n/a",
-    "-",
-    "--",
-    "—",
-    "——",
-]
-
-# Sort by length descending for greedy matching
-CORE_REPLACE_STRING_SORTED = sorted(CORE_REPLACE_STRING, key=len, reverse=True)
+# Legacy constants kept for backwards compatibility (some external code may reference them)
+# These are now defined in infrastructure.cleansing.normalizers.customer_name
 
 
 def normalize_for_temp_id(company_name: str) -> str:
     """
     Normalize company name for temporary ID generation.
 
-    Based on: legacy/annuity_hub/common_utils/common_utils.py::clean_company_name
-
-    Operations (in order):
-    1. Remove all whitespace
-    2. Remove business patterns (及下属子企业, -养老, etc.)
-    3. Remove status markers (已转出, 待转出, etc.)
-    4. Remove trailing punctuation
-    5. Full-width → Half-width conversion
-    6. Normalize brackets to Chinese
-    7. Lowercase (NEW - for hash stability)
+    .. deprecated:: 2026-01-05
+        Use `normalize_customer_name` from `infrastructure.cleansing.normalizers`
+        instead. This function is maintained for backwards compatibility.
 
     Args:
         company_name: Raw company name to normalize.
@@ -122,82 +46,14 @@ def normalize_for_temp_id(company_name: str) -> str:
         '中国平安'
         >>> normalize_for_temp_id("中国平安-已转出")
         '中国平安'
-        >>> normalize_for_temp_id("中国平安(集团)")
-        '中国平安（集团）'
     """
-    if not company_name:
-        return ""
-
-    name = company_name
-
-    # 0. Check for invalid placeholders (before any processing)
-    # These are data entry placeholders, not real company names
-    if name.strip() in INVALID_PLACEHOLDERS:
-        return ""
-
-    # 1. Remove all whitespace
-    name = re.sub(r"\s+", "", name)
-
-    # 2. Remove business-specific patterns and suffixes
-    name = re.sub(r"及下属子企业", "", name)
-    # Remove patterns like: (团托), -ChinaHolding, -BSU280, -养老, -福利, -Dsservice
-    # Also handles mixed alphanumeric codes like -SupportChinaMiniMalls
-    name = re.sub(
-        r"(?:\(团托\)|（团托）|-[A-Za-z][A-Za-z0-9]*|-\d+|-养老|-福利)$", "", name
+    warnings.warn(
+        "normalize_for_temp_id is deprecated. "
+        "Use normalize_customer_name from infrastructure.cleansing.normalizers instead.",
+        DeprecationWarning,
+        stacklevel=2,
     )
-
-    # 3. Remove status markers
-    for core_str in CORE_REPLACE_STRING_SORTED:
-        # Pattern for status at start (with optional brackets and separator)
-        # e.g., "已转出-中国平安" -> "中国平安"
-        pattern_start = rf"^[\(\（]?{re.escape(core_str)}[\)\）]?[\-]?"
-        name = re.sub(pattern_start, "", name)
-
-        # Pattern for status at end (with optional separators and brackets)
-        # e.g., "中国平安-已转出" -> "中国平安"
-        pattern_end = rf"[\-\(\（]{re.escape(core_str)}[\)\）]?$"
-        name = re.sub(pattern_end, "", name)
-
-        # Pattern for status in brackets at end
-        # e.g., "中国平安（已转出）" -> "中国平安"
-        pattern_bracket = rf"[\(\（]{re.escape(core_str)}[\)\）]$"
-        name = re.sub(pattern_bracket, "", name)
-
-    # 4. Full-width → Half-width conversion (before bracket normalization)
-    name = "".join(
-        [
-            chr(ord(char) - FULLWIDTH_TO_HALFWIDTH_OFFSET)
-            if FULLWIDTH_CHAR_START <= ord(char) <= FULLWIDTH_CHAR_END
-            else char
-            for char in name
-        ]
-    )
-
-    # 5. Normalize brackets to Chinese
-    name = name.replace("(", "（").replace(")", "）")
-
-    # 6. Remove redundant suffix markers in brackets at end
-    # Only remove if the marker already appears in the name (truly redundant)
-    # e.g., "XX集团有限公司（集团）" -> "XX集团有限公司" (集团 appears twice)
-    # but "中国平安（集团）" stays as is (集团 is part of the name)
-    for suffix in REDUNDANT_SUFFIX_MARKERS:
-        # Check if suffix appears in name before the trailing bracket
-        pattern = rf"（{re.escape(suffix)}）$"
-        if re.search(pattern, name):
-            # Get the name without the trailing bracket
-            name_without_suffix = re.sub(pattern, "", name)
-            # Only remove if the suffix already exists in the remaining name
-            if suffix in name_without_suffix:
-                name = name_without_suffix
-
-    # 7. Remove trailing punctuation and empty brackets (after bracket normalization)
-    name = re.sub(r"[\-\.。]+$", "", name)  # Remove trailing dash, period (EN/CN)
-    name = re.sub(r"（）$", "", name)  # Remove empty Chinese brackets at end
-
-    # 8. Lowercase for hash stability (NEW - not in legacy)
-    name = name.lower()
-
-    return name
+    return normalize_customer_name(company_name)
 
 
 def generate_temp_company_id(customer_name: str, salt: str) -> str:
