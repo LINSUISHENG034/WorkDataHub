@@ -1,8 +1,8 @@
 """
-Annuity Performance Domain Configuration.
+Annuity Income Domain Configuration.
 
-Migrated from guimo_iter_config.py to enable config-driven comparison.
-Contains all domain-specific values for the 规模明细 (annuity_performance) domain.
+Contains all domain-specific values for the 收入明细 (annuity_income) domain.
+Integrates with the extracted legacy cleaner from run_legacy_annuity_income_cleaner.py.
 """
 
 from __future__ import annotations
@@ -16,31 +16,34 @@ if TYPE_CHECKING:
     import pandas as pd
 
 
-class AnnuityPerformanceConfig(DomainComparisonConfig):
-    """Configuration for annuity_performance (规模明细) domain comparison."""
+class AnnuityIncomeConfig(DomainComparisonConfig):
+    """Configuration for annuity_income (收入明细) domain comparison."""
 
     # ==========================================================================
-    # Required Properties (from guimo_iter_config.py)
+    # Required Properties
     # ==========================================================================
 
     @property
     def domain_name(self) -> str:
-        return "annuity_performance"
+        return "annuity_income"
 
     @property
     def sheet_name(self) -> str:
-        return "规模明细"
+        return "收入明细"
 
     @property
     def numeric_fields(self) -> List[str]:
-        """Numeric fields requiring zero-tolerance comparison."""
+        """Numeric fields requiring zero-tolerance comparison.
+
+        annuity_income schema uses: 固费, 浮费, 回补, 税
+        (different from annuity_performance: 首年保费, 续期保费, 保费合计,
+        受托规模, 投资规模)
+        """
         return [
-            "期初资产规模",
-            "期末资产规模",
-            "供款",
-            "流失(含待遇支付)",  # Legacy column name
-            "流失",
-            "待遇支付",
+            "固费",
+            "浮费",
+            "回补",
+            "税",
         ]
 
     @property
@@ -66,9 +69,8 @@ class AnnuityPerformanceConfig(DomainComparisonConfig):
     @property
     def column_name_mapping(self) -> Dict[str, str]:
         """Column name mapping: Legacy -> New Pipeline."""
-        return {
-            "流失(含待遇支付)": "流失_含待遇支付",
-        }
+        # Legacy now outputs 计划代码 directly (unified with New Pipeline)
+        return {}
 
     # ==========================================================================
     # Abstract Method Implementations
@@ -76,14 +78,27 @@ class AnnuityPerformanceConfig(DomainComparisonConfig):
 
     def get_legacy_cleaner(self) -> Type:
         """
-        Get Legacy AnnuityPerformanceCleaner class.
+        Get Legacy AnnuityIncomeCleaner class wrapped in an adapter.
 
         Uses lazy import to enable --new-only mode without Legacy dependencies.
+        Directly imports from legacy module to ensure complete MySQL mapping data.
+
+        Note: AnnuityIncomeCleaner doesn't accept sheet_name parameter
+        (hardcoded to "收入明细"), so we wrap it in an adapter for
+        interface compatibility.
         """
         # Lazy import to avoid import errors when Legacy is not installed
-        from annuity_hub.data_handler.data_cleaner import AnnuityPerformanceCleaner
+        from annuity_hub.data_handler.data_cleaner import AnnuityIncomeCleaner
 
-        return AnnuityPerformanceCleaner
+        class AnnuityIncomeCleanerAdapter(AnnuityIncomeCleaner):
+            """Adapter to make AnnuityIncomeCleaner compatible with framework."""
+
+            def __init__(self, path, sheet_name: str = "收入明细"):
+                # AnnuityIncomeCleaner ignores sheet_name (hardcoded in _clean_method)
+                # but we accept it for interface compatibility
+                super().__init__(path)
+
+        return AnnuityIncomeCleanerAdapter
 
     def build_new_pipeline(
         self,
@@ -91,18 +106,15 @@ class AnnuityPerformanceConfig(DomainComparisonConfig):
         sheet_name: str,
         row_limit: Optional[int],
         enable_enrichment: bool,
-        sync_lookup_budget: int,  # Kept for interface compatibility
+        sync_lookup_budget: int,
     ) -> "pd.DataFrame":
         """
-        Build and execute New Pipeline for annuity_performance domain.
-
-        This is a thin wrapper around the existing pipeline builder logic,
-        migrated from guimo_iter_cleaner_compare.py run_new_pipeline().
+        Build and execute New Pipeline for annuity_income domain.
         """
         import pandas as pd
 
         from work_data_hub.config.settings import get_settings
-        from work_data_hub.domain.annuity_performance.pipeline_builder import (
+        from work_data_hub.domain.annuity_income.pipeline_builder import (
             build_bronze_to_silver_pipeline,
             load_plan_override_mapping,
         )
@@ -111,7 +123,7 @@ class AnnuityPerformanceConfig(DomainComparisonConfig):
             EqcLookupConfig,
         )
 
-        # Build EqcLookupConfig based on enable_enrichment flag (Story 6.2-P17)
+        # Build EqcLookupConfig based on enable_enrichment flag
         if enable_enrichment:
             eqc_config = EqcLookupConfig(
                 enabled=True,
@@ -121,7 +133,7 @@ class AnnuityPerformanceConfig(DomainComparisonConfig):
         else:
             eqc_config = EqcLookupConfig.disabled()
 
-        # Load raw data (same as Legacy cleaner input)
+        # Load raw data
         raw_df = pd.read_excel(excel_path, sheet_name=sheet_name, dtype=str)
 
         if row_limit and row_limit > 0:
@@ -155,7 +167,6 @@ class AnnuityPerformanceConfig(DomainComparisonConfig):
             # Run without database mapping repository
             pipeline = build_bronze_to_silver_pipeline(
                 eqc_config=eqc_config,
-                enrichment_service=None,
                 plan_override_mapping=plan_override_mapping,
                 mapping_repository=None,
             )
@@ -185,7 +196,6 @@ class AnnuityPerformanceConfig(DomainComparisonConfig):
 
             pipeline = build_bronze_to_silver_pipeline(
                 eqc_config=eqc_config,
-                enrichment_service=None,
                 plan_override_mapping=plan_override_mapping,
                 mapping_repository=mapping_repository,
             )
@@ -209,12 +219,10 @@ class AnnuityPerformanceConfig(DomainComparisonConfig):
 
 
 # Register this config when module is imported
-# This is done via the register_config decorator in __init__.py
-# But we also need to update the registry directly here for robustness
 def _register():
     from . import DOMAIN_CONFIGS
 
-    DOMAIN_CONFIGS["annuity_performance"] = AnnuityPerformanceConfig
+    DOMAIN_CONFIGS["annuity_income"] = AnnuityIncomeConfig
 
 
 _register()

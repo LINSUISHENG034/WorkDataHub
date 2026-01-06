@@ -14,8 +14,9 @@ Usage:
         --domain annuity_performance data/202412_annuity.xlsx --limit 100
 
     # With deterministic export (for reproducible comparisons)
-    PYTHONPATH=src uv run python scripts/validation/CLI/cleaner_compare.py \
-        --domain annuity_performance --month 202311 --limit 100 --export --run-id baseline-202311
+    PYTHONPATH=src uv run python scripts/validation/CLI/cleaner_compare.py \\
+        --domain annuity_performance --month 202311 --limit 100 --export \\
+        --run-id baseline-202311
 
 See docs/guides/validation/cleaner-comparison-usage-guide.md for full documentation.
 """
@@ -23,6 +24,10 @@ See docs/guides/validation/cleaner-comparison-usage-guide.md for full documentat
 from __future__ import annotations
 
 import argparse
+
+# Early logging suppression: Set root logger to ERROR before work_data_hub imports
+# This prevents DEBUG/INFO logs from being emitted during module initialization
+import logging
 import sys
 import time
 from datetime import date as date_type
@@ -32,6 +37,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import pandas as pd
+
+logging.root.setLevel(logging.ERROR)
+# Also suppress any existing handlers
+for handler in logging.root.handlers:
+    handler.setLevel(logging.ERROR)
 
 # Add script directory to path for local imports
 SCRIPT_DIR = Path(__file__).parent
@@ -624,9 +634,10 @@ def run_comparison(
     row_limit: int,
     enable_enrichment: bool = False,
     sync_lookup_budget: int = 1000,
-    save_debug: bool = False,
+    save_snapshot: bool = False,
     run_id: Optional[str] = None,
-) -> tuple:
+    quiet: bool = False,
+) -> tuple:  # noqa: PLR0913
     """
     Run full comparison between Legacy and New Pipeline cleaners.
 
@@ -638,24 +649,29 @@ def run_comparison(
     if run_id is None:
         run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
-    print("🔄 Running Legacy cleaner...")
+    if not quiet:
+        print("🔄 Running Legacy cleaner...")
     legacy_df = run_legacy_cleaner(config, excel_path, sheet_name, row_limit)
 
-    print("🔄 Running New Pipeline...")
+    if not quiet:
+        print("🔄 Running New Pipeline...")
     new_df = run_new_pipeline(
         config, excel_path, sheet_name, row_limit, enable_enrichment, sync_lookup_budget
     )
 
-    if save_debug:
+    if save_snapshot:
         save_debug_snapshots(legacy_df, new_df, run_id=run_id)
 
-    print("🔍 Comparing numeric fields...")
+    if not quiet:
+        print("🔍 Comparing numeric fields...")
     numeric_diffs = compare_numeric_fields(config, legacy_df, new_df)
 
-    print("🔍 Comparing derived fields...")
+    if not quiet:
+        print("🔍 Comparing derived fields...")
     derived_diffs = compare_derived_fields(config, legacy_df, new_df)
 
-    print("🔍 Comparing upgrade fields...")
+    if not quiet:
+        print("🔍 Comparing upgrade fields...")
     upgrade_diffs = compare_upgrade_fields(config, legacy_df, new_df)
 
     execution_time_ms = int((time.perf_counter() - start_time) * 1000)
@@ -759,9 +775,30 @@ Available domains: {", ".join(available_domains)}
         help="Enable EQC enrichment service (default: disabled)",
     )
     parser.add_argument(
+        "--snapshot",
+        action="store_true",
+        help=(
+            "Save intermediate snapshots (CSV exports of Legacy and New Pipeline outputs)"
+        ),
+    )
+    # Backward compatibility: --debug maps to --snapshot (deprecated)
+    parser.add_argument(
         "--debug",
         action="store_true",
-        help="Save debug snapshots (CSV exports of both outputs)",
+        dest="snapshot",
+        help="DEPRECATED: Use --snapshot instead",
+    )
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Enable verbose output (show INFO-level diagnostic logs)",
+    )
+    parser.add_argument(
+        "--quiet",
+        "-q",
+        action="store_true",
+        help="Quiet mode (show only errors and final summary)",
     )
     parser.add_argument(
         "--export",
@@ -788,14 +825,26 @@ Available domains: {", ".join(available_domains)}
         "--run-id",
         type=str,
         default=None,
-        help="Custom run ID for deterministic export directory naming (default: timestamp)",
+        help=(
+            "Custom run ID for deterministic export directory naming (default: timestamp)"
+        ),
     )
 
     args = parser.parse_args()
 
+    # Configure logging verbosity based on CLI flags
+    from work_data_hub.utils.logging import reconfigure_for_console
+
+    reconfigure_for_console(
+        debug=False,  # Never enable full DEBUG-level for this script
+        verbose=args.verbose,
+        quiet=args.quiet,
+    )
+
     # Load domain configuration
     config = get_domain_config(args.domain)
-    print(f"📋 Domain: {config.domain_name}")
+    if not args.quiet:
+        print(f"📋 Domain: {config.domain_name}")
 
     # Determine sheet name
     sheet_name = args.sheet if args.sheet else config.sheet_name
@@ -825,9 +874,10 @@ Available domains: {", ".join(available_domains)}
         sys.exit(1)
 
     # Performance warning for full dataset (Hard Constraint #4)
-    if args.limit == 0:
+    if args.limit == 0 and not args.quiet:
         print(
-            "⚠️  Warning: --limit 0 runs on full dataset. This may be slow and memory-intensive."
+            "⚠️  Warning: --limit 0 runs on full dataset. "
+            "This may be slow and memory-intensive."
         )
 
     # Token validation: only when --enrichment is requested
@@ -857,7 +907,7 @@ Available domains: {", ".join(available_domains)}
         print(f"   Rows: {len(new_df)}")
         print(f"   Columns: {len(new_df.columns)}")
         print(f"   Columns: {list(new_df.columns)}")
-        if args.debug:
+        if args.snapshot:
             run_dir = ARTIFACTS_DIR / run_id
             run_dir.mkdir(parents=True, exist_ok=True)
             snapshots_dir = run_dir / DEBUG_SNAPSHOTS_SUBDIR
@@ -874,8 +924,9 @@ Available domains: {", ".join(available_domains)}
         row_limit=args.limit,
         enable_enrichment=args.enrichment,
         sync_lookup_budget=args.sync_budget,
-        save_debug=args.debug,
+        save_snapshot=args.snapshot,
         run_id=run_id,
+        quiet=args.quiet,
     )
 
     print_report(report)

@@ -208,11 +208,8 @@ def get_logger(name: str) -> Any:
     stdlib_logger = logging.getLogger(name)
     if stdlib_logger.propagate is False:
         stdlib_logger.propagate = True
-    # Keep module loggers "open" and let handlers control filtering. This also
-    # avoids surprising suppression if an intermediate parent logger level is
-    # raised elsewhere in the process.
-    if stdlib_logger.level == logging.NOTSET:
-        stdlib_logger.setLevel(logging.DEBUG)
+    # Let loggers inherit from root logger - don't override with DEBUG
+    # This allows reconfigure_for_console() to control verbosity
     return structlog.get_logger(name)
 
 
@@ -302,8 +299,25 @@ def reconfigure_for_console(
 
     # Update root logger level
     logging.root.setLevel(root_level)
-    for handler in logging.root.handlers:
-        handler.setLevel(root_level)
+
+    # Clear and replace all root handlers with properly configured ones
+    # This ensures any handlers added during module init use the CLI-specified level
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+
+    # Add a single StreamHandler with the correct level
+    new_handler = logging.StreamHandler()
+    new_handler.setLevel(root_level)
+    new_handler.setFormatter(logging.Formatter("%(message)s"))
+    logging.root.addHandler(new_handler)
+
+    # Also update work_data_hub logger and all its children to ensure suppression
+    for name in list(logging.Logger.manager.loggerDict):
+        if name.startswith("work_data_hub"):
+            child_logger = logging.getLogger(name)
+            child_logger.setLevel(root_level)
+            for handler in child_logger.handlers[:]:
+                child_logger.removeHandler(handler)
 
     # Get existing processors minus the renderer
     base_processors: list[Processor] = [

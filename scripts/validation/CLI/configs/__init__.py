@@ -72,6 +72,12 @@ def _load_domain_configs() -> None:
     except ImportError:
         pass  # Config not yet created or dependencies missing
 
+    # Import annuity_income config
+    try:
+        from . import annuity_income  # noqa: F401
+    except ImportError:
+        pass  # Config not yet created or dependencies missing
+
 
 # Auto-load configs on module import
 _load_domain_configs()

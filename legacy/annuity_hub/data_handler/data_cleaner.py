@@ -297,9 +297,12 @@ class AnnuityPerformanceCleaner(AbstractCleaner):
 class AnnuityIncomeCleaner(AbstractCleaner):
     def _clean_method(self) -> pd.DataFrame:
         df = self._load_data("收入明细")
+        # 统一列名：兼容 '计划号' 和 '计划代码' 两种格式
+        # 与 New Pipeline 对齐，统一使用 '计划代码'
         df.rename(
             columns={
                 "机构": "机构代码",
+                "计划号": "计划代码",  # 兼容旧版 Excel 格式
             },
             inplace=True,
         )
@@ -333,8 +336,9 @@ class AnnuityIncomeCleaner(AbstractCleaner):
             lambda x: clean_company_name(x) if isinstance(x, str) else x
         )
 
+        # 使用统一的 '计划代码' 列名
         df = self._update_company_id(
-            df, plan_code_col="计划号", customer_name_col="客户名称"
+            df, plan_code_col="计划代码", customer_name_col="客户名称"
         )
 
         # 根据 '年金账户名' 补充 'company_id'
