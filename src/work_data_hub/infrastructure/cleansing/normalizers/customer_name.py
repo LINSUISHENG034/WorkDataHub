@@ -10,7 +10,9 @@ Architecture Reference:
 - docs/specific/customer/customer-name-normalization-refactor.md
 
 Usage:
-    from work_data_hub.infrastructure.cleansing.normalizers import normalize_customer_name
+    from work_data_hub.infrastructure.cleansing.normalizers import (
+        normalize_customer_name,
+    )
 
     normalized = normalize_customer_name("中国平安-已转出")
     # Returns: "中国平安"
@@ -83,6 +85,25 @@ STATUS_MARKERS: List[str] = [
 # Sort by length descending for greedy matching
 _STATUS_MARKERS_SORTED = sorted(STATUS_MARKERS, key=len, reverse=True)
 
+# =============================================================================
+# Enterprise Types to PRESERVE (legal entity structure indicators)
+# =============================================================================
+# These indicate legal entity structure and should NOT be removed
+ENTERPRISE_TYPES: List[str] = [
+    "特殊普通合伙",  # Special General Partnership
+    "普通合伙",  # General Partnership
+    "有限合伙",  # Limited Partnership
+    "有限公司",  # Limited Liability Company (in parentheses)
+    "个人独资",  # Sole Proprietorship
+    "全民所有制",  # Wholly State-owned
+    "集体所有制",  # Collective-owned
+    "股份合作",  # Shareholding Cooperative
+    "个体工商户",  # Individual Business
+]
+
+# Sort by length descending for greedy matching
+_ENTERPRISE_TYPES_SORTED = sorted(ENTERPRISE_TYPES, key=len, reverse=True)
+
 # Decorative characters to remove (from normalize_company_name)
 _DECORATIVE_CHARS = '「」『』"'
 
@@ -100,6 +121,59 @@ INVALID_PLACEHOLDERS: List[str] = [
     "—",
     "——",
 ]
+
+# =============================================================================
+# Protected Names (whitelist) - skip cleaning entirely, only apply UPPERCASE
+# =============================================================================
+# These exact names are protected from any cleaning transformations.
+# Use for special entity names that would otherwise be incorrectly modified.
+PROTECTED_NAMES: List[str] = [
+    "保留账户管理",  # Would be incorrectly stripped to "管理" due to STATUS_MARKERS
+]
+
+# Create a set for O(1) lookup, normalized to uppercase for matching
+_PROTECTED_NAMES_SET = {name.upper() for name in PROTECTED_NAMES}
+
+
+def _clean_trailing_parenthesis(name: str) -> str:
+    """Remove trailing parenthesized suffixes unless they contain enterprise types.
+
+    Simplified logic (2026-01-07):
+    - KEEP: Only if content matches an ENTERPRISE_TYPE (普通合伙, 有限合伙, etc.)
+    - REMOVE: Everything else (aliases, status, group indicators, etc.)
+
+    This provides better generalization than trying to enumerate all removal patterns.
+
+    Args:
+        name: Company name to clean.
+
+    Returns:
+        Cleaned name with trailing parenthesis removed unless it's an enterprise type.
+
+    Examples:
+        >>> _clean_trailing_parenthesis("公司（集团）")
+        '公司'
+        >>> _clean_trailing_parenthesis("公司（普通合伙）")
+        '公司（普通合伙）'
+        >>> _clean_trailing_parenthesis("公司（平安）")
+        '公司'
+        >>> _clean_trailing_parenthesis("中心（另一个名字）")
+        '中心'
+    """
+    # Match trailing parenthesized content: （...） or (...)
+    match = re.search(r"[（\(]([^）\)]+)[）\)]$", name)
+    if not match:
+        return name
+
+    content = match.group(1)
+
+    # ONLY preserve if content matches an enterprise type
+    for etype in _ENTERPRISE_TYPES_SORTED:
+        if etype in content:
+            return name  # Preserve enterprise type
+
+    # Remove all other trailing parenthesis content
+    return name[: match.start()]
 
 
 def normalize_customer_name(name: str | None) -> str:
@@ -145,6 +219,12 @@ def normalize_customer_name(name: str | None) -> str:
     if not isinstance(name, str):
         return ""
 
+    # 0. Check for protected names - skip all cleaning, only apply UPPERCASE
+    # This allows exact matches to bypass all transformations
+    name_upper = name.strip().upper()
+    if name_upper in _PROTECTED_NAMES_SET:
+        return name_upper
+
     # 1. Check for invalid placeholders (before any processing)
     if name.strip() in INVALID_PLACEHOLDERS:
         return ""
@@ -179,13 +259,18 @@ def normalize_customer_name(name: str | None) -> str:
 
         # Pattern for status at end (with optional separators and brackets)
         # e.g., "中国平安-已转出" → "中国平安"
-        pattern_end = rf"[\-\(\（]{re.escape(marker)}[\)\）]?$"
+        # Also handle em-dash: "中国平安——待转出" → "中国平安"
+        pattern_end = rf"[—\-\(\（]{re.escape(marker)}[\)\）]?$"
         result = re.sub(pattern_end, "", result)
 
         # Pattern for status in brackets at end
         # e.g., "中国平安（已转出）" → "中国平安"
         pattern_bracket = rf"[\(\（]{re.escape(marker)}[\)\）]$"
         result = re.sub(pattern_bracket, "", result)
+
+    # 6.5 Clean trailing parenthesized suffixes but preserve enterprise types
+    # e.g., "公司（集团）" → "公司" but "公司（普通合伙）" stays
+    result = _clean_trailing_parenthesis(result)
 
     # 7. Full-width ASCII → Half-width conversion
     result = "".join(
@@ -201,11 +286,13 @@ def normalize_customer_name(name: str | None) -> str:
     result = result.replace("(", "（").replace(")", "）")
 
     # 9. Remove trailing punctuation and empty brackets
-    result = re.sub(r"[\-\.。]+$", "", result)  # Remove trailing dash, period
+    result = re.sub(r"[—\-\.。]+$", "", result)  # Remove trailing dash, em-dash, period
     result = re.sub(r"（）$", "", result)  # Remove empty Chinese brackets
     # Only remove orphaned/unmatched trailing brackets, not paired ones with content
     # e.g., "公司）" → "公司" but "公司（集团）" stays as is
-    result = re.sub(r"[\-]+$", "", result)  # Remove trailing dashes
+    result = re.sub(
+        r"[—\-]+$", "", result
+    )  # Remove trailing dashes (regular and em-dash)
 
     # 10. UPPERCASE conversion (decision: 2026-01-05)
     result = result.upper()
@@ -213,4 +300,10 @@ def normalize_customer_name(name: str | None) -> str:
     return result
 
 
-__all__ = ["normalize_customer_name", "STATUS_MARKERS", "INVALID_PLACEHOLDERS"]
+__all__ = [
+    "normalize_customer_name",
+    "STATUS_MARKERS",
+    "INVALID_PLACEHOLDERS",
+    "ENTERPRISE_TYPES",
+    "PROTECTED_NAMES",
+]
