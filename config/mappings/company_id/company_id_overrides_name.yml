@@ -1,18 +1,26 @@
-# Company ID Overrides - Customer Name Mappings (Priority 4)
-# Story 6.x: Internal Mapping Tables and Database Schema
+# Company ID Overrides - Customer Name Mappings (Priority 3)
+# Story 6.1.1: Simplified to 3 priorities (plan, hardcode, name)
 #
 # Format: customer_name: company_id
 # Example:
 #   "中国平安": "600866980"
 #   "平安保险": "600866980"
 #
-# This file maps customer names (客户名称) to company IDs.
-# Names should be normalized (trimmed, consistent encoding).
-# P1-P4 data will be migrated from Layer 2 (Database Cache) in future.
+# Special Value: "__EMPTY__"
+#   Use "__EMPTY__" to explicitly exclude a customer name from resolution.
+#   The resolved company_id will be empty string, preventing further layer lookup.
+#   Example:
+#     "保留账户管理": "__EMPTY__"
 #
-# New Pipeline Priority Order:
+# This file maps customer names (客户名称) to company IDs.
+# Names should match exactly (case-sensitive, trimmed).
+#
+# Current Priority Order:
 #   P1: plan (计划代码)
-#   P2: account_name (年金账户名)
-#   P3: account (年金账户号)
-#   P4: name (本文件 - 客户名称)
-#   P5: hardcode (组合映射特殊情况)
+#   P2: hardcode (计划代码+客户名组合)
+#   P3: name (本文件 - 客户名称)
+
+# === Excluded Names (无需生成 company_id) ===
+保留账户管理: "__EMPTY__"
+平安-中信锦绣人生企业年金计划保留计划(受托): "__EMPTY__"
+金坛市原企业年金基金转制无主户企业: "__EMPTY__"

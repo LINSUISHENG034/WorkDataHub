@@ -2,7 +2,10 @@
 YAML override resolution strategy.
 
 This module handles Step 1 of the resolution priority: YAML overrides
-with 5 priority levels (plan → account → hardcode → name → account_name).
+with 3 priority levels (plan → hardcode → name).
+
+Note: account and account_name priorities removed in Story 6.1.1 to align
+with DB layer simplification (merged with customer_name or deemed unreliable).
 
 Story 7.3: Infrastructure Layer Decomposition
 """
@@ -11,10 +14,15 @@ from typing import Dict, Tuple
 
 import pandas as pd
 
-from ..types import ResolutionStrategy
+from work_data_hub.infrastructure.enrichment.types import ResolutionStrategy
 
 # YAML priority levels in resolution order
-YAML_PRIORITY_ORDER = ["plan", "account", "hardcode", "name", "account_name"]
+# Note: account/account_name removed - aligned with DB layer (Story 6.1.1)
+YAML_PRIORITY_ORDER = ["plan", "hardcode", "name"]
+
+# Special placeholder for "empty" company_id (excluded names)
+# Usage in YAML: "保留账户管理": "__EMPTY__"
+EMPTY_PLACEHOLDER = "__EMPTY__"
 
 
 def resolve_via_yaml_overrides(
@@ -23,10 +31,12 @@ def resolve_via_yaml_overrides(
     yaml_overrides: Dict[str, Dict[str, str]],
 ) -> Tuple[pd.Series, Dict[str, int]]:
     """
-    Resolve company_id via YAML overrides (5 priority levels).
+    Resolve company_id via YAML overrides (3 priority levels).
 
-    Priority order: plan (1) → account (2) → hardcode (3) →
-    name (4) → account_name (5)
+    Priority order: plan (1) → hardcode (2) → name (3)
+
+    Special value "__EMPTY__" in YAML will resolve to empty string,
+    treating the name as explicitly excluded from resolution.
 
     Args:
         df: Input DataFrame.
@@ -40,12 +50,11 @@ def resolve_via_yaml_overrides(
     hits_by_priority: Dict[str, int] = {}
 
     # Map priority levels to columns
+    # Note: account/account_name removed - aligned with DB layer (Story 6.1.1)
     priority_columns = {
         "plan": strategy.plan_code_column,
-        "account": strategy.account_number_column,
         "hardcode": strategy.plan_code_column,  # Same as plan for hardcode
         "name": strategy.customer_name_column,
-        "account_name": strategy.account_name_column,
     }
 
     for priority in YAML_PRIORITY_ORDER:
@@ -67,6 +76,11 @@ def resolve_via_yaml_overrides(
 
         # Map values to company IDs
         lookup_values = df.loc[mask_unresolved, column].map(mappings)
+
+        # Convert __EMPTY__ placeholder to empty string
+        lookup_values = lookup_values.replace(EMPTY_PLACEHOLDER, "")
+
+        # Count hits: both non-NA values and empty strings (explicit exclusions)
         new_hits = lookup_values.notna()
 
         # Update resolved series with new values (avoid deprecated fillna downcasting)

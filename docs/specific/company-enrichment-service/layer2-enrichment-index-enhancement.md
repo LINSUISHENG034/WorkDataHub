@@ -1,9 +1,20 @@
 # Layer 2 Enrichment Index 增强需求
 
-> **文档状态**: 需求规划
+> **文档状态**: ✅ 已完成/归档
 > **创建日期**: 2025-12-08
+> **归档日期**: 2026-01-07
 > **来源**: Epic 6 回顾讨论
-> **优先级**: High
+> **实现状态**: Story 6.1.1 ~ 6.1.3, Story 7.1-4
+
+> [!IMPORTANT]
+> **此文档已归档**。所有功能已在以下 Story 中实现：
+> - Story 6.1.1: Enrichment Index Schema Enhancement
+> - Story 6.1.3: Domain Learning Mechanism
+> - Story 7.1-4: Legacy Migration to enrichment_index
+> 
+> **实现差异**: 最终实现简化为 4 种 lookup_type (`plan_code`, `customer_name`, `plan_customer`, `former_name`)，移除了 `account_name` 和 `account_number`。
+> 
+> 最新文档请参见: `docs/guides/infrastructure/company-enrichment-service.md`
 
 ---
 

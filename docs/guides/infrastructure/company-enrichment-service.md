@@ -1,9 +1,9 @@
 # 企业客户身份识别服务 (Company Enrichment Service)
 
-> **文档状态**: 基础框架 - 待测试验证
+> **文档状态**: 已验证 - 与代码同步
 > **Epic**: 6 - Company Enrichment Service
-> **最后更新**: 2025-12-08
-> **Layer 2 增强**: 规划中 - 参见 `docs/specific/company-enrichment-service/layer2-enrichment-index-enhancement.md`
+> **最后更新**: 2026-01-07
+> **Layer 2 增强**: 已实现 - 参见 Story 6.1.1 ~ 6.1.3
 
 ---
 
@@ -42,21 +42,19 @@
 │  输入: DataFrame (含 计划代码, 客户名称, 年金账户名, 年金账户号, 公司代码)    │
 │                              ↓                                               │
 │  ┌────────────────────────────────────────────────────────────────────────┐ │
-│  │ Layer 1: YAML Configuration (5 Priority Levels)                        │ │
+│  │ Layer 1: YAML Configuration (3 Priority Levels)                        │ │
 │  │   P1: plan_code → company_id (计划代码直接映射)                         │ │
-│  │   P2: account_name → company_id (年金账户名映射)                        │ │
-│  │   P3: account_number → company_id (年金账户号映射)                      │ │
-│  │   P4: customer_name (normalized) → company_id (客户名称映射)            │ │
-│  │   P5: plan_code → customer_name → company_id (计划代码→客户名→公司)     │ │
+│  │   P2: hardcode → company_id (计划代码+客户名组合映射)                   │ │
+│  │   P3: customer_name → company_id (客户名称映射)                         │ │
+│  │   Note: account_name/account_number 已移除 (Story 6.1.1)               │ │
 │  └────────────────────────────────────────────────────────────────────────┘ │
 │                              ↓ Not found                                     │
 │  ┌────────────────────────────────────────────────────────────────────────┐ │
-│  │ Layer 2: Database Cache (enterprise.enrichment_index) [增强版]         │ │
+│  │ Layer 2: Database Cache (enterprise.enrichment_index)                  │ │
 │  │   DB-P1: plan_code → company_id                                        │ │
-│  │   DB-P2: account_name → company_id                                     │ │
-│  │   DB-P3: account_number → company_id                                   │ │
-│  │   DB-P4: customer_name (normalized) → company_id                       │ │
-│  │   DB-P5: plan_code + customer_name → company_id                        │ │
+│  │   DB-P2: customer_name (normalized) → company_id                       │ │
+│  │   DB-P3: plan_customer (plan_code + customer_name) → company_id        │ │
+│  │   DB-P4: former_name (公司曾用名) → company_id                         │ │
 │  │   - 包含历史 EQC API 查询结果、手动映射、Domain 自学习数据              │ │
 │  └────────────────────────────────────────────────────────────────────────┘ │
 │                              ↓ Not found                                     │
@@ -104,7 +102,7 @@
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.3 Domain 自学习循环 (规划中)
+### 2.3 Domain 自学习循环 (已实现)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -116,12 +114,11 @@
 │  从 Domain 表中提取有效映射                                                  │
 │  (company_id 非空且非临时 ID IN_*)                                           │
 │       ↓                                                                      │
-│  按 lookup_type 分类整理:                                                    │
+│  按 lookup_type 分类整理 (4 种类型):                                          │
 │    - plan_code → company_id                                                  │
-│    - account_name → company_id                                               │
-│    - account_number → company_id                                             │
 │    - customer_name (normalized) → company_id                                 │
-│    - plan_code + customer_name → company_id                                  │
+│    - plan_customer (plan_code + customer_name) → company_id                  │
+│    - former_name → company_id                                                │
 │       ↓                                                                      │
 │  批量写入 enrichment_index                                                   │
 │  (ON CONFLICT 更新 confidence 和 hit_count)                                  │
@@ -131,7 +128,7 @@
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-> **详细设计**: 参见 `docs/specific/company-enrichment-service/layer2-enrichment-index-enhancement.md`
+> **实现代码**: `src/work_data_hub/infrastructure/enrichment/domain_learning_service.py`
 
 ---
 
@@ -139,22 +136,20 @@
 
 ### 3.1 CompanyIdResolver
 
-**位置**: `src/work_data_hub/infrastructure/enrichment/company_id_resolver.py`
+**位置**: `src/work_data_hub/infrastructure/enrichment/resolver/` (已拆分为子模块)
+
+**核心文件**:
+
+| 文件 | 说明 |
+|------|------|
+| `core.py` | 主入口，CompanyIdResolver 类定义 |
+| `yaml_strategy.py` | Layer 1: YAML 配置查找 |
+| `db_strategy.py` | Layer 2: 数据库缓存查找 |
+| `eqc_strategy.py` | Layer 4: EQC API 同步查找 |
+| `backflow.py` | Layer 3: Backflow 回写机制 |
+| `progress.py` | 进度跟踪和日志 |
 
 **职责**: 批量解析 DataFrame 中的公司 ID
-
-**关键方法**:
-
-| 方法 | 说明 |
-|------|------|
-| `resolve_batch(df, strategy)` | 主入口，批量解析 DataFrame |
-| `_resolve_via_yaml_overrides()` | Layer 1: YAML 配置查找 |
-| `_resolve_via_db_cache()` | Layer 2: 数据库缓存查找 |
-| `_resolve_via_eqc_sync()` | Layer 4: EQC API 同步查找 |
-| `_resolve_via_eqc_provider()` | Layer 4: 通过 EqcProvider 查找 |
-| `_backflow_new_mappings()` | Layer 3: Backflow 回写机制 |
-| `_enqueue_for_async_enrichment()` | Layer 5: 异步队列入队 |
-| `_generate_temp_id()` | Layer 5: 临时 ID 生成 |
 
 ### 3.2 ResolutionStrategy
 
@@ -208,13 +203,13 @@ class ResolutionStatistics:
 ### 4.1 文件位置
 
 ```
-data/mappings/
-├── company_id_overrides_plan.yml        # P1: 计划代码 → company_id
-├── company_id_overrides_account_name.yml # P2: 年金账户名 → company_id
-├── company_id_overrides_account.yml     # P3: 年金账户号 → company_id
-├── company_id_overrides_name.yml        # P4: 客户名称 → company_id
-└── company_id_overrides_hardcode.yml    # P5: 计划代码 → 客户名称 → company_id
+config/mappings/company_id/
+├── company_id_overrides_plan.yml      # P1: 计划代码 → company_id
+├── company_id_overrides_hardcode.yml  # P2: 计划代码+客户名组合 → company_id
+└── company_id_overrides_name.yml      # P3: 客户名称 → company_id
 ```
+
+> **Note**: `company_id_overrides_account.yml` 和 `company_id_overrides_account_name.yml` 已在 Story 6.1.1 中移除。
 
 ### 4.2 配置格式
 
@@ -243,18 +238,18 @@ XNP001:
 | 优先级 | 字段 | 说明 | 适用场景 |
 |--------|------|------|----------|
 | P1 | plan_code | 计划代码直接映射 | 一个计划只属于一家公司 |
-| P2 | account_name | 年金账户名映射 | 账户名包含公司信息 |
-| P3 | account_number | 年金账户号映射 | 账户号唯一标识公司 |
-| P4 | customer_name | 客户名称映射 (normalized) | 通用客户名称匹配 |
-| P5 | plan_code + customer_name | 组合映射 | 同一计划下多个客户 |
+| P2 | hardcode | 计划代码+客户名组合映射 | 同一计划下多个客户 |
+| P3 | customer_name | 客户名称映射 | 通用客户名称匹配 |
+
+> **Note**: `account_name` 和 `account_number` 已在 Story 6.1.1 中移除。
 
 ---
 
 ## 5. 数据库 Schema
 
-### 5.1 enterprise.enrichment_index (增强版 - 规划中)
+### 5.1 enterprise.enrichment_index (已实现)
 
-**用途**: 多优先级公司映射缓存，支持 5 种 lookup_type
+**用途**: 多优先级公司映射缓存，支持 4 种 lookup_type
 
 ```sql
 CREATE TABLE enterprise.enrichment_index (
@@ -262,7 +257,7 @@ CREATE TABLE enterprise.enrichment_index (
 
     -- 查找键
     lookup_key VARCHAR(255) NOT NULL,
-    lookup_type VARCHAR(20) NOT NULL,  -- plan_code, account_name, account_number, customer_name, plan_customer
+    lookup_type VARCHAR(20) NOT NULL,  -- plan_code, customer_name, plan_customer, former_name
 
     -- 映射结果
     company_id VARCHAR(50) NOT NULL,
@@ -295,10 +290,11 @@ CREATE INDEX ix_enrichment_index_source_domain ON enterprise.enrichment_index(so
 | lookup_type | 说明 | lookup_key 格式 |
 |-------------|------|-----------------|
 | `plan_code` | 计划代码 (DB-P1) | 原始值 |
-| `account_name` | 年金账户名 (DB-P2) | 原始值 |
-| `account_number` | 年金账户号 (DB-P3) | 原始值 |
-| `customer_name` | 客户名称 (DB-P4) | normalized 值 |
-| `plan_customer` | 计划+客户组合 (DB-P5) | `{plan_code}\|{normalized_name}` |
+| `customer_name` | 客户名称 (DB-P2) | normalized 值 |
+| `plan_customer` | 计划+客户组合 (DB-P3) | `{plan_code}\|{normalized_name}` |
+| `former_name` | 公司曾用名 (DB-P4) | normalized 值 |
+
+> **Note**: `account_name` 和 `account_number` 已在 Story 6.1.1 中移除。
 
 **source 枚举值**:
 
@@ -311,25 +307,7 @@ CREATE INDEX ix_enrichment_index_source_domain ON enterprise.enrichment_index(so
 | `domain_learning` | Domain 数据自学习 | 0.85-0.95 |
 | `legacy_migration` | Legacy 数据迁移 | 0.90-1.00 |
 
-### 5.2 enterprise.company_name_index (现有)
-
-**用途**: 公司名称到 ID 的缓存映射 (将迁移到 enrichment_index)
-
-```sql
-CREATE TABLE enterprise.company_name_index (
-    normalized_name VARCHAR(255) PRIMARY KEY,
-    company_id VARCHAR(50) NOT NULL,
-    match_type VARCHAR(20),        -- 'exact', 'fuzzy', 'alias', 'eqc_api'
-    confidence DECIMAL(3,2),       -- 0.00-1.00
-    source VARCHAR(50),            -- 'yaml', 'eqc_api', 'manual', 'backflow'
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX ix_company_name_index_company_id
-ON enterprise.company_name_index(company_id);
-```
-
-### 5.3 enterprise.enrichment_requests
+### 5.2 enterprise.enrichment_requests
 
 **用途**: 异步解析队列
 
@@ -490,22 +468,40 @@ WHERE status = 'done' AND processed_at < NOW() - INTERVAL '30 days';
 
 ## 9. 测试验证
 
-> **待完成**: 以下测试用例需要实际运行验证
+### 9.1 自动化测试
 
-### 9.1 Layer 1 - YAML 配置测试
+**执行单元测试**:
 
-| 测试场景 | 输入 | 预期输出 | 实际结果 |
-|----------|------|----------|----------|
-| P1 计划代码命中 | plan_code=FP0001 | company_id=614810477 | 待验证 |
-| P4 客户名称命中 | customer_name=公司A有限公司 | company_id=? | 待验证 |
-| 无匹配 | plan_code=UNKNOWN | 进入 Layer 2 | 待验证 |
+```bash
+# 运行 enrichment 相关单元测试
+uv run pytest tests/unit/infrastructure/enrichment/ -v --tb=short
 
-### 9.2 Layer 5 - 临时 ID 测试
+# 运行 mapping repository 测试
+uv run pytest tests/unit/infrastructure/enrichment/test_mapping_repository_enrichment_index.py -v
 
-| 测试场景 | 输入 | 预期输出 | 实际结果 |
-|----------|------|----------|----------|
-| 临时 ID 生成 | customer_name=新公司XYZ | INXXXXXXXX | 待验证 |
-| 确定性验证 | 同一名称两次 | 相同 ID | 待验证 |
+# 运行 enrichment service 测试
+uv run pytest tests/domain/company_enrichment/test_enrichment_service.py -v
+```
+
+**测试覆盖范围**:
+
+| 测试文件 | 覆盖范围 |
+|----------|----------|
+| `test_mapping_repository_enrichment_index.py` | LookupType, SourceType, EnrichmentIndexRecord, lookup/insert 方法 |
+| `test_enrichment_service.py` | CompanyEnrichmentService, EQC 集成, 缓存机制 |
+| `test_enrichment_index_migration.py` | 数据库迁移 |
+
+### 9.2 手动验证
+
+**ETL 验证**:
+
+```bash
+# 干运行测试
+uv run python -m work_data_hub etl annuity_performance --dry-run
+
+# 查看解析统计
+uv run python -m work_data_hub etl annuity_performance --verbose
+```
 
 ---
 
@@ -513,6 +509,7 @@ WHERE status = 'done' AND processed_at < NOW() - INTERVAL '30 days';
 
 | 日期 | 版本 | 变更内容 | 作者 |
 |------|------|----------|------|
+| 2026-01-07 | 1.0 | 与代码同步: 简化 YAML/DB 优先级, 更新代码结构, 添加测试命令 | Link |
 | 2025-12-08 | 0.1 | 初始框架创建 | Epic 6 Retrospective |
 
 ---
@@ -529,9 +526,15 @@ WHERE status = 'done' AND processed_at < NOW() - INTERVAL '30 days';
 
 | 组件 | 路径 |
 |------|------|
-| CompanyIdResolver | `src/work_data_hub/infrastructure/enrichment/company_id_resolver.py` |
+| CompanyIdResolver (core) | `src/work_data_hub/infrastructure/enrichment/resolver/core.py` |
+| YAML Strategy | `src/work_data_hub/infrastructure/enrichment/resolver/yaml_strategy.py` |
+| DB Strategy | `src/work_data_hub/infrastructure/enrichment/resolver/db_strategy.py` |
+| EQC Strategy | `src/work_data_hub/infrastructure/enrichment/resolver/eqc_strategy.py` |
+| Backflow | `src/work_data_hub/infrastructure/enrichment/resolver/backflow.py` |
 | Types | `src/work_data_hub/infrastructure/enrichment/types.py` |
 | MappingRepository | `src/work_data_hub/infrastructure/enrichment/mapping_repository.py` |
+| EnrichmentIndexOps | `src/work_data_hub/infrastructure/enrichment/repository/enrichment_index_ops.py` |
+| DomainLearningService | `src/work_data_hub/infrastructure/enrichment/domain_learning_service.py` |
 | EqcProvider | `src/work_data_hub/infrastructure/enrichment/eqc_provider.py` |
 | LookupQueue | `src/work_data_hub/domain/company_enrichment/lookup_queue.py` |
 | Observability | `src/work_data_hub/domain/company_enrichment/observability.py` |
