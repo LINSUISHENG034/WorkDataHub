@@ -258,13 +258,19 @@ class AnnuityPerformanceOut(BaseModel):
     组合名称: Optional[str] = Field(None, max_length=255, description="Portfolio name")
     客户名称: Optional[str] = Field(None, max_length=255, description="Customer name")
     期初资产规模: Optional[Decimal] = Field(
-        None, decimal_places=4, ge=0, description="Initial asset scale (non-negative)"
+        None,
+        decimal_places=4,
+        description="Initial asset scale (can be negative for adjustments)",
     )
     期末资产规模: Optional[Decimal] = Field(
-        None, decimal_places=4, ge=0, description="Final asset scale"
+        None,
+        decimal_places=4,
+        description="Final asset scale (can be negative for adjustments)",
     )
     供款: Optional[Decimal] = Field(
-        None, decimal_places=4, ge=0, description="Contribution (non-negative)"
+        None,
+        decimal_places=4,
+        description="Contribution (can be negative for adjustments)",
     )
     流失_含待遇支付: Optional[Decimal] = Field(
         None,
