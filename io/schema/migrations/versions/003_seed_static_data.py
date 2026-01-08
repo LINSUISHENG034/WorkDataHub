@@ -132,6 +132,14 @@ def _load_csv_seed_data(conn, csv_filename: str, table_name: str, schema: str) -
     ]:
         columns.remove("id")
 
+    # Exclude created_at/updated_at for tables with server_default=now()
+    # These columns should use database defaults, not CSV values (which may be empty)
+    if table_name == "年金客户":
+        if "created_at" in columns:
+            columns.remove("created_at")
+        if "updated_at" in columns:
+            columns.remove("updated_at")
+
     columns_str = ", ".join(f'"{col}"' for col in columns)
     # Use safe parameter names (param_0, param_1, etc.) to handle special chars
     # in column names

@@ -242,11 +242,20 @@ def _drop_database(admin_dsn: str, db_name: str) -> None:
 
 @pytest.fixture
 def postgres_db_with_migrations() -> Generator[str, None, None]:
-    """Use a temporary PostgreSQL database, apply migrations, and yield DSN."""
+    """Use a temporary PostgreSQL database, apply migrations, and yield DSN.
+
+    Layer 4: Enhanced test isolation with explicit safety assertions.
+    See docs/specific/critical/001_downgrade_db.md
+    """
     from work_data_hub.io.schema import migration_runner
 
     base_dsn = _resolve_postgres_dsn()
     temp_dsn, temp_db, admin_dsn = _create_ephemeral_database(base_dsn)
+
+    # Layer 4: Assert temp database uses safe naming convention
+    assert temp_db.startswith("wdh_test_"), (
+        f"SAFETY: Temp DB must use 'wdh_test_' prefix, got: {temp_db}"
+    )
 
     original_database_url = os.environ.get("DATABASE_URL")
     original_wdh_database_uri = os.environ.get("WDH_DATABASE__URI")
@@ -257,26 +266,25 @@ def postgres_db_with_migrations() -> Generator[str, None, None]:
     os.environ["WDH_TEST_DATABASE_URI"] = temp_dsn
     get_settings.cache_clear()
 
+    # Explicit URL passing - migration_runner will use this directly
     migration_runner.upgrade(temp_dsn)
     try:
         yield temp_dsn
     finally:
-        # Robust cleanup: ensure database is ALWAYS dropped even if downgrade fails
-        # This prevents orphaned test databases from accumulating
+        # Cleanup with explicit URL - Layer 3 protection in migration_runner
+        # will block if URL somehow resolves to production
         try:
-            _validate_test_database(
-                temp_dsn
-            )  # Safety check: prevent production DB clearing
+            _validate_test_database(temp_dsn)
             migration_runner.downgrade(temp_dsn, "base")
         except Exception:
-            # Log but don't fail - database cleanup is more important
+            # Downgrade failure is OK - DB will be dropped anyway
             pass
         finally:
-            # ALWAYS drop the temp database, regardless of downgrade success
             _drop_database(admin_dsn, temp_db)
 
         get_settings.cache_clear()
 
+        # Restore original environment
         if original_database_url is None:
             os.environ.pop("DATABASE_URL", None)
         else:

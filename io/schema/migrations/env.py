@@ -1,9 +1,7 @@
 """Alembic environment configuration anchored in the IO layer (Story 1.7).
 
-This script loads the canonical WorkDataHub settings so migrations always run
-against the same database configuration used by the application. Logging
-delegates to the structlog pipeline defined in work_data_hub.utils.logging to
-keep observability consistent with the rest of the platform.
+Critical Issue 001 Fix: Layer 1 - Only use get_settings() as fallback when
+no explicit URL is provided. See docs/specific/critical/001_downgrade_db.md
 """
 
 from __future__ import annotations
@@ -30,17 +28,29 @@ if config.config_file_name is not None:
 
 logger = get_logger("work_data_hub.io.schema.migrations.env")
 
-try:
-    settings = get_settings()
-    database_url = settings.get_database_connection_string()
-    config.set_main_option("sqlalchemy.url", database_url)
-    logger.info("migrations.database_url", url=database_url)
-except Exception as exc:  # pragma: no cover - defensive logging only
-    logger.warning(
-        "migrations.settings_unavailable",
-        error=str(exc),
-        fallback_url=config.get_main_option("sqlalchemy.url"),
-    )
+# Layer 1+2: URL resolution with correct priority
+# Priority: explicit_url > get_settings() > alembic.ini default
+explicit_url = config.attributes.get("explicit_database_url")
+
+if explicit_url:
+    # Highest priority: Explicit URL from migration_runner
+    config.set_main_option("sqlalchemy.url", explicit_url)
+    logger.info("migrations.explicit_url", url=explicit_url[:50])
+else:
+    # Normal case: Use get_settings() to read from .wdh_env
+    try:
+        settings = get_settings()
+        database_url = settings.get_database_connection_string()
+        config.set_main_option("sqlalchemy.url", database_url)
+        logger.info("migrations.settings_url", url=database_url[:50])
+    except Exception as exc:  # pragma: no cover
+        # Fallback: Keep alembic.ini default if settings unavailable
+        fallback_url = config.get_main_option("sqlalchemy.url")
+        logger.warning(
+            "migrations.settings_unavailable",
+            error=str(exc),
+            fallback_url=fallback_url,
+        )
 
 target_metadata = None
 
