@@ -50,10 +50,46 @@ def _table_exists(conn, table_name: str, schema: str) -> bool:
     return result.scalar()
 
 
-def _get_seeds_dir() -> Path:
-    """Get the path to config/seeds/ directory."""
-    # Path: io/schema/migrations/versions/003_*.py -> config/seeds/
+def _get_seeds_base_dir() -> Path:
+    """Get the base path to config/seeds/ directory."""
     return Path(__file__).parent.parent.parent.parent.parent / "config" / "seeds"
+
+
+def _get_seed_file_path(filename: str) -> Path:
+    """Get path to seed file using highest version containing that file.
+
+    NOTE: This logic is intentionally duplicated from seed_resolver.py.
+    Migrations must be self-contained and not import from project code,
+    as project code may change while migrations must remain stable.
+
+    Scans all numeric version directories (001, 002, ...) and selects
+    the highest one that actually contains the specified file.
+    Empty directories are ignored - they don't affect version selection.
+
+    Args:
+        filename: Name of the seed CSV file (e.g., "产品线.csv")
+
+    Returns:
+        Full path to the seed file from the highest version containing it,
+        or fallback to base directory if no versioned file exists.
+    """
+    base_dir = _get_seeds_base_dir()
+
+    if not base_dir.exists():
+        return base_dir / filename
+
+    # Find all version directories containing this file
+    versions_with_file = []
+    for d in base_dir.iterdir():
+        if d.is_dir() and d.name.isdigit():
+            if (d / filename).exists():
+                versions_with_file.append(d.name)
+
+    if versions_with_file:
+        highest = max(versions_with_file, key=int)
+        return base_dir / highest / filename
+
+    return base_dir / filename  # Fallback for backward compatibility
 
 
 def _normalize_value(value: str) -> str | None:
@@ -72,7 +108,7 @@ def _load_csv_seed_data(conn, csv_filename: str, table_name: str, schema: str) -
 
     Returns the number of rows inserted.
     """
-    csv_path = _get_seeds_dir() / csv_filename
+    csv_path = _get_seed_file_path(csv_filename)
 
     if not csv_path.exists():
         print(f"Warning: CSV file not found: {csv_path}")
@@ -127,7 +163,7 @@ def _load_csv_seed_data(conn, csv_filename: str, table_name: str, schema: str) -
 def upgrade() -> None:
     """Populate all reference data tables from CSV files."""
     conn = op.get_bind()
-    seeds_dir = _get_seeds_dir()
+    seeds_dir = _get_seeds_base_dir()
 
     print(f"Loading seed data from: {seeds_dir}")
 
