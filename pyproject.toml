@@ -110,6 +110,8 @@ extend-select = ["TID"]  # Clean Architecture enforcement (Story 1.6)
 "src/work_data_hub/gui/**/*.py" = ["PLR0913"]
 "src/work_data_hub/scripts/**/*.py" = ["TID251"]  # Scripts can import from IO layer
 "scripts/**/*.py" = ["TID251"]  # Root scripts can import from IO layer
+# Scripts: Original data generation scripts have verbose logging and long docstrings
+"scripts/original_data/*.py" = ["E501", "PLR0912", "PLR0915"]
 "tests/**/*.py" = ["ALL"]  # Test files exempt from all rules
 "legacy/**/*.py" = ["ALL"]  # Legacy code exempt from all rules
 
