@@ -122,7 +122,10 @@ class FailureExporter:
         self._ensure_directory()
         file_exists = self.output_file.exists()
 
-        with open(self.output_file, "a", newline="", encoding="utf-8") as f:
+        # Use utf-8-sig (with BOM) for new files, utf-8 for appending
+        # This ensures Windows apps correctly detect Chinese encoding
+        encoding = "utf-8" if file_exists else "utf-8-sig"
+        with open(self.output_file, "a", newline="", encoding=encoding) as f:
             writer = csv.DictWriter(f, fieldnames=self.FIELDNAMES)
             if not file_exists:
                 writer.writeheader()

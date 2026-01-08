@@ -19,6 +19,7 @@ Usage:
 
 import argparse
 import sys
+from pathlib import Path
 from typing import List, Optional
 
 # Import the package module for dynamic lookup of patchable functions.
@@ -92,6 +93,19 @@ def main(argv: Optional[List[str]] = None) -> int:  # noqa: PLR0911, PLR0912, PL
         "--period",
         type=str,
         help="Period in YYYYMM format for Epic 3 domains (e.g., '202510')",
+    )
+
+    # Sprint Change Proposal 2026-01-08: Direct file processing
+    parser.add_argument(
+        "--file",
+        type=str,
+        default=None,
+        help=(
+            "Process a specific file directly (bypasses automatic discovery). "
+            "Supports Excel (.xlsx, .xls, .xlsm) and CSV (.csv) formats. "
+            "Must be used with --domains for a single domain. "
+            "Mutually exclusive with --period."
+        ),
     )
 
     parser.add_argument(
@@ -269,6 +283,27 @@ def main(argv: Optional[List[str]] = None) -> int:  # noqa: PLR0911, PLR0912, PL
     # Story 6.2-P16 AC-2: --check-db diagnostic mode
     if getattr(args, "check_db", False):
         return _check_database_connection()
+
+    # Sprint Change Proposal 2026-01-08: --file parameter validation
+    file_path = getattr(args, "file", None)
+    if file_path:
+        # --file requires --domains (single domain only)
+        if not args.domains:
+            parser.error("--file requires --domains with exactly one domain")
+        # Check if single domain (not comma-separated)
+        if "," in args.domains:
+            parser.error(
+                "--file only supports a single domain (no comma-separated list)"
+            )
+        # --file mutually exclusive with --period
+        if args.period:
+            parser.error("--file and --period are mutually exclusive")
+        # --file mutually exclusive with --all-domains
+        if args.all_domains:
+            parser.error("--file cannot be used with --all-domains")
+        # File must exist
+        if not Path(file_path).exists():
+            parser.error(f"File not found: {file_path}")
 
     # Validate domain arguments
     if not args.domains and not args.all_domains:

@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
+import pandas as pd
+
 from work_data_hub.config.settings import get_settings
 from work_data_hub.infrastructure.constants import (
     MAX_MONTH,
@@ -227,6 +229,94 @@ class FileDiscoveryService:
             )
             self.logger.error("discovery.failed", **wrapped.to_dict())
             raise wrapped
+
+    def load_from_file(
+        self,
+        file_path: str | Path,
+        domain: str,
+        sheet_name: Optional[str | int] = None,
+    ) -> DataDiscoveryResult:
+        """
+        Load data directly from a specified file path, bypassing automatic discovery.
+
+        Sprint Change Proposal 2026-01-08: ETL Specified File Support
+
+        Args:
+            file_path: Path to data file (Excel or CSV)
+            domain: Domain name for configuration lookup
+            sheet_name: Override sheet name (optional, ignored for CSV)
+
+        Returns:
+            DataDiscoveryResult with loaded DataFrame and metadata
+
+        Raises:
+            FileNotFoundError: If file does not exist
+            ValueError: If file type is not supported
+            DiscoveryError: If domain configuration is invalid
+        """
+        start_time = time.time()
+        path = Path(file_path)
+
+        # Validate file exists
+        if not path.exists():
+            raise FileNotFoundError(f"File not found: {path}")
+
+        # Load domain configuration
+        domain_config = self._load_domain_config(domain)
+
+        # Read file based on extension
+        suffix = path.suffix.lower()
+        if suffix == ".csv":
+            df = pd.read_csv(path, encoding="utf-8-sig")
+            actual_sheet_name = sheet_name or domain_config.sheet_name
+        elif suffix in (".xlsx", ".xls", ".xlsm"):
+            actual_sheet_name = sheet_name or domain_config.sheet_name
+            read_result = self.excel_reader.read_sheet(
+                file_path=path,
+                sheet_name=actual_sheet_name,
+            )
+            df = read_result.df
+        else:
+            raise ValueError(f"Unsupported file type: {suffix}")
+
+        # Apply column normalization (same logic as discover_and_load)
+        renamed_columns = {}
+        columns_config = getattr(domain_config, "columns", None)
+        if columns_config:
+            # Apply column mapping (file_col -> domain_col)
+            mapping = {}
+            for field_name, header_name in columns_config.items():
+                mapping[header_name] = field_name
+
+            # Track which columns will be renamed BEFORE renaming
+            renamed_columns = {
+                old: new for old, new in mapping.items() if old in df.columns
+            }
+            # Rename columns that exist
+            df = df.rename(columns=mapping)
+
+        # Calculate duration
+        total_duration = int((time.time() - start_time) * 1000)
+
+        self.logger.info(
+            "load_from_file.completed",
+            domain=domain,
+            file_path=str(path),
+            rows=len(df),
+            columns=len(df.columns),
+        )
+
+        return DataDiscoveryResult(
+            df=df,
+            file_path=path,
+            version="direct",
+            sheet_name=actual_sheet_name,
+            row_count=len(df),
+            column_count=len(df.columns),
+            duration_ms=total_duration,
+            columns_renamed=renamed_columns,
+            stage_durations={"read": total_duration},
+        )
 
     def _load_domain_config(self, domain: str) -> DomainConfigV2:
         """Load and validate domain configuration.

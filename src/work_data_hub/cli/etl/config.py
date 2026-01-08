@@ -105,6 +105,9 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:  
     # Story 6.2-P16: Pass file selection strategy from CLI to op
     if hasattr(args, "file_selection") and args.file_selection:
         discover_config["selection_strategy"] = args.file_selection
+    # Sprint Change Proposal 2026-01-08: Direct file processing
+    if hasattr(args, "file") and args.file:
+        discover_config["file_path"] = args.file
 
     # Story 7.5-5: Extract session_id for unified failure logging
     session_id = getattr(args, "session_id", None)

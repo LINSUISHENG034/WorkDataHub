@@ -775,3 +775,158 @@ class TestDataDiscoveryResult:
         assert result.duration_ms == 150
         assert result.columns_renamed == {"old": "new"}
         assert result.stage_durations["version_detection"] == 50
+
+
+# =============================================================================
+# Sprint Change Proposal 2026-01-08: ETL Specified File Support
+# Tests for load_from_file() method
+# =============================================================================
+
+
+class TestLoadFromFile:
+    """Test suite for load_from_file() method - Sprint Change Proposal 2026-01-08."""
+
+    def test_load_csv_file_success(self, tmp_path):
+        """Test loading a CSV file directly with domain configuration."""
+        # Create test CSV file
+        csv_file = tmp_path / "test_data.csv"
+        test_df = pd.DataFrame(
+            {"company_name": ["Company A", "Company B"], "amount": [100, 200]}
+        )
+        test_df.to_csv(csv_file, index=False, encoding="utf-8-sig")
+
+        # Setup domain config (without columns attribute - not part of DomainConfigV2)
+        domain_cfg = DomainConfigV2(
+            base_path="reference/data",
+            file_patterns=["*.csv"],
+            exclude_patterns=[],
+            sheet_name="Sheet1",
+            version_strategy="highest_number",
+            fallback="error",
+        )
+
+        service = FileDiscoveryService(
+            settings=_fake_settings(domain_cfg),
+            excel_reader=DummyReader(),
+        )
+
+        result = service.load_from_file(
+            file_path=csv_file,
+            domain="annuity_performance",
+        )
+
+        assert isinstance(result, DataDiscoveryResult)
+        assert result.file_path == csv_file
+        assert result.row_count == 2
+        assert result.column_count == 2
+        assert "company_name" in result.df.columns
+        assert "amount" in result.df.columns
+        assert result.version == "direct"
+
+    def test_load_excel_file_with_default_sheet(self, tmp_path):
+        """Test loading an Excel file using domain's default sheet name."""
+        excel_file = tmp_path / "test_data.xlsx"
+        test_df = pd.DataFrame({"data": [1, 2, 3]})
+        test_df.to_excel(excel_file, sheet_name="规模明细", index=False)
+
+        domain_cfg = DomainConfigV2(
+            base_path="reference/data",
+            file_patterns=["*.xlsx"],
+            exclude_patterns=[],
+            sheet_name="规模明细",
+            version_strategy="highest_number",
+            fallback="error",
+        )
+
+        service = FileDiscoveryService(
+            settings=_fake_settings(domain_cfg),
+            excel_reader=ExcelReader(),
+        )
+
+        result = service.load_from_file(
+            file_path=excel_file,
+            domain="annuity_performance",
+        )
+
+        assert isinstance(result, DataDiscoveryResult)
+        assert result.file_path == excel_file
+        assert result.sheet_name == "规模明细"
+        assert result.row_count == 3
+
+    def test_load_excel_file_with_sheet_override(self, tmp_path):
+        """Test loading an Excel file with sheet name override."""
+        excel_file = tmp_path / "test_data.xlsx"
+        test_df = pd.DataFrame({"data": [1, 2, 3]})
+        test_df.to_excel(excel_file, sheet_name="CustomSheet", index=False)
+
+        domain_cfg = DomainConfigV2(
+            base_path="reference/data",
+            file_patterns=["*.xlsx"],
+            exclude_patterns=[],
+            sheet_name="DefaultSheet",
+            version_strategy="highest_number",
+            fallback="error",
+        )
+
+        service = FileDiscoveryService(
+            settings=_fake_settings(domain_cfg),
+            excel_reader=ExcelReader(),
+        )
+
+        result = service.load_from_file(
+            file_path=excel_file,
+            domain="annuity_performance",
+            sheet_name="CustomSheet",
+        )
+
+        assert isinstance(result, DataDiscoveryResult)
+        assert result.sheet_name == "CustomSheet"
+
+    def test_file_not_found_raises_error(self, tmp_path):
+        """Test that FileNotFoundError is raised for non-existent file."""
+        domain_cfg = DomainConfigV2(
+            base_path="reference/data",
+            file_patterns=["*.csv"],
+            exclude_patterns=[],
+            sheet_name="Sheet1",
+            version_strategy="highest_number",
+            fallback="error",
+        )
+
+        service = FileDiscoveryService(
+            settings=_fake_settings(domain_cfg),
+        )
+
+        non_existent_file = tmp_path / "does_not_exist.csv"
+
+        with pytest.raises(FileNotFoundError):
+            service.load_from_file(
+                file_path=non_existent_file,
+                domain="annuity_performance",
+            )
+
+    def test_unsupported_extension_raises_error(self, tmp_path):
+        """Test that unsupported file extensions raise ValueError."""
+        domain_cfg = DomainConfigV2(
+            base_path="reference/data",
+            file_patterns=["*.txt"],
+            exclude_patterns=[],
+            sheet_name="Sheet1",
+            version_strategy="highest_number",
+            fallback="error",
+        )
+
+        service = FileDiscoveryService(
+            settings=_fake_settings(domain_cfg),
+        )
+
+        unsupported_file = tmp_path / "test.txt"
+        unsupported_file.write_text("test content")
+
+        with pytest.raises(ValueError) as exc:
+            service.load_from_file(
+                file_path=unsupported_file,
+                domain="annuity_performance",
+            )
+
+        assert "Unsupported file type" in str(exc.value)

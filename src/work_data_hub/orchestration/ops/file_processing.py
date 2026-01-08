@@ -10,6 +10,7 @@ This module contains ops for file discovery and Excel reading:
 """
 
 import logging
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
@@ -39,6 +40,8 @@ class DiscoverFilesConfig(Config):
     period: Optional[str] = None  # YYYYMM format for Epic 3 schema domains
     # Story 6.2-P16: File selection strategy when multiple files match
     selection_strategy: str = "error"  # error, newest, oldest, first
+    # Sprint Change Proposal 2026-01-08: Direct file processing
+    file_path: Optional[str] = None  # Bypasses auto-discovery
 
     @field_validator("domain")
     @classmethod
@@ -70,13 +73,28 @@ def discover_files_op(
     - Epic 3 schema (base_path, file_patterns, version_strategy) → FileDiscoveryService
     - Legacy schema (pattern, select) → DataSourceConnector
 
+    Sprint Change Proposal 2026-01-08:
+    - Direct file processing via file_path parameter (bypasses auto-discovery)
+
     Args:
         context: Dagster execution context
-        config: Configuration with domain and optional period parameters
+        config: Configuration with domain and optional period/file_path parameters
 
     Returns:
         List of file paths (JSON-serializable strings)
     """
+    # Sprint Change Proposal 2026-01-08: Direct file processing
+    if config.file_path:
+        path = Path(config.file_path)
+        if not path.exists():
+            raise FileNotFoundError(f"File not found: {config.file_path}")
+
+        context.log.info(
+            f"Direct file processing mode - domain: {config.domain}, "
+            f"file: {config.file_path}"
+        )
+        return [str(path)]
+
     settings = get_settings()
 
     # Load domain configuration to detect schema type
@@ -212,7 +230,10 @@ def read_excel_op(
     context: OpExecutionContext, config: ReadExcelConfig, file_paths: List[str]
 ) -> List[Dict[str, Any]]:
     """
-    Read Excel file from first discovered path and return rows as list of dictionaries.
+    Read Excel or CSV file from first discovered path and return rows as list of dictionaries.
+
+    Sprint Change Proposal 2026-01-08:
+    - Added CSV file support via file extension detection
 
     Supports data sampling via --sample parameter for quick ETL validation.
 
@@ -232,8 +253,26 @@ def read_excel_op(
     file_path = file_paths[0]
 
     try:
-        # Read all rows first (needed for sample calculation)
-        rows = read_excel_rows(file_path, sheet=config.sheet)
+        # Sprint Change Proposal 2026-01-08: Detect file type and use appropriate reader
+        suffix = Path(file_path).suffix.lower()
+
+        if suffix == ".csv":
+            # Read CSV file with standard pandas type inference
+            # Sprint Change Proposal 2026-01-08: Unified CSV reading
+            import pandas as pd
+
+            df = pd.read_csv(
+                file_path,
+                encoding="utf-8-sig",  # Handle BOM in Chinese CSV files
+                low_memory=False,  # Better type inference for large files
+            )
+
+            rows = df.to_dict("records")
+            context.log.info(f"CSV file detected, loaded {len(rows)} rows")
+        else:
+            # Read all rows first (needed for sample calculation)
+            rows = read_excel_rows(file_path, sheet=config.sheet)
+
         total_rows = len(rows)
 
         # Apply sampling if configured

@@ -185,9 +185,13 @@ def build_bronze_to_silver_pipeline(
             }
         ),
         # Step 9: Clean Group Enterprise Customer Number (lstrip "C")
+        # Fix: Convert to string first to handle NaN-only columns (float64)
         CalculationStep(
             {
-                "集团企业客户号": lambda df: df["集团企业客户号"].str.lstrip("C")
+                "集团企业客户号": lambda df: df["集团企业客户号"]
+                .astype(str)
+                .replace("nan", None)
+                .str.lstrip("C")
                 if "集团企业客户号" in df.columns
                 else pd.Series([None] * len(df)),
             }
