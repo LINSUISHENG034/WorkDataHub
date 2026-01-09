@@ -30,6 +30,7 @@ PYTHONPATH=src uv run python scripts/migrations/migrate_legacy_to_enrichment_ind
 
 # Step 6: Validate parity (1-2 days)
 # Compare new implementation with legacy output
+PYTHONPATH=src uv run python scripts/validation/CLI/cleaner_compare.py {domain} --month {YYYYMM} --export
 # Target: 100% match
 ```
 

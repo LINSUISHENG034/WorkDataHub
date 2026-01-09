@@ -1,7 +1,7 @@
 # Domain Migration Workflow
 
-**Version:** 1.0
-**Last Updated:** 2025-12-09
+**Version:** 1.1
+**Last Updated:** 2026-01-09
 **Purpose:** Single entry point for complete domain migration from legacy to new architecture
 
 ---
@@ -253,7 +253,7 @@ This document provides a complete end-to-end workflow for migrating a legacy dom
 | Document | Purpose |
 |----------|---------|
 | [Legacy Parity Validation Guide](../../runbooks/legacy-parity-validation.md) | Validation procedures |
-| Parity script: `scripts/tools/parity/validate_{domain}_parity.py` | Automated comparison |
+| Parity CLI: `scripts/validation/CLI/cleaner_compare.py` | Automated comparison |
 
 ### Exit Criteria
 
@@ -428,7 +428,7 @@ uv run pytest -m unit tests/unit/domain/{domain}/
 uv run pytest -m integration tests/integration/domain/{domain}/
 
 # Parity validation
-PYTHONPATH=src uv run python scripts/tools/parity/validate_{domain}_parity.py
+PYTHONPATH=src uv run python scripts/validation/CLI/cleaner_compare.py {domain} --month 202401 --export
 ```
 
 ### File Templates

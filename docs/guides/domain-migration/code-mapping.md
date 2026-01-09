@@ -1,7 +1,7 @@
 # Cleansing Rules to Code Mapping Guide
 
-**Version:** 1.0
-**Last Updated:** 2025-12-09
+**Version:** 1.1
+**Last Updated:** 2026-01-09
 **Purpose:** Translate cleansing rules documentation into implementation code
 
 ---
@@ -505,7 +505,14 @@ def replace_null_string(df: pd.DataFrame, column: str, default: str) -> pd.DataF
 
 **Implementation:**
 
-Create `scripts/tools/parity/validate_{domain}_parity.py` following the pattern in [Legacy Parity Validation Guide](../runbooks/legacy-parity-validation.md).
+Use the parity validation CLI to compare legacy and new pipeline outputs:
+
+```bash
+# Run parity comparison for a domain
+PYTHONPATH=src uv run python scripts/validation/CLI/cleaner_compare.py {domain} --month 202401 --export
+```
+
+For detailed validation procedures, see [Legacy Parity Validation Guide](../../runbooks/legacy-parity-validation.md).
 
 ---
 

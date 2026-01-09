@@ -1,7 +1,7 @@
 # Domain Development Guide
 
-**Version:** 1.1
-**Last Updated:** 2025-12-12
+**Version:** 1.2
+**Last Updated:** 2026-01-09
 **Based On:** Epic 5.5 Pipeline Architecture Validation
 
 ---
@@ -80,9 +80,7 @@ src/work_data_hub/domain/{domain_name}/
 ├── helpers.py           # Data transformation helpers
 ├── service.py           # Business service layer
 ├── pipeline_builder.py  # Pipeline step configuration
-├── constants.py         # Domain-specific constants (optional)
-└── assets/              # Dagster Assets (optional)
-    └── __init__.py
+└── constants.py         # Domain-specific constants (optional)
 ```
 
 ### File Responsibilities
@@ -178,16 +176,20 @@ src/work_data_hub/domain/{domain_name}/
 
 ## Key Configuration Patterns
 
-### Foreign Key Backfill Configuration (config/data_sources.yml)
+### Foreign Key Backfill Configuration (config/foreign_keys.yml)
 
-Use this when the domain需要配置驱动的引用表回填（Epic 6.2）。`foreign_keys` 节是可选的，缺失时 loader 返回空列表（no-op）。
+Use this when the domain 需要配置驱动的引用表回填（Epic 6.2）。`foreign_keys` 节是可选的，缺失时 loader 返回空列表（no-op）。
+
+> **Note:** Story 6.2-P14 将 FK 配置从 `data_sources.yml` 拆分为独立的 `config/foreign_keys.yml` 文件，遵循单一职责原则。
 
 **Steps**
-1. 打开 `config/data_sources.yml`
+1. 打开 `config/foreign_keys.yml`
 2. 在目标域下添加 `foreign_keys`（依赖只能指向同一域内已声明的 FK，禁止跨域；不允许环/自引用）：
 
 ```yaml
-schema_version: "1.0"  # backward compatible
+# config/foreign_keys.yml
+schema_version: "1.2"  # Story 6.2-P18 added advanced aggregations
+
 domains:
   annuity_performance:
     foreign_keys:
@@ -195,43 +197,78 @@ domains:
         source_column: "计划代码"
         target_table: "年金计划"
         target_key: "年金计划号"
+        target_schema: "mapping"  # specify target schema
         mode: "insert_missing"
         backfill_columns:
           - source: "计划代码"
             target: "年金计划号"
           - source: "计划名称"
-            target: "计划名称"
+            target: "计划全称"
             optional: true
+          # Story 6.2-P15: max_by aggregation
+          - source: "机构代码"
+            target: "主拓代码"
+            optional: true
+            aggregation:
+              type: "max_by"
+              order_column: "期末资产规模"
+          # Story 6.2-P15: concat_distinct aggregation
+          - source: "业务类型"
+            target: "管理资格"
+            optional: true
+            aggregation:
+              type: "concat_distinct"
+              separator: "+"
+              sort: true
+
       - name: "fk_portfolio"
         source_column: "组合代码"
         target_table: "组合计划"
         target_key: "组合代码"
+        target_schema: "mapping"
         depends_on: ["fk_plan"]  # same-domain only
         backfill_columns:
           - source: "组合代码"
             target: "组合代码"
           - source: "计划代码"
             target: "年金计划号"
-
-  annuity_income:
-    # 示例：可按需启用/扩展 FK 配置
-    foreign_keys: []
 ```
+
+**Aggregation Types (Story 6.2-P15 / P18)**
+
+| Type | Description | Required Fields |
+|------|-------------|----------------|
+| `first` | Default, takes first non-null value per group | None |
+| `max_by` | Select value from row with maximum order column | `order_column` |
+| `concat_distinct` | Concatenate distinct values with separator | `separator` (default `+`), `sort` (default true) |
+| `count_distinct` | Count unique non-null values per group | None |
+| `template` | Construct text from template with placeholders | `template` |
+| `lambda` | Execute custom Python lambda expression | `code` |
+
+**Lambda Security Note:**
+> [!CAUTION]
+> The `lambda` aggregation type executes arbitrary Python code via `eval()`. This is considered safe because:
+> 1. Config files (`config/foreign_keys.yml`) are developer-controlled (trusted source)
+> 2. Not exposed to end-user input
+> 3. Code review required for config changes
+>
+> **Never** allow user-provided input to flow into lambda code strings.
 
 **Best Practices**
 - **Unique per domain:** FK 名称在同一域内必须唯一。
 - **Same-domain dependencies only:** `depends_on` 仅能引用同域 FK，跨域引用应拆分为独立域配置。
 - **No cycles:** 环/自引用会在加载阶段被拒绝（错误信息包含 `circular dependency`）。
 - **Optional columns:** 仅对非必需字段使用 `optional: true`，避免吞掉关键字段。
-- **Backward compatibility:** `schema_version: "1.0"` + 缺失 `foreign_keys` 节均应无副作用（返回空列表）。
+- **Backward compatibility:** `schema_version: "1.2"` + 缺失 `foreign_keys` 节均应无副作用（返回空列表）。
 
 **Schema Version Evolution Strategy**
 
 | Version | Features | Migration Path |
 |---------|----------|----------------|
-| 1.0 (current) | `foreign_keys` section, `depends_on`, `optional` columns | N/A (initial) |
-| 1.1 (planned) | Cross-domain references, conditional backfill | Add `cross_domain_refs` field; 1.0 configs remain valid |
-| 2.0 (future) | Breaking changes (if any) | Migration script + deprecation warnings in 1.x |
+| 1.0 | Basic `foreign_keys`, `depends_on`, `optional` | N/A (initial) |
+| 1.1 | `target_schema`, `skip_blank_values` | Additive, 1.0 compatible |
+| 1.2 (current) | Advanced aggregations (`max_by`, `concat_distinct`, `count_distinct`, `template`, `lambda`) | Additive, 1.x compatible |
+| 2.0 (future) | Breaking changes (if any) | Migration script + deprecation warnings |
 
 **Version Compatibility Rules:**
 1. **Minor versions (1.x):** Always backward compatible; new fields are optional with sensible defaults
