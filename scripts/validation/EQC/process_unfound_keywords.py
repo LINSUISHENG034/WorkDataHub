@@ -40,6 +40,8 @@ sys.path.insert(0, "src")
 def configure_logging(verbose: bool = False) -> None:
     """Configure logging to suppress JSON noise in CLI output."""
     # Suppress noisy loggers
+    # In non-verbose mode, set to ERROR to hide IntegrityError savepoint rollback warnings
+    # These are expected during normal operation (e.g., duplicate former_name conflicts)
     noisy_loggers = [
         "work_data_hub.infrastructure.enrichment",
         "work_data_hub.infrastructure.enrichment.eqc_provider",
@@ -48,7 +50,7 @@ def configure_logging(verbose: bool = False) -> None:
         "httpx",
         "httpcore",
     ]
-    level = logging.DEBUG if verbose else logging.WARNING
+    level = logging.DEBUG if verbose else logging.ERROR
     for logger_name in noisy_loggers:
         logging.getLogger(logger_name).setLevel(level)
 
@@ -392,7 +394,9 @@ def process_keywords(
                     result.company_name = company_info.official_name
                     report.successful_queries += 1
                     if not quiet:
-                        print(f"  ✅ Found: {company_info.company_id} - {company_info.official_name}")
+                        print(
+                            f"  ✅ Found: {company_info.company_id} - {company_info.official_name}"
+                        )
 
                     # Commit to persist cached data
                     connection.commit()
@@ -440,7 +444,7 @@ def process_keywords(
                     ):
                         report.search_key_word_updates += 1
                         if not quiet:
-                            print(f"     ✅ Updated search_key_word: found=true")
+                            print("     ✅ Updated search_key_word: found=true")
 
             except Exception as e:
                 result.error_message = str(e)
@@ -480,12 +484,16 @@ def print_summary(report: ProcessReport) -> None:
         duration = (report.end_time - report.start_time).total_seconds()
         print(f"⏱️  Duration: {duration:.2f} seconds")
 
-    print(f"\n📈 Statistics:")
+    print("\n📈 Statistics:")
     print(f"  Total keywords:      {report.total_keywords:,}")
-    print(f"  ✅ Successful:       {report.successful_queries:,} ({100*report.successful_queries/report.total_keywords:.1f}%)")
-    print(f"  ❌ Failed:           {report.failed_queries:,} ({100*report.failed_queries/report.total_keywords:.1f}%)")
+    print(
+        f"  ✅ Successful:       {report.successful_queries:,} ({100 * report.successful_queries / report.total_keywords:.1f}%)"
+    )
+    print(
+        f"  ❌ Failed:           {report.failed_queries:,} ({100 * report.failed_queries / report.total_keywords:.1f}%)"
+    )
 
-    print(f"\n📝 Data Writes:")
+    print("\n📝 Data Writes:")
     print(f"  base_info writes:           {report.base_info_writes:,}")
     print(f"  customer_name writes:       {report.customer_name_writes:,}")
     print(f"  former_name writes:         {report.former_name_writes:,}")
@@ -502,7 +510,9 @@ def print_summary(report: ProcessReport) -> None:
     if success:
         print("✅ PROCESSING COMPLETED SUCCESSFULLY")
         if report.former_name_writes > 0:
-            print(f"   🎉 former_name feature working ({report.former_name_writes} records)")
+            print(
+                f"   🎉 former_name feature working ({report.former_name_writes} records)"
+            )
         remaining = report.total_keywords - report.search_key_word_updates
         if remaining > 0:
             print(f"   📌 {remaining:,} keywords still need processing")
@@ -551,12 +561,14 @@ def main():
         help="Skip token validation (use existing token as-is)",
     )
     parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Show detailed logging output (JSON logs)",
     )
     parser.add_argument(
-        "--quiet", "-q",
+        "--quiet",
+        "-q",
         action="store_true",
         help="Minimal output (only errors and final summary)",
     )
@@ -592,7 +604,7 @@ def main():
         from collections import Counter
 
         source_counts = Counter(source for _, source in keywords)
-        print(f"\n📊 Keywords by source:")
+        print("\n📊 Keywords by source:")
         for source, count in sorted(source_counts.items()):
             print(f"  {source}: {count:,}")
 

@@ -548,33 +548,9 @@ class EqcProvider:
                         )
                 return
 
-            # Write to enterprise.enrichment_index with match_type=eqc (Epic 6.1)
-            record = EnrichmentIndexRecord(
-                lookup_key=normalized,
-                lookup_type=LookupType.CUSTOMER_NAME,
-                company_id=result.company_id,
-                confidence=result.confidence,
-                source=SourceType.EQC_API,
-                source_domain="eqc_sync_lookup",
-            )
-
-            self.mapping_repository.insert_enrichment_index_batch([record])
-
-            # Write former names to enrichment_index (DB-P6) with conflict detection
-            if parsed and parsed.company_former_name:
-                self._write_former_names_to_enrichment_index(
-                    former_names_str=parsed.company_former_name,
-                    company_id=result.company_id,
-                    base_confidence=result.confidence,
-                )
-
-            logger.debug(
-                "eqc_provider.cached_result",
-                msg="Cached EQC lookup result to enrichment_index",
-            )
-
-            # Story 6.2-P5/P8: Write to enterprise.base_info with all raw API responses
-            # Now includes parsed fields from BaseInfoParser
+            # PRIORITY 1: Write to enterprise.base_info FIRST (primary persistence)
+            # This ensures raw API data is always persisted even if index writes fail
+            # Story 6.2-P5/P8: Write with all raw API responses and parsed fields
             if raw_json is not None and self.mapping_repository:
                 try:
                     upsert_kwargs = build_upsert_kwargs(parsed)
@@ -593,10 +569,73 @@ class EqcProvider:
                         msg="Persisted EQC result to base_info table with parsed fields",
                     )
                 except Exception as e:
-                    # Non-blocking: log and continue
+                    # Non-blocking: log and continue to enrichment_index writes
                     logger.warning(
                         "eqc_provider.base_info_persistence_failed",
-                        msg="Failed to persist to base_info - continuing without persistence",
+                        msg="Failed to persist to base_info - continuing with enrichment_index",
+                        error_type=type(e).__name__,
+                    )
+
+            # PRIORITY 2: Write to enterprise.enrichment_index (cache layer)
+            # Use Savepoint to isolate transaction failures - IntegrityError won't
+            # invalidate the outer transaction and rollback base_info writes
+            try:
+                # Begin nested transaction (savepoint)
+                savepoint = self.mapping_repository.connection.begin_nested()
+                try:
+                    record = EnrichmentIndexRecord(
+                        lookup_key=normalized,
+                        lookup_type=LookupType.CUSTOMER_NAME,
+                        company_id=result.company_id,
+                        confidence=result.confidence,
+                        source=SourceType.EQC_API,
+                        source_domain="eqc_sync_lookup",
+                    )
+                    self.mapping_repository.insert_enrichment_index_batch([record])
+                    savepoint.commit()
+                    logger.debug(
+                        "eqc_provider.cached_result",
+                        msg="Cached EQC lookup result to enrichment_index",
+                    )
+                except Exception as e:
+                    # Rollback only this savepoint, outer transaction stays valid
+                    savepoint.rollback()
+                    logger.warning(
+                        "eqc_provider.enrichment_index_cache_failed",
+                        msg="Failed to cache to enrichment_index - rolled back savepoint",
+                        error_type=type(e).__name__,
+                    )
+            except Exception as e:
+                # Fallback if begin_nested() fails
+                logger.warning(
+                    "eqc_provider.enrichment_index_savepoint_failed",
+                    msg="Failed to create savepoint for enrichment_index",
+                    error_type=type(e).__name__,
+                )
+
+            # PRIORITY 3: Write former names to enrichment_index (DB-P6)
+            # Also uses Savepoint for transaction isolation
+            if parsed and parsed.company_former_name:
+                try:
+                    savepoint = self.mapping_repository.connection.begin_nested()
+                    try:
+                        self._write_former_names_to_enrichment_index(
+                            former_names_str=parsed.company_former_name,
+                            company_id=result.company_id,
+                            base_confidence=result.confidence,
+                        )
+                        savepoint.commit()
+                    except Exception as e:
+                        savepoint.rollback()
+                        logger.warning(
+                            "eqc_provider.former_names_cache_failed",
+                            msg="Failed to cache former names - rolled back savepoint",
+                            error_type=type(e).__name__,
+                        )
+                except Exception as e:
+                    logger.warning(
+                        "eqc_provider.former_names_savepoint_failed",
+                        msg="Failed to create savepoint for former names",
                         error_type=type(e).__name__,
                     )
 
