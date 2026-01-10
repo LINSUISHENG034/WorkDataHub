@@ -18,7 +18,7 @@ from sqlalchemy import create_engine, text
 from tqdm import tqdm
 
 # Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 # Database connection
 DB_URL = "postgresql://postgres:Post.169828@localhost:5432/postgres"
@@ -27,7 +27,7 @@ DB_URL = "postgresql://postgres:Post.169828@localhost:5432/postgres"
 def load_config():
     """Load the plan-institution mapping configuration."""
     config_path = (
-        Path(__file__).parent.parent / "config" / "mappings" / "default_plan_institution_code.yml"
+        Path(__file__).parent.parent.parent / "config" / "mappings" / "default_plan_institution_code.yml"
     )
     with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
