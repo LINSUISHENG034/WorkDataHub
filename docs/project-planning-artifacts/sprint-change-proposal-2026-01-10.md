@@ -85,11 +85,23 @@ This proposal emerged from a parallel workstream analyzing the `legacy` PostgreS
 
 | Factor | Evaluation | Score |
 |--------|------------|-------|
-| Effort | 4 weeks (per V3.2 proposal) | Medium |
+| Effort | 4 weeks total (see breakdown below) | Medium |
 | Risk | New schema, no existing code dependency | Low |
 | Business Value | Historical trend analysis, customer attribution | High |
 | Technical Debt | Clean greenfield implementation | Low |
 | Timeline Impact | Parallel track, does not block Epic 6 | None |
+
+**工期估算说明**：
+
+| 阶段 | 内容 | 工期 |
+|------|------|------|
+| **开发工作** | Story 7.0-7.10 (Schema, ETL, Hooks) | 9.5 工作日 (~2周) |
+| **BI验证** | Power BI模型核对、数据一致性验证 | 3-5 工作日 |
+| **切割上线** | 生产部署、监控配置、文档更新 | 2-3 工作日 |
+| **总计** | 完整交付周期 | **~4周** |
+
+> [!NOTE]
+> V3.2实施方案中的4周估算包含完整交付周期（开发+验证+上线），本提案Story估算仅覆盖开发工作。
 
 ### 3.3 Alternative Approaches Considered
 
@@ -111,21 +123,136 @@ This proposal emerged from a parallel workstream analyzing the `legacy` PostgreS
 
 | Story ID | Title | Effort |
 |----------|-------|--------|
+| 7.0 | **Alembic Migration Script** (`004_customer_mdm.py`) | 0.5 days |
 | 7.1 | Customer Schema Setup (`customer.customer_plan_contract`) | 0.5 days |
 | 7.2 | Monthly Snapshot Table (`customer.fct_customer_business_monthly_status`) | 0.5 days |
 | 7.3 | Business Type Aggregation View | 0.5 days |
-| 7.4 | Historical Data Backfill (12-24 months) | 1 day |
-| 7.5 | Contract Status ETL (Daily/Event-driven) | 1 day |
-| 7.6 | Monthly Snapshot Job | 1 day |
-| 7.7 | Power BI Star Schema Integration | 1 day |
-| 7.8 | Index Optimization (BRIN, Partial) | 0.5 days |
-| 7.9 | Integration Testing & Documentation | 1 day |
+| 7.4 | **Customer Tags JSONB Migration** (见下方说明) | 0.5 days |
+| 7.5 | Historical Data Backfill (12-24 months) | 1 day |
+| 7.6 | Contract Status Sync (**Post-ETL Hook**) | 1.5 days |
+| 7.7 | Monthly Snapshot Refresh (**Post-ETL Hook**) | 1.5 days |
+| 7.8 | Power BI Star Schema Integration | 1 day |
+| 7.9 | Index & Trigger Optimization (BRIN, Partial, `trg_sync_product_line_name`) | 0.5 days |
+| 7.10 | Integration Testing & Documentation | 1 day |
 
-**Total Estimated Effort**: 7 working days (~1.5 weeks)
+**Total Estimated Effort**: 9.5 working days (~2 weeks)
 
 ---
 
-### 4.2 PRD Modification: Add FR-9
+#### 4.1.1 Story 7.4 说明：Customer Tags JSONB Migration
+
+> [!IMPORTANT]
+> V3.2实施方案明确要求将`mapping."年金客户".年金客户标签`从`VARCHAR`迁移为`JSONB`类型，以支持多维标签管理。
+
+**迁移内容**：
+```sql
+-- Step 1: 添加新的JSONB列
+ALTER TABLE mapping."年金客户" ADD COLUMN tags JSONB DEFAULT '[]'::jsonb;
+
+-- Step 2: 迁移现有数据（将VARCHAR解析为JSONB数组）
+UPDATE mapping."年金客户"
+SET tags = CASE
+    WHEN 年金客户标签 IS NULL OR 年金客户标签 = '' THEN '[]'::jsonb
+    ELSE jsonb_build_array(年金客户标签)
+END;
+
+-- Step 3: 验证迁移完成后，标记旧列为deprecated（暂不删除）
+COMMENT ON COLUMN mapping."年金客户".年金客户标签 IS 'DEPRECATED: Use tags JSONB column instead';
+```
+
+**验收标准**：
+- ✅ `tags` JSONB列已创建并填充数据
+- ✅ 现有ETL和BI查询兼容新列
+- ✅ 旧列`年金客户标签`保留但标记为deprecated
+
+---
+
+#### 4.1.2 Story 7.9 说明：触发器设计
+
+**包含触发器**：`trg_sync_product_line_name`
+
+当`mapping."产品线".产品线`发生变更时，自动同步更新`customer`表中的冗余字段：
+
+```sql
+CREATE OR REPLACE FUNCTION sync_product_line_name()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- 同步到合约表
+    UPDATE customer.customer_plan_contract
+    SET 产品线名称 = NEW.产品线, updated_at = CURRENT_TIMESTAMP
+    WHERE 产品线代码 = NEW.产品线代码 AND 产品线名称 != NEW.产品线;
+
+    -- 同步到快照表
+    UPDATE customer.fct_customer_business_monthly_status
+    SET product_line_name = NEW.产品线, updated_at = CURRENT_TIMESTAMP
+    WHERE product_line_code = NEW.产品线代码 AND product_line_name != NEW.产品线;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_sync_product_line_name
+    AFTER UPDATE ON mapping."产品线"
+    FOR EACH ROW
+    WHEN (OLD.产品线 != NEW.产品线)
+    EXECUTE FUNCTION sync_product_line_name();
+```
+
+---
+
+### 4.2 ETL Integration Architecture: Post-ETL Hook Pattern
+
+> [!IMPORTANT]
+> Customer MDM 需要在常规 domain ETL 完成后自动刷新，确保数据一致性。
+
+**设计原则**：
+1. **独立运行**：支持手动触发 `python -m work_data_hub.cli customer-mdm sync`
+2. **自动触发**：业务数据 ETL 完成后自动执行刷新 (Post-ETL Hook)
+3. **幂等性**：重复执行不会产生重复数据
+
+**执行流程**：
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  ETL Pipeline Execution                                          │
+├─────────────────────────────────────────────────────────────────┤
+│  1. Domain ETL (annuity_performance, annuity_income, etc.)      │
+│     └─ Write to: business.规模明细, business.收入明细           │
+│                                                                  │
+│  2. [POST-ETL HOOK] Contract Status Sync (Story 7.5)            │
+│     └─ Read: business.规模明细                                   │
+│     └─ Write: customer.customer_plan_contract                   │
+│                                                                  │
+│  3. [POST-ETL HOOK] Snapshot Refresh (Story 7.6)                │
+│     └─ Read: customer.customer_plan_contract + mapping tables   │
+│     └─ Write: customer.fct_customer_business_monthly_status     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**CLI 命令设计**：
+
+```bash
+# 常规 ETL (自动触发 Post-ETL Hooks)
+uv run --env-file .wdh_env python -m work_data_hub.cli etl \
+  --domains annuity_performance --period 202501 --execute
+
+# 手动触发 Customer MDM 刷新
+uv run --env-file .wdh_env python -m work_data_hub.cli customer-mdm sync
+uv run --env-file .wdh_env python -m work_data_hub.cli customer-mdm snapshot --period 202501
+
+# 禁用 Post-ETL Hooks (调试用)
+uv run --env-file .wdh_env python -m work_data_hub.cli etl \
+  --domains annuity_performance --period 202501 --execute --no-post-hooks
+```
+
+**实现位置**：
+- Hook 注册：`src/work_data_hub/cli/etl/hooks.py` (新建)
+- Customer MDM CLI：`src/work_data_hub/cli/customer_mdm/` (新建)
+- Hook 执行：在 `_execute_single_domain()` 完成后调用
+
+---
+
+### 4.3 PRD Modification: Add FR-9
 
 ```markdown
 ### FR-9: Customer Master Data Management
@@ -142,12 +269,29 @@ This proposal emerged from a parallel workstream analyzing the `legacy` PostgreS
 **FR-9.3: Product Line Dimension**
 - **Description:** Unified product line dimension (PL201-PL204) with derived business type
 - **User Value:** Consistent reporting across 受托/投资 business types
+
+**FR-9.4: Automated MDM Refresh**
+- **Description:** Customer MDM automatically refreshes after business data ETL completion
+- **User Value:** Always-consistent customer status without manual intervention
+- **Acceptance Criteria:**
+  - ✅ Post-ETL hooks trigger contract sync and snapshot refresh
+  - ✅ Manual override available via `--no-post-hooks` flag
+  - ✅ Execution is idempotent (safe to re-run)
 ```
 
 ---
 
-### 4.3 Architecture Modification: Add `customer` Schema
+### 4.4 Architecture Modification: Add `customer` Schema
 
+**Alembic Migration** (Story 7.0):
+```
+io/schema/migrations/versions/
+└── 004_customer_mdm.py
+    ├── upgrade(): CREATE SCHEMA customer, CREATE TABLE ...
+    └── downgrade(): DROP TABLE ..., DROP SCHEMA customer
+```
+
+**Schema Objects**:
 ```sql
 -- New schema and tables
 CREATE SCHEMA IF NOT EXISTS customer;
@@ -162,7 +306,132 @@ CREATE TABLE customer.fct_customer_business_monthly_status (...);
 CREATE VIEW v_customer_business_monthly_status_by_type AS ...;
 ```
 
-**Full DDL**: See [customer-identity-monthly-snapshot-implementation-v3.2-project-based.md §7.1](file:///e:/Projects/WorkDataHub/docs/specific/customer-db-refactor/customer-identity-monthly-snapshot-implementation-v3.2-project-based.md#71-创建customer-schema和新表)
+---
+
+### 4.5 Schema Relationship Diagram
+
+**表关系概览**：
+
+```mermaid
+erDiagram
+    %% 现有表 (Existing Tables)
+    mapping_年金客户 {
+        varchar company_id PK
+        varchar 客户名称
+        varchar 年金客户类型
+        varchar 年金客户标签 "DEPRECATED"
+        jsonb tags "NEW - 多维标签"
+    }
+    
+    mapping_年金计划 {
+        varchar 年金计划号 PK
+        varchar company_id FK
+        varchar 计划类型
+    }
+    
+    mapping_产品线 {
+        varchar 产品线代码 PK
+        varchar 产品线
+    }
+    
+    business_规模明细 {
+        int id PK
+        date 月度
+        varchar 计划代码
+        varchar company_id
+        varchar 产品线代码
+        decimal 期末资产规模
+    }
+    
+    %% 新增表 (New Tables)
+    customer_plan_contract {
+        serial contract_id PK
+        varchar company_id FK
+        varchar 年金计划号 FK
+        varchar 产品线代码 FK
+        varchar 状态
+        date valid_from
+        date valid_to
+    }
+    
+    fct_customer_business_monthly_status {
+        date snapshot_month PK
+        varchar company_id PK_FK
+        varchar product_line_code PK_FK
+        boolean is_strategic
+        boolean is_existing
+        boolean is_churned
+        decimal aum_balance
+    }
+    
+    %% 关系定义
+    mapping_年金客户 ||--o{ customer_plan_contract : "company_id"
+    mapping_年金计划 ||--o{ customer_plan_contract : "年金计划号"
+    mapping_产品线 ||--o{ customer_plan_contract : "产品线代码"
+    
+    mapping_年金客户 ||--o{ fct_customer_business_monthly_status : "company_id"
+    mapping_产品线 ||--o{ fct_customer_business_monthly_status : "product_line_code"
+    
+    business_规模明细 ||--o{ customer_plan_contract : "数据源"
+    customer_plan_contract ||--o{ fct_customer_business_monthly_status : "聚合"
+```
+
+**外键关系表**：
+
+| 新表 | 外键字段 | 引用表 | 引用字段 | 关系类型 |
+|------|----------|--------|----------|----------|
+| `customer.customer_plan_contract` | `company_id` | `mapping."年金客户"` | `company_id` | N:1 |
+| `customer.customer_plan_contract` | `年金计划号` | `mapping."年金计划"` | `年金计划号` | N:1 |
+| `customer.customer_plan_contract` | `产品线代码` | `mapping."产品线"` | `产品线代码` | N:1 |
+| `customer.fct_customer_business_monthly_status` | `company_id` | `mapping."年金客户"` | `company_id` | N:1 |
+| `customer.fct_customer_business_monthly_status` | `product_line_code` | `mapping."产品线"` | `产品线代码` | N:1 |
+
+**数据流向**：
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        DATA FLOW ARCHITECTURE                          │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  [Source Layer]                                                         │
+│  ┌─────────────────────┐                                               │
+│  │ business.规模明细   │ ◄── Excel ETL (annuity_performance)          │
+│  │ business.收入明细   │ ◄── Excel ETL (annuity_income)               │
+│  └─────────┬───────────┘                                               │
+│            │                                                            │
+│            ▼                                                            │
+│  [Dimension Layer - 维度表]                                             │
+│  ┌─────────────────────┐ ┌─────────────────────┐ ┌────────────────────┐│
+│  │ mapping.年金客户    │ │ mapping.年金计划    │ │ mapping.产品线     ││
+│  │ (10,436 rows)       │ │ (1,158 rows)        │ │ (12 rows)          ││
+│  └─────────┬───────────┘ └─────────┬───────────┘ └─────────┬──────────┘│
+│            │                       │                        │           │
+│            └───────────────────────┼────────────────────────┘           │
+│                                    │                                    │
+│                                    ▼                                    │
+│  [MDM Layer - 新增] ◄─────── Post-ETL Hook                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐│
+│  │ customer.customer_plan_contract (OLTP, SCD Type 2)                  ││
+│  │ - 记录客户-计划-产品线的签约关系                                    ││
+│  │ - valid_from/valid_to 支持历史追溯                                  ││
+│  └─────────────────────────────────┬───────────────────────────────────┘│
+│                                    │                                    │
+│                                    ▼                                    │
+│  ┌─────────────────────────────────────────────────────────────────────┐│
+│  │ customer.fct_customer_business_monthly_status (OLAP, Snapshot)      ││
+│  │ - 月度快照，支持历史趋势分析                                        ││
+│  │ - is_strategic, is_existing, is_churned 状态固化                    ││
+│  └─────────────────────────────────────────────────────────────────────┘│
+│                                    │                                    │
+│                                    ▼                                    │
+│  [BI Layer]                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐│
+│  │ Power BI Star Schema                                                ││
+│  │ Fact: fct_customer_business_monthly_status                          ││
+│  │ Dims: mapping.年金客户, mapping.产品线                              ││
+│  └─────────────────────────────────────────────────────────────────────┘│
+└────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -188,6 +457,8 @@ CREATE VIEW v_customer_business_monthly_status_by_type AS ...;
 ### 5.3 Success Criteria
 
 - [ ] `customer` schema created with 2 tables + 1 view
+- [ ] `mapping."年金客户".tags` JSONB column created and populated
+- [ ] `trg_sync_product_line_name` trigger deployed and tested
 - [ ] Historical data backfilled (2023-01 to present)
 - [ ] Monthly snapshot job runs successfully
 - [ ] Power BI connects to star schema model
@@ -222,6 +493,8 @@ CREATE VIEW v_customer_business_monthly_status_by_type AS ...;
 - [x] 3.2 Architecture reviewed: New `customer` schema required
 - [x] 3.3 UI/UX examined: No UI changes (BI layer only)
 - [x] 3.4 Other artifacts reviewed: Epic index needs update
+- [x] 3.5 Tags JSONB migration: `mapping."年金客户".tags` column addition identified
+- [x] 3.6 Trigger design: `trg_sync_product_line_name` requirement identified
 
 ### Section 4: Path Forward Evaluation
 - [x] 4.1 Direct Adjustment: Not viable (scope too large)
