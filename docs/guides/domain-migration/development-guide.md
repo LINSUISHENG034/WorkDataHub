@@ -887,6 +887,170 @@ def build_bronze_to_silver_pipeline() -> Pipeline:
 - **Purpose:** Validates Infrastructure Layer architecture generality
 - **Features:** Simpler structure, demonstrates pattern reusability
 
+### annual_award (Code Review Reference)
+
+- **Location:** `src/work_data_hub/domain/annual_award/`
+- **Purpose:** Demonstrates common pitfalls and required infrastructure integrations
+- **Features:** Multi-sheet support, plan code enrichment, company ID resolution
+
+---
+
+## Code Review Checklist (Lessons from annual_award)
+
+Based on the annual_award domain code review, the following checklist ensures new domains properly integrate with existing infrastructure:
+
+### 1. Company ID Resolution
+
+**Required Components:**
+- [ ] `mapping_repository` passed to `CompanyIdResolutionStep`
+- [ ] `company_id_column` set in `ResolutionStrategy` to use source data
+- [ ] `repo_connection.commit()` in finally block for backflow persistence
+
+**Common Mistakes:**
+```python
+# ❌ WRONG - Missing mapping_repository (DB cache lookup skipped)
+pipeline = build_bronze_to_silver_pipeline(eqc_config=eqc_config)
+
+# ✅ CORRECT - Pass mapping_repository for enrichment_index lookup
+pipeline = build_bronze_to_silver_pipeline(
+    eqc_config=eqc_config,
+    mapping_repository=mapping_repository,
+    db_connection=repo_connection,
+)
+```
+
+**ResolutionStrategy Configuration:**
+```python
+# ❌ WRONG - company_id_column=None ignores source data
+strategy = ResolutionStrategy(
+    company_id_column=None,  # Source company_id not used!
+    ...
+)
+
+# ✅ CORRECT - Use existing company_id from source
+strategy = ResolutionStrategy(
+    company_id_column="company_id",  # Preserves source data
+    ...
+)
+```
+
+### 2. Plan Code Defaults
+
+**Required:** Apply `PLAN_CODE_DEFAULTS` for empty plan codes after enrichment.
+
+```python
+from work_data_hub.infrastructure.mappings import PLAN_CODE_DEFAULTS
+
+# For domains using '计划代码' column:
+from work_data_hub.infrastructure.transforms import apply_plan_code_defaults
+steps.append(CalculationStep({"计划代码": lambda df: apply_plan_code_defaults(df)}))
+
+# For domains using different column names (e.g., '年金计划号'):
+# Create adapter function that maps to PLAN_CODE_DEFAULTS
+```
+
+### 3. Database Connection Management
+
+**Pattern from annuity_performance:**
+```python
+mapping_repository = None
+repo_connection = None
+try:
+    from sqlalchemy import create_engine
+    settings = get_settings()
+    engine = create_engine(settings.get_database_connection_string())
+    repo_connection = engine.connect()
+    mapping_repository = CompanyMappingRepository(repo_connection)
+except Exception as e:
+    logger.warning("Failed to initialize CompanyMappingRepository", error=str(e))
+
+try:
+    # ... pipeline execution ...
+finally:
+    if repo_connection is not None:
+        try:
+            repo_connection.commit()  # CRITICAL: Persist backflow data
+        except Exception:
+            repo_connection.rollback()
+        repo_connection.close()
+```
+
+### 4. Data Priority Rules
+
+**Principle:** Always preserve existing source data; only fill empty values.
+
+```python
+# ✅ CORRECT - Only process empty values
+mask_empty = df["column"].isna() | (df["column"] == "")
+# Apply enrichment only to mask_empty rows
+```
+
+### 5. EQC Query Configuration (Critical for Company ID Resolution)
+
+**Problem:** Domains with `sync_budget=0` will only use cache, never query EQC API.
+
+**Required Changes for New Domains:**
+
+1. **CLI config.py** - Add EQC configuration block:
+```python
+# In src/work_data_hub/cli/etl/config.py
+if domain == "your_domain":
+    from work_data_hub.infrastructure.enrichment import EqcLookupConfig
+
+    eqc_config = EqcLookupConfig.from_cli_args(args)
+    run_config["ops"]["process_your_domain_op"] = {
+        "config": {
+            "enrichment_enabled": eqc_config.enabled,
+            "enrichment_sync_budget": eqc_config.sync_budget,
+            "export_unknown_names": eqc_config.export_unknown_names,
+            "eqc_lookup_config": eqc_config.to_dict(),
+            "plan_only": effective_plan_only,
+            "session_id": session_id,
+        }
+    }
+```
+
+2. **CLI main.py** - Add domain to enrichment_domains:
+```python
+# In src/work_data_hub/cli/etl/main.py
+enrichment_domains = {"annuity_performance", "your_domain"}  # Add your domain
+```
+
+3. **Op function** - Use ProcessingConfig instead of hardcoded values:
+```python
+# ❌ WRONG - Hardcoded sync_budget=0 (no EQC queries)
+eqc_config = EqcLookupConfig(
+    enabled=True,
+    sync_budget=0,  # Never queries EQC!
+)
+
+# ✅ CORRECT - Use ProcessingConfig from CLI
+if config.eqc_lookup_config is not None:
+    eqc_config = EqcLookupConfig.from_dict(config.eqc_lookup_config)
+else:
+    eqc_config = EqcLookupConfig(
+        enabled=config.enrichment_enabled,
+        sync_budget=max(config.enrichment_sync_budget, 0),
+        auto_create_provider=config.enrichment_enabled,
+        export_unknown_names=config.export_unknown_names,
+        auto_refresh_token=True,
+    )
+```
+
+### 6. Plan Code Defaults
+
+**Required:** Apply `PLAN_CODE_DEFAULTS` for empty plan codes.
+
+```python
+from work_data_hub.infrastructure.mappings import PLAN_CODE_DEFAULTS
+# PLAN_CODE_DEFAULTS = {"集合计划": "AN001", "单一计划": "AN002"}
+
+# For standard '计划代码' column:
+from work_data_hub.infrastructure.transforms import apply_plan_code_defaults
+
+# For custom column names, create adapter function
+```
+
 ---
 
 ## References

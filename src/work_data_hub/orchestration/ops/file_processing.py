@@ -191,6 +191,8 @@ class ReadExcelConfig(Config):
 
     # Accept sheet index (int) or sheet name (str)
     sheet: Any = 0
+    # Multi-sheet support: list of sheet names to read and merge
+    sheet_names: Optional[List[str]] = None
     # Data sampling in 'index/count' format (1-indexed), e.g., '1/10' for first 10%
     sample: Optional[str] = None
 
@@ -235,11 +237,15 @@ def read_excel_op(
     Sprint Change Proposal 2026-01-08:
     - Added CSV file support via file extension detection
 
+    Multi-sheet support:
+    - If sheet_names is provided (list of sheet names), reads all sheets and merges them
+    - Otherwise falls back to single sheet_name behavior
+
     Supports data sampling via --sample parameter for quick ETL validation.
 
     Args:
         context: Dagster execution context
-        config: Configuration with sheet and optional sample parameters
+        config: Configuration with sheet, sheet_names, and optional sample parameters
         file_paths: List of discovered file paths (uses first one for MVP)
 
     Returns:
@@ -269,6 +275,24 @@ def read_excel_op(
 
             rows = df.to_dict("records")
             context.log.info(f"CSV file detected, loaded {len(rows)} rows")
+        elif config.sheet_names:
+            # Multi-sheet support: read and merge all specified sheets
+            rows = []
+            for sheet_name in config.sheet_names:
+                try:
+                    sheet_rows = read_excel_rows(file_path, sheet=sheet_name)
+                    rows.extend(sheet_rows)
+                    context.log.info(
+                        f"Multi-sheet read: sheet='{sheet_name}', rows={len(sheet_rows)}"
+                    )
+                except Exception as e:
+                    # Log warning but continue with other sheets
+                    context.log.warning(f"Failed to read sheet '{sheet_name}': {e}")
+
+            context.log.info(
+                f"Multi-sheet reading completed: sheets={config.sheet_names}, "
+                f"total_rows={len(rows)}"
+            )
         else:
             # Read all rows first (needed for sample calculation)
             rows = read_excel_rows(file_path, sheet=config.sheet)
@@ -296,7 +320,8 @@ def read_excel_op(
 
         context.log.info(
             f"Excel reading completed - file: {file_path}, "
-            f"sheet: {config.sheet}, rows: {len(rows)}, "
+            f"sheet: {config.sheet_names if config.sheet_names else config.sheet}, "
+            f"rows: {len(rows)}, "
             f"columns: {list(rows[0].keys()) if rows else []}"
         )
 

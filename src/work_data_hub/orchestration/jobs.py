@@ -32,6 +32,7 @@ from .ops import (
     generic_backfill_refs_op,  # Epic 6.2 - configuration-driven backfill
     load_op,
     load_to_db_op,
+    process_annual_award_op,
     process_annuity_income_op,
     process_annuity_performance_op,
     process_company_lookup_queue_op,
@@ -172,6 +173,32 @@ def annuity_income_job() -> Any:
     load_op(gated_rows)
 
 
+@job
+def annual_award_job() -> Any:
+    """
+    End-to-end annual award (当年中标) processing job.
+
+    This job orchestrates the ETL pipeline for merging legacy:
+    - TrusteeAwardCleaner (企年受托中标)
+    - InvesteeAwardCleaner (企年投资中标)
+
+    Pipeline Flow:
+    1. Discover files matching domain patterns
+    2. Read Excel data from discovered files
+    3. Process data through annual_award domain pipeline
+    4. Load fact data to customer.当年中标 table
+    """
+    # Wire ops together - Dagster handles dependency graph
+    discovered_paths = discover_files_op()
+
+    # Read Excel data and process through annual award service
+    excel_rows = read_excel_op(discovered_paths)
+    processed_data = process_annual_award_op(excel_rows, discovered_paths)
+
+    # Load to database (no backfill for Phase 1)
+    load_op(processed_data)
+
+
 class AnnuityPipelineConfig(Config):
     """Config schema for the Story 4.5 consolidated pipeline job."""
 
@@ -285,6 +312,10 @@ JOB_REGISTRY: Dict[str, JobEntry] = {
     "annuity_income": JobEntry(
         job=annuity_income_job,
         supports_backfill=True,  # Story 7.3-7 added backfill support
+    ),
+    "annual_award": JobEntry(
+        job=annual_award_job,
+        supports_backfill=False,  # Phase 1: No FK backfill until customer_plan_contract
     ),
     "sandbox_trustee_performance": JobEntry(
         job=sandbox_trustee_performance_job,
@@ -406,11 +437,18 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
 
     # Determine sheet configuration.
     # If --sheet not provided, try to get sheet_name from data_sources.yml.
+    # Also check for sheet_names (multi-sheet) configuration.
     sheet_value = getattr(args, "sheet", None)
+    sheet_names_list = None
+
+    domain_config = (data_sources.get("domains") or {}).get(args.domain, {}) or {}
+
     if sheet_value is None:
-        # Check if domain is Epic 3 schema and has sheet_name configured
-        domain_config = (data_sources.get("domains") or {}).get(args.domain, {}) or {}
-        if isinstance(domain_config, dict) and "sheet_name" in domain_config:
+        # Check if domain has sheet_names (multi-sheet) configured
+        if isinstance(domain_config, dict) and "sheet_names" in domain_config:
+            sheet_names_list = domain_config["sheet_names"]
+        # Otherwise try sheet_name
+        elif isinstance(domain_config, dict) and "sheet_name" in domain_config:
             sheet_value = domain_config["sheet_name"]
         else:
             # Fallback to 0 for legacy domains
@@ -426,10 +464,18 @@ def build_run_config(args: argparse.Namespace) -> Dict[str, Any]:
         # Coerce sheet: if it's a digit-like string, pass as int; else pass as name
         sheet_cfg: Any
         try:
-            sheet_cfg = int(sheet_value)
+            sheet_cfg = int(sheet_value) if sheet_value else 0
         except Exception:
             sheet_cfg = sheet_value
-        run_config["ops"]["read_excel_op"] = {"config": {"sheet": sheet_cfg}}
+
+        # Build read_excel_op config
+        read_excel_config: Dict[str, Any] = {"sheet": sheet_cfg}
+
+        # Add sheet_names if configured (multi-sheet support)
+        if sheet_names_list:
+            read_excel_config["sheet_names"] = sheet_names_list
+
+        run_config["ops"]["read_excel_op"] = {"config": read_excel_config}
         # process_trustee_performance_op has no config
 
     # Epic 6.2: Generic backfill configuration (configuration-driven approach)

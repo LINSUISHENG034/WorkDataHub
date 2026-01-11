@@ -325,7 +325,7 @@ def main(argv: Optional[List[str]] = None) -> int:  # noqa: PLR0911, PLR0912, PL
     elif args.all_domains:
         domains_for_check = etl_module._load_configured_domains()
 
-    enrichment_domains = {"annuity_performance"}
+    enrichment_domains = {"annuity_performance", "annual_award"}
     if enrichment_enabled and any(d in enrichment_domains for d in domains_for_check):
         _validate_and_refresh_token(auto_refresh=auto_refresh_enabled)
 

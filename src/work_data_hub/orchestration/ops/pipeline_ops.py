@@ -472,3 +472,132 @@ def process_annuity_income_op(
     except Exception as e:
         context.log.error(f"Domain processing failed: {e}")
         raise
+
+
+@op
+def process_annual_award_op(
+    context: OpExecutionContext,
+    config: ProcessingConfig,
+    excel_rows: List[Dict[str, Any]],
+    file_paths: List[str],
+) -> List[Dict[str, Any]]:
+    """
+    Process annual award (当年中标) data and return validated records as dicts.
+
+    Handles Chinese 企年受托中标/企年投资中标 Excel data.
+    This domain merges legacy TrusteeAwardCleaner and InvesteeAwardCleaner.
+
+    Args:
+        context: Dagster execution context
+        config: Processing configuration including plan_only settings
+        excel_rows: Raw Excel row data
+        file_paths: List of file paths (uses first one for data_source metadata)
+
+    Returns:
+        List of processed record dictionaries (JSON-serializable)
+    """
+    from datetime import datetime, timezone
+
+    import pandas as pd
+
+    from work_data_hub.domain.annual_award.helpers import convert_dataframe_to_models
+    from work_data_hub.domain.annual_award.pipeline_builder import (
+        build_bronze_to_silver_pipeline,
+    )
+    from work_data_hub.domain.pipelines.types import PipelineContext
+    from work_data_hub.infrastructure.enrichment import EqcLookupConfig
+    from work_data_hub.infrastructure.enrichment.mapping_repository import (
+        CompanyMappingRepository,
+    )
+
+    file_path = file_paths[0] if file_paths else "unknown"
+
+    # Initialize mapping_repository for DB cache lookup (follows annuity_performance pattern)
+    mapping_repository = None
+    repo_connection = None
+    try:
+        from sqlalchemy import create_engine
+
+        settings = get_settings()
+        engine = create_engine(settings.get_database_connection_string())
+        repo_connection = engine.connect()
+        mapping_repository = CompanyMappingRepository(repo_connection)
+    except Exception as e:
+        context.log.warning(
+            "Failed to initialize CompanyMappingRepository; proceeding without DB cache: %s",
+            str(e),
+        )
+        mapping_repository = None
+        repo_connection = None
+
+    try:
+        # Convert rows to DataFrame
+        df = pd.DataFrame(excel_rows)
+
+        # Story 6.2-P17: Rehydrate EqcLookupConfig from ProcessingConfig (SSOT)
+        # Follows annuity_performance pattern for EQC query and backflow
+        if config.eqc_lookup_config is not None:
+            eqc_config = EqcLookupConfig.from_dict(config.eqc_lookup_config)
+        else:
+            # Derive from legacy enrichment_* fields
+            eqc_config = EqcLookupConfig(
+                enabled=config.enrichment_enabled,
+                sync_budget=max(config.enrichment_sync_budget, 0),
+                auto_create_provider=config.enrichment_enabled,
+                export_unknown_names=config.export_unknown_names,
+                auto_refresh_token=True,
+            )
+
+        # Build and execute pipeline with company_id resolution
+        # Pass mapping_repository for DB cache lookup (enrichment_index)
+        # Pass db_connection for plan code enrichment (customer_plan_contract)
+        pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=eqc_config,
+            mapping_repository=mapping_repository,
+            db_connection=repo_connection,
+        )
+        pipeline_context = PipelineContext(
+            pipeline_name="bronze_to_silver",
+            execution_id=f"annual_award-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+            timestamp=datetime.now(timezone.utc),
+            config={"domain": "annual_award"},
+            domain="annual_award",
+            run_id=f"annual_award-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+            extra={"data_source": file_path},
+        )
+
+        result_df = pipeline.execute(df, pipeline_context)
+
+        # Convert to models and then to dicts
+        records, failed_count = convert_dataframe_to_models(result_df)
+
+        result_dicts = [
+            model.model_dump(mode="json", by_alias=True, exclude_none=True)
+            for model in records
+        ]
+
+        # Enhanced logging with execution mode
+        mode_text = "EXECUTED" if not config.plan_only else "PLAN-ONLY"
+        context.log.info(
+            "Domain processing completed (%s) - source: %s, input_rows: %s, "
+            "output_records: %s, failed: %s, domain: annual_award",
+            mode_text,
+            file_path,
+            len(excel_rows),
+            len(result_dicts),
+            failed_count,
+        )
+
+        return result_dicts
+
+    except Exception as e:
+        context.log.error(f"Domain processing failed: {e}")
+        raise
+    finally:
+        # CRITICAL: Commit to persist backflow data to enrichment_index, then cleanup
+        if repo_connection is not None:
+            try:
+                repo_connection.commit()
+            except Exception:
+                repo_connection.rollback()
+            repo_connection.close()

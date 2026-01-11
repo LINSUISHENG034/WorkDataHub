@@ -196,8 +196,15 @@ class DomainConfigV2(BaseModel):
 
     sheet_name: Union[str, int] = Field(
         ...,
-        description="Excel sheet name (string) or 0-based index (int)",
+        description="Excel sheet name (string) or 0-based index (int). For single-sheet domains.",
         examples=["规模明细", 0],
+    )
+
+    sheet_names: Optional[List[str]] = Field(
+        default=None,
+        description="List of Excel sheet names to read and merge. Takes precedence over sheet_name when provided. "
+        "Used for domains that need to combine data from multiple sheets.",
+        examples=[["企年受托中标(空白)", "企年投资中标(空白)"]],
     )
 
     version_strategy: Literal["highest_number", "latest_modified", "manual"] = Field(

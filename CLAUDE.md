@@ -4,6 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > **📚 Detailed Standards:** See [`docs/project-context.md`](docs/project-context.md) for complete development standards, architecture documentation, CLI reference, and domain terminology.
 
+## Project Context Protocol:
+1. **Environment**: Always load config from `.wdh_env`. DO NOT guess credentials.
+2. **Dual-DB Constraint**: 'Legacy' refers to the schema in Postgres (migrated from MySQL). 'New' refers to the `annuity_performance` domain logic.
+3. **Migration Rule**: All schema changes must be via Alembic. Direct DDL is forbidden unless explicitly requested for debugging.
+4. **Zero Legacy Debt**: Do not import any code from `legacy/` directory into `src/`. Re-implement logic only.”
+
 ## Core Development Philosophy
 
 ### KISS (Keep It Simple, Stupid)

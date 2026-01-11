@@ -133,14 +133,23 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:  
 
     # Determine sheet configuration
     sheet_value = getattr(args, "sheet", None)
+    sheet_names_list = None
+
     if sheet_value is None:
-        # Check if domain is Epic 3 schema and has sheet_name configured
+        # Check if domain is Epic 3 schema and has sheet_name/sheet_names configured
         # Story 6.2-P14: Try to get sheet_name from domain config
         try:
-            if domain_cfg and hasattr(domain_cfg, "sheet_name"):
-                sheet_value = domain_cfg.sheet_name
+            if domain_cfg:
+                # Check for sheet_names (multi-sheet)
+                if hasattr(domain_cfg, "sheet_names") and domain_cfg.sheet_names:
+                    sheet_names_list = domain_cfg.sheet_names
+
+                # Check for sheet_name (single fallback)
+                if hasattr(domain_cfg, "sheet_name"):
+                    sheet_value = domain_cfg.sheet_name
+                else:
+                    sheet_value = "0"
             else:
-                # Fallback to 0 for legacy domains
                 sheet_value = "0"
         except (NameError, AttributeError):
             # domain_cfg might not be defined if exception occurred during loading
@@ -155,11 +164,17 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:  
         # Use existing separate ops for single-file processing
         sheet_cfg: Any
         try:
-            sheet_cfg = int(sheet_value)
+            sheet_cfg = int(sheet_value) if sheet_value is not None else 0
         except Exception:
             sheet_cfg = sheet_value
+
         # Build read_excel_op config with optional sample parameter
         read_excel_config: Dict[str, Any] = {"sheet": sheet_cfg}
+
+        # Add sheet_names if configured (multi-sheet support)
+        if sheet_names_list:
+            read_excel_config["sheet_names"] = sheet_names_list
+
         sample_value = getattr(args, "sample", None)
         if sample_value:
             read_excel_config["sample"] = sample_value
@@ -207,6 +222,23 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:  
     if domain == "annuity_income":
         run_config["ops"]["process_annuity_income_op"] = {
             "config": {
+                "plan_only": effective_plan_only,
+                "session_id": session_id,
+            }
+        }
+
+    # Add enrichment configuration for annual_award domain
+    # Follows annuity_performance pattern for EQC query and backflow
+    if domain == "annual_award":
+        from work_data_hub.infrastructure.enrichment import EqcLookupConfig
+
+        eqc_config = EqcLookupConfig.from_cli_args(args)
+        run_config["ops"]["process_annual_award_op"] = {
+            "config": {
+                "enrichment_enabled": eqc_config.enabled,
+                "enrichment_sync_budget": eqc_config.sync_budget,
+                "export_unknown_names": eqc_config.export_unknown_names,
+                "eqc_lookup_config": eqc_config.to_dict(),
                 "plan_only": effective_plan_only,
                 "session_id": session_id,
             }

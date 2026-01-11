@@ -66,7 +66,7 @@ domains:
 
   # Annuity Performance Domain
   # ✅ VALIDATED with real 202411 data (Epic 3 Tech Spec Action Item #2)
-  # Path structure: tests/fixtures/real_data/202411/收集数据/数据采集/V1/*.xlsx
+  # Path structure: tests/fixtures/real_data/202411/收集数据/数据采集/*.xlsx
   #
   # Story 6.2-P14: FK backfill rules moved to config/foreign_keys.yml
   annuity_performance:
@@ -118,6 +118,37 @@ domains:
         - "月度"
         - "业务类型"
         - "计划类型"
+
+  # Annual Award Domain (当年中标)
+  # Story: Domain Migration - Merged TrusteeAwardCleaner + InvesteeAwardCleaner
+  # Supports both 企年受托中标 and 企年投资中标 sheets
+  annual_award:
+    # Base path for manual data input (Epic 3 schema)
+    # File structure: tests/fixtures/real_data/{YYYYMM}/收集数据/业务收集
+    base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/业务收集"
+
+    # File patterns for annual award data
+    file_patterns:
+      - "*台账登记*.xlsx"
+      - "*当年中标*.xlsx"
+
+    # Sheet names for trustee and investee awards (multi-sheet support)
+    # read_excel_op will merge data from all listed sheets
+    sheet_name: "企年受托中标(空白)"  # Fallback for single-sheet mode
+    sheet_names:
+      - "企年受托中标(空白)"
+      - "企年投资中标(空白)"
+
+    # Output destination configuration
+    output:
+      table: "当年中标"
+      schema_name: "customer"
+      pk:
+        - "上报月份"
+        - "业务类型"
+
+    # No FK backfill until customer_plan_contract table is created
+    requires_backfill: false
 
   # Future domains (Epic 9) can be added here:
   # Minimal config using defaults inheritance:
