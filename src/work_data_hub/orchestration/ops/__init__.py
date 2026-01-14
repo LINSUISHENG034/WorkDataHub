@@ -34,6 +34,9 @@ from work_data_hub.domain.annuity_performance.service import (
 from work_data_hub.domain.reference_backfill.config_loader import (
     load_foreign_keys_config,
 )
+
+# New Protocol-based registry (Phase 0 refactor)
+from work_data_hub.domain.registry import DOMAIN_SERVICE_REGISTRY
 from work_data_hub.domain.sandbox_trustee_performance.service import process
 from work_data_hub.io.connectors.file_connector import (
     FileDiscoveryService,
@@ -60,18 +63,14 @@ from .company_enrichment import (
 
 # Demonstration/sample ops
 from .demo_ops import load_to_db_op, read_csv_op, validate_op
-
-# Generic domain processing (Story 7.4-3)
-from .domain_processing import (
-    ProcessDomainOpConfig,
-    process_domain_op,
-)
 from .file_processing import (
     DiscoverFilesConfig,
+    ReadDataOpConfig,
     ReadExcelConfig,
     ReadProcessConfig,
     discover_files_op,
     read_and_process_sandbox_trustee_files_op,
+    read_data_op,
     read_excel_op,
 )
 
@@ -81,6 +80,9 @@ from .generic_backfill import (
     gate_after_backfill,
     generic_backfill_refs_op,
 )
+
+# New generic op using Protocol (Phase 3 refactor)
+from .generic_ops import GenericDomainOpConfig, process_domain_op_v2
 
 # Hybrid reference ops
 from .hybrid_reference import HybridReferenceConfig, hybrid_reference_op
@@ -92,15 +94,7 @@ from .loading import (
 )
 
 # Domain processing ops and configs
-from .pipeline_ops import (
-    DOMAIN_SERVICE_REGISTRY,
-    DomainServiceEntry,
-    ProcessingConfig,
-    process_annual_award_op,
-    process_annuity_income_op,
-    process_annuity_performance_op,
-    process_sandbox_trustee_performance_op,
-)
+from .pipeline_ops import ProcessingConfig
 
 # Reference backfill ops and configs
 from .reference_backfill import (
@@ -114,16 +108,16 @@ __all__ = [
     # File processing
     "DiscoverFilesConfig",
     "discover_files_op",
+    "ReadDataOpConfig",
+    "read_data_op",
     "ReadExcelConfig",
     "read_excel_op",
     "ReadProcessConfig",
     "read_and_process_sandbox_trustee_files_op",
     # Domain processing
     "ProcessingConfig",
-    "process_sandbox_trustee_performance_op",
-    "process_annuity_performance_op",
-    "process_annuity_income_op",
-    "process_annual_award_op",
+    "GenericDomainOpConfig",
+    "process_domain_op_v2",
     "read_csv_op",
     "validate_op",
     "load_to_db_op",
@@ -158,9 +152,6 @@ __all__ = [
     "load_foreign_keys_config",
     "process_with_enrichment",
     "process_annuity_income_with_enrichment",
-    # Story 7.4-3: Domain Registry pattern
+    # Protocol-based Domain Registry (Phase 0 refactor)
     "DOMAIN_SERVICE_REGISTRY",
-    "DomainServiceEntry",
-    "ProcessDomainOpConfig",
-    "process_domain_op",
 ]

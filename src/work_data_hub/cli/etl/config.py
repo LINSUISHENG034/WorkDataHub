@@ -161,24 +161,28 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:  
             "config": {"sheet": sheet_value, "max_files": max_files}
         }
     else:
-        # Use existing separate ops for single-file processing
+        # Phase 4 Refactor: Use read_data_op for unified data loading
+        # (replaces legacy read_excel_op)
         sheet_cfg: Any
         try:
             sheet_cfg = int(sheet_value) if sheet_value is not None else 0
         except Exception:
             sheet_cfg = sheet_value
 
-        # Build read_excel_op config with optional sample parameter
-        read_excel_config: Dict[str, Any] = {"sheet": sheet_cfg}
+        # Build read_data_op config (Phase 0: unified data loading)
+        read_data_config: Dict[str, Any] = {
+            "domain": domain,
+            "sheet": sheet_cfg,
+        }
 
         # Add sheet_names if configured (multi-sheet support)
         if sheet_names_list:
-            read_excel_config["sheet_names"] = sheet_names_list
+            read_data_config["sheet_names"] = sheet_names_list
 
         sample_value = getattr(args, "sample", None)
         if sample_value:
-            read_excel_config["sample"] = sample_value
-        run_config["ops"]["read_excel_op"] = {"config": read_excel_config}
+            read_data_config["sample"] = sample_value
+        run_config["ops"]["read_data_op"] = {"config": read_data_config}
 
     # Epic 6.2: Generic backfill configuration (Story 7.4-2: config-driven)
     # Check requires_backfill from domain config (defaults to false for safety)
@@ -197,51 +201,15 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:  
             }
         }
 
-    # Add enrichment configuration for annuity_performance domain
-    if domain == "annuity_performance":
-        from work_data_hub.infrastructure.enrichment import EqcLookupConfig
-
-        # Story 6.2-P17: EqcLookupConfig from CLI args (SSOT).
-        eqc_config = EqcLookupConfig.from_cli_args(args)
-        run_config["ops"]["process_annuity_performance_op"] = {
-            "config": {
-                # Legacy fields kept for backward compatibility / logging
-                "enrichment_enabled": eqc_config.enabled,
-                "enrichment_sync_budget": eqc_config.sync_budget,
-                "export_unknown_names": eqc_config.export_unknown_names,
-                # Story 6.2-P17: Preferred config payload
-                "eqc_lookup_config": eqc_config.to_dict(),
-                "plan_only": effective_plan_only,
-                "use_pipeline": getattr(args, "use_pipeline", None),
-                # Story 7.5-5: Session ID for unified failure logging
-                "session_id": session_id,
-            }
+    # Phase 4 Refactor: Generic domain op configuration
+    # Replaces all per-domain ops (process_annuity_performance_op, etc.)
+    # with unified process_domain_op_v2 that uses DomainServiceProtocol
+    run_config["ops"]["process_domain_op_v2"] = {
+        "config": {
+            "domain": domain,
+            "plan_only": effective_plan_only,
+            "session_id": session_id,
         }
-
-    # Story 7.5-5: Add session_id for annuity_income domain
-    if domain == "annuity_income":
-        run_config["ops"]["process_annuity_income_op"] = {
-            "config": {
-                "plan_only": effective_plan_only,
-                "session_id": session_id,
-            }
-        }
-
-    # Add enrichment configuration for annual_award domain
-    # Follows annuity_performance pattern for EQC query and backflow
-    if domain == "annual_award":
-        from work_data_hub.infrastructure.enrichment import EqcLookupConfig
-
-        eqc_config = EqcLookupConfig.from_cli_args(args)
-        run_config["ops"]["process_annual_award_op"] = {
-            "config": {
-                "enrichment_enabled": eqc_config.enabled,
-                "enrichment_sync_budget": eqc_config.sync_budget,
-                "export_unknown_names": eqc_config.export_unknown_names,
-                "eqc_lookup_config": eqc_config.to_dict(),
-                "plan_only": effective_plan_only,
-                "session_id": session_id,
-            }
-        }
+    }
 
     return run_config
