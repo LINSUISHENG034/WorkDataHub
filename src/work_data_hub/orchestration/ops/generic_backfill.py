@@ -64,6 +64,30 @@ def generic_backfill_refs_op(
             "plan_only": config.plan_only,
         }
 
+    # Phase 4 Enhancement: Check requires_backfill from domain config
+    # This is a safeguard for domains that explicitly disable backfill
+    try:
+        from work_data_hub.infrastructure.settings.data_source_schema import (
+            get_domain_config_v2,
+        )
+        domain_cfg = get_domain_config_v2(
+            config.domain, config_path="config/data_sources.yml"
+        )
+        if not getattr(domain_cfg, "requires_backfill", True):
+            context.log.info(
+                f"Domain '{config.domain}' has requires_backfill=false, skipping"
+            )
+            return {
+                "processing_order": [],
+                "tables_processed": [],
+                "total_inserted": 0,
+                "plan_only": config.plan_only,
+                "skipped_reason": "requires_backfill=false",
+            }
+    except Exception as e:
+        # If config loading fails, continue with FK config check
+        context.log.debug(f"Could not check requires_backfill: {e}")
+
     settings = get_settings()
 
     conn = None

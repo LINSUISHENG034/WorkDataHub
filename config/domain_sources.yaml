@@ -1,0 +1,28 @@
+# Domain Source Configuration
+# 定义每个 domain 的数据来源类型和加载策略
+
+annuity_performance:
+  source_type: single_file
+  discovery:
+    path_pattern: "{data_root}/*规模收入数据*.xlsx"
+    sheet_name: null  # 自动检测
+
+annuity_income:
+  source_type: single_file
+  discovery:
+    path_pattern: "{data_root}/*规模收入数据*.xlsx"
+    sheet_name: null
+
+sandbox_trustee_performance:
+  source_type: single_file
+  discovery:
+    path_pattern: "{data_root}/*受托业绩*.xlsx"
+    sheet_name: null
+
+annual_award:
+  source_type: single_file
+  discovery:
+    path_pattern: "{data_root}/*当年中标*.xlsx"
+    sheet_names:
+      - "企年受托中标(空白)"
+      - "企年投资中标(空白)"

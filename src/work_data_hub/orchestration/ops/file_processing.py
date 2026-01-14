@@ -17,12 +17,14 @@ import yaml
 from dagster import Config, OpExecutionContext, op
 from pydantic import field_validator
 
+from work_data_hub.config.domain_sources import DOMAIN_SOURCE_REGISTRY
 from work_data_hub.config.settings import get_settings
 from work_data_hub.domain.sandbox_trustee_performance.service import process
 from work_data_hub.io.connectors.file_connector import (
     FileDiscoveryService,
 )
 from work_data_hub.io.readers.excel_reader import read_excel_rows
+from work_data_hub.io.readers.multi_table_loader import MultiTableLoader
 
 from ._internal import _load_valid_domains
 
@@ -330,6 +332,100 @@ def read_excel_op(
     except Exception as e:
         context.log.error(f"Excel reading failed for '{file_path}': {e}")
         raise
+
+
+class ReadDataOpConfig(Config):
+    """Configuration for unified data reading operation."""
+
+    domain: str
+    sheet: Any = 0
+    sheet_names: Optional[List[str]] = None
+    sample: Optional[str] = None
+
+
+@op
+def read_data_op(
+    context: OpExecutionContext,
+    config: ReadDataOpConfig,
+    file_paths: List[str],
+) -> List[Dict[str, Any]]:
+    """
+    Unified data loading entry point.
+
+    Dispatches to appropriate loader based on domain source configuration:
+    - single_file: Uses Excel/CSV reader (existing logic)
+    - multi_table: Uses MultiTableLoader for database tables
+
+    Args:
+        context: Dagster execution context
+        config: Configuration with domain and sheet parameters
+        file_paths: List of discovered file paths (used for single_file)
+
+    Returns:
+        List of row dictionaries (JSON-serializable)
+    """
+    domain = config.domain
+    source_config = DOMAIN_SOURCE_REGISTRY.get(domain)
+
+    if source_config is None:
+        # Fallback: unconfigured domain uses default Excel loading
+        context.log.warning(
+            f"Domain '{domain}' not in source registry, using Excel loader"
+        )
+        return _read_excel_files(context, file_paths, config)
+
+    if source_config.source_type == "multi_table":
+        context.log.info(f"Loading {domain} via multi_table strategy")
+        return MultiTableLoader.load(source_config)
+    else:
+        # single_file or unknown - use Excel loading
+        return _read_excel_files(context, file_paths, config)
+
+
+def _read_excel_files(
+    context: OpExecutionContext,
+    file_paths: List[str],
+    config: ReadDataOpConfig,
+) -> List[Dict[str, Any]]:
+    """Internal helper to read Excel/CSV files."""
+    if not file_paths:
+        context.log.warning("No file paths provided")
+        return []
+
+    file_path = file_paths[0]
+    suffix = Path(file_path).suffix.lower()
+
+    if suffix == ".csv":
+        import pandas as pd
+
+        df = pd.read_csv(file_path, encoding="utf-8-sig", low_memory=False)
+        rows = df.to_dict("records")
+        context.log.info(f"CSV file loaded: {len(rows)} rows")
+    elif config.sheet_names:
+        rows = []
+        for sheet_name in config.sheet_names:
+            try:
+                sheet_rows = read_excel_rows(file_path, sheet=sheet_name)
+                rows.extend(sheet_rows)
+            except Exception as e:
+                context.log.warning(f"Failed to read sheet '{sheet_name}': {e}")
+        context.log.info(f"Multi-sheet read: {len(rows)} total rows")
+    else:
+        rows = read_excel_rows(file_path, sheet=config.sheet)
+
+    # Apply sampling if configured
+    if config.sample and rows:
+        from work_data_hub.cli.etl.sample_parser import (
+            calculate_slice_range,
+            parse_sample,
+        )
+
+        sample_cfg = parse_sample(config.sample)
+        skip, limit = calculate_slice_range(len(rows), sample_cfg)
+        rows = rows[skip : skip + limit]
+        context.log.info(f"Sampling applied: {len(rows)} rows")
+
+    return rows
 
 
 class ReadProcessConfig(Config):
