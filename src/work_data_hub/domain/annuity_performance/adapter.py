@@ -63,7 +63,7 @@ class AnnuityPerformanceService:
             failed_count=len(rows) - len(result.records),
             processing_time_ms=elapsed_ms,
             enrichment_stats=(
-                result.enrichment_stats.to_dict()
+                result.enrichment_stats.model_dump()
                 if hasattr(result, "enrichment_stats") and result.enrichment_stats
                 else None
             ),
