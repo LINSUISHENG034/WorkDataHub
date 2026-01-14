@@ -184,22 +184,16 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:  
             read_data_config["sample"] = sample_value
         run_config["ops"]["read_data_op"] = {"config": read_data_config}
 
-    # Epic 6.2: Generic backfill configuration (Story 7.4-2: config-driven)
-    # Check requires_backfill from domain config (defaults to false for safety)
-    try:
-        requires_backfill = getattr(domain_cfg, "requires_backfill", False)
-    except (NameError, AttributeError):
-        # domain_cfg might not be defined if exception occurred during loading
-        requires_backfill = False
-
-    if requires_backfill:
-        run_config["ops"]["generic_backfill_refs_op"] = {
-            "config": {
-                "domain": domain,
-                "plan_only": effective_plan_only,
-                "add_tracking_fields": False,  # mapping tables lack these
-            }
+    # Phase 4 Enhancement: Always pass domain to backfill op
+    # The op internally checks requires_backfill and FK configs
+    # We must always pass the correct domain to prevent default value issues
+    run_config["ops"]["generic_backfill_refs_op"] = {
+        "config": {
+            "domain": domain,
+            "plan_only": effective_plan_only,
+            "add_tracking_fields": False,  # mapping tables lack these
         }
+    }
 
     # Phase 4 Refactor: Generic domain op configuration
     # Replaces all per-domain ops (process_annuity_performance_op, etc.)
