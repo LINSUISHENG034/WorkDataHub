@@ -1,8 +1,8 @@
 # Domain Development Guide
 
-**Version:** 1.2
-**Last Updated:** 2026-01-09
-**Based On:** Epic 5.5 Pipeline Architecture Validation
+**Version:** 2.0
+**Last Updated:** 2026-01-14
+**Based On:** Orchestration Layer Refactor (Protocol + Registry + Factory)
 
 ---
 
@@ -68,13 +68,14 @@ Before implementing a new domain, ensure you have:
 
 ---
 
-## Domain Directory Structure (6-File Standard)
+## Domain Directory Structure (7-File Standard)
 
-Each domain follows a standardized 6-file structure:
+Each domain follows a standardized 7-file structure (updated with Protocol adapter):
 
 ```
 src/work_data_hub/domain/{domain_name}/
 ├── __init__.py          # Module exports
+├── adapter.py           # [NEW] DomainServiceProtocol implementation
 ├── models.py            # Pydantic data models (Bronze/Silver/Gold)
 ├── schemas.py           # Pandera DataFrame schemas
 ├── helpers.py           # Data transformation helpers
@@ -88,10 +89,11 @@ src/work_data_hub/domain/{domain_name}/
 | File | Purpose | Key Contents |
 |------|---------|--------------|
 | `__init__.py` | Public API exports | Export main service function, models, schemas |
+| **`adapter.py`** | **Protocol implementation** | **`{Domain}Service` class implementing `DomainServiceProtocol`** |
 | `models.py` | Data models | `{Domain}In` (Bronze), `{Domain}Out` (Silver/Gold) Pydantic models |
 | `schemas.py` | DataFrame validation | `Bronze{Domain}Schema`, `Gold{Domain}Schema` Pandera schemas |
 | `helpers.py` | Transformation utilities | `convert_dataframe_to_models()`, domain-specific helpers |
-| `service.py` | Business logic | `process_{domain}()` main entry point |
+| `service.py` | Business logic | `process_{domain}()` / `process_with_enrichment()` |
 | `pipeline_builder.py` | Pipeline composition | `build_bronze_to_silver_pipeline()` |
 | `constants.py` | Static mappings | Column mappings, code translations, business rules |
 
@@ -141,8 +143,15 @@ src/work_data_hub/domain/{domain_name}/
 - [ ] Configure pipeline steps (`pipeline_builder.py`)
   - [ ] `build_bronze_to_silver_pipeline()` - Pipeline composition
 
-### Phase 4: Configuration
+### Phase 4: Protocol Adapter & Registration
 
+- [ ] **Create `adapter.py`** implementing `DomainServiceProtocol`
+  - [ ] `domain_name` property returning domain identifier
+  - [ ] `requires_enrichment` property (True if needs CompanyEnrichmentService)
+  - [ ] `requires_backfill` property (True if needs FK backfill)
+  - [ ] `process()` method delegating to existing service
+- [ ] **Register in `domain/registry.py`**
+  - Add import and `register_domain()` call in `_register_all_domains()`
 - [ ] Configure upsert keys (`DEFAULT_UPSERT_KEYS` in service.py)
 - [ ] Add data source configuration (if using file discovery)
 - [ ] Register domain cleansing rules in `CleansingRegistry`
@@ -867,6 +876,87 @@ def build_bronze_to_silver_pipeline() -> Pipeline:
     )
 
     return pipeline
+---
+
+### adapter.py Template (NEW - DomainServiceProtocol)
+
+```python
+"""Domain Service Adapter implementing DomainServiceProtocol.
+
+This adapter wraps existing domain service logic and provides a unified
+interface for the generic orchestration layer.
+"""
+import time
+from typing import Any, Dict, List
+
+from work_data_hub.domain.protocols import (
+    DomainProcessingResult,
+    ProcessingContext,
+)
+
+
+class {Domain}Service:
+    """{Domain} 领域服务适配器.
+
+    Implements DomainServiceProtocol for unified orchestration.
+    """
+
+    @property
+    def domain_name(self) -> str:
+        return "{domain}"
+
+    @property
+    def requires_enrichment(self) -> bool:
+        """Set True if domain needs CompanyEnrichmentService injection."""
+        return True  # or False based on domain needs
+
+    @property
+    def requires_backfill(self) -> bool:
+        """Set True if domain needs FK backfill after processing."""
+        return True  # or False based on domain needs
+
+    def process(
+        self,
+        rows: List[Dict[str, Any]],
+        context: ProcessingContext,
+    ) -> DomainProcessingResult:
+        """委托给现有的 service 处理逻辑."""
+        from .service import process_with_enrichment  # or process_{domain}
+
+        start = time.perf_counter()
+
+        result = process_with_enrichment(
+            rows,
+            data_source=context.data_source,
+            enrichment_service=context.enrichment_service,
+            export_unknown_names=context.export_unknown_names,
+            session_id=context.session_id,
+        )
+
+        elapsed_ms = (time.perf_counter() - start) * 1000
+
+        return DomainProcessingResult(
+            records=result.records,
+            total_input=len(rows),
+            total_output=len(result.records),
+            failed_count=len(rows) - len(result.records),
+            processing_time_ms=elapsed_ms,
+            enrichment_stats=(
+                result.enrichment_stats.model_dump()
+                if hasattr(result, "enrichment_stats") and result.enrichment_stats
+                else None
+            ),
+            unknown_names_csv=getattr(result, "unknown_names_csv", None),
+        )
+```
+
+**Registration in `domain/registry.py`:**
+
+```python
+# Add in _register_all_domains() function:
+from work_data_hub.domain.{domain_name}.adapter import {Domain}Service
+
+register_domain("{domain_name}", {Domain}Service())
 ```
 
 ---
@@ -878,16 +968,16 @@ def build_bronze_to_silver_pipeline() -> Pipeline:
 - **Location:** `src/work_data_hub/domain/annuity_performance/`
 - **Documentation:** `docs/domains/annuity_performance.md`
 - **Runbook:** `docs/runbooks/annuity_performance.md`
-- **Features:** Full 6-file structure, company ID enrichment, complex transformations
+- **Features:** Full 7-file structure, Protocol adapter, company ID enrichment, complex transformations
 
 ### annuity_income (Validation Reference)
 
 - **Location:** `src/work_data_hub/domain/annuity_income/`
 - **Documentation:** Not yet published; reference source code for patterns
 - **Purpose:** Validates Infrastructure Layer architecture generality
-- **Features:** Simpler structure, demonstrates pattern reusability
+- **Features:** Protocol adapter, simpler structure, demonstrates pattern reusability
 
-### annual_award (Code Review Reference)
+### annual_award (Pipeline Architecture Reference)
 
 - **Location:** `src/work_data_hub/domain/annual_award/`
 - **Purpose:** Demonstrates common pitfalls and required infrastructure integrations

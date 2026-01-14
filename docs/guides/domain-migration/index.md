@@ -2,6 +2,9 @@
 
 This directory contains all documentation related to migrating legacy domains to the WorkDataHub architecture.
 
+> [!IMPORTANT]
+> **v2.0 架构更新**: 从 2026-01-14 起，domain 实现需要包含 `adapter.py` 文件实现 `DomainServiceProtocol`。详见 [Development Guide](./development-guide.md)。
+
 ## Quick Start
 
 **New to domain migration?** Start with the [Workflow Guide](./workflow.md).
@@ -21,14 +24,17 @@ PYTHONPATH=src uv run python scripts/migrations/migrate_legacy_to_enrichment_ind
 # Reference: docs/templates/cleansing-rules-template.md
 
 # Step 4: Implement domain (2-3 days)
-# Create 6 files: models.py, schemas.py, service.py, etc.
+# Create 7 files: adapter.py, models.py, schemas.py, etc.
 # Use: docs/guides/domain-migration/development-guide.md
 
-# Step 5: Validate mappings (critical!)
+# Step 5: Register Protocol adapter (NEW)
+# Edit domain/registry.py to register your {Domain}Service
+
+# Step 6: Validate mappings (critical!)
 # Verify all mappings from legacy are present and correctly handled
 # Reference: docs/guides/domain-migration/mapping-validation-best-practices.md
 
-# Step 6: Validate parity (1-2 days)
+# Step 7: Validate parity (1-2 days)
 # Compare new implementation with legacy output
 PYTHONPATH=src uv run python scripts/validation/CLI/cleaner_compare.py {domain} --month {YYYYMM} --export
 # Target: 100% match

@@ -1,8 +1,11 @@
 # Domain Migration Workflow
 
-**Version:** 1.1
-**Last Updated:** 2026-01-09
+**Version:** 2.0
+**Last Updated:** 2026-01-14
 **Purpose:** Single entry point for complete domain migration from legacy to new architecture
+
+> [!TIP]
+> **新架构**: 从 v2.0 开始，domain 实现需要包含 `adapter.py` 文件实现 `DomainServiceProtocol`，并在 `domain/registry.py` 中注册。参考 [development-guide.md](./development-guide.md) 获取详细模板。
 
 ---
 
@@ -159,6 +162,7 @@ This document provides a complete end-to-end workflow for migrating a legacy dom
   ```
   src/work_data_hub/domain/{domain_name}/
   ├── __init__.py
+  ├── adapter.py            # [NEW] Protocol adapter
   ├── constants.py
   ├── models.py
   ├── schemas.py
@@ -192,7 +196,16 @@ This document provides a complete end-to-end workflow for migrating a legacy dom
   - `convert_dataframe_to_models()`
   - Domain-specific helper functions
 
-- [ ] **3.8** Write tests
+- [ ] **3.8** **Implement adapter.py** (Protocol)
+  - Create `{Domain}Service` class implementing `DomainServiceProtocol`
+  - Delegate `process()` to existing service function
+  - Set `requires_enrichment` and `requires_backfill` properties
+
+- [ ] **3.9** **Register in domain/registry.py**
+  - Import adapter in `_register_all_domains()`
+  - Call `register_domain("{domain_name}", {Domain}Service())`
+
+- [ ] **3.10** Write tests
   - Unit tests for models and schemas
   - Integration tests for pipeline
 
@@ -272,7 +285,8 @@ This document provides a complete end-to-end workflow for migrating a legacy dom
 
 ### Code Complete
 
-- [ ] `src/work_data_hub/domain/{domain_name}/` - 6-file structure
+- [ ] `src/work_data_hub/domain/{domain_name}/` - 7-file structure (incl. adapter.py)
+- [ ] `domain/registry.py` - Domain registered
 - [ ] `tests/unit/domain/{domain_name}/` - Unit tests
 - [ ] `tests/integration/domain/{domain_name}/` - Integration tests
 
@@ -367,8 +381,9 @@ Use this checklist to ensure all steps are completed before marking a domain mig
 - [ ] Domain added to cleansing-rules/index.md
 
 ### 💻 Phase 3: Implementation
-- [ ] Domain directory created with all 6 files
+- [ ] Domain directory created with all 7 files
   - [ ] `__init__.py` - Module exports
+  - [ ] `adapter.py` - Protocol adapter (NEW)
   - [ ] `constants.py` - Mappings and configurations
   - [ ] `models.py` - Pydantic models
   - [ ] `schemas.py` - Pandera schemas
