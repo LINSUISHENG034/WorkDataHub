@@ -1,8 +1,8 @@
 # Database Schema Panorama (数据库全景图)
 
 **Created:** 2025-12-23
-**Last Updated:** 2025-12-23
-**Version:** 2.0
+**Last Updated:** 2026-01-15
+**Version:** 2.1
 **Maintainer:** Development Team
 **Verified Against:** PostgreSQL production database (2025-12-23)
 
@@ -17,9 +17,10 @@
 | [3. Schema: business](#3-schema-business) | Domain transaction data (1 table) |
 | [4. Schema: mapping](#4-schema-mapping) | Reference/master data (6 tables) |
 | [5. Schema: public](#5-schema-public) | Pipeline infrastructure (3 tables) |
-| [6. Empty Schemas](#6-empty-schemas) | Reserved schemas |
-| [7. Entity Relationships](#7-entity-relationships) | Visual table relationships |
-| [8. Data Flow Architecture](#8-data-flow-architecture) | How data moves through the system |
+| [6. Schema: customer](#6-schema-customer) | Customer lifecycle tracking (2 tables, 1 view) |
+| [7. Empty Schemas](#7-empty-schemas) | Reserved schemas |
+| [8. Entity Relationships](#8-entity-relationships) | Visual table relationships |
+| [9. Data Flow Architecture](#9-data-flow-architecture) | How data moves through the system |
 | [Appendix](#appendix) | Configuration, glossary, deprecated tables |
 
 ---
@@ -44,8 +45,10 @@
 │                                                                           │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
 │  │   customer   │  │   finance    │  │    system    │  │   wdh_dev    │ │
-│  │   (empty)    │  │   (empty)    │  │   (empty)    │  │   (empty)    │ │
-│  │  [Reserved]  │  │  [Reserved]  │  │  [Reserved]  │  │  [Reserved]  │ │
+│  │  (3 objects) │  │   (empty)    │  │   (empty)    │  │   (empty)    │ │
+│  │ • 当年中标   │  │  [Reserved]  │  │  [Reserved]  │  │  [Reserved]  │ │
+│  │ • 当年流失   │  │              │  │              │  │              │ │
+│  │ • Agg View   │  │              │  │              │  │              │ │
 │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘ │
 │                                                                           │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -59,7 +62,7 @@
 | `business` | 1 | Domain transaction data (annuity performance) | ✅ Active |
 | `mapping` | 6 | Reference/master data (plans, portfolios, customers) | ✅ Active |
 | `public` | 3 | Pipeline infrastructure (executions, metrics, migrations) | ✅ Active |
-| `customer` | 0 | Reserved for future customer data | 🔲 Empty |
+| `customer` | 3 | Customer lifecycle tracking (awards, losses, views) | ✅ Active |
 | `finance` | 0 | Reserved for future financial data | 🔲 Empty |
 | `system` | 0 | Reserved for system operations | 🔲 Empty |
 | `wdh_dev` | 0 | Development/testing sandbox | 🔲 Empty |
@@ -655,18 +658,82 @@
 
 ---
 
-## 6. Empty Schemas
+## 6. Schema: customer
+
+**Purpose:** Customer lifecycle tracking - awards, losses, and aggregation views.
+
+### 6.1 Table Summary
+
+| Object | Type | Purpose |
+|--------|------|---------|
+| `当年中标` | Table | Annual award records by business type |
+| `当年流失` | Table | Annual loss records by business type |
+| `v_customer_business_monthly_status_by_type` | View | Pre-aggregated monthly status by business type |
+
+---
+
+### 6.2 v_customer_business_monthly_status_by_type (Aggregation View)
+
+**Purpose:** Pre-aggregated view for BI analysis of award/loss patterns by business type.
+
+**Source Tables:** `customer.当年中标`, `customer.当年流失`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `上报月份` | DATE | Report month dimension |
+| `业务类型` | VARCHAR | Business type (企年受托/企年投资) |
+| `award_count` | BIGINT | Count of awards |
+| `award_distinct_companies` | BIGINT | Distinct company_ids with awards (NULL excluded) |
+| `loss_count` | BIGINT | Count of losses |
+| `loss_distinct_companies` | BIGINT | Distinct company_ids with losses (NULL excluded) |
+| `net_change` | BIGINT | award_count - loss_count |
+
+**SQL Definition:**
+```sql
+CREATE VIEW customer.v_customer_business_monthly_status_by_type AS
+WITH combined AS (
+    SELECT "上报月份", "业务类型", company_id, 'award' AS record_type
+    FROM customer."当年中标"
+    UNION ALL
+    SELECT "上报月份", "业务类型", company_id, 'loss' AS record_type
+    FROM customer."当年流失"
+)
+SELECT
+    "上报月份",
+    "业务类型",
+    COUNT(*) FILTER (WHERE record_type = 'award') AS award_count,
+    COUNT(DISTINCT company_id) FILTER (WHERE record_type = 'award' AND company_id IS NOT NULL) AS award_distinct_companies,
+    COUNT(*) FILTER (WHERE record_type = 'loss') AS loss_count,
+    COUNT(DISTINCT company_id) FILTER (WHERE record_type = 'loss' AND company_id IS NOT NULL) AS loss_distinct_companies,
+    COUNT(*) FILTER (WHERE record_type = 'award') - COUNT(*) FILTER (WHERE record_type = 'loss') AS net_change
+FROM combined
+GROUP BY "上报月份", "业务类型"
+ORDER BY "上报月份" DESC, "业务类型";
+```
+
+**Usage Example:**
+```sql
+-- Get monthly status for all business types
+SELECT * FROM customer.v_customer_business_monthly_status_by_type;
+
+-- Filter by specific business type
+SELECT * FROM customer.v_customer_business_monthly_status_by_type
+WHERE "业务类型" = '企年受托';
+```
+
+---
+
+## 7. Empty Schemas
 
 | Schema | Purpose | Notes |
 |--------|---------|-------|
-| `customer` | Reserved for customer-specific data | Future expansion |
 | `finance` | Reserved for financial data | Future expansion |
 | `system` | Reserved for system operations | Was planned for sync_state table |
 | `wdh_dev` | Development/testing sandbox | Local development use |
 
 ---
 
-## 7. Entity Relationships
+## 8. Entity Relationships
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -749,9 +816,9 @@
 
 ---
 
-## 8. Data Flow Architecture
+## 9. Data Flow Architecture
 
-### 8.1 ETL Pipeline Flow
+### 9.1 ETL Pipeline Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -781,7 +848,7 @@
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 8.2 Company Enrichment Flow
+### 9.2 Company Enrichment Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
