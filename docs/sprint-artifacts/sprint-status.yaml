@@ -400,6 +400,25 @@ development_status:
   7.5-5-unified-failed-records-logging: done # Session-based unified failure CSV ✅ Code Review PASSED 2026-01-02
   7.5-6-cli-output-ux-optimization: done # CLI verbosity levels (--quiet/--verbose) - ✅ Code Review PASSED 2026-01-03
 
+  # Epic 7.6: Customer Master Data Management
+  # Added 2026-01-15 via Sprint Change Proposal
+  # Tracks customer identity and status over time (中标/流失/战客/已客)
+  # Reference: docs/project-planning-artifacts/sprint-change-proposal-2026-01-10.md
+  # Story location: docs/sprint-artifacts/stories/epic-customer-mdm/
+  epic-7.6: in-progress
+  7.6-0-alembic-migration-script: done # 004_create_annual_award.py, 005_create_annual_loss.py - ✅ Completed 2026-01-15
+  7.6-1-customer-annual-award-table: done # customer.当年中标 (annual_award domain) - ✅ Completed 2026-01-15
+  7.6-2-customer-annual-loss-table: done # customer.当年流失 (annual_loss domain) - ✅ Completed 2026-01-15
+  7.6-3-business-type-aggregation-view: ready-for-dev # v_customer_business_monthly_status_by_type view
+  7.6-4-customer-tags-jsonb-migration: backlog # mapping.年金客户.tags JSONB column (0.5 days)
+  7.6-5-historical-data-backfill: backlog # 12-24 months historical data (1 day)
+  7.6-6-contract-status-sync-post-etl-hook: backlog # Post-ETL Hook (1.5 days)
+  7.6-7-monthly-snapshot-refresh-post-etl-hook: backlog # Post-ETL Hook (1.5 days)
+  7.6-8-power-bi-star-schema-integration: backlog # BI layer integration (1 day)
+  7.6-9-index-trigger-optimization: backlog # BRIN, Partial indexes, trg_sync_product_line_name (0.5 days)
+  7.6-10-integration-testing-documentation: backlog # Integration tests and docs (1 day)
+  epic-7.6-retrospective: optional
+
   # Epic 8: Testing & Validation Infrastructure
   # BLOCKED BY: Epic 7.5 (Empty Customer Name Handling)
   epic-8: backlog
