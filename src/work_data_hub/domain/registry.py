@@ -29,6 +29,7 @@ def unregister_domain(name: str) -> None:
 def _register_all_domains() -> None:
     """注册所有内置 domain 服务."""
     from work_data_hub.domain.annual_award.adapter import AnnualAwardService
+    from work_data_hub.domain.annual_loss.adapter import AnnualLossService
     from work_data_hub.domain.annuity_income.adapter import AnnuityIncomeService
     from work_data_hub.domain.annuity_performance.adapter import (
         AnnuityPerformanceService,
@@ -41,6 +42,7 @@ def _register_all_domains() -> None:
     register_domain("annuity_income", AnnuityIncomeService())
     register_domain("sandbox_trustee_performance", SandboxTrusteePerformanceService())
     register_domain("annual_award", AnnualAwardService())
+    register_domain("annual_loss", AnnualLossService())
 
 
 _register_all_domains()

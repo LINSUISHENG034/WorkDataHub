@@ -150,6 +150,35 @@ domains:
     # No FK backfill until customer_plan_contract table is created
     requires_backfill: false
 
+  # Annual Loss Domain (当年流失)
+  # Story: Domain Migration - Merged TrusteeLossCleaner + InvesteeLossCleaner
+  # Supports both 企年受托流失 and 企年投资流失 sheets
+  annual_loss:
+    # Base path for manual data input
+    base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/业务收集"
+
+    # File patterns for annual loss data
+    file_patterns:
+      - "*台账登记*.xlsx"
+      - "*当年流失*.xlsx"
+
+    # Sheet names for trustee and investee loss (multi-sheet support)
+    sheet_name: "企年受托流失(解约)"  # Fallback for single-sheet mode
+    sheet_names:
+      - "企年受托流失(解约)"
+      - "企年投资流失(解约)"
+
+    # Output destination configuration
+    output:
+      table: "当年流失"
+      schema_name: "customer"
+      pk:
+        - "上报月份"
+        - "业务类型"
+
+    # No FK backfill until customer_plan_contract table is created
+    requires_backfill: false
+
   # Future domains (Epic 9) can be added here:
   # Minimal config using defaults inheritance:
   #
