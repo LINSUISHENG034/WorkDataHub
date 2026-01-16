@@ -541,7 +541,8 @@
 | `id` | INTEGER | **NO** | Record ID |
 | `company_id` | VARCHAR | **NO** | **PK** - Company ID |
 | `客户名称` | VARCHAR | YES | Customer name |
-| `年金客户标签` | VARCHAR | YES | Customer tag |
+| `年金客户标签` | VARCHAR | YES | **DEPRECATED** - Use `tags` column instead |
+| `tags` | JSONB | YES | Customer tags array (default: `[]`). GIN indexed. |
 | `年金客户类型` | VARCHAR | YES | Customer type |
 | `年金计划类型` | VARCHAR | YES | Plan type |
 | `关键年金计划` | VARCHAR | YES | Key plan |

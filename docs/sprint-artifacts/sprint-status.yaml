@@ -409,8 +409,8 @@ development_status:
   7.6-0-alembic-migration-script: done # 004_create_annual_award.py, 005_create_annual_loss.py - ✅ Completed 2026-01-15
   7.6-1-customer-annual-award-table: done # customer.当年中标 (annual_award domain) - ✅ Completed 2026-01-15
   7.6-2-customer-annual-loss-table: done # customer.当年流失 (annual_loss domain) - ✅ Completed 2026-01-15
-  7.6-3-business-type-aggregation-view: in-progress # v_customer_business_monthly_status_by_type view - Code Review in progress
-  7.6-4-customer-tags-jsonb-migration: backlog # mapping.年金客户.tags JSONB column (0.5 days)
+  7.6-3-business-type-aggregation-view: done # v_customer_business_monthly_status_by_type view - Code Review in progress
+  7.6-4-customer-tags-jsonb-migration: done # mapping.年金客户.tags JSONB column - Code Review PASSED 2026-01-16
   7.6-5-historical-data-backfill: backlog # 12-24 months historical data (1 day)
   7.6-6-contract-status-sync-post-etl-hook: backlog # Post-ETL Hook (1.5 days)
   7.6-7-monthly-snapshot-refresh-post-etl-hook: backlog # Post-ETL Hook (1.5 days)
