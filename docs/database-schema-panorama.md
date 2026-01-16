@@ -1,7 +1,7 @@
 # Database Schema Panorama (数据库全景图)
 
 **Created:** 2025-12-23
-**Last Updated:** 2026-01-15
+**Last Updated:** 2026-01-16
 **Version:** 2.1
 **Maintainer:** Development Team
 **Verified Against:** PostgreSQL production database (2025-12-23)
@@ -665,11 +665,11 @@
 
 ### 6.1 Table Summary
 
-| Object | Type | Purpose |
-|--------|------|---------|
-| `当年中标` | Table | Annual award records by business type |
-| `当年流失` | Table | Annual loss records by business type |
-| `v_customer_business_monthly_status_by_type` | View | Pre-aggregated monthly status by business type |
+| Object | Type | Rows | Purpose |
+|--------|------|------|---------|
+| `当年中标` | Table | ~416 | Annual award records (23 months: 2024-02 to 2025-12) |
+| `当年流失` | Table | ~241 | Annual loss records (23 months: 2024-02 to 2025-12) |
+| `v_customer_business_monthly_status_by_type` | View | - | Pre-aggregated monthly status by business type |
 
 ---
 
