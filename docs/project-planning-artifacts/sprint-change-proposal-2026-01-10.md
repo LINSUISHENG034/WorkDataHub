@@ -63,14 +63,13 @@ This proposal emerged from a parallel workstream analyzing the `legacy` PostgreS
 | Component | Current State | Required Change |
 |-----------|---------------|-----------------|
 | Database Schema | `business`, `mapping`, `enterprise` schemas | **Add** `customer` schema with 2 tables + 1 view |
-| ETL Pipeline | Domain-focused (annuity_performance, etc.) | **Add** Customer snapshot ETL job |
+| ETL Pipeline | Domain-focused (annuity_performance, etc.) | **Add** Post-ETL Hooks for customer MDM refresh |
 | BI Integration | Direct table queries | **Add** star schema model for Power BI |
 
 ### 2.4 Artifact Conflicts
 
 | Artifact | Conflict Type | Resolution |
 |----------|---------------|------------|
-| `docs/architecture/domain-registry.md` | Missing customer domain | Add customer domain registration |
 | `docs/epics/index.md` | Missing Epic 7 | Add Epic 7 reference |
 | `docs/prd/functional-requirements.md` | Missing FR-9 | Add Customer MDM requirements |
 
@@ -117,25 +116,24 @@ This proposal emerged from a parallel workstream analyzing the `legacy` PostgreS
 
 ## 4. Detailed Change Proposals
 
-### 4.1 New Epic: Epic 7 - Customer Master Data Management
+### 4.1 New Epic: Epic 7.6 - Customer Master Data Management
 
 **Goal**: Build a comprehensive customer identity management system with monthly snapshots for historical trend analysis.
 
 **Proposed Stories**:
 
-| Story ID | Title | Effort |
-|----------|-------|--------|
-| 7.0 | ~~Alembic Migration Script~~ ✅ **已完成**: `004_create_annual_award.py`, `005_create_annual_loss.py` | - |
-| 7.1 | ~~Customer Schema Setup~~ ✅ **已完成**: `customer.当年中标` (annual_award domain) | - |
-| 7.2 | ~~Monthly Snapshot Table~~ ✅ **已完成**: `customer.当年流失` (annual_loss domain) | - |
-| 7.3 | Business Type Aggregation View | 0.5 days |
-| 7.4 | **Customer Tags JSONB Migration** (见下方说明) | 0.5 days |
-| 7.5 | Historical Data Backfill (12-24 months) | 1 day |
-| 7.6 | Contract Status Sync (**Post-ETL Hook**) | 1.5 days |
-| 7.7 | Monthly Snapshot Refresh (**Post-ETL Hook**) | 1.5 days |
-| 7.8 | Power BI Star Schema Integration | 1 day |
-| 7.9 | Index & Trigger Optimization (BRIN, Partial, `trg_sync_product_line_name`) | 0.5 days |
-| 7.10 | Integration Testing & Documentation | 1 day |
+| Story ID | Title | Effort | Status |
+|----------|-------|--------|--------|
+| 7.6-1 | ~~Customer Schema Setup~~ (`customer.当年中标`) | - | ✅ **已完成** |
+| 7.6-2 | ~~Monthly Snapshot Table~~ (`customer.当年流失`) | - | ✅ **已完成** |
+| 7.6-3 | ~~Business Type Aggregation View~~ | 0.5 days | ✅ **已完成**: `006_create_business_type_view.py` |
+| 7.6-4 | ~~Customer Tags JSONB Migration~~ | 0.5 days | ✅ **已完成**: `007_add_customer_tags_jsonb.py` |
+| 7.6-5 | ~~Historical Data Backfill~~ (12-24 months) | 1 day | ✅ **已完成**: 416 中标 + 241 流失 records |
+| 7.6-6 | Contract Status Sync (**Post-ETL Hook**) - 包含 Alembic 迁移 `008_create_customer_plan_contract.py` | 1.5 days | 🔲 ready-for-dev |
+| 7.6-7 | Monthly Snapshot Refresh (**Post-ETL Hook**) - 包含 Alembic 迁移 `009_create_fct_customer_monthly_status.py` | 1.5 days | 🔲 backlog |
+| 7.6-8 | Power BI Star Schema Integration | 1 day | 🔲 backlog |
+| 7.6-9 | Index & Trigger Optimization (BRIN, Partial, `trg_sync_product_line_name`) | 0.5 days | 🔲 backlog |
+| 7.6-10 | Integration Testing & Documentation | 1 day | 🔲 backlog |
 
 **Total Estimated Effort**: 9.5 working days (~2 weeks)
 
@@ -169,7 +167,139 @@ COMMENT ON COLUMN mapping."年金客户".年金客户标签 IS 'DEPRECATED: Use 
 
 ---
 
-#### 4.1.2 Story 7.9 说明：触发器设计
+#### 4.1.2 Story 7.6 说明：customer_plan_contract 表结构
+
+> [!IMPORTANT]
+> 此表是 Customer MDM 的核心表，需通过 Alembic 迁移脚本 `008_create_customer_plan_contract.py` 创建，确保新环境部署一致性。
+
+**表结构**：
+
+```sql
+CREATE TABLE customer.customer_plan_contract (
+    -- 主键
+    contract_id SERIAL PRIMARY KEY,
+
+    -- 业务维度（复合业务键）
+    company_id VARCHAR NOT NULL,
+    plan_code VARCHAR NOT NULL,
+    product_line_code VARCHAR(20) NOT NULL,
+
+    -- 冗余字段（查询便利）
+    product_line_name VARCHAR(50) NOT NULL,
+
+    -- 年度初始化状态（每年1月更新）
+    is_strategic BOOLEAN DEFAULT FALSE,
+    is_existing BOOLEAN DEFAULT FALSE,
+    status_year INTEGER NOT NULL,
+
+    -- 月度更新状态
+    contract_status VARCHAR(20) NOT NULL,  -- 枚举：正常/流失/停缴/新中标/新到账
+
+    -- SCD Type 2 时间维度（月末）
+    valid_from DATE NOT NULL,
+    valid_to DATE DEFAULT '9999-12-31',
+
+    -- 审计字段
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+
+    -- 外键约束
+    CONSTRAINT fk_contract_product_line FOREIGN KEY (product_line_code)
+        REFERENCES mapping.产品线(产品线代码),
+
+    -- 复合唯一约束（业务键 + 时间）
+    CONSTRAINT uq_active_contract UNIQUE (company_id, plan_code, product_line_code, valid_to)
+);
+```
+
+**索引策略**：
+
+| 索引类型 | 字段 | 用途 |
+|----------|------|------|
+| B-Tree | `company_id` | 客户维度查询 |
+| B-Tree | `plan_code` | 计划维度查询 |
+| B-Tree | `product_line_code` | 产品线过滤 |
+| Partial | `is_strategic WHERE TRUE` | 战客快速查询 |
+| Partial | `valid_to = '9999-12-31'` | 当前有效合约 |
+| BRIN | `valid_from` | 时间范围扫描 |
+
+**数据来源**：
+
+| 来源表 | 用途 |
+|--------|------|
+| `business.规模明细` | 派生当前有效合约，按 `(company_id, plan_code, product_line_code)` 去重 |
+| `business.收入明细` | 辅助判断合约活跃状态 |
+| `customer.当年中标` | 更新 `contract_status = '新中标'` |
+| `customer.当年流失` | 更新 `contract_status = '流失'` |
+
+---
+
+#### 4.1.3 Story 7.7 说明：fct_customer_business_monthly_status 表结构
+
+> [!IMPORTANT]
+> 此表是 Customer MDM 的 OLAP 分析表，用于月度快照固化，需通过 Alembic 迁移脚本 `009_create_fct_customer_monthly_status.py` 创建。
+
+**表结构**：
+
+```sql
+CREATE TABLE customer.fct_customer_business_monthly_status (
+    -- 复合主键维度
+    snapshot_month DATE NOT NULL,
+    company_id VARCHAR NOT NULL,
+    product_line_code VARCHAR(20) NOT NULL,
+
+    -- 冗余字段（查询便利）
+    product_line_name VARCHAR(50) NOT NULL,
+
+    -- 状态标签（历史固化）
+    is_strategic BOOLEAN DEFAULT FALSE,      -- 战客
+    is_existing BOOLEAN DEFAULT FALSE,       -- 已客
+    is_new BOOLEAN DEFAULT FALSE,            -- 新客
+    is_winning_this_year BOOLEAN DEFAULT FALSE,  -- 本年中标
+    is_churned_this_year BOOLEAN DEFAULT FALSE,  -- 本年流失
+
+    -- 度量值
+    aum_balance DECIMAL(20,2) DEFAULT 0,     -- 月末资产规模
+    plan_count INTEGER DEFAULT 0,            -- 关联计划数
+
+    -- 审计字段
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+
+    -- 约束
+    PRIMARY KEY (snapshot_month, company_id, product_line_code),
+
+    -- 外键约束
+    CONSTRAINT fk_snapshot_company FOREIGN KEY (company_id)
+        REFERENCES mapping.年金客户(company_id),
+    CONSTRAINT fk_snapshot_product_line FOREIGN KEY (product_line_code)
+        REFERENCES mapping.产品线(产品线代码)
+);
+```
+
+**索引策略**：
+
+| 索引类型 | 字段 | 用途 |
+|----------|------|------|
+| B-Tree | `product_line_code` | 产品线过滤 |
+| B-Tree | `company_id` | 客户维度查询 |
+| Composite | `(snapshot_month, product_line_code)` | 月度+产品线联合查询 |
+| Partial | `is_strategic WHERE TRUE` | 战客快速查询 |
+| BRIN | `snapshot_month` | 时间范围扫描 |
+
+**数据来源**：
+
+| 来源表 | 用途 |
+|--------|------|
+| `customer.customer_plan_contract` | 派生客户状态 (is_strategic, is_existing, is_new) |
+| `business.规模明细` | 聚合 `aum_balance` (月末资产规模) |
+| `customer.当年中标` | 判断 `is_winning_this_year` |
+| `customer.当年流失` | 判断 `is_churned_this_year` |
+
+**刷新机制**：Post-ETL Hook，每次业务 ETL 完成后自动刷新当月快照。
+
+---
+
+#### 4.1.4 Story 7.9 说明：触发器设计
 
 **包含触发器**：`trg_sync_product_line_name`
 
@@ -208,9 +338,9 @@ CREATE TRIGGER trg_sync_product_line_name
 > Customer MDM 需要在常规 domain ETL 完成后自动刷新，确保数据一致性。
 
 **设计原则**：
-1. **独立运行**：支持手动触发 `python -m work_data_hub.cli customer-mdm sync`
-2. **自动触发**：业务数据 ETL 完成后自动执行刷新 (Post-ETL Hook)
-3. **幂等性**：重复执行不会产生重复数据
+1.  **独立运行**：支持手动触发 `python -m work_data_hub.cli customer-mdm sync`
+2.  **自动触发**：业务数据 ETL 完成后自动执行刷新 (Post-ETL Hook)
+3.  **幂等性**：重复执行不会产生重复数据
 
 **执行流程**：
 
@@ -452,7 +582,7 @@ erDiagram
 |------|----------------|-------------|
 | **Product Manager** | Review and approve FR-9 requirements | Updated PRD |
 | **Solution Architect** | Validate customer schema design | Architecture approval |
-| **Development Team** | Implement Epic 7 stories | Working code |
+| **Development Team** | Implement Epic 7.6 stories | Working code |
 | **Data Engineer** | Configure ETL jobs | Dagster job definitions |
 
 ### 5.3 Success Criteria
@@ -460,9 +590,9 @@ erDiagram
 - [x] `customer` schema created ✅
 - [x] `customer.当年中标` table created with ETL support ✅
 - [x] `customer.当年流失` table created with ETL support ✅
-- [ ] `mapping."年金客户".tags` JSONB column created and populated
+- [x] `mapping."年金客户".tags` JSONB column created and populated ✅ (Story 7.6-4)
 - [ ] `trg_sync_product_line_name` trigger deployed and tested
-- [ ] Historical data backfilled (2023-01 to present)
+- [x] Historical data backfilled (2023-01 to present) ✅ (Story 7.6-5: 416 中标 + 241 流失)
 - [ ] Monthly snapshot job runs successfully
 - [ ] Power BI connects to star schema model
 - [ ] 战客/已客/中标/流失 status queries return correct data
@@ -470,10 +600,10 @@ erDiagram
 ### 5.4 Next Steps
 
 1. ✅ **Immediate**: Approve this Sprint Change Proposal
-2. 🔲 **Week 1**: Create Epic 7 document (`docs/epics/epic-7-customer-mdm.md`)
-3. 🔲 **Week 1**: Update PRD with FR-9 requirements
-4. 🔲 **Week 2**: Begin Story 7.1-7.3 (Schema & Tables)
-5. 🔲 **Week 3-4**: Complete remaining stories
+2. ✅ **Completed**: Create Epic 7.6 stories in `docs/sprint-artifacts/stories/epic-customer-mdm/`
+3. ✅ **Completed**: Story 7.6-0 ~ 7.6-5 (Alembic, Schema, View, JSONB, Backfill)
+4. 🔲 **In Progress**: Story 7.6-6 (Contract Status Sync Post-ETL Hook)
+5. 🔲 **Week 2-3**: Complete remaining stories 7.6-7 ~ 7.6-10
 
 ---
 
