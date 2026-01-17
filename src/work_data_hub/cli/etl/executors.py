@@ -369,12 +369,14 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:  # noq
         else:
             console.print("❌ Job completed with failures")
             if not args.raise_on_error:
+                from .error_formatter import format_step_failure
+
                 for event in result.all_node_events:
                     if event.is_failure:
-                        console.print(
-                            f"   Error in {event.node_name}: "
-                            f"{event.event_specific_data}"
+                        clean_message = format_step_failure(
+                            event.node_name, event.event_specific_data
                         )
+                        console.print(f"   {clean_message}")
 
         return 0 if result.success else 1
 
