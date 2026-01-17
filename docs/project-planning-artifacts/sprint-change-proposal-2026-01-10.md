@@ -22,7 +22,7 @@ The current WorkDataHub project lacks a comprehensive **Customer Master Data Man
 ### 1.2 Discovery Context
 
 This proposal emerged from a parallel workstream analyzing the `legacy` PostgreSQL database structure, specifically:
-- `mapping."年金客户"` (10,436 records) - existing customer dimension
+- `customer."年金客户"` (10,436 records) - existing customer dimension (migrated from mapping schema)
 - `mapping."年金计划"` (1,158 records) - existing plan dimension
 - `business."规模明细"` (625,126 rows, 2022-2025) - core business data
 
@@ -157,7 +157,7 @@ SET tags = CASE
 END;
 
 -- Step 3: 验证迁移完成后，标记旧列为deprecated（暂不删除）
-COMMENT ON COLUMN mapping."年金客户".年金客户标签 IS 'DEPRECATED: Use tags JSONB column instead';
+COMMENT ON COLUMN customer."年金客户".年金客户标签 IS 'DEPRECATED: Use tags JSONB column instead';
 ```
 
 **验收标准**：
@@ -269,8 +269,7 @@ CREATE TABLE customer.fct_customer_business_monthly_status (
     PRIMARY KEY (snapshot_month, company_id, product_line_code),
 
     -- 外键约束
-    CONSTRAINT fk_snapshot_company FOREIGN KEY (company_id)
-        REFERENCES mapping.年金客户(company_id),
+        REFERENCES customer.年金客户(company_id),
     CONSTRAINT fk_snapshot_product_line FOREIGN KEY (product_line_code)
         REFERENCES mapping.产品线(产品线代码)
 );
@@ -447,7 +446,7 @@ CREATE VIEW v_customer_business_monthly_status_by_type AS ...;
 ```mermaid
 erDiagram
     %% 现有表 (Existing Tables)
-    mapping_年金客户 {
+    customer_年金客户 {
         varchar company_id PK
         varchar 客户名称
         varchar 年金客户类型
@@ -500,12 +499,12 @@ erDiagram
         varchar 机构代码 FK
     }
     
-    %% 关系定义 - 已更新
-    mapping_年金客户 ||--o{ customer_当年中标 : "company_id"
+    %% 关系定义 - 已更新 (年金客户 migrated to customer schema)
+    customer_年金客户 ||--o{ customer_当年中标 : "company_id"
     mapping_年金计划 ||--o{ customer_当年中标 : "年金计划号"
     mapping_产品线 ||--o{ customer_当年中标 : "产品线代码"
     
-    mapping_年金客户 ||--o{ customer_当年流失 : "company_id"
+    customer_年金客户 ||--o{ customer_当年流失 : "company_id"
     mapping_年金计划 ||--o{ customer_当年流失 : "年金计划号"
     mapping_产品线 ||--o{ customer_当年流失 : "产品线代码"
 ```
@@ -514,10 +513,10 @@ erDiagram
 
 | 新表 | 外键字段 | 引用表 | 引用字段 | 关系类型 | 状态 |
 |------|----------|--------|----------|----------|------|
-| `customer.当年中标` | `company_id` | `mapping."年金客户"` | `company_id` | N:1 | ✅ 已实施 |
+| `customer.当年中标` | `company_id` | `customer."年金客户"` | `company_id` | N:1 | ✅ 已实施 |
 | `customer.当年中标` | `年金计划号` | `mapping."年金计划"` | `年金计划号` | N:1 | ✅ 已实施 |
 | `customer.当年中标` | `产品线代码` | `mapping."产品线"` | `产品线代码` | N:1 | ✅ 已实施 |
-| `customer.当年流失` | `company_id` | `mapping."年金客户"` | `company_id` | N:1 | ✅ 已实施 |
+| `customer.当年流失` | `company_id` | `customer."年金客户"` | `company_id` | N:1 | ✅ 已实施 |
 | `customer.当年流失` | `年金计划号` | `mapping."年金计划"` | `年金计划号` | N:1 | ✅ 已实施 |
 | `customer.当年流失` | `产品线代码` | `mapping."产品线"` | `产品线代码` | N:1 | ✅ 已实施 |
 
@@ -550,7 +549,8 @@ erDiagram
 │            ▼                                                            │
 │  [Dimension Layer - 维度表]                                             │
 │  ┌─────────────────────┐ ┌─────────────────────┐ ┌────────────────────┐│
-│  │ mapping.年金客户    │ │ mapping.年金计划    │ │ mapping.产品线     ││
+│  │ customer.年金客户    │ │ mapping.年金计划    │ │ mapping.产品线     ││
+│  │ (company_id)        │ │ (年金计划号)        │ │ (产品线代码)       ││
 │  │ (company_id)        │ │ (年金计划号)        │ │ (产品线代码)       ││
 │  └─────────────────────┘ └─────────────────────┘ └────────────────────┘│
 │                                    │                                    │
@@ -559,7 +559,7 @@ erDiagram
 │  ┌─────────────────────────────────────────────────────────────────────┐│
 │  │ Power BI                                                            ││
 │  │ Facts: customer.当年中标, customer.当年流失                         ││
-│  │ Dims: mapping.年金客户, mapping.产品线, mapping.年金计划            ││
+│  │ Dims: customer.年金客户, mapping.产品线, mapping.年金计划            ││
 │  └─────────────────────────────────────────────────────────────────────┘│
 └────────────────────────────────────────────────────────────────────────┘
 ```

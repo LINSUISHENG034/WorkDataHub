@@ -155,12 +155,13 @@ domains:
 
       # 年金客户 (Annuity Customer) reference table backfill
       # Story 7.3-7: Add company_id → 年金客户 FK relationship (BF-001)
+      # Story 7.6: Table migrated from mapping to customer schema
       # Uses max_by aggregation (Story 6.2-P15) for 主拓机构代码/主拓机构
       - name: "fk_customer"
         source_column: "company_id"
         target_table: "年金客户"
         target_key: "company_id"
-        target_schema: "mapping"
+        target_schema: "customer"
         mode: "insert_missing"
         skip_blank_values: true # Skip temp IDs (IN*)
         backfill_columns:
@@ -317,11 +318,12 @@ domains:
 
       # 年金客户 (Annuity Customer) reference table backfill
       # NOTE: No max_by aggregation - 期末资产规模 not available in annuity_income
+      # Story 7.6: Table migrated from mapping to customer schema
       - name: "fk_customer"
         source_column: "company_id"
         target_table: "年金客户"
         target_key: "company_id"
-        target_schema: "mapping"
+        target_schema: "customer"
         mode: "insert_missing"
         skip_blank_values: true
         backfill_columns:

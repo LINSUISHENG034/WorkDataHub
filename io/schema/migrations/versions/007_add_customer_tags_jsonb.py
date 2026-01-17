@@ -1,4 +1,4 @@
-"""Add tags JSONB column to mapping.年金客户 table.
+"""Add tags JSONB column to customer.年金客户 table.
 
 This migration adds a JSONB column for multi-dimensional customer tagging,
 migrates existing data from the VARCHAR 年金客户标签 column, and creates
@@ -7,7 +7,7 @@ a GIN index for efficient tag queries.
 Purpose: Enable multi-tag support for customer segmentation without schema
 changes. Supports queries like: WHERE tags @> '["VIP"]'
 
-Source table: mapping.年金客户
+Source table: customer.年金客户 (migrated from mapping schema in Story 7.6)
 
 Revision ID: 20260115_000007
 Revises: 20260115_000006
@@ -37,11 +37,11 @@ def upgrade() -> None:
             BEGIN
                 IF NOT EXISTS (
                     SELECT 1 FROM information_schema.columns
-                    WHERE table_schema = 'mapping'
+                    WHERE table_schema = 'customer'
                     AND table_name = '年金客户'
                     AND column_name = 'tags'
                 ) THEN
-                    ALTER TABLE mapping."年金客户"
+                    ALTER TABLE customer."年金客户"
                     ADD COLUMN tags JSONB DEFAULT '[]'::jsonb;
                 END IF;
             END $$;
@@ -53,7 +53,7 @@ def upgrade() -> None:
     conn.execute(
         sa.text(
             """
-            UPDATE mapping."年金客户"
+            UPDATE customer."年金客户"
             SET tags = CASE
                 WHEN "年金客户标签" IS NULL OR "年金客户标签" = '' THEN '[]'::jsonb
                 ELSE jsonb_build_array("年金客户标签")
@@ -67,7 +67,7 @@ def upgrade() -> None:
         sa.text(
             """
             CREATE INDEX idx_年金客户_tags_gin
-            ON mapping."年金客户" USING GIN (tags)
+            ON customer."年金客户" USING GIN (tags)
             """
         )
     )
@@ -76,7 +76,7 @@ def upgrade() -> None:
     conn.execute(
         sa.text(
             """
-            COMMENT ON COLUMN mapping."年金客户"."年金客户标签"
+            COMMENT ON COLUMN customer."年金客户"."年金客户标签"
             IS 'DEPRECATED: Use tags JSONB column instead'
             """
         )
@@ -96,7 +96,7 @@ def downgrade() -> None:
     conn.execute(
         sa.text(
             """
-            COMMENT ON COLUMN mapping."年金客户"."年金客户标签" IS NULL
+            COMMENT ON COLUMN customer."年金客户"."年金客户标签" IS NULL
             """
         )
     )
@@ -105,7 +105,7 @@ def downgrade() -> None:
     conn.execute(
         sa.text(
             """
-            DROP INDEX IF EXISTS mapping.idx_年金客户_tags_gin
+            DROP INDEX IF EXISTS customer.idx_年金客户_tags_gin
             """
         )
     )
@@ -114,7 +114,7 @@ def downgrade() -> None:
     conn.execute(
         sa.text(
             """
-            ALTER TABLE mapping."年金客户" DROP COLUMN IF EXISTS tags
+            ALTER TABLE customer."年金客户" DROP COLUMN IF EXISTS tags
             """
         )
     )

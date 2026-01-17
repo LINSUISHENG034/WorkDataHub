@@ -62,7 +62,7 @@
 │                     数据分层架构                                  │
 ├─────────────────────────────────────────────────────────────────┤
 │  [基础层 - 维度表]                                               │
-│  mapping."年金客户" / mapping."年金计划" / mapping."产品线"      │
+│  customer."年金客户" / mapping."年金计划" / mapping."产品线"      │
 │                          │                                       │
 │                          ▼                                       │
 │  [操作层 - OLTP] ◄────── customer.customer_plan_contract         │
@@ -107,9 +107,8 @@ CREATE TABLE customer.customer_plan_contract (
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 
-    -- 外键约束
     CONSTRAINT fk_contract_company FOREIGN KEY (company_id)
-        REFERENCES mapping."年金客户"(company_id),
+        REFERENCES customer."年金客户"(company_id),
     CONSTRAINT fk_contract_product_line FOREIGN KEY (product_line_code)
         REFERENCES mapping."产品线"(产品线代码),
 
@@ -170,7 +169,7 @@ CREATE INDEX idx_contract_valid_from_brin ON customer.customer_plan_contract USI
 
 | 依赖表 | 关联字段 | 记录数 | 说明 |
 |--------|----------|--------|------|
-| `mapping."年金客户"` | `company_id` | ~10,436 | 客户主数据 |
+| `customer."年金客户"` | `company_id` | ~10,436 | 客户主数据 |
 | `mapping."年金计划"` | `年金计划号` | ~1,158 | 计划维度 |
 | `mapping."产品线"` | `产品线代码` | 4 (PL201-PL204) | 产品线维度 |
 
@@ -185,7 +184,7 @@ CREATE INDEX idx_contract_valid_from_brin ON customer.customer_plan_contract USI
 ### 3.3 数据完整性规则
 
 1. **company_id 缺失处理**：不记录 `company_id` 为空的数据
-2. **外键校验**：插入前需确保 `company_id` 存在于 `mapping."年金客户"`
+2. **外键校验**：插入前需确保 `company_id` 存在于 `customer."年金客户"`
 3. **产品线代码校验**：仅接受 PL201-PL204
 
 ---

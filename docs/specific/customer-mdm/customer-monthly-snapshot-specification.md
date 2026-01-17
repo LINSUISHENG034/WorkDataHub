@@ -100,7 +100,7 @@ CREATE TABLE customer.customer_monthly_snapshot (
 
     -- 外键约束
     CONSTRAINT fk_snapshot_company FOREIGN KEY (company_id)
-        REFERENCES mapping."年金客户"(company_id),
+        REFERENCES customer."年金客户"(company_id),
     CONSTRAINT fk_snapshot_product_line FOREIGN KEY (product_line_code)
         REFERENCES mapping."产品线"(产品线代码)
 );

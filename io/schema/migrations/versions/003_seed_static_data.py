@@ -374,9 +374,10 @@ def upgrade() -> None:
         print(f"Seeded {count} rows into mapping.利润指标")
 
     # === 8. 年金客户 (985 rows - cascade filtered from 年金计划.company_id) ===
-    if _table_exists(conn, "年金客户", "mapping"):
-        count = _load_csv_seed_data(conn, "年金客户.csv", "年金客户", "mapping")
-        print(f"Seeded {count} rows into mapping.年金客户")
+    # Story 7.6: Migrated from mapping to customer schema
+    if _table_exists(conn, "年金客户", "customer"):
+        count = _load_csv_seed_data(conn, "年金客户.csv", "年金客户", "customer")
+        print(f"Seeded {count} rows into customer.年金客户")
 
     # === 9. 年金计划 (1,128 rows - base table, company_id NOT LIKE 'IN%') ===
     if _table_exists(conn, "年金计划", "mapping"):
@@ -416,7 +417,7 @@ def downgrade() -> None:
         ("base_info", "enterprise"),
         ("组合计划", "mapping"),
         ("年金计划", "mapping"),
-        ("年金客户", "mapping"),
+        ("年金客户", "customer"),  # Story 7.6: Migrated to customer schema
         ("利润指标", "mapping"),
         ("产品明细", "mapping"),
         ("计划层规模", "mapping"),

@@ -51,7 +51,7 @@ domains:
   # Override: output.schema_name = sandbox (instead of business)
   sandbox_trustee_performance:
     # NOTE: No {YYYYMM} here to keep sensors/schedules period-free.
-    base_path: "tests/fixtures/real_data/202411/收集数据/业务收集"
+    base_path: "data/real_data/202411/收集数据/业务收集"
 
     # Trustee files live under nested folders (e.g., "每月业务收集-11月"), so use recursive glob.
     file_patterns:
@@ -71,7 +71,7 @@ domains:
   # Story 6.2-P14: FK backfill rules moved to config/foreign_keys.yml
   annuity_performance:
     # Base path with template variable {YYYYMM} (e.g., 202501)
-    base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集"
+    base_path: "data/real_data/{YYYYMM}/收集数据/数据采集"
 
     # File patterns to match (glob syntax)
     file_patterns:
@@ -97,7 +97,7 @@ domains:
   # Story 5.5.2: Second domain to validate Infrastructure Layer architecture
   annuity_income:
     # Base path with template variable {YYYYMM}
-    base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/数据采集"
+    base_path: "data/real_data/{YYYYMM}/收集数据/数据采集"
 
     # File patterns to match (glob syntax)
     file_patterns:
@@ -125,7 +125,7 @@ domains:
   annual_award:
     # Base path for manual data input (Epic 3 schema)
     # File structure: tests/fixtures/real_data/{YYYYMM}/收集数据/业务收集
-    base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/业务收集"
+    base_path: "data/real_data/{YYYYMM}/收集数据/业务收集"
 
     # File patterns for annual award data
     file_patterns:
@@ -155,7 +155,7 @@ domains:
   # Supports both 企年受托流失 and 企年投资流失 sheets
   annual_loss:
     # Base path for manual data input
-    base_path: "tests/fixtures/real_data/{YYYYMM}/收集数据/业务收集"
+    base_path: "data/real_data/{YYYYMM}/收集数据/业务收集"
 
     # File patterns for annual loss data
     file_patterns:

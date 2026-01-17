@@ -573,7 +573,70 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
         )
 
     # ========================================================================
-    # MAPPING SCHEMA (6 tables: 3 seed tables + 3 reference tables)
+    # CUSTOMER SCHEMA (1 table: 年金客户)
+    # ========================================================================
+
+    # Create customer schema if not exists
+    conn.execute(sa.text("CREATE SCHEMA IF NOT EXISTS customer"))
+
+    # === 14. 年金客户 (Annuity Customers - reference table, not a domain) ===
+    # Story 7.5: id column changed to IDENTITY for FK backfill compatibility
+    # Story 7.5-1: Replace 更新时间 with created_at/updated_at for audit consistency
+    # Story 7.6: Migrated from mapping to customer schema for Customer MDM consistency
+    if not _table_exists(conn, "年金客户", "customer"):
+        op.create_table(
+            "年金客户",
+            sa.Column(
+                "id",
+                sa.Integer(),
+                sa.Identity(always=False),
+                nullable=False,
+            ),
+            sa.Column("company_id", sa.String(), nullable=False),
+            sa.Column("客户名称", sa.String(), nullable=True),
+            sa.Column("年金客户标签", sa.String(), nullable=True),
+            sa.Column("年金客户类型", sa.String(), nullable=True),
+            sa.Column("年金计划类型", sa.String(), nullable=True),
+            sa.Column("关键年金计划", sa.String(), nullable=True),
+            sa.Column("主拓机构代码", sa.String(), nullable=True),
+            sa.Column("主拓机构", sa.String(), nullable=True),
+            sa.Column("其他年金计划", sa.String(), nullable=True),
+            sa.Column("客户简称", sa.String(), nullable=True),
+            # Story 7.5-1: Removed 更新时间, will be added via migration
+            sa.Column("最新受托规模", sa.Float(), nullable=True),
+            sa.Column("最新投管规模", sa.Float(), nullable=True),
+            sa.Column("管理资格", sa.String(), nullable=True),
+            sa.Column("规模区间", sa.String(), nullable=True),
+            sa.Column("计划层规模", sa.Float(), nullable=True),
+            sa.Column("年缴费规模", sa.Float(), nullable=True),
+            sa.Column("外部受托规模", sa.Float(), nullable=True),
+            sa.Column("上报受托规模", sa.Float(), nullable=True),
+            sa.Column("上报投管规模", sa.Float(), nullable=True),
+            sa.Column("关联机构数", sa.Integer(), nullable=True),
+            sa.Column("其他开拓机构", sa.String(), nullable=True),
+            sa.Column("计划状态", sa.String(), nullable=True),
+            sa.Column("关联计划数", sa.Integer(), nullable=True),
+            sa.Column("备注", sa.Text(), nullable=True),
+            # Story 7.5-1: Add audit columns for consistency with domain tables
+            sa.Column(
+                "created_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=False,
+                server_default=func.now(),
+            ),
+            sa.Column(
+                "updated_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=False,
+                server_default=func.now(),
+            ),
+            sa.PrimaryKeyConstraint("company_id", name="年金客户_pkey"),
+            schema="customer",
+            comment="Reference table: Annuity customers (10,997 rows, manual DDL)",
+        )
+
+    # ========================================================================
+    # MAPPING SCHEMA (5 tables: 3 seed tables + 2 reference tables + 1 view)
     # ========================================================================
 
     # Create mapping schema if not exists
@@ -626,60 +689,14 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
             comment="Reference data: Plan scale levels (7 rows, to be seeded)",
         )
 
-    # === 14. 年金客户 (Annuity Customers - reference table, not a domain) ===
-    # Story 7.5: id column changed to IDENTITY for FK backfill compatibility
-    # Story 7.5-1: Replace 更新时间 with created_at/updated_at for audit consistency
-    if not _table_exists(conn, "年金客户", "mapping"):
-        op.create_table(
-            "年金客户",
-            sa.Column(
-                "id",
-                sa.Integer(),
-                sa.Identity(always=False),
-                nullable=False,
-            ),
-            sa.Column("company_id", sa.String(), nullable=False),
-            sa.Column("客户名称", sa.String(), nullable=True),
-            sa.Column("年金客户标签", sa.String(), nullable=True),
-            sa.Column("年金客户类型", sa.String(), nullable=True),
-            sa.Column("年金计划类型", sa.String(), nullable=True),
-            sa.Column("关键年金计划", sa.String(), nullable=True),
-            sa.Column("主拓机构代码", sa.String(), nullable=True),
-            sa.Column("主拓机构", sa.String(), nullable=True),
-            sa.Column("其他年金计划", sa.String(), nullable=True),
-            sa.Column("客户简称", sa.String(), nullable=True),
-            # Story 7.5-1: Removed 更新时间, will be added via migration
-            sa.Column("最新受托规模", sa.Float(), nullable=True),
-            sa.Column("最新投管规模", sa.Float(), nullable=True),
-            sa.Column("管理资格", sa.String(), nullable=True),
-            sa.Column("规模区间", sa.String(), nullable=True),
-            sa.Column("计划层规模", sa.Float(), nullable=True),
-            sa.Column("年缴费规模", sa.Float(), nullable=True),
-            sa.Column("外部受托规模", sa.Float(), nullable=True),
-            sa.Column("上报受托规模", sa.Float(), nullable=True),
-            sa.Column("上报投管规模", sa.Float(), nullable=True),
-            sa.Column("关联机构数", sa.Integer(), nullable=True),
-            sa.Column("其他开拓机构", sa.String(), nullable=True),
-            sa.Column("计划状态", sa.String(), nullable=True),
-            sa.Column("关联计划数", sa.Integer(), nullable=True),
-            sa.Column("备注", sa.Text(), nullable=True),
-            # Story 7.5-1: Add audit columns for consistency with domain tables
-            sa.Column(
-                "created_at",
-                sa.TIMESTAMP(timezone=True),
-                nullable=False,
-                server_default=func.now(),
-            ),
-            sa.Column(
-                "updated_at",
-                sa.TIMESTAMP(timezone=True),
-                nullable=False,
-                server_default=func.now(),
-            ),
-            sa.PrimaryKeyConstraint("company_id", name="年金客户_pkey"),
-            schema="mapping",
-            comment="Reference table: Annuity customers (10,997 rows, manual DDL)",
-        )
+    # === 14. 年金客户 兼容性视图 (Compatibility View for BI backward compat) ===
+    # Story 7.6: Table migrated to customer schema, create view in mapping
+    conn.execute(
+        sa.text("""
+        CREATE OR REPLACE VIEW mapping."年金客户" AS
+        SELECT * FROM customer."年金客户"
+    """)
+    )
 
     # === 15. 产品明细 (Product Details - seed data, not a domain) ===
     if not _table_exists(conn, "产品明细", "mapping"):
@@ -765,11 +782,15 @@ def downgrade() -> None:
     if _table_exists(conn, "sync_state", "system"):
         op.drop_table("sync_state", schema="system")
 
+    # Customer schema - drop view first, then table
+    conn.execute(sa.text('DROP VIEW IF EXISTS mapping."年金客户"'))
+    if _table_exists(conn, "年金客户", "customer"):
+        op.drop_table("年金客户", schema="customer")
+
     # Mapping schema
     for table in [
         "利润指标",
         "产品明细",
-        "年金客户",
         "计划层规模",
         "组织架构",
         "产品线",
