@@ -97,6 +97,7 @@ class FileDiscoveryService:
                 include_patterns=list(domain_config.file_patterns),
                 exclude_patterns=list(domain_config.exclude_patterns or []),
                 selection_strategy=strategy,
+                domain=domain,
             )
             self.logger.info(
                 "discovery.file_matched",

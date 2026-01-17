@@ -46,7 +46,12 @@ class DummyMatcher:
         self.calls = []
 
     def match_files(
-        self, search_path, include_patterns, exclude_patterns, selection_strategy=None
+        self,
+        search_path,
+        include_patterns,
+        exclude_patterns,
+        selection_strategy=None,
+        domain="unknown",
     ):
         self.calls.append(
             {
@@ -54,6 +59,7 @@ class DummyMatcher:
                 "include_patterns": include_patterns,
                 "exclude_patterns": exclude_patterns,
                 "selection_strategy": selection_strategy,
+                "domain": domain,
             }
         )
         if self.raise_error:
@@ -238,6 +244,7 @@ def test_multi_domain_independence_and_failure_isolated(tmp_path):
             include_patterns,
             exclude_patterns,
             selection_strategy=None,
+            domain="unknown",
         ):
             if "B" in str(search_path):
                 raise FileNotFoundError("no domain B files")

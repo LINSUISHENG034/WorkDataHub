@@ -263,6 +263,44 @@ def bind_context(**kwargs: Any) -> Any:
     return structlog.get_logger().bind(**kwargs)
 
 
+def _get_root_log_level(debug: bool, verbose: bool, quiet: bool) -> int:
+    """Determine root log level based on verbosity flags.
+
+    Story 7.5-6: Aligned with dagster_logging.py levels.
+    Story CLI-OUTPUT-CLEANUP: Default mode now uses CRITICAL to prevent
+    JSON logs and Dagster stack traces from mixing with spinner output.
+    """
+    if debug:
+        return logging.DEBUG
+    if verbose:
+        return logging.WARNING
+    if quiet:
+        return logging.CRITICAL
+    # Default: Only CRITICAL for clean terminal output
+    # CLI user-facing output uses console.print() which is not affected by log level
+    return logging.CRITICAL
+
+
+def _configure_dagster_logger(debug: bool) -> None:
+    """Configure Dagster logger level and filters.
+
+    Story 7.5-6 AC-1: Suppress Dagster DEBUG in default mode.
+    Story CLI-ERROR-CLEANUP: Add cascade filter.
+    """
+    dagster_logger = logging.getLogger("dagster")
+    # Clear any existing handlers and filters
+    for handler in dagster_logger.handlers[:]:
+        dagster_logger.removeHandler(handler)
+    for filter_ in dagster_logger.filters[:]:
+        dagster_logger.removeFilter(filter_)
+
+    if debug:
+        dagster_logger.setLevel(logging.DEBUG)
+    else:
+        dagster_logger.setLevel(logging.WARNING)
+        dagster_logger.addFilter(DagsterCascadeFilter())
+
+
 def reconfigure_for_console(
     debug: bool = False, verbose: bool = False, quiet: bool = False
 ) -> None:
@@ -298,32 +336,8 @@ def reconfigure_for_console(
         >>> logger = get_logger(__name__)
         >>> logger.info("Processing started")  # Only shown if verbose/debug
     """
-    # Story 7.5-6 AC-1: Suppress Dagster DEBUG in default mode
-    # Configure Dagster's logging level based on debug mode
-    dagster_logger = logging.getLogger("dagster")
-    if debug:
-        dagster_logger.setLevel(logging.DEBUG)
-    else:
-        # Suppress Dagster DEBUG/INFO to reduce terminal noise
-        dagster_logger.setLevel(logging.WARNING)
-        # Story CLI-ERROR-CLEANUP: Suppress cascading dependency failure noise
-        dagster_logger.addFilter(DagsterCascadeFilter())
-
-    # Determine root log level based on verbosity
-    # Priority: debug > verbose > default > quiet
-    # Story 7.5-6: Aligned with dagster_logging.py levels
-    if debug:
-        root_level = logging.DEBUG
-    elif verbose:
-        # verbose: Show WARNING+ for diagnostic information
-        root_level = logging.WARNING
-    elif quiet:
-        # quiet: Show only CRITICAL for silent operation
-        root_level = logging.CRITICAL
-    else:
-        # Default: Only ERROR+ for clean terminal output
-        # Suppresses WARNING-level structlog messages (e.g., columns_not_found)
-        root_level = logging.ERROR
+    _configure_dagster_logger(debug)
+    root_level = _get_root_log_level(debug, verbose, quiet)
 
     # Update root logger level
     logging.root.setLevel(root_level)
@@ -340,6 +354,9 @@ def reconfigure_for_console(
     new_handler = logging.StreamHandler(stream)
     new_handler.setLevel(root_level)
     new_handler.setFormatter(logging.Formatter("%(message)s"))
+    # Story CLI-ERROR-CLEANUP: Add cascade filter to suppress dependency noise
+    if not debug:
+        new_handler.addFilter(DagsterCascadeFilter())
     logging.root.addHandler(new_handler)
 
     # Also update work_data_hub logger and all its children to ensure suppression

@@ -19,8 +19,14 @@ Usage:
 
 import argparse
 import sys
+import warnings
 from pathlib import Path
 from typing import List, Optional
+
+# Story CLI-OUTPUT-CLEANUP: Suppress third-party library warnings that clutter terminal output
+# These warnings are not actionable by users and interfere with spinner display
+warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
+warnings.filterwarnings("ignore", message="DataFrame columns are not unique")
 
 # Import the package module for dynamic lookup of patchable functions.
 # This allows tests to patch work_data_hub.cli.etl._execute_single_domain etc.

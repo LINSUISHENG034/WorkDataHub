@@ -70,6 +70,7 @@ class FilePatternMatcher:
         include_patterns: List[str],
         exclude_patterns: Optional[List[str]] = None,
         selection_strategy: SelectionStrategy | str = SelectionStrategy.ERROR,
+        domain: str = "unknown",
     ) -> FileMatchResult:
         """
         Match files in search_path using include/exclude patterns.
@@ -110,7 +111,7 @@ class FilePatternMatcher:
         # Step 3: Validate at least 1 file exists
         if len(matched) == 0:
             raise DiscoveryError(
-                domain="unknown",
+                domain=domain,
                 failed_stage="file_matching",
                 original_error=FileNotFoundError("No matching files"),
                 message=(
@@ -122,7 +123,7 @@ class FilePatternMatcher:
 
         # Step 4: Handle multiple matches based on strategy
         if len(matched) > 1:
-            selected_file = self._select_by_strategy(matched, strategy)
+            selected_file = self._select_by_strategy(matched, strategy, domain)
         else:
             selected_file = matched[0]
 
@@ -155,7 +156,7 @@ class FilePatternMatcher:
         return SelectionStrategy(str(selection_strategy))
 
     def _select_by_strategy(
-        self, files: List[Path], strategy: SelectionStrategy
+        self, files: List[Path], strategy: SelectionStrategy, domain: str = "unknown"
     ) -> Path:
         """
         Select a single file from multiple matches based on strategy.
@@ -174,7 +175,7 @@ class FilePatternMatcher:
         """
         if strategy == SelectionStrategy.ERROR:
             raise DiscoveryError(
-                domain="unknown",
+                domain=domain,
                 failed_stage="file_matching",
                 original_error=ValueError("Ambiguous file match"),
                 message=(

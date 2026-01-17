@@ -24,9 +24,12 @@ def get_dagster_log_level(
 
     Verbosity Levels (from quietest to loudest):
         - quiet:   CRITICAL only (silent except fatal errors)
-        - default: ERROR only (clean UX, no warnings in terminal)
+        - default: CRITICAL only (clean UX, Dagster logs suppressed)
         - verbose: WARNING+ (show diagnostic warnings)
         - debug:   DEBUG+ (full output including Dagster internals)
+
+    Story CLI-OUTPUT-CLEANUP: Default changed from ERROR to CRITICAL
+    to prevent Dagster stack traces from mixing with spinner output.
     """
     if debug:
         return "DEBUG"
@@ -35,9 +38,9 @@ def get_dagster_log_level(
     elif quiet:
         return "CRITICAL"
     else:
-        # Default: suppress WARNING to keep terminal clean
-        # Only show ERROR+ for truly exceptional cases
-        return "ERROR"
+        # Default: suppress all Dagster logs to keep terminal clean
+        # CLI user-facing output uses console.print() which is not affected
+        return "CRITICAL"
 
 
 def build_logger_config(
