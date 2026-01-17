@@ -44,6 +44,31 @@ SENSITIVE_PATTERNS = [
 REDACTED_VALUE = "[REDACTED]"
 
 
+class DagsterCascadeFilter(logging.Filter):
+    """Filter out Dagster's cascading 'Dependencies failed' messages.
+
+    When one op fails, Dagster logs ERROR for every downstream op saying
+    "Dependencies for step X failed". This is noise - user already knows
+    the root cause from the first failure.
+
+    Story: CLI-ERROR-CLEANUP
+    """
+
+    NOISE_PATTERNS = [
+        "Dependencies for step",
+        "were not executed:",
+        "Not executing.",
+    ]
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Return False to suppress, True to allow."""
+        if record.name.startswith("dagster"):
+            message = record.getMessage()
+            if any(pattern in message for pattern in self.NOISE_PATTERNS):
+                return False  # Suppress this message
+        return True  # Allow all other messages
+
+
 def sanitize_for_logging(data: Dict[str, Any]) -> Dict[str, Any]:
     """Redact sensitive values from a dictionary before logging.
 
@@ -280,6 +305,8 @@ def reconfigure_for_console(
     else:
         # Suppress Dagster DEBUG/INFO to reduce terminal noise
         dagster_logger.setLevel(logging.WARNING)
+        # Story CLI-ERROR-CLEANUP: Suppress cascading dependency failure noise
+        dagster_logger.addFilter(DagsterCascadeFilter())
 
     # Determine root log level based on verbosity
     # Priority: debug > verbose > default > quiet
