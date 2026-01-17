@@ -21,6 +21,7 @@ Usage:
 import logging
 import os
 import re
+import sys
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
@@ -333,7 +334,10 @@ def reconfigure_for_console(
         logging.root.removeHandler(handler)
 
     # Add a single StreamHandler with the correct level
-    new_handler = logging.StreamHandler()
+    # Use stderr for structlog output to avoid mixing with Rich console on stdout
+    # Story CLI-ERROR-CLEANUP: Prevents JSON logs from appearing inline with spinner
+    stream = sys.stderr if not debug else sys.stdout
+    new_handler = logging.StreamHandler(stream)
     new_handler.setLevel(root_level)
     new_handler.setFormatter(logging.Formatter("%(message)s"))
     logging.root.addHandler(new_handler)
