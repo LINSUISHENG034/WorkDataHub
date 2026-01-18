@@ -31,6 +31,31 @@ from structlog import get_logger
 logger = get_logger(__name__)
 
 
+# Import contract sync function (Story 7.6-6)
+def _sync_contract_status_hook(domain: str, period: str | None) -> None:
+    """Post-ETL hook wrapper for contract status sync.
+
+    Wraps the customer_mdm.sync_contract_status function to match
+    the PostEtlHook signature.
+
+    Args:
+        domain: Domain name (should be 'annuity_performance')
+        period: Period string (currently unused, syncs all available data)
+    """
+    from work_data_hub.customer_mdm import sync_contract_status
+
+    logger.info("Triggering contract status sync from post-ETL hook")
+
+    result = sync_contract_status(period=period, dry_run=False)
+
+    logger.info(
+        "Contract status sync completed",
+        inserted=result["inserted"],
+        updated=result["updated"],
+        total=result["total"],
+    )
+
+
 @dataclass
 class PostEtlHook:
     """A hook that runs after ETL completion for a domain.
@@ -38,7 +63,7 @@ class PostEtlHook:
     Attributes:
         name: Unique identifier for this hook
         domains: List of domain names that trigger this hook
-        hook_fn: Function to execute with signature:
+        hook_fn: Function to execute with signature
             (domain: str, period: str | None) -> None
     """
 
@@ -51,11 +76,11 @@ class PostEtlHook:
 POST_ETL_HOOKS: List[PostEtlHook] = [
     # Hook registration for Story 7.6-6: Contract Status Sync
     # Triggers after annuity_performance domain ETL completes
-    # PostEtlHook(
-    #     name="contract_status_sync",
-    #     domains=["annuity_performance"],
-    #     hook_fn=sync_contract_status,
-    # ),
+    PostEtlHook(
+        name="contract_status_sync",
+        domains=["annuity_performance"],
+        hook_fn=_sync_contract_status_hook,
+    ),
 ]
 
 
