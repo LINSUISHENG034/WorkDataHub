@@ -168,6 +168,12 @@ def main(argv: Optional[List[str]] = None) -> int:  # noqa: PLR0911, PLR0912, PL
         default=False,
         help="Skip fact loading, run backfill only",
     )
+    parser.add_argument(
+        "--no-post-hooks",
+        action="store_true",
+        default=False,
+        help="Disable Post-ETL hooks (e.g., customer MDM sync)",
+    )
 
     # Queue processing arguments
     parser.add_argument(
