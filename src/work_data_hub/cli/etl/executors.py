@@ -378,6 +378,23 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:  # noq
                         )
                         console.print(f"   {clean_message}")
 
+        # Story 7.6-6: Execute Post-ETL hooks on success
+        if result.success and not getattr(args, "no_post_hooks", False):
+            from .hooks import run_post_etl_hooks
+
+            period = getattr(args, "period", None)
+            console.print("\n🪝 Running Post-ETL hooks...")
+            try:
+                run_post_etl_hooks(domain=domain, period=period)
+                console.print("✓ Post-ETL hooks completed")
+            except Exception as e:
+                console.print(f"⚠ Post-ETL hooks failed: {e}")
+                if args.debug:
+                    import traceback
+
+                    console.print("\n🐛 Hook traceback:")
+                    traceback.print_exc()
+
         return 0 if result.success else 1
 
     except Exception as e:
