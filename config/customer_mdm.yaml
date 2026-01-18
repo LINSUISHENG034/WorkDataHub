@@ -1,0 +1,7 @@
+customer_mdm:
+  # Strategic customer threshold (5 billion yuan) - Reserved for Story 7.6-9
+  strategic_threshold: 500000000
+  # Top N customers per branch for whitelist - Reserved for Story 7.6-9
+  whitelist_top_n: 10
+  # Current status year
+  status_year: 2026
