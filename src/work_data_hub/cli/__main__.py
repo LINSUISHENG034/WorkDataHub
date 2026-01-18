@@ -14,6 +14,7 @@ Available commands:
     eqc-gui      - Launch EQC quick query GUI (Tkinter)
     eqc-gui-fluent - Launch EQC quick query GUI (Fluent/Modern)
     cleanse      - Data cleansing operations
+    customer-mdm - Customer Master Data Management operations
 
 Examples:
     # Single domain ETL
@@ -65,10 +66,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         epilog="""
 Examples:
   # Single domain ETL
-  python -m work_data_hub.cli etl --domains annuity_performance --period 202411 --execute
+  python -m work_data_hub.cli etl --domains annuity_performance \\
+      --period 202411 --execute
 
   # Multi-domain ETL
-  python -m work_data_hub.cli etl --domains annuity_performance,annuity_income --period 202411 --execute
+  python -m work_data_hub.cli etl \\
+      --domains annuity_performance,annuity_income --period 202411 --execute
 
   # All domains ETL
   python -m work_data_hub.cli etl --all-domains --period 202411 --execute
@@ -80,7 +83,8 @@ Examples:
   python -m work_data_hub.cli eqc-refresh --status
 
   # Data cleansing
-  python -m work_data_hub.cli cleanse --table business_info --domain eqc_business_info
+  python -m work_data_hub.cli cleanse --table business_info \\
+      --domain eqc_business_info
         """,
     )
 
@@ -139,6 +143,14 @@ Examples:
         add_help=False,  # Let the delegated module handle help
     )
 
+    # Customer MDM command (delegate to customer_mdm module)
+    subparsers.add_parser(
+        "customer-mdm",
+        help="Customer Master Data Management operations",
+        description="Manage customer master data synchronization",
+        add_help=False,
+    )
+
     # Parse arguments
     args, remaining_args = parser.parse_known_args(argv)
 
@@ -188,6 +200,21 @@ Examples:
         # Reconstruct argv for the delegated module
         delegated_argv = remaining_args if remaining_args else []
         return cleanse_main(delegated_argv)
+
+    elif args.command == "customer-mdm":
+        # Delegate to customer_mdm module
+        # Extract subcommand (e.g., "sync") from remaining_args
+        if remaining_args and remaining_args[0] == "sync":
+            from work_data_hub.cli.customer_mdm.sync import main as customer_mdm_main
+
+            # Pass args after "sync" to the delegated module
+            delegated_argv = remaining_args[1:] if len(remaining_args) > 1 else []
+            return customer_mdm_main(delegated_argv)
+        else:
+            # No subcommand provided, show help
+            from work_data_hub.cli.customer_mdm.sync import main as customer_mdm_main
+
+            return customer_mdm_main(["--help"])
 
     else:
         parser.print_help()
