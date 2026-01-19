@@ -51,13 +51,17 @@ def sync_contract_status(
     customer.customer_plan_contract.
 
     This function performs an idempotent upsert operation:
-    - Inserts new contract records for the period
-    - Updates existing records if business data has changed
-    - Uses ON CONFLICT clause to handle duplicate keys
+    - Inserts new contract records for ALL available periods
+    - Uses ON CONFLICT DO NOTHING for idempotent writes
+    - Does NOT implement true SCD Type 2 versioning (v1 simplified)
+
+    Note:
+        v1 Implementation: The `period` parameter is currently UNUSED.
+        All available data from business.规模明细 is synced regardless of
+        the period argument. Period filtering may be added in Story 7.6-9.
 
     Args:
-        period: Optional period string (YYYYMM format). If None, syncs
-            latest available data.
+        period: Reserved for future use. Currently ignored - syncs all data.
         dry_run: If True, logs actions without executing database changes
 
     Returns:

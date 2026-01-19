@@ -379,6 +379,9 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:  # noq
                         console.print(f"   {clean_message}")
 
         # Story 7.6-6: Execute Post-ETL hooks on success
+        # Design Decision: Hook failures are logged as warnings but do NOT fail the
+        # ETL job. This ensures data loading completes even if downstream sync fails.
+        # Users can manually re-run via `customer-mdm sync` command.
         if result.success and not getattr(args, "no_post_hooks", False):
             from .hooks import run_post_etl_hooks
 
@@ -388,7 +391,7 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:  # noq
                 run_post_etl_hooks(domain=domain, period=period)
                 console.print("✓ Post-ETL hooks completed")
             except Exception as e:
-                console.print(f"⚠ Post-ETL hooks failed: {e}")
+                console.print(f"⚠ Post-ETL hooks failed: {e}")  # Warning only
                 if args.debug:
                     import traceback
 

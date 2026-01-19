@@ -412,7 +412,7 @@ development_status:
   7.6-3-business-type-aggregation-view: done # v_customer_business_monthly_status_by_type view - Code Review in progress
   7.6-4-customer-tags-jsonb-migration: done # mapping.年金客户.tags JSONB column - Code Review PASSED 2026-01-16
   7.6-5-historical-data-backfill: done # 12-24 months historical data - ✅ Backfill completed 2026-01-16 (416 中标 + 241 流失 records)
-  7.6-6-contract-status-sync-post-etl-hook: ready-for-dev # Post-ETL Hook (1.5 days) - Story created 2026-01-16
+  7.6-6-contract-status-sync-post-etl-hook: review # Post-ETL Hook (1.5 days) - Code Review fixes applied 2026-01-19
   7.6-7-monthly-snapshot-refresh-post-etl-hook: backlog # Post-ETL Hook (1.5 days)
   7.6-8-power-bi-star-schema-integration: backlog # BI layer integration (1 day)
   7.6-9-index-trigger-optimization: backlog # BRIN, Partial indexes, trg_sync_product_line_name (0.5 days)
