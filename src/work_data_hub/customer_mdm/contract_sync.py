@@ -73,7 +73,8 @@ def sync_contract_status(
     Raises:
         psycopg.Error: Database connection or query error
     """
-    load_dotenv()
+    # Force .wdh_env to override system environment variables (Story 7.3-5 pattern)
+    load_dotenv(dotenv_path=".wdh_env", override=True)
 
     database_url = os.getenv("DATABASE_URL")
     if not database_url:

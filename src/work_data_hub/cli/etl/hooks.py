@@ -72,7 +72,32 @@ class PostEtlHook:
     hook_fn: Callable[[str, str | None], None]
 
 
+# Import snapshot refresh function (Story 7.6-7)
+def _snapshot_refresh_hook(domain: str, period: str | None) -> None:
+    """Post-ETL hook wrapper for monthly snapshot refresh.
+
+    Runs AFTER contract_status_sync to ensure fresh contract data is available.
+
+    Args:
+        domain: Domain name (should be 'annuity_performance')
+        period: Period string in YYYYMM format
+    """
+    from work_data_hub.customer_mdm import refresh_monthly_snapshot
+
+    logger.info("Triggering monthly snapshot refresh from post-ETL hook")
+
+    result = refresh_monthly_snapshot(period=period, dry_run=False)
+
+    logger.info(
+        "Monthly snapshot refresh completed",
+        upserted=result["upserted"],
+        total=result["total"],
+    )
+
+
 # Registry of post-ETL hooks
+# IMPORTANT: Hook execution order follows list order.
+# contract_status_sync MUST run before snapshot_refresh
 POST_ETL_HOOKS: List[PostEtlHook] = [
     # Hook registration for Story 7.6-6: Contract Status Sync
     # Triggers after annuity_performance domain ETL completes
@@ -80,6 +105,13 @@ POST_ETL_HOOKS: List[PostEtlHook] = [
         name="contract_status_sync",
         domains=["annuity_performance"],
         hook_fn=_sync_contract_status_hook,
+    ),
+    # Hook registration for Story 7.6-7: Monthly Snapshot Refresh
+    # Must run AFTER contract_status_sync (order matters)
+    PostEtlHook(
+        name="snapshot_refresh",
+        domains=["annuity_performance"],
+        hook_fn=_snapshot_refresh_hook,
     ),
 ]
 

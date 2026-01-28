@@ -203,18 +203,26 @@ Examples:
 
     elif args.command == "customer-mdm":
         # Delegate to customer_mdm module
-        # Extract subcommand (e.g., "sync") from remaining_args
+        # Extract subcommand (e.g., "sync", "snapshot") from remaining_args
         if remaining_args and remaining_args[0] == "sync":
-            from work_data_hub.cli.customer_mdm.sync import main as customer_mdm_main
+            from work_data_hub.cli.customer_mdm.sync import main as sync_main
 
             # Pass args after "sync" to the delegated module
             delegated_argv = remaining_args[1:] if len(remaining_args) > 1 else []
-            return customer_mdm_main(delegated_argv)
-        else:
-            # No subcommand provided, show help
-            from work_data_hub.cli.customer_mdm.sync import main as customer_mdm_main
+            return sync_main(delegated_argv)
+        elif remaining_args and remaining_args[0] == "snapshot":
+            from work_data_hub.cli.customer_mdm.snapshot import main as snapshot_main
 
-            return customer_mdm_main(["--help"])
+            # Pass args after "snapshot" to the delegated module
+            delegated_argv = remaining_args[1:] if len(remaining_args) > 1 else []
+            return snapshot_main(delegated_argv)
+        else:
+            # No subcommand or unknown subcommand, show available options
+            print("Customer MDM subcommands:")
+            print("  sync      - Sync contract status from business.规模明细")
+            print("  snapshot  - Refresh monthly snapshot data")
+            print("\nUsage: customer-mdm <subcommand> [options]")
+            return 1
 
     else:
         parser.print_help()

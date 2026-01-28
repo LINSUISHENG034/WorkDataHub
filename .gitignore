@@ -2,6 +2,9 @@
 # WorkDataHub .gitignore
 # ============================================================================
 
+# Bmad-Method
+.agent/
+
 # exclude_file
 # 1. 忽略 fixtures 下的所有内容，但允许进入 fixtures 文件夹
 tests/fixtures/*

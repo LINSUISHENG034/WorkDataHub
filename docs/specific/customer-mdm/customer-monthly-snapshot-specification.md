@@ -7,6 +7,19 @@
 > - [customer-plan-contract-specification.md](./customer-plan-contract-specification.md)
 > - [customer-identity-monthly-snapshot-implementation-v3.2-project-based.md](./customer-identity-monthly-snapshot-implementation-v3.2-project-based.md)
 
+> [!IMPORTANT]
+> **实际实现差异 (Story 7.6-7)**
+>
+> 本文档描述的是 **Plan-level 粒度** 的原始设计。实际实现采用了 **Product Line-level 聚合粒度**：
+>
+> | 项目 | 本文档 (原始设计) | 实际实现 (Story 7.6-7) |
+> |------|------------------|----------------------|
+> | 表名 | `customer.customer_monthly_snapshot` | `customer.fct_customer_business_monthly_status` |
+> | 主键 | `(snapshot_month, company_id, plan_code, product_line_code)` | `(snapshot_month, company_id, product_line_code)` |
+> | 计划数 | 每条记录一个计划 | `plan_count` 列聚合 |
+>
+> 聚合设计减少了数据量并优化了 BI 查询性能。详见 Story 7.6-7 Dev Notes。
+
 ---
 
 ## 0. 快速理解：表格关系总览
