@@ -414,7 +414,7 @@ development_status:
   7.6-5-historical-data-backfill: done # 12-24 months historical data - ✅ Backfill completed 2026-01-16 (416 中标 + 241 流失 records)
   7.6-6-contract-status-sync-post-etl-hook: done # Post-ETL Hook (1.5 days) - Code Review fixes applied 2026-01-19
   7.6-7-monthly-snapshot-refresh-post-etl-hook: done # Post-ETL Hook (1.5 days) - Code Review PASSED 2026-01-28
-  7.6-8-power-bi-star-schema-integration: backlog # BI layer integration (1 day)
+  7.6-8-power-bi-star-schema-integration: done # BI layer integration (1 day) - Code Review PASSED 2026-01-29
   7.6-9-index-trigger-optimization: backlog # BRIN, Partial indexes, trg_sync_product_line_name (0.5 days)
   7.6-10-integration-testing-documentation: backlog # Integration tests and docs (1 day)
   epic-7.6-retrospective: optional
