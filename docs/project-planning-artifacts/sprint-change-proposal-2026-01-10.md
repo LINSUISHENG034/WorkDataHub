@@ -310,13 +310,13 @@ RETURNS TRIGGER AS $$
 BEGIN
     -- 同步到合约表
     UPDATE customer.customer_plan_contract
-    SET 产品线名称 = NEW.产品线, updated_at = CURRENT_TIMESTAMP
-    WHERE 产品线代码 = NEW.产品线代码 AND 产品线名称 != NEW.产品线;
+    SET product_line_name = NEW.产品线, updated_at = CURRENT_TIMESTAMP
+    WHERE product_line_code = NEW.产品线代码 AND product_line_name IS DISTINCT FROM NEW.产品线;
 
     -- 同步到快照表
     UPDATE customer.fct_customer_business_monthly_status
     SET product_line_name = NEW.产品线, updated_at = CURRENT_TIMESTAMP
-    WHERE product_line_code = NEW.产品线代码 AND product_line_name != NEW.产品线;
+    WHERE product_line_code = NEW.产品线代码 AND product_line_name IS DISTINCT FROM NEW.产品线;
 
     RETURN NEW;
 END;
@@ -325,7 +325,7 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_sync_product_line_name
     AFTER UPDATE ON mapping."产品线"
     FOR EACH ROW
-    WHEN (OLD.产品线 != NEW.产品线)
+    WHEN (OLD.产品线 IS DISTINCT FROM NEW.产品线)
     EXECUTE FUNCTION sync_product_line_name();
 ```
 
