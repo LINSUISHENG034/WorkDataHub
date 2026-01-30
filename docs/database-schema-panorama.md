@@ -1,8 +1,8 @@
 # Database Schema Panorama (数据库全景图)
 
 **Created:** 2025-12-23
-**Last Updated:** 2026-01-16
-**Version:** 2.1
+**Last Updated:** 2026-01-30
+**Version:** 2.2
 **Maintainer:** Development Team
 **Verified Against:** PostgreSQL production database (2025-12-23)
 
@@ -17,10 +17,11 @@
 | [3. Schema: business](#3-schema-business) | Domain transaction data (1 table) |
 | [4. Schema: mapping](#4-schema-mapping) | Reference/master data (6 tables) |
 | [5. Schema: public](#5-schema-public) | Pipeline infrastructure (3 tables) |
-| [6. Schema: customer](#6-schema-customer) | Customer lifecycle tracking (2 tables, 1 view) |
-| [7. Empty Schemas](#7-empty-schemas) | Reserved schemas |
-| [8. Entity Relationships](#8-entity-relationships) | Visual table relationships |
-| [9. Data Flow Architecture](#9-data-flow-architecture) | How data moves through the system |
+| [6. Schema: customer](#6-schema-customer) | Customer lifecycle tracking (6 objects) |
+| [7. Schema: bi](#7-schema-bi-bi-star-schema) | BI star schema views (4 views) |
+| [8. Empty Schemas](#8-empty-schemas) | Reserved schemas |
+| [9. Entity Relationships](#9-entity-relationships) | Visual table relationships |
+| [10. Data Flow Architecture](#10-data-flow-architecture) | How data moves through the system |
 | [Appendix](#appendix) | Configuration, glossary, deprecated tables |
 
 ---
@@ -44,25 +45,27 @@
 │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘ │
 │                                                                           │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
-│  │   customer   │  │   finance    │  │    system    │  │   wdh_dev    │ │
-│  │  (3 objects) │  │   (empty)    │  │   (empty)    │  │   (empty)    │ │
-│  │ • 当年中标   │  │  [Reserved]  │  │  [Reserved]  │  │  [Reserved]  │ │
-│  │ • 当年流失   │  │              │  │              │  │              │ │
-│  │ • Agg View   │  │              │  │              │  │              │ │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘ │
+│  │   customer   │  │      bi      │  │   finance    │  │    system    │ │
+│  │  (6 objects) │  │  (4 views)   │  │   (empty)    │  │   (empty)    │ │
+│  │ • 年金客户   │  │ • dim_*      │  │  [Reserved]  │  │  [Reserved]  │ │
+│  │ • contracts  │  │ • fct_*      │  │              │  │              │ │
+│  │ • snapshots  │  │ (Star Schema)│  │              │  │              │ │
+│  │ • 中标/流失  │  └──────────────┘  └──────────────┘  └──────────────┘ │
+│  └──────────────┘                                                        │
 │                                                                           │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 1.2 Schema Summary
 
-| Schema | Tables | Purpose | Status |
+| Schema | Tables/Views | Purpose | Status |
 |--------|--------|---------|--------|
 | `enterprise` | 12 | Company enrichment, EQC data, mapping cache | ✅ Active |
 | `business` | 1 | Domain transaction data (annuity performance) | ✅ Active |
 | `mapping` | 6 | Reference/master data (plans, portfolios, customers) | ✅ Active |
 | `public` | 3 | Pipeline infrastructure (executions, metrics, migrations) | ✅ Active |
-| `customer` | 3 | Customer lifecycle tracking (awards, losses, views) | ✅ Active |
+| `customer` | 6 | Customer lifecycle tracking (contracts, snapshots, awards, losses) | ✅ Active |
+| `bi` | 4 views | BI star schema for Power BI DirectQuery | ✅ Active |
 | `finance` | 0 | Reserved for future financial data | 🔲 Empty |
 | `system` | 0 | Reserved for system operations | 🔲 Empty |
 | `wdh_dev` | 0 | Development/testing sandbox | 🔲 Empty |
@@ -661,19 +664,75 @@
 
 ## 6. Schema: customer
 
-**Purpose:** Customer lifecycle tracking - awards, losses, and aggregation views.
+**Purpose:** Customer lifecycle tracking - awards, losses, contract relationships, and monthly snapshots.
 
 ### 6.1 Table Summary
 
 | Object | Type | Rows | Purpose |
 |--------|------|------|---------|
-| `当年中标` | Table | ~416 | Annual award records (23 months: 2024-02 to 2025-12) |
-| `当年流失` | Table | ~241 | Annual loss records (23 months: 2024-02 to 2025-12) |
+| `年金客户` | Table | ~9,813 | Customer master data (dimension) |
+| `当年中标` | Table | ~416 | Annual award records |
+| `当年流失` | Table | ~241 | Annual loss records |
+| `customer_plan_contract` | Table | ~3,000+ | Customer-plan contract relationships (SCD Type 2 ready) |
+| `fct_customer_business_monthly_status` | Table | ~1,500+ | Monthly snapshot fact table for BI |
 | `v_customer_business_monthly_status_by_type` | View | - | Pre-aggregated monthly status by business type |
 
----
+### 6.2 customer_plan_contract (Story 7.6-6)
 
-### 6.2 v_customer_business_monthly_status_by_type (Aggregation View)
+**Purpose:** Tracks customer-plan contract relationships with SCD Type 2 time dimensions.
+
+**Business Key:** `(company_id, plan_code, product_line_code, valid_to)`
+
+**Migration:** `008_create_customer_plan_contract.py`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `contract_id` | SERIAL | Primary key (surrogate) |
+| `company_id` | VARCHAR | FK to `年金客户.company_id` |
+| `plan_code` | VARCHAR(20) | Plan identifier |
+| `product_line_code` | VARCHAR(20) | FK to `产品线.产品线代码` |
+| `product_line_name` | VARCHAR(50) | Denormalized name (trigger-synced) |
+| `is_strategic` | BOOLEAN | Strategic customer flag |
+| `is_existing` | BOOLEAN | Existing customer flag |
+| `status_year` | INTEGER | Year context for annual status |
+| `contract_status` | VARCHAR(20) | "正常" or "停缴" |
+| `valid_from` | DATE | SCD Type 2 start date |
+| `valid_to` | DATE | SCD Type 2 end date (default: 9999-12-31) |
+
+**Indexes:**
+- Primary: `contract_id`
+- Unique: `(company_id, plan_code, product_line_code, valid_to)`
+- Composite: `(company_id, plan_code, product_line_code) WHERE valid_to = '9999-12-31'`
+- Partial: `is_strategic = TRUE`
+
+### 6.3 fct_customer_business_monthly_status (Story 7.6-7)
+
+**Purpose:** Monthly fact table for BI analysis at Customer + Product Line granularity.
+
+**Primary Key:** `(snapshot_month, company_id, product_line_code)` (composite)
+
+**Migration:** `009_create_fct_customer_monthly_status.py`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `snapshot_month` | DATE | End-of-month date (e.g., 2026-01-31) |
+| `company_id` | VARCHAR | FK to `年金客户.company_id` |
+| `product_line_code` | VARCHAR(20) | FK to `产品线.产品线代码` |
+| `product_line_name` | VARCHAR(50) | Denormalized name (trigger-synced) |
+| `is_strategic` | BOOLEAN | Aggregated via BOOL_OR |
+| `is_existing` | BOOLEAN | Aggregated via BOOL_OR |
+| `is_new` | BOOLEAN | Derived: is_winning AND NOT is_existing |
+| `is_winning_this_year` | BOOLEAN | Derived from `当年中标` |
+| `is_churned_this_year` | BOOLEAN | Derived from `当年流失` |
+| `aum_balance` | DECIMAL(20,2) | Aggregated AUM from `规模明细` |
+| `plan_count` | INTEGER | COUNT DISTINCT plan_code |
+
+**Indexes:**
+- Composite: `(snapshot_month, product_line_code)`
+- Partial: `is_strategic = TRUE`
+- BRIN: `snapshot_month`
+
+### 6.4 v_customer_business_monthly_status_by_type (Aggregation View)
 
 **Purpose:** Pre-aggregated view for BI analysis of award/loss patterns by business type.
 
@@ -724,7 +783,82 @@ WHERE "业务类型" = '企年受托';
 
 ---
 
-## 7. Empty Schemas
+## 7. Schema: bi (BI Star Schema)
+
+**Purpose:** Power BI DirectQuery integration - star schema views for self-service analytics.
+
+**Migration:** `010_create_bi_star_schema.py`
+
+### 7.1 View Summary
+
+| View | Type | Source | Purpose |
+|------|------|--------|---------|
+| `dim_customer` | Dimension | `customer.年金客户` | Customer dimension (filtered to those with contracts) |
+| `dim_product_line` | Dimension | `mapping.产品线` | Product line dimension |
+| `dim_time` | Dimension | Generated | Time dimension from distinct snapshot_month |
+| `fct_customer_monthly_summary` | Fact | `customer.fct_customer_business_monthly_status` | Monthly fact view |
+
+### 7.2 dim_customer
+
+**Source:** `customer."年金客户"` filtered by EXISTS in `fct_customer_business_monthly_status`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `company_id` | VARCHAR | Primary key |
+| `customer_name` | VARCHAR | 客户名称 |
+| `customer_type` | VARCHAR | 年金客户类型 |
+| `customer_tags` | JSONB | Customer tags (Story 7.6-4) |
+| `customer_short_name` | VARCHAR | 客户简称 |
+| `latest_trustee_aum` | NUMERIC | 最新受托规模 |
+| `latest_investment_aum` | NUMERIC | 最新投管规模 |
+| `aum_tier` | VARCHAR | 规模区间 |
+| `plan_count` | INTEGER | 关联计划数 |
+
+### 7.3 dim_product_line
+
+**Source:** `mapping."产品线"`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `product_line_code` | VARCHAR | Primary key (产品线代码) |
+| `product_line_name` | VARCHAR | 产品线 |
+| `business_category` | VARCHAR | 业务大类 |
+
+### 7.4 dim_time
+
+**Source:** Generated from distinct `snapshot_month` in `fct_customer_business_monthly_status`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `snapshot_month` | DATE | Primary key |
+| `year` | INTEGER | Year extracted |
+| `quarter` | INTEGER | Quarter extracted |
+| `month_number` | INTEGER | Month number (1-12) |
+| `month_name` | VARCHAR | Month name (January, etc.) |
+| `year_month_label` | VARCHAR | YYYY-MM format |
+
+### 7.5 fct_customer_monthly_summary
+
+**Source:** `customer.fct_customer_business_monthly_status`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `snapshot_month` | DATE | FK to dim_time |
+| `company_id` | VARCHAR | FK to dim_customer |
+| `product_line_code` | VARCHAR | FK to dim_product_line |
+| `product_line_name` | VARCHAR | Denormalized for convenience |
+| `is_strategic` | BOOLEAN | Strategic customer flag |
+| `is_existing` | BOOLEAN | Existing customer flag |
+| `is_new` | BOOLEAN | New customer flag |
+| `is_winning` | BOOLEAN | Winning this year (renamed from is_winning_this_year) |
+| `is_churned` | BOOLEAN | Churned this year (renamed from is_churned_this_year) |
+| `aum_balance` | DECIMAL | Assets under management |
+| `plan_count` | INTEGER | Number of plans |
+| `updated_at` | TIMESTAMPTZ | Last update timestamp |
+
+---
+
+## 8. Empty Schemas
 
 | Schema | Purpose | Notes |
 |--------|---------|-------|
@@ -734,7 +868,7 @@ WHERE "业务类型" = '企年受托';
 
 ---
 
-## 8. Entity Relationships
+## 9. Entity Relationships
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -817,7 +951,7 @@ WHERE "业务类型" = '企年受托';
 
 ---
 
-## 9. Data Flow Architecture
+## 10. Data Flow Architecture
 
 ### 9.1 ETL Pipeline Flow
 

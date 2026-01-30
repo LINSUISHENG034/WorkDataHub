@@ -1242,6 +1242,65 @@ class HybridReferenceService:
 
 ---
 
+### Decision #12: Customer MDM Post-ETL Hook Architecture
+
+**Problem:** Customer contract status and monthly snapshot data must be automatically derived from ETL source data (`business.规模明细`) after each ETL run. Manual triggers are needed for ad-hoc operations and backfills.
+
+**Decision:** Registry-based Post-ETL hook pattern with ordered execution and idempotent operations.
+
+#### Architecture
+
+```
+ETL Pipeline
+    │
+    ▼
+Post-ETL Hook Registry
+    │
+    ├── 1. contract_status_sync     → customer.customer_plan_contract
+    │       (ON CONFLICT DO NOTHING)
+    │
+    └── 2. snapshot_refresh          → customer.fct_customer_business_monthly_status
+            (ON CONFLICT DO UPDATE)
+```
+
+#### Key Design Decisions
+
+| Aspect | Decision | Rationale |
+|--------|----------|-----------|
+| **Trigger Pattern** | Registry-based hooks (`PostEtlHook` dataclass) | Extensible, declarative, testable |
+| **Execution Order** | List order in `POST_ETL_HOOKS` | Contract sync must precede snapshot refresh |
+| **Idempotency** | `ON CONFLICT DO NOTHING` (sync) / `ON CONFLICT DO UPDATE` (refresh) | Safe retry and re-execution |
+| **Granularity Shift** | Plan-level → Product Line-level in snapshot | Reduces data volume for BI consumption |
+| **BI Layer** | Views in `bi` schema (not materialized) | DirectQuery compatibility, zero maintenance |
+| **Denormalization** | `product_line_name` with trigger sync | Avoids JOINs in BI queries, trigger ensures consistency |
+| **Error Handling** | Hook failures logged, remaining hooks continue | Resilience: one hook failure doesn't block others |
+| **Skip Mechanism** | `--no-post-hooks` CLI flag | Operational flexibility for ETL-only runs |
+
+#### Data Flow
+
+1. **Source**: `business.规模明细` (monthly AUM data, plan-level)
+2. **Contract Table**: `customer.customer_plan_contract` (plan-level, SCD Type 2 ready)
+3. **Fact Table**: `customer.fct_customer_business_monthly_status` (product line-level, monthly snapshot)
+4. **BI Views**: `bi.dim_customer`, `bi.dim_product_line`, `bi.dim_time`, `bi.fct_customer_monthly_summary`
+
+#### Implementation (Epic 7.6)
+
+- **Story 7.6-6**: Contract Status Sync (Post-ETL Hook)
+- **Story 7.6-7**: Monthly Snapshot Refresh (Post-ETL Hook)
+- **Story 7.6-8**: Power BI Star Schema Integration
+- **Story 7.6-9**: Index & Trigger Optimization
+- **Story 7.6-10**: Integration Testing & Documentation
+
+#### Related Files
+
+- Hook registry: `src/work_data_hub/cli/etl/hooks.py`
+- Contract sync: `src/work_data_hub/customer_mdm/contract_sync.py`
+- Snapshot refresh: `src/work_data_hub/customer_mdm/snapshot_refresh.py`
+- Migrations: `io/schema/migrations/versions/008-011`
+- Integration tests: `tests/integration/customer_mdm/`
+
+---
+
 ## Technical Debt & Future Considerations
 
 ### TD-001: Cross-Domain Mapping Data Consolidation

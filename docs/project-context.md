@@ -358,7 +358,61 @@ Output: company_id (已解析或临时)
 
 ---
 
-## 9. 🚀 Quick Reference (快速参考)
+## 9. 🏢 Customer MDM (客户主数据管理)
+
+> **Epic 7.6 (2026-01):** 实现客户合同状态跟踪和月度快照生成，支持 Power BI 自助分析。
+
+### Post-ETL Hook 架构
+
+Customer MDM 通过 **Post-ETL Hook** 机制在 ETL 完成后自动触发数据同步：
+
+```
+ETL Pipeline (annuity_performance)
+    │
+    ▼
+Post-ETL Hook Registry
+    │
+    ├── 1. contract_status_sync  → customer.customer_plan_contract
+    │       (ON CONFLICT DO NOTHING)
+    │
+    └── 2. snapshot_refresh      → customer.fct_customer_business_monthly_status
+            (ON CONFLICT DO UPDATE)
+```
+
+**关键特性：**
+- **执行顺序保证**: `contract_status_sync` 必须先于 `snapshot_refresh` 执行
+- **幂等性**: 多次执行产生相同结果，支持安全重试
+- **CLI 跳过**: 使用 `--no-post-hooks` 禁用自动触发
+
+### CLI 命令
+
+```bash
+# ETL 自动触发 Hooks
+uv run --env-file .wdh_env python -m work_data_hub.cli etl \
+  --domain annuity_performance --execute
+
+# 禁用 Hooks (仅 ETL)
+uv run --env-file .wdh_env python -m work_data_hub.cli etl \
+  --domain annuity_performance --execute --no-post-hooks
+
+# 手动触发 Contract Sync
+uv run --env-file .wdh_env python -m work_data_hub.cli customer-mdm sync
+
+# 手动触发 Snapshot Refresh
+uv run --env-file .wdh_env python -m work_data_hub.cli customer-mdm snapshot --period 202601
+```
+
+### 相关文档
+
+| 文档 | 路径 |
+|------|------|
+| CLI 使用指南 | `docs/specific/customer-mdm/cli-usage-guide.md` |
+| 架构决策 #12 | `docs/architecture/architectural-decisions.md#decision-12` |
+| Schema 全景图 | `docs/database-schema-panorama.md` (§6-7: customer/bi schema) |
+
+---
+
+## 10. 🚀 Quick Reference (快速参考)
 
 ### CLI 常用命令
 
