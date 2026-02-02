@@ -1,7 +1,7 @@
 """Annual Award (当年中标) domain - Models.
 
-This domain unifies TrusteeAwardCleaner (企年受托中标) and InvesteeAwardCleaner (企年投资中标)
-from legacy system into a single domain.
+This domain unifies TrusteeAwardCleaner (企年受托中标) and
+InvesteeAwardCleaner (企年投资中标) from legacy system into a single domain.
 """
 
 import logging
@@ -87,7 +87,8 @@ class AnnualAwardIn(BaseModel):
 
     # Fields to be dropped (kept here for awareness, removed in pipeline)
     # 区域, 年金中心, 上报人 - will be dropped during transformation
-    # Investment-only redundant fields (战区前五大、中心前十大、机构前十大、五亿以上) also dropped
+    # Investment-only redundant fields also dropped:
+    # (战区前五大、中心前十大、机构前十大、五亿以上)
 
     @model_validator(mode="before")
     @classmethod

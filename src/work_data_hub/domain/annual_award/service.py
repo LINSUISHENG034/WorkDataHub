@@ -195,9 +195,6 @@ def _process_source_sheet(
     domain: str,
 ) -> AnnualAwardProcessingResult:
     """Process a single source sheet (trustee or investee)."""
-    sheet_name = (
-        "企年受托中标(空白)" if sheet_type == "trustee" else "企年投资中标(空白)"
-    )
     # Use correct product line names per mapping."产品线" table
     business_type = "企年受托" if sheet_type == "trustee" else "企年投资"
 

@@ -112,10 +112,11 @@ def _apply_branch_code_mapping(df: pd.DataFrame) -> pd.Series:
 def _apply_plan_code_defaults_for_annual_award(df: pd.DataFrame) -> pd.Series:
     """Apply default plan codes for annual_award domain.
 
-    Adapts the shared apply_plan_code_defaults logic for annual_award's '年金计划号' column.
-    Uses PLAN_CODE_DEFAULTS: 集合计划→AN001, 单一计划→AN002
+    Adapts the shared apply_plan_code_defaults logic for annual_award's
+    '年金计划号' column. Uses PLAN_CODE_DEFAULTS: 集合计划→AN001, 单一计划→AN002
 
-    Only fills empty values - preserves existing 年金计划号 from source data or enrichment.
+    Only fills empty values - preserves existing 年金计划号 from source data
+    or enrichment.
     """
     from work_data_hub.infrastructure.mappings import PLAN_CODE_DEFAULTS
 
@@ -179,9 +180,11 @@ class CompanyIdResolutionStep(TransformStep):
             df["客户名称"] = pd.NA
 
         # Resolution strategy follows annuity_performance pattern:
-        # Priority: YAML overrides → DB cache (enrichment_index) → existing company_id → temp ID
+        # Priority: YAML overrides → DB cache (enrichment_index) →
+        # existing company_id → temp ID
         strategy = ResolutionStrategy(
-            plan_code_column="年金计划号",  # Uses 年金计划号 for YAML plan override lookup
+            # Uses 年金计划号 for YAML plan override lookup
+            plan_code_column="年金计划号",
             customer_name_column="客户名称",
             account_name_column=None,  # No account name in annual award
             account_number_column=None,  # No account number in annual award
@@ -218,9 +221,11 @@ class PlanCodeEnrichmentStep(TransformStep):
       Rationale: "P" prefix typically indicates pooled/collective plans (集合计划)
     - 单一计划: Prefer plan codes starting with "S" (e.g., S0001, S0002)
       Rationale: "S" prefix typically indicates single/individual plans (单一计划)
-    - If no matching prefix found, use any available plan code for the company
+    - If no matching prefix found, use any available plan code for the
+      company
 
-    Only updates rows where 年金计划号 is empty (preserves existing values per requirement #2).
+    Only updates rows where 年金计划号 is empty (preserves existing values
+    per requirement #2).
     """
 
     def __init__(self, db_connection=None) -> None:
@@ -264,7 +269,8 @@ class PlanCodeEnrichmentStep(TransformStep):
 
         # Query customer_plan_contract table
         try:
-            # Build lookup mapping: (company_id, product_line_code) -> list of plan_codes
+            # Build lookup mapping:
+            # (company_id, product_line_code) -> list of plan_codes
             plan_code_mapping = self._build_plan_code_mapping(rows_to_enrich)
 
             # Apply enrichment
@@ -469,7 +475,8 @@ def build_bronze_to_silver_pipeline(
     # Step 12: Apply plan code defaults for remaining empty values
     # Uses PLAN_CODE_DEFAULTS: 集合计划→AN001, 单一计划→AN002
     # Must run AFTER PlanCodeEnrichmentStep (fallback for unmatched records)
-    # Note: apply_plan_code_defaults expects '计划代码' column, so we adapt for '年金计划号'
+    # Note: apply_plan_code_defaults expects '计划代码' column,
+    # so we adapt for '年金计划号'
     steps.append(
         CalculationStep(
             {

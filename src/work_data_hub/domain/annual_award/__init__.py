@@ -1,7 +1,7 @@
 """Annual Award (当年中标) domain.
 
-This domain unifies TrusteeAwardCleaner (企年受托中标) and InvesteeAwardCleaner (企年投资中标)
-from the legacy system into a single domain.
+This domain unifies TrusteeAwardCleaner (企年受托中标) and
+InvesteeAwardCleaner (企年投资中标) from the legacy system into a single domain.
 
 Implements requirements:
 1. Drop columns: 区域, 年金中心, 上报人
