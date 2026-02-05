@@ -77,6 +77,8 @@ def create_table(conn) -> None:
 
         -- Redundant fields (for query convenience)
         product_line_name VARCHAR(50) NOT NULL,
+        customer_name VARCHAR(200),             -- From customer.年金客户.客户名称
+        plan_name VARCHAR(200),                 -- From mapping.年金计划.计划全称
 
         -- Annual initialization status (updated every January)
         is_strategic BOOLEAN DEFAULT FALSE,
@@ -99,20 +101,36 @@ def create_table(conn) -> None:
             REFERENCES mapping.产品线(产品线代码),
 
         -- Compound unique constraint (business key + time)
-        CONSTRAINT uq_active_contract UNIQUE (company_id, plan_code, product_line_code, valid_to)
+        CONSTRAINT uq_active_contract UNIQUE (
+            company_id, plan_code, product_line_code, valid_to
+        )
     );
     """
     execute_sql(conn, create_table_sql)
 
     # Create indexes
     indexes = [
-        "CREATE INDEX idx_contract_company ON customer.customer_plan_contract(company_id)",
-        "CREATE INDEX idx_contract_plan ON customer.customer_plan_contract(plan_code)",
-        "CREATE INDEX idx_contract_product_line ON customer.customer_plan_contract(product_line_code)",
-        "CREATE INDEX idx_contract_strategic ON customer.customer_plan_contract(is_strategic) WHERE is_strategic = TRUE",
-        "CREATE INDEX idx_contract_status_year ON customer.customer_plan_contract(status_year)",
-        "CREATE INDEX idx_active_contracts ON customer.customer_plan_contract(company_id, plan_code, product_line_code) WHERE valid_to = '9999-12-31'",
-        "CREATE INDEX idx_contract_valid_from_brin ON customer.customer_plan_contract USING BRIN (valid_from)",
+        """CREATE INDEX idx_contract_company
+            ON customer.customer_plan_contract(company_id)""",
+        """CREATE INDEX idx_contract_plan
+            ON customer.customer_plan_contract(plan_code)""",
+        """CREATE INDEX idx_contract_product_line
+            ON customer.customer_plan_contract(product_line_code)""",
+        """CREATE INDEX idx_contract_strategic
+            ON customer.customer_plan_contract(is_strategic)
+            WHERE is_strategic = TRUE""",
+        """CREATE INDEX idx_contract_status_year
+            ON customer.customer_plan_contract(status_year)""",
+        """CREATE INDEX idx_active_contracts
+            ON customer.customer_plan_contract(
+                company_id, plan_code, product_line_code
+            ) WHERE valid_to = '9999-12-31'""",
+        """CREATE INDEX idx_contract_valid_from_brin
+            ON customer.customer_plan_contract USING BRIN (valid_from)""",
+        """CREATE INDEX idx_contract_customer_name
+            ON customer.customer_plan_contract(customer_name)""",
+        """CREATE INDEX idx_contract_plan_name
+            ON customer.customer_plan_contract(plan_name)""",
     ]
 
     for idx_sql in indexes:
@@ -148,6 +166,8 @@ def seed_data(conn) -> None:
         plan_code,
         product_line_code,
         product_line_name,
+        customer_name,
+        plan_name,
         is_strategic,
         is_existing,
         status_year,
@@ -160,17 +180,22 @@ def seed_data(conn) -> None:
         s.计划代码 as plan_code,
         s.产品线代码 as product_line_code,
         COALESCE(p.产品线, s.业务类型) as product_line_name,
-        FALSE as is_strategic,  -- Default, can be updated based on business rules
-        FALSE as is_existing,   -- Default, can be calculated based on previous year data
+        cust.客户名称 as customer_name,
+        plan.计划全称 as plan_name,
+        FALSE as is_strategic,  -- Default
+        FALSE as is_existing,   -- Default
         %s as status_year,
         CASE
             WHEN s.期末资产规模 > 0 THEN '正常'
             ELSE '停缴'
         END as contract_status,
-        (date_trunc('month', %s::date) + interval '1 month - 1 day')::date as valid_from,
+        (date_trunc('month', %s::date) + interval '1 month - 1 day')::date
+            as valid_from,
         '9999-12-31'::date as valid_to
     FROM business.规模明细 s
     LEFT JOIN mapping.产品线 p ON s.产品线代码 = p.产品线代码
+    LEFT JOIN customer."年金客户" cust ON s.company_id = cust.company_id
+    LEFT JOIN mapping."年金计划" plan ON s.计划代码 = plan.年金计划号
     WHERE s.月度 = %s
       AND s.company_id IS NOT NULL
       AND s.产品线代码 IS NOT NULL
@@ -206,9 +231,10 @@ def verify_data(conn) -> None:
         """)
         logger.info("  By product line:")
         for row in cursor.fetchall():
-            logger.info(
-                f"    {row['product_line_code']} ({row['product_line_name']}): {row['count']:,}"
-            )
+            code = row["product_line_code"]
+            name = row["product_line_name"]
+            count = row["count"]
+            logger.info(f"    {code} ({name}): {count:,}")
 
         # By contract status
         cursor.execute("""
@@ -224,6 +250,7 @@ def verify_data(conn) -> None:
         # Sample records
         cursor.execute("""
             SELECT cpc.company_id, cpc.plan_code, cpc.product_line_name,
+                   cpc.customer_name, cpc.plan_name,
                    cpc.contract_status, cpc.valid_from
             FROM customer.customer_plan_contract cpc
             ORDER BY cpc.contract_id
@@ -231,9 +258,13 @@ def verify_data(conn) -> None:
         """)
         logger.info("  Sample records:")
         for row in cursor.fetchall():
-            logger.info(
-                f"    {row['company_id']} | {row['plan_code']} | {row['product_line_name']} | {row['contract_status']} | {row['valid_from']}"
-            )
+            cid = row["company_id"]
+            pcode = row["plan_code"]
+            pln = row["product_line_name"]
+            cname = row["customer_name"]
+            pname = row["plan_name"]
+            status = row["contract_status"]
+            logger.info(f"    {cid} | {pcode} | {pln} | {cname} | {pname} | {status}")
 
 
 def main():

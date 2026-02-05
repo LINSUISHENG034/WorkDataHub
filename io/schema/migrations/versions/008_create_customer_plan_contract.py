@@ -44,6 +44,8 @@ def upgrade() -> None:
 
                 -- Redundant fields (for query convenience)
                 product_line_name VARCHAR(50) NOT NULL,
+                customer_name VARCHAR(200),
+                plan_name VARCHAR(200),
 
                 -- Annual initialization status (updated every January)
                 is_strategic BOOLEAN DEFAULT FALSE,
@@ -103,6 +105,12 @@ def upgrade() -> None:
 
             CREATE INDEX IF NOT EXISTS idx_contract_valid_from_brin
                 ON customer.customer_plan_contract USING BRIN (valid_from);
+
+            CREATE INDEX IF NOT EXISTS idx_contract_customer_name
+                ON customer.customer_plan_contract(customer_name);
+
+            CREATE INDEX IF NOT EXISTS idx_contract_plan_name
+                ON customer.customer_plan_contract(plan_name);
             """
         )
     )
@@ -138,10 +146,78 @@ def upgrade() -> None:
         )
     )
 
+    # 5. Create sync trigger for customer name changes
+    conn.execute(
+        sa.text(
+            """
+            CREATE OR REPLACE FUNCTION customer.sync_contract_customer_name()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                IF OLD.客户名称 IS DISTINCT FROM NEW.客户名称 THEN
+                    UPDATE customer.customer_plan_contract
+                    SET customer_name = NEW.客户名称,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE company_id = NEW.company_id;
+                END IF;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+
+            DROP TRIGGER IF EXISTS trg_sync_contract_customer_name
+                ON customer."年金客户";
+
+            CREATE TRIGGER trg_sync_contract_customer_name
+                AFTER UPDATE OF 客户名称 ON customer."年金客户"
+                FOR EACH ROW
+                EXECUTE FUNCTION customer.sync_contract_customer_name();
+            """
+        )
+    )
+
+    # 6. Create sync trigger for plan name changes
+    conn.execute(
+        sa.text(
+            """
+            CREATE OR REPLACE FUNCTION customer.sync_contract_plan_name()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                IF OLD.计划全称 IS DISTINCT FROM NEW.计划全称 THEN
+                    UPDATE customer.customer_plan_contract
+                    SET plan_name = NEW.计划全称,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE plan_code = NEW.年金计划号;
+                END IF;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+
+            DROP TRIGGER IF EXISTS trg_sync_contract_plan_name
+                ON mapping."年金计划";
+
+            CREATE TRIGGER trg_sync_contract_plan_name
+                AFTER UPDATE OF 计划全称 ON mapping."年金计划"
+                FOR EACH ROW
+                EXECUTE FUNCTION customer.sync_contract_plan_name();
+            """
+        )
+    )
+
 
 def downgrade() -> None:
     """Remove customer_plan_contract table and all associated objects."""
     conn = op.get_bind()
+
+    # Drop sync triggers first
+    conn.execute(
+        sa.text(
+            """
+            DROP TRIGGER IF EXISTS trg_sync_contract_customer_name
+                ON customer."年金客户";
+            DROP TRIGGER IF EXISTS trg_sync_contract_plan_name
+                ON mapping."年金计划";
+            """
+        )
+    )
 
     # Drop table (cascades to indexes and triggers)
     conn.execute(
@@ -152,11 +228,13 @@ def downgrade() -> None:
         )
     )
 
-    # Drop trigger function
+    # Drop trigger functions
     conn.execute(
         sa.text(
             """
             DROP FUNCTION IF EXISTS customer.update_customer_plan_contract_timestamp();
+            DROP FUNCTION IF EXISTS customer.sync_contract_customer_name();
+            DROP FUNCTION IF EXISTS customer.sync_contract_plan_name();
             """
         )
     )

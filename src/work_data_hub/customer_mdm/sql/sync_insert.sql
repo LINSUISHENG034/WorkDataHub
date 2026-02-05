@@ -16,6 +16,8 @@ INSERT INTO customer.customer_plan_contract (
     plan_code,
     product_line_code,
     product_line_name,
+    customer_name,
+    plan_name,
     is_strategic,
     is_existing,
     status_year,
@@ -28,6 +30,8 @@ SELECT DISTINCT
     s.计划代码 as plan_code,
     s.产品线代码 as product_line_code,
     COALESCE(p.产品线, s.业务类型) as product_line_name,
+    cust.客户名称 as customer_name,
+    plan.计划全称 as plan_name,
     CASE
         WHEN sw.company_id IS NOT NULL THEN TRUE
         ELSE FALSE
@@ -48,6 +52,8 @@ SELECT DISTINCT
     '9999-12-31'::date as valid_to
 FROM business.规模明细 s
 LEFT JOIN mapping."产品线" p ON s.产品线代码 = p.产品线代码
+LEFT JOIN customer."年金客户" cust ON s.company_id = cust.company_id
+LEFT JOIN mapping."年金计划" plan ON s.计划代码 = plan.年金计划号
 LEFT JOIN strategic_whitelist sw
     ON s.company_id = sw.company_id
     AND s.计划代码 = sw.计划代码

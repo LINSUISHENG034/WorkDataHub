@@ -90,6 +90,8 @@ CREATE TABLE customer.customer_plan_contract (
 
     -- 冗余字段（便于查询）
     product_line_name VARCHAR(50) NOT NULL,         -- 产品线名称：企年受托、企年投资等
+    customer_name VARCHAR(200),                     -- 客户名称（冗余，自动同步）
+    plan_name VARCHAR(200),                         -- 计划全称（冗余，自动同步）
 
     -- 年度初始化状态（每年1月更新）
     is_strategic BOOLEAN DEFAULT FALSE,             -- 是否战客
@@ -125,6 +127,8 @@ CREATE INDEX idx_contract_status_year ON customer.customer_plan_contract(status_
 CREATE INDEX idx_active_contracts ON customer.customer_plan_contract(company_id, plan_code, product_line_code)
     WHERE valid_to = '9999-12-31';
 CREATE INDEX idx_contract_valid_from_brin ON customer.customer_plan_contract USING BRIN (valid_from);
+CREATE INDEX idx_contract_customer_name ON customer.customer_plan_contract(customer_name);
+CREATE INDEX idx_contract_plan_name ON customer.customer_plan_contract(plan_name);
 ```
 
 ### 2.2 字段说明
@@ -136,6 +140,8 @@ CREATE INDEX idx_contract_valid_from_brin ON customer.customer_plan_contract USI
 | `plan_code` | VARCHAR | 计划代码 | `business.规模明细.计划代码` |
 | `product_line_code` | VARCHAR(20) | 产品线代码（PL201-PL204） | `mapping."产品线".产品线代码` |
 | `product_line_name` | VARCHAR(50) | 产品线名称（冗余） | `mapping."产品线".产品线` |
+| `customer_name` | VARCHAR(200) | 客户名称（冗余，自动同步） | `customer."年金客户".客户名称` |
+| `plan_name` | VARCHAR(200) | 计划全称（冗余，自动同步） | `mapping."年金计划".计划全称` |
 | `is_strategic` | BOOLEAN | 是否战客 | 规模汇总 + 白名单 |
 | `is_existing` | BOOLEAN | 是否已客（FALSE=新客） | 上年末规模汇总 |
 | `status_year` | INTEGER | 状态所属年度 | 系统计算 |
