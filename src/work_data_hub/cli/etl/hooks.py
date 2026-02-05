@@ -1,6 +1,8 @@
 """Post-ETL hook infrastructure for automatic data synchronization.
 
 Story 7.6-6: Contract Status Sync (Post-ETL Hook)
+Story 7.6-11: Customer Status Field Enhancement
+
 Provides a registry-based pattern for running cleanup, enrichment, or
 synchronization tasks after domain ETL completion.
 
@@ -30,13 +32,16 @@ from structlog import get_logger
 
 logger = get_logger(__name__)
 
+# Period format constants
+MIN_PERIOD_LENGTH = 6  # YYYYMM format minimum length
 
-# Import contract sync function (Story 7.6-6)
+
+# Import contract sync function (Story 7.6-6, enhanced in Story 7.6-11)
 def _sync_contract_status_hook(domain: str, period: str | None) -> None:
     """Post-ETL hook wrapper for contract status sync.
 
-    Wraps the customer_mdm.sync_contract_status function to match
-    the PostEtlHook signature.
+    Story 7.6-11: Now includes full is_strategic, is_existing, and
+    contract_status v2 logic with 12-month rolling contribution window.
 
     Args:
         domain: Domain name (should be 'annuity_performance')
@@ -95,6 +100,41 @@ def _snapshot_refresh_hook(domain: str, period: str | None) -> None:
     )
 
 
+# Year initialization hook (Story 7.6-11)
+def _year_init_hook(domain: str, period: str | None) -> None:
+    """Post-ETL hook for annual status initialization.
+
+    Story 7.6-11: Triggers year initialization when processing January data.
+    Updates is_strategic and is_existing for the current year.
+
+    Args:
+        domain: Domain name (should be 'annuity_performance')
+        period: Period string in YYYYMM format
+    """
+    from datetime import datetime
+
+    from work_data_hub.customer_mdm import initialize_year_status
+
+    # Only trigger for January periods
+    if period and len(period) >= MIN_PERIOD_LENGTH:
+        month = int(period[4:6])
+        if month != 1:
+            logger.debug("Skipping year init - not January", period=period)
+            return
+
+    current_year = datetime.now().year
+    logger.info("Triggering year initialization from post-ETL hook", year=current_year)
+
+    result = initialize_year_status(year=current_year, dry_run=False)
+
+    logger.info(
+        "Year initialization completed",
+        strategic_updated=result["strategic_updated"],
+        existing_updated=result["existing_updated"],
+        total=result["total"],
+    )
+
+
 # Registry of post-ETL hooks
 # IMPORTANT: Hook execution order follows list order.
 # contract_status_sync MUST run before snapshot_refresh
@@ -105,6 +145,13 @@ POST_ETL_HOOKS: List[PostEtlHook] = [
         name="contract_status_sync",
         domains=["annuity_performance"],
         hook_fn=_sync_contract_status_hook,
+    ),
+    # Hook registration for Story 7.6-11: Year Initialization
+    # Triggers only for January ETL runs
+    PostEtlHook(
+        name="year_init",
+        domains=["annuity_performance"],
+        hook_fn=_year_init_hook,
     ),
     # Hook registration for Story 7.6-7: Monthly Snapshot Refresh
     # Must run AFTER contract_status_sync (order matters)

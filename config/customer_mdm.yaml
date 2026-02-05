@@ -1,9 +1,9 @@
 customer_mdm:
-  # Strategic customer threshold (5 billion yuan) - Reserved for Story 7.6-9
+  # Strategic customer threshold (500 million yuan) - Story 7.6-11
   strategic_threshold: 500000000
-  # Top N customers per branch for whitelist - Reserved for Story 7.6-9
+  # Top N customers per branch for whitelist - Story 7.6-11
   whitelist_top_n: 10
-  # Current status year - Reserved for Story 7.6-9
+  # Current status year - Story 7.6-11
   # NOTE: Story 7.6-6 sync logic uses EXTRACT(YEAR FROM s.月度) at runtime,
   # NOT this config value. This setting is placeholder for future use.
   status_year: 2026

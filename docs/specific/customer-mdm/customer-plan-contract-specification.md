@@ -428,6 +428,34 @@ INSERT INTO customer.customer_plan_contract (
 );
 ```
 
+#### 5.3.1 状态变化检测字段 (Story 7.6-12)
+
+以下字段的变化会触发版本创建：
+
+| 字段 | 说明 | 变化示例 |
+|------|------|----------|
+| `contract_status` | 合约状态 | 正常 ↔ 停缴 |
+| `is_strategic` | 战客状态 | FALSE → TRUE |
+| `is_existing` | 已客状态 | FALSE → TRUE |
+
+**检测逻辑**：
+```python
+def has_status_changed(old: Record, new: Record) -> bool:
+    """检测是否需要创建新版本。"""
+    return (
+        old.contract_status != new.contract_status or
+        old.is_strategic != new.is_strategic or
+        old.is_existing != new.is_existing
+    )
+```
+
+#### 5.3.2 实现参考
+
+生产实现详见 `src/work_data_hub/customer_mdm/contract_sync.py`：
+- `_build_close_old_records_sql()`: 关闭状态已变化的旧记录
+- `_build_sync_sql()`: 插入新/变化的记录
+- `has_status_changed()`: 状态变化检测函数
+
 ### 5.4 日期格式化规则
 
 | 场景 | 日期格式 | 示例 |

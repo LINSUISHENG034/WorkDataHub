@@ -216,11 +216,25 @@ Examples:
             # Pass args after "snapshot" to the delegated module
             delegated_argv = remaining_args[1:] if len(remaining_args) > 1 else []
             return snapshot_main(delegated_argv)
+        elif remaining_args and remaining_args[0] == "init-year":
+            from work_data_hub.cli.customer_mdm.init_year import main as init_year_main
+
+            # Pass args after "init-year" to the delegated module
+            delegated_argv = remaining_args[1:] if len(remaining_args) > 1 else []
+            return init_year_main(delegated_argv)
+        elif remaining_args and remaining_args[0] == "validate":
+            from work_data_hub.cli.customer_mdm.validate import main as validate_main
+
+            # Pass args after "validate" to the delegated module
+            delegated_argv = remaining_args[1:] if len(remaining_args) > 1 else []
+            return validate_main(delegated_argv)
         else:
             # No subcommand or unknown subcommand, show available options
             print("Customer MDM subcommands:")
             print("  sync      - Sync contract status from business.规模明细")
             print("  snapshot  - Refresh monthly snapshot data")
+            print("  init-year - Initialize annual status fields")
+            print("  validate  - Validate status field distributions (AC-5)")
             print("\nUsage: customer-mdm <subcommand> [options]")
             return 1
 
