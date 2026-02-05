@@ -33,14 +33,59 @@ from work_data_hub.customer_mdm.strategic import (
 logger = get_logger(__name__)
 
 
+def apply_ratchet_rule(
+    is_strategic_db: bool | None,
+    is_strategic_calculated: bool,
+) -> tuple[bool, bool]:
+    """Apply the "Ratchet Rule" for strategic customer status.
+
+    Story 7.6-15: Implements Principle 3 (只增不减) from business rules.
+
+    Note: This is a Python reference implementation of the Ratchet Rule.
+    The actual enforcement is done in SQL (close_old_records.sql line 60).
+    This function exists for:
+    1. Unit testing to verify the business logic
+    2. Future use if Python-side validation is needed
+    3. Documentation of the business rule in code
+
+    Business Rule:
+    - Can upgrade: FALSE → TRUE (triggers SCD update)
+    - Cannot downgrade: TRUE → FALSE (no SCD update, keep strategic status)
+
+    Args:
+        is_strategic_db: Current status in database (None for new customers)
+        is_strategic_calculated: Newly calculated status from AUM
+
+    Returns:
+        Tuple of (final_strategic_status, should_trigger_scd_update)
+    """
+    # Handle None as False for comparison (new customer case)
+    db_status = is_strategic_db if is_strategic_db is not None else False
+
+    if db_status is True and is_strategic_calculated is False:
+        # Protection: Strategic customer AUM dropped, keep status
+        return True, False  # No SCD update
+
+    if db_status is False and is_strategic_calculated is True:
+        # Upgrade: Non-strategic → Strategic
+        return True, True  # Trigger SCD update
+
+    # No change in strategic status
+    return is_strategic_calculated, False
+
+
 def has_status_changed(old: dict | object, new: dict | object) -> bool:
     """Detect if tracked status fields have changed between old and new records.
 
     Story 7.6-12: SCD Type 2 status change detection.
 
+    Note: This is a Python reference implementation for testing purposes.
+    The actual change detection is done in SQL (close_old_records.sql).
+    This function exists for unit testing and future Python-side validation.
+
     Tracked fields that trigger version creation:
     - contract_status (正常 ↔ 停缴)
-    - is_strategic (战客状态变化)
+    - is_strategic (战客状态变化) - Note: Ratchet Rule applies (upgrade only)
     - is_existing (已客状态变化)
 
     Args:

@@ -2,7 +2,7 @@
 -- Story 7.6-12: SCD Type 2 Implementation
 --
 -- These CTEs are shared between close_old_records.sql and sync_insert.sql
--- Parameters: %s (whitelist_top_n), %s (strategic_threshold)
+-- Parameters: whitelist_top_n, strategic_threshold
 
 -- CTE 1: Prior year December data for is_existing check
 prior_year_dec AS (

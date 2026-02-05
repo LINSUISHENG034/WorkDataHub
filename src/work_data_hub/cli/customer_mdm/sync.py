@@ -60,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
 
         print("✓ Sync completed:")
         print(f"  Inserted: {result['inserted']}")
-        print(f"  Updated: {result['updated']}")
+        print(f"  Closed: {result['closed']}")
         print(f"  Total processed: {result['total']}")
 
         if args.dry_run:
