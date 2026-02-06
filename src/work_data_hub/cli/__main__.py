@@ -228,6 +228,12 @@ Examples:
             # Pass args after "validate" to the delegated module
             delegated_argv = remaining_args[1:] if len(remaining_args) > 1 else []
             return validate_main(delegated_argv)
+        elif remaining_args and remaining_args[0] == "cutover":
+            from work_data_hub.cli.customer_mdm.cutover import main as cutover_main
+
+            # Pass args after "cutover" to the delegated module
+            delegated_argv = remaining_args[1:] if len(remaining_args) > 1 else []
+            return cutover_main(delegated_argv)
         else:
             # No subcommand or unknown subcommand, show available options
             print("Customer MDM subcommands:")
@@ -235,6 +241,7 @@ Examples:
             print("  snapshot  - Refresh monthly snapshot data")
             print("  init-year - Initialize annual status fields")
             print("  validate  - Validate status field distributions (AC-5)")
+            print("  cutover   - Execute annual cutover (年度切断)")
             print("\nUsage: customer-mdm <subcommand> [options]")
             return 1
 

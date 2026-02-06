@@ -3,6 +3,9 @@
 Story 7.6-11: Customer Status Field Enhancement
 AC-3: Create CLI command for annual status initialization
 
+Story 7.6-14: Annual Cutover Implementation (年度切断逻辑)
+AC-1: Annual Cutover Function
+
 Updates is_strategic and is_existing fields for all contracts in a given year.
 """
 
@@ -14,12 +17,17 @@ import psycopg
 from dotenv import load_dotenv
 from structlog import get_logger
 
+from work_data_hub.customer_mdm.sql import load_sql
 from work_data_hub.customer_mdm.strategic import (
     get_strategic_threshold,
     get_whitelist_top_n,
 )
 
 logger = get_logger(__name__)
+
+# Year validation boundaries for annual cutover
+MIN_CUTOVER_YEAR = 2020
+MAX_CUTOVER_YEAR = 2050
 
 
 def initialize_year_status(
@@ -185,3 +193,107 @@ def _update_existing(cur, year: int, prior_year: int) -> int:
     """
     cur.execute(sql, (prior_year,))
     return cur.rowcount
+
+
+def annual_cutover(year: int, dry_run: bool = False) -> dict[str, int]:
+    """Execute annual cutover for customer_plan_contract.
+
+    Story 7.6-14: Annual Cutover Implementation (年度切断逻辑)
+
+    Business Rule (Principle 1 - 年度切断):
+    1. Close all current records (valid_to = 'YYYY-01-01')
+    2. Insert new records with status_year = year
+
+    This function is idempotent - uses ON CONFLICT DO NOTHING for inserts.
+
+    Args:
+        year: The new status year (e.g., 2026). Must be between 2020 and 2050.
+        dry_run: If True, rollback changes after counting
+
+    Returns:
+        dict with 'closed_count' and 'inserted_count'
+
+    Raises:
+        ValueError: If year is outside valid range (2020-2050)
+        psycopg.Error: Database connection or query error
+    """
+    # M2: Year boundary validation
+    if not (MIN_CUTOVER_YEAR <= year <= MAX_CUTOVER_YEAR):
+        raise ValueError(
+            f"Year must be between {MIN_CUTOVER_YEAR} and {MAX_CUTOVER_YEAR}, "
+            f"got {year}. Use a reasonable year for annual cutover."
+        )
+
+    load_dotenv(dotenv_path=".wdh_env", override=True)
+
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        raise ValueError("DATABASE_URL not found in environment")
+
+    cutover_date = f"{year}-01-01"
+    prior_year = year - 1
+    strategic_threshold = get_strategic_threshold()
+    whitelist_top_n = get_whitelist_top_n()
+
+    logger.info(
+        "Starting annual cutover",
+        year=year,
+        prior_year=prior_year,
+        cutover_date=cutover_date,
+        strategic_threshold=strategic_threshold,
+        whitelist_top_n=whitelist_top_n,
+        dry_run=dry_run,
+    )
+
+    with psycopg.connect(database_url) as conn:
+        with conn.cursor() as cur:
+            # Step 1: Close all current records
+            close_sql = load_sql("annual_cutover_close.sql")
+            cur.execute(close_sql, (cutover_date,))
+            closed_count = cur.rowcount
+
+            logger.info("Annual cutover Step 1: Closed records", closed=closed_count)
+
+            # Step 2: Insert new records
+            insert_sql = load_sql("annual_cutover_insert.sql")
+            # Parameters: year, year, whitelist_top_n, strategic_threshold,
+            #             cutover_date, year, cutover_date
+            cur.execute(
+                insert_sql,
+                (
+                    year,
+                    year,
+                    whitelist_top_n,
+                    strategic_threshold,
+                    cutover_date,
+                    year,
+                    cutover_date,
+                ),
+            )
+            inserted_count = cur.rowcount
+
+            logger.info(
+                "Annual cutover Step 2: Inserted records", inserted=inserted_count
+            )
+
+            if dry_run:
+                conn.rollback()
+                logger.info("Dry run mode: Changes rolled back")
+            else:
+                conn.commit()
+
+            logger.info(
+                "Annual cutover completed",
+                year=year,
+                prior_year=prior_year,
+                cutover_date=cutover_date,
+                closed_count=closed_count,
+                inserted_count=inserted_count,
+                dry_run=dry_run,
+                data_source=f"business.规模明细 ({prior_year}-12)",
+            )
+
+            return {
+                "closed_count": closed_count,
+                "inserted_count": inserted_count,
+            }
