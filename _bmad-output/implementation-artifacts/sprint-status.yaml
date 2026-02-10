@@ -251,6 +251,7 @@ development_status:
   7.6-13-customer-plan-contract-name-fields: done
   7.6-14-annual-cutover-implementation: done
   7.6-15-ratchet-rule-implementation: done
+  7.6-16-fact-table-refactoring: done
   epic-7.6-retrospective: optional
 
   # ============================================================================

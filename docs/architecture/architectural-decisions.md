@@ -1259,7 +1259,8 @@ Post-ETL Hook Registry
     ├── 1. contract_status_sync     → customer.customer_plan_contract
     │       (ON CONFLICT DO NOTHING)
     │
-    └── 2. snapshot_refresh          → customer.fct_customer_business_monthly_status
+    └── 2. snapshot_refresh          → customer.fct_customer_product_line_monthly
+                                       customer.fct_customer_plan_monthly
             (ON CONFLICT DO UPDATE)
 ```
 
@@ -1280,7 +1281,9 @@ Post-ETL Hook Registry
 
 1. **Source**: `business.规模明细` (monthly AUM data, plan-level)
 2. **Contract Table**: `customer.customer_plan_contract` (plan-level, SCD Type 2 ready)
-3. **Fact Table**: `customer.fct_customer_business_monthly_status` (product line-level, monthly snapshot)
+3. **Fact Tables**:
+   - `customer.fct_customer_product_line_monthly` (product line-level, monthly snapshot)
+   - `customer.fct_customer_plan_monthly` (plan-level, monthly snapshot)
 4. **BI Views**: `bi.dim_customer`, `bi.dim_product_line`, `bi.dim_time`, `bi.fct_customer_monthly_summary`
 
 #### Implementation (Epic 7.6)

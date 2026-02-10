@@ -1,24 +1,27 @@
-# customer.customer_monthly_snapshot 业务规格说明书
+# customer monthly snapshot (Dual Tables) 业务规格说明书
 
-> **版本**: v0.1
+> **版本**: v0.3
 > **创建日期**: 2026-01-11
-> **状态**: 待验证
+> **更新日期**: 2026-02-09
+> **状态**: 已实现
 > **关联文档**:
 > - [customer-plan-contract-specification.md](./customer-plan-contract-specification.md)
 > - [customer-identity-monthly-snapshot-implementation-v3.2-project-based.md](./customer-identity-monthly-snapshot-implementation-v3.2-project-based.md)
 
 > [!IMPORTANT]
-> **实际实现差异 (Story 7.6-7)**
+> **实际实现 (Story 7.6-16: 双表粒度分离)**
 >
-> 本文档描述的是 **Plan-level 粒度** 的原始设计。实际实现采用了 **Product Line-level 聚合粒度**：
+> 本文档描述的是 **双表设计** 的实际实现：
 >
-> | 项目 | 本文档 (原始设计) | 实际实现 (Story 7.6-7) |
-> |------|------------------|----------------------|
-> | 表名 | `customer.customer_monthly_snapshot` | `customer.fct_customer_business_monthly_status` |
-> | 主键 | `(snapshot_month, company_id, plan_code, product_line_code)` | `(snapshot_month, company_id, product_line_code)` |
-> | 计划数 | 每条记录一个计划 | `plan_count` 列聚合 |
+> | 表名 | 粒度 | 用途 |
+> |------|------|------|
+> | `customer.fct_customer_product_line_monthly` | Company + ProductLine | 战客/已客/中标/AUM汇总 |
+> | `customer.fct_customer_plan_monthly` | Company + Plan + ProductLine | 流失/合约状态/AUM明细 |
 >
-> 聚合设计减少了数据量并优化了 BI 查询性能。详见 Story 7.6-7 Dev Notes。
+> **设计原因**：
+> - `is_winning_this_year` (中标) 天然粒度是 ProductLine 级别
+> - `is_churned_this_year` (流失) 天然粒度是 Plan 级别
+> - 双表设计让每个业务事件在其天然粒度追踪，符合 Kimball 维度建模最佳实践
 
 ---
 
@@ -29,35 +32,29 @@
 | 表 | 一句话解释 |
 |----|-----------|
 | **customer_plan_contract** | 签约记录（谁买了什么，是否战客/已客） |
-| **customer_monthly_snapshot** | 月度报告（这个月中标了谁？解约了谁？规模多少？） |
+| **fct_customer_product_line_monthly** | 产品线级月度报告（中标/战客/AUM汇总） |
+| **fct_customer_plan_monthly** | 计划级月度报告（流失/合约状态/AUM明细） |
 
-### 0.2 两张表的关系
+### 0.2 两张事实表的关系
 
 ```
-customer_plan_contract              customer_monthly_snapshot
-(签约记录 - OLTP)                   (月度快照 - OLAP)
-┌─────────────────────┐             ┌─────────────────────┐
-│ company_id          │             │ snapshot_month      │
-│ plan_code           │             │ company_id          │
-│ product_line_code   │─────JOIN───→│ plan_code           │
-│                     │             │ product_line_code   │
-│ is_strategic  ──────┼─────────────┼→ (通过JOIN获取)     │
-│ is_existing   ──────┼─────────────┼→ (通过JOIN获取)     │
-│ contract_status     │             │                     │
-│                     │             │ is_winning_this_year│
-│                     │             │ is_churned_this_year│
-│                     │             │ aum_balance         │
-└─────────────────────┘             └─────────────────────┘
+customer_plan_contract
+(签约记录 - OLTP)
+┌─────────────────────┐
+│ company_id          │
+│ plan_code           │
+│ product_line_code   │
+│ is_strategic        │
+│ is_existing         │
+│ contract_status     │
+└─────────────────────┘
+        │
+        ├── 聚合到产品线粒度 ───────────────┐
+        │                                 │
+        ▼                                 ▼
+fct_customer_product_line_monthly   fct_customer_plan_monthly
+(产品线级快照 - OLAP)                (计划级快照 - OLAP)
 ```
-
-### 0.3 为什么需要两张表？
-
-| 问题 | contract表 | snapshot表 |
-|------|-----------|------------|
-| 战客/已客状态 | ✅ 唯一真相来源 | ❌ 通过JOIN获取 |
-| 中标/解约状态 | ❌ | ✅ 月度滚动更新 |
-| 历史规模 | ❌ | ✅ 每月固化 |
-| 查询场景 | 当前状态 | 历史趋势 |
 
 ---
 
@@ -65,232 +62,193 @@ customer_plan_contract              customer_monthly_snapshot
 
 ### 1.1 设计目标
 
-`customer.customer_monthly_snapshot` 是客户业务状态的月度快照表（OLAP），用于：
+双表快照用于：
 
-- 每月月末固化客户状态和规模
-- 记录当年中标/解约事件
-- 支持历史趋势分析和Power BI报表
+- 每月月末固化客户状态和规模（历史趋势分析）
+- 中标/流失事件在正确粒度落表
+- 兼顾产品线级 BI 汇总与计划级明细分析
 
-### 1.2 核心功能
+### 1.2 表职责分工
 
-| 功能 | 说明 |
-|------|------|
-| 状态固化 | 每月快照，不可修改历史数据 |
-| 中标追踪 | 记录当年中标客户（年度重置） |
-| 解约追踪 | 记录当年解约客户（年度重置） |
-| 规模汇总 | 按业务主键聚合月末资产规模 |
+| 表 | 主要职责 |
+|----|----------|
+| `fct_customer_product_line_monthly` | 产品线级汇总：战客/已客/中标/AUM/计划数 |
+| `fct_customer_plan_monthly` | 计划级明细：流失/合约状态/AUM |
 
 ---
 
-## 2. 表结构定义
+## 2. 表结构定义（简化版）
 
-### 2.1 DDL
+### 2.1 产品线级事实表
 
 ```sql
-CREATE TABLE customer.customer_monthly_snapshot (
-    -- 复合主键
-    snapshot_month DATE NOT NULL,                   -- 快照月份（月末最后一日）
-    company_id VARCHAR NOT NULL,                    -- 客户ID
-    plan_code VARCHAR NOT NULL,                     -- 计划代码
-    product_line_code VARCHAR(20) NOT NULL,         -- 产品线代码
-
-    -- 冗余字段（便于查询）
-    product_line_name VARCHAR(50) NOT NULL,         -- 产品线名称
-
-    -- 状态标签（当年事件，年度重置）
-    is_winning_this_year BOOLEAN DEFAULT FALSE,     -- 当年中标
-    is_churned_this_year BOOLEAN DEFAULT FALSE,     -- 当年解约
-
-    -- 度量值
-    aum_balance DECIMAL(20,2) DEFAULT 0,            -- 月末资产规模
-
-    -- 审计字段
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE customer.fct_customer_product_line_monthly (
+    snapshot_month DATE NOT NULL,
+    company_id VARCHAR NOT NULL,
+    product_line_code VARCHAR(20) NOT NULL,
+    product_line_name VARCHAR(50) NOT NULL,
+    customer_name VARCHAR(200),
+    is_strategic BOOLEAN DEFAULT FALSE,
+    is_existing BOOLEAN DEFAULT FALSE,
+    is_new BOOLEAN DEFAULT FALSE,
+    is_winning_this_year BOOLEAN DEFAULT FALSE,
+    is_churned_this_year BOOLEAN DEFAULT FALSE,
+    aum_balance DECIMAL(20,2) DEFAULT 0,
+    plan_count INTEGER DEFAULT 0,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-
-    -- 主键约束
-    PRIMARY KEY (snapshot_month, company_id, plan_code, product_line_code),
-
-    -- 外键约束
-    CONSTRAINT fk_snapshot_company FOREIGN KEY (company_id)
-        REFERENCES customer."年金客户"(company_id),
-    CONSTRAINT fk_snapshot_product_line FOREIGN KEY (product_line_code)
-        REFERENCES mapping."产品线"(产品线代码)
+    PRIMARY KEY (snapshot_month, company_id, product_line_code)
 );
 ```
 
-### 2.2 索引
+### 2.2 计划级事实表
 
 ```sql
--- 常用查询索引
-CREATE INDEX idx_snapshot_month ON customer.customer_monthly_snapshot(snapshot_month);
-CREATE INDEX idx_snapshot_company ON customer.customer_monthly_snapshot(company_id);
-CREATE INDEX idx_snapshot_product_line ON customer.customer_monthly_snapshot(product_line_code);
-
--- 复合索引
-CREATE INDEX idx_snapshot_month_company ON customer.customer_monthly_snapshot(snapshot_month, company_id);
-
--- BRIN索引（时间范围查询）
-CREATE INDEX idx_snapshot_month_brin ON customer.customer_monthly_snapshot USING BRIN (snapshot_month);
-
--- 部分索引
-CREATE INDEX idx_snapshot_winning ON customer.customer_monthly_snapshot(snapshot_month, company_id)
-    WHERE is_winning_this_year = TRUE;
-CREATE INDEX idx_snapshot_churned ON customer.customer_monthly_snapshot(snapshot_month, company_id)
-    WHERE is_churned_this_year = TRUE;
+CREATE TABLE customer.fct_customer_plan_monthly (
+    snapshot_month DATE NOT NULL,
+    company_id VARCHAR NOT NULL,
+    plan_code VARCHAR NOT NULL,
+    product_line_code VARCHAR(20) NOT NULL,
+    customer_name VARCHAR(200),
+    plan_name VARCHAR(200),
+    product_line_name VARCHAR(50) NOT NULL,
+    is_churned_this_year BOOLEAN DEFAULT FALSE,
+    contract_status VARCHAR(50),
+    aum_balance DECIMAL(20,2) DEFAULT 0,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (snapshot_month, company_id, plan_code, product_line_code)
+);
 ```
 
-### 2.3 字段说明
+### 2.3 核心索引（参考 migrations 完整列表）
 
-| 字段 | 类型 | 说明 | 数据来源 |
-|------|------|------|----------|
-| `snapshot_month` | DATE | 快照月份（月末最后一日） | 系统生成 |
-| `company_id` | VARCHAR | 客户ID | `customer_plan_contract` |
-| `plan_code` | VARCHAR | 计划代码 | `customer_plan_contract` |
-| `product_line_code` | VARCHAR(20) | 产品线代码 | `customer_plan_contract` |
-| `product_line_name` | VARCHAR(50) | 产品线名称（冗余） | `mapping."产品线"` |
-| `is_winning_this_year` | BOOLEAN | 当年中标 | `ledger.当年中标` |
-| `is_churned_this_year` | BOOLEAN | 当年解约 | `ledger.当年解约` |
-| `aum_balance` | DECIMAL(20,2) | 月末资产规模 | `business.规模明细` |
+- 产品线表：`idx_fct_pl_snapshot_month`, `idx_fct_pl_company`, `idx_fct_pl_product_line`
+- 计划表：`idx_fct_plan_snapshot_month`, `idx_fct_plan_company`, `idx_fct_plan_plan_code`
 
 ---
 
 ## 3. 状态定义
 
-### 3.1 is_winning_this_year（当年中标）
+### 3.1 ProductLine 级（汇总）
 
-```
-判定时机：月度滚动更新
-数据来源：ledger.当年中标
-重置周期：每年1月清零
-判定规则：
-  - 业务主键存在于当年中标名单 → TRUE
-  - 否则 → FALSE
-```
+- **is_strategic**：来自 `customer_plan_contract`，BOOL_OR 聚合
+- **is_existing**：来自 `customer_plan_contract`，BOOL_OR 聚合
+- **is_new**：`is_winning_this_year AND NOT is_existing`
+- **is_winning_this_year**：`customer.当年中标` 按 `company_id + 产品线代码` 判定
+- **is_churned_this_year**：`customer.当年流失` 按 `company_id + 产品线代码` 判定（产品线级聚合）
 
-### 3.2 is_churned_this_year（当年解约）
+### 3.2 Plan 级（明细）
 
-```
-判定时机：月度滚动更新
-数据来源：ledger.当年解约
-重置周期：每年1月清零
-判定规则：
-  - 业务主键存在于当年解约名单 → TRUE
-  - 否则 → FALSE
-```
+- **is_churned_this_year**：`customer.当年流失` 按 `company_id + 年金计划号` 判定
+- **contract_status**：来自 `customer_plan_contract`
 
-### 3.3 aum_balance（月末资产规模）
+### 3.3 AUM 计算
 
-```
-判定时机：月度更新
-数据来源：business.规模明细
-计算规则：
-  - 按业务主键(company_id + plan_code + product_line_code)聚合
-  - SUM(期末资产规模)
-```
+- 产品线级：`SUM(business.规模明细.期末资产规模)` 按 `(company_id, 产品线代码, 月度)`
+- 计划级：`SUM(business.规模明细.期末资产规模)` 按 `(company_id, 计划代码, 产品线代码, 月度)`
 
 ---
 
-## 4. 数据更新逻辑
+## 4. 数据更新逻辑（核心 SQL 摘要）
 
 ### 4.1 更新触发时机
 
 | 触发方式 | 说明 | 频率 |
 |----------|------|------|
 | Post-ETL Hook | `customer_plan_contract` 更新后自动触发 | 月度 |
-| 手动触发 | `customer-mdm snapshot --period 202501` | 按需 |
+| 手动触发 | `customer-mdm snapshot --period YYYYMM` | 按需 |
 
-### 4.2 快照生成SQL
+### 4.2 产品线级快照刷新（摘要）
 
 ```sql
-INSERT INTO customer.customer_monthly_snapshot (
-    snapshot_month,
-    company_id,
-    plan_code,
-    product_line_code,
-    product_line_name,
-    is_winning_this_year,
-    is_churned_this_year,
-    aum_balance
-)
+INSERT INTO customer.fct_customer_product_line_monthly (...)
 SELECT
-    :snapshot_month as snapshot_month,
-    c.company_id,
-    c.plan_code,
-    c.product_line_code,
-    p.产品线 as product_line_name,
-
-    -- 当年中标判定
-    EXISTS (
-        SELECT 1 FROM ledger.当年中标 w
-        WHERE w.company_id = c.company_id
-          AND w.年金计划号 = c.plan_code
-          AND w.产品线代码 = c.product_line_code
-          AND EXTRACT(YEAR FROM w.中标日期) = EXTRACT(YEAR FROM :snapshot_month)
-    ) as is_winning_this_year,
-
-    -- 当年解约判定
-    EXISTS (
-        SELECT 1 FROM ledger.当年解约 l
-        WHERE l.company_id = c.company_id
-          AND l.年金计划号 = c.plan_code
-          AND l.产品线代码 = c.product_line_code
-          AND EXTRACT(YEAR FROM l.流失日期) = EXTRACT(YEAR FROM :snapshot_month)
-    ) as is_churned_this_year,
-
-    -- 月末资产规模
-    COALESCE(SUM(s.期末资产规模), 0) as aum_balance
-
+  :snapshot_month AS snapshot_month,
+  c.company_id,
+  c.product_line_code,
+  MAX(c.product_line_name) AS product_line_name,
+  MAX(c.customer_name) AS customer_name,
+  BOOL_OR(c.is_strategic) AS is_strategic,
+  BOOL_OR(c.is_existing) AS is_existing,
+  (EXISTS (...) AND NOT BOOL_OR(c.is_existing)) AS is_new,
+  EXISTS (...) AS is_winning_this_year,
+  EXISTS (...) AS is_churned_this_year,
+  COALESCE(SUM(s.期末资产规模), 0) AS aum_balance,
+  COUNT(DISTINCT c.plan_code) AS plan_count
 FROM customer.customer_plan_contract c
-LEFT JOIN mapping."产品线" p ON c.product_line_code = p.产品线代码
-LEFT JOIN business.规模明细 s ON
-    c.company_id = s.company_id
-    AND c.plan_code = s.计划代码
-    AND c.product_line_code = s.产品线代码
-    AND s.月度 = :snapshot_month
-WHERE c.valid_to = '9999-12-31'  -- 仅当前有效合约
-GROUP BY c.company_id, c.plan_code, c.product_line_code, p.产品线
+LEFT JOIN business.规模明细 s
+  ON s.company_id = c.company_id
+ AND s.产品线代码 = c.product_line_code
+ AND s.月度 = DATE_TRUNC('month', :snapshot_month)
+WHERE c.valid_to = '9999-12-31'
+GROUP BY c.company_id, c.product_line_code
+ON CONFLICT (...) DO UPDATE ...;
+```
 
-ON CONFLICT (snapshot_month, company_id, plan_code, product_line_code)
-DO UPDATE SET
-    is_winning_this_year = EXCLUDED.is_winning_this_year,
-    is_churned_this_year = EXCLUDED.is_churned_this_year,
-    aum_balance = EXCLUDED.aum_balance,
-    updated_at = CURRENT_TIMESTAMP;
+### 4.3 计划级快照刷新（摘要）
+
+```sql
+INSERT INTO customer.fct_customer_plan_monthly (...)
+SELECT
+  :snapshot_month AS snapshot_month,
+  c.company_id,
+  c.plan_code,
+  c.product_line_code,
+  c.customer_name,
+  c.plan_name,
+  c.product_line_name,
+  EXISTS (...) AS is_churned_this_year,
+  c.contract_status,
+  COALESCE(SUM(s.期末资产规模), 0) AS aum_balance
+FROM customer.customer_plan_contract c
+LEFT JOIN business.规模明细 s
+  ON s.company_id = c.company_id
+ AND s.计划代码 = c.plan_code
+ AND s.产品线代码 = c.product_line_code
+ AND s.月度 = DATE_TRUNC('month', :snapshot_month)
+WHERE c.valid_to = '9999-12-31'
+GROUP BY c.company_id, c.plan_code, c.product_line_code
+ON CONFLICT (...) DO UPDATE ...;
 ```
 
 ---
 
-## 5. 与contract表的关联查询
+## 5. 典型查询示例
 
-### 5.1 完整客户状态视图
+### 5.1 产品线级全量状态视图（示意）
 
 ```sql
--- 获取完整客户状态（合并两张表）
-CREATE VIEW v_customer_full_status AS
+CREATE VIEW v_customer_product_line_status AS
 SELECT
-    s.snapshot_month,
-    s.company_id,
-    s.plan_code,
-    s.product_line_code,
-    s.product_line_name,
+  f.snapshot_month,
+  f.company_id,
+  f.product_line_code,
+  f.product_line_name,
+  f.customer_name,
+  f.is_strategic,
+  f.is_existing,
+  f.is_new,
+  f.is_winning_this_year,
+  f.is_churned_this_year,
+  f.aum_balance,
+  f.plan_count
+FROM customer.fct_customer_product_line_monthly f;
+```
 
-    -- 来自contract表
-    c.is_strategic,
-    c.is_existing,
-    c.contract_status,
+### 5.2 计划级明细视图（示意）
 
-    -- 来自snapshot表
-    s.is_winning_this_year,
-    s.is_churned_this_year,
-    s.aum_balance
-
-FROM customer.customer_monthly_snapshot s
-JOIN customer.customer_plan_contract c ON
-    s.company_id = c.company_id
-    AND s.plan_code = c.plan_code
-    AND s.product_line_code = c.product_line_code
-    AND c.valid_to = '9999-12-31';
+```sql
+CREATE VIEW v_customer_plan_status AS
+SELECT
+  f.snapshot_month,
+  f.company_id,
+  f.plan_code,
+  f.product_line_code,
+  f.plan_name,
+  f.customer_name,
+  f.contract_status,
+  f.is_churned_this_year,
+  f.aum_balance
+FROM customer.fct_customer_plan_monthly f;
 ```
 
 ---
@@ -310,4 +268,5 @@ JOIN customer.customer_plan_contract c ON
 | 版本 | 日期 | 修订内容 |
 |------|------|----------|
 | v0.1 | 2026-01-11 | 初稿，基于contract表规格和用户验证反馈创建 |
-
+| v0.2 | 2026-02-09 | Story 7.6-16: 双表粒度分离，更新实现说明 |
+| v0.3 | 2026-02-09 | 替换单表 DDL/SQL 为双表实现，补充职责分工 |

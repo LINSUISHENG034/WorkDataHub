@@ -1,6 +1,7 @@
 """End-to-end integration tests for Customer MDM pipeline.
 
 Story 7.6-10: Integration Testing & Documentation
+Story 7.6-16: Fact Table Refactoring (双表粒度分离)
 AC-1: Create integration test suite for full Customer MDM pipeline
 
 Tests cover the complete data flow:
@@ -84,7 +85,10 @@ class TestCustomerMdmEndToEnd:
             assert statuses.get("TEST_C003") == "停缴"
 
     def test_snapshot_refresh_aggregates_to_product_line_level(
-        self, customer_mdm_test_db: str, test_period: str
+        self,
+        customer_mdm_test_db: str,
+        test_period: str,
+        test_snapshot_month: str,
     ):
         """AC-1: Verify snapshot refresh aggregates contract data.
 
@@ -107,7 +111,12 @@ class TestCustomerMdmEndToEnd:
             result = refresh_monthly_snapshot(period=test_period, dry_run=False)
 
         # Assert: Check refresh results
-        assert result["upserted"] > 0, "Snapshot refresh should upsert records"
+        assert result["product_line_upserted"] > 0, (
+            "Snapshot refresh should upsert records"
+        )
+        assert result["plan_upserted"] > 0, (
+            "Plan snapshot refresh should upsert records"
+        )
 
         # Verify aggregation level
         engine = create_engine(customer_mdm_test_db)
@@ -121,7 +130,7 @@ class TestCustomerMdmEndToEnd:
                         product_line_code,
                         plan_count,
                         aum_balance
-                    FROM customer.fct_customer_business_monthly_status
+                    FROM customer.fct_customer_product_line_monthly
                     WHERE company_id = 'TEST_C004'
                     """
                 )
@@ -132,6 +141,28 @@ class TestCustomerMdmEndToEnd:
             row = c004_rows[0]
             assert row[2] == 2, "plan_count should be 2 (P005, P006)"
             assert row[3] == 1000000.00, "AUM should be 750000 + 250000"
+
+            # Verify plan-level snapshots exist for each plan
+            plan_result = conn.execute(
+                text(
+                    """
+                    SELECT plan_code, aum_balance
+                    FROM customer.fct_customer_plan_monthly
+                    WHERE company_id = 'TEST_C004'
+                      AND snapshot_month = :snapshot_month
+                    ORDER BY plan_code
+                    """
+                ),
+                {"snapshot_month": test_snapshot_month},
+            )
+            plan_rows = list(plan_result)
+
+            assert len(plan_rows) == 2, "TEST_C004 should have 2 plan-level rows"
+            plan_balances = {row[0]: float(row[1]) for row in plan_rows}
+            assert plan_balances == {
+                "P005": 750000.00,
+                "P006": 250000.00,
+            }
 
     def test_bi_views_reflect_snapshot_data(
         self, customer_mdm_test_db: str, test_period: str
@@ -245,8 +276,8 @@ class TestSnapshotRefreshIdempotency:
             # Second refresh (should upsert same records)
             result2 = refresh_monthly_snapshot(period=test_period, dry_run=False)
 
-        # Both runs should process same total records
-        assert result1["total"] == result2["total"]
+        # Both runs should process same number of records
+        assert result1["product_line_upserted"] == result2["product_line_upserted"]
 
         # Verify data is identical after both runs
         engine = create_engine(customer_mdm_test_db)
@@ -255,11 +286,11 @@ class TestSnapshotRefreshIdempotency:
                 text(
                     """
                     SELECT COUNT(*)
-                    FROM customer.fct_customer_business_monthly_status
+                    FROM customer.fct_customer_product_line_monthly
                     """
                 )
             )
             final_count = count_result.scalar()
 
             # Should have same count as first run (no duplicates)
-            assert final_count == result1["upserted"]
+            assert final_count == result1["product_line_upserted"]

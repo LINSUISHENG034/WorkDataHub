@@ -1,7 +1,10 @@
 """Customer MDM snapshot CLI command.
 
 Story 7.6-7: Monthly Snapshot Refresh (Post-ETL Hook)
+Story 7.6-16: Fact Table Refactoring (双表粒度分离)
+
 Manual trigger for monthly snapshot refresh.
+Refreshes both ProductLine and Plan level fact tables.
 
 Usage:
     python -m work_data_hub.cli customer-mdm snapshot --period 202601
@@ -56,8 +59,8 @@ def main(argv: list[str] | None = None) -> int:
         )
 
         print("✓ Snapshot refresh completed:")
-        print(f"  Upserted: {result['upserted']}")
-        print(f"  Total source records: {result['total']}")
+        print(f"  ProductLine table: {result['product_line_upserted']} records")
+        print(f"  Plan table: {result['plan_upserted']} records")
 
         if args.dry_run:
             print("\n⚠ Dry-run mode: No changes were made to the database")

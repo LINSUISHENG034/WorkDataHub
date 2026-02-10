@@ -12,7 +12,7 @@ This document describes the command-line interface (CLI) for the Customer Master
 
 - Database connection configured in `.wdh_env`
 - Python environment with `work_data_hub` package installed
-- Required tables created via Alembic migrations (008-011)
+- Required tables created via Alembic migrations (009, 013)
 
 ## Commands
 
@@ -49,7 +49,9 @@ uv run --env-file .wdh_env python -m work_data_hub.cli customer-mdm sync --perio
 
 ### 2. Monthly Snapshot Refresh
 
-Refreshes the monthly snapshot in `customer.fct_customer_business_monthly_status`.
+Refreshes dual monthly snapshots in:
+`customer.fct_customer_product_line_monthly` and
+`customer.fct_customer_plan_monthly`.
 
 ```bash
 # Production run for January 2026
@@ -75,8 +77,8 @@ uv run --env-file .wdh_env python -m work_data_hub.cli customer-mdm snapshot --p
 ```
 🔄 Starting monthly snapshot refresh for period 202601...
 ✓ Snapshot refresh completed:
-  Upserted: 847
-  Total source records: 847
+  ProductLine table: 847 records
+  Plan table: 1203 records
 ```
 
 ## Post-ETL Hook Integration

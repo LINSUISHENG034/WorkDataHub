@@ -375,7 +375,8 @@ Post-ETL Hook Registry
     ├── 1. contract_status_sync  → customer.customer_plan_contract
     │       (ON CONFLICT DO NOTHING)
     │
-    └── 2. snapshot_refresh      → customer.fct_customer_business_monthly_status
+    └── 2. snapshot_refresh      → customer.fct_customer_product_line_monthly
+                                   customer.fct_customer_plan_monthly
             (ON CONFLICT DO UPDATE)
 ```
 

@@ -1,12 +1,13 @@
 """Tests for product line name sync trigger.
 
 Story 7.6-10: Integration Testing & Documentation
+Story 7.6-16: Fact Table Refactoring (双表粒度分离)
 AC-8: Verify product_line_name sync trigger propagates changes correctly
 
 Tests the trigger created in Migration 011 that syncs product_line_name
 from mapping."产品线" to denormalized columns in:
 - customer.customer_plan_contract
-- customer.fct_customer_business_monthly_status
+- customer.fct_customer_product_line_monthly
 """
 
 from __future__ import annotations
@@ -98,7 +99,7 @@ class TestProductLineNameSyncTrigger:
     def test_trigger_propagates_name_change_to_snapshot_table(
         self, customer_mdm_test_db: str, test_period: str
     ):
-        """AC-8: Verify trigger updates fct_customer_business_monthly_status.product_line_name.
+        """AC-8: Verify trigger updates fct_customer_product_line_monthly.product_line_name.
 
         When 产品线.产品线 is updated, the trigger should propagate
         the new name to the monthly snapshot fact table.
@@ -123,7 +124,7 @@ class TestProductLineNameSyncTrigger:
                 text(
                     """
                     SELECT DISTINCT product_line_name
-                    FROM customer.fct_customer_business_monthly_status
+                    FROM customer.fct_customer_product_line_monthly
                     WHERE product_line_code = 'PL202'
                     """
                 )
@@ -147,7 +148,7 @@ class TestProductLineNameSyncTrigger:
                 text(
                     """
                     SELECT DISTINCT product_line_name
-                    FROM customer.fct_customer_business_monthly_status
+                    FROM customer.fct_customer_product_line_monthly
                     WHERE product_line_code = 'PL202'
                     """
                 )
@@ -234,4 +235,159 @@ class TestProductLineNameSyncTrigger:
                     WHERE "产品线代码" = 'PL202'
                     """
                 )
+            )
+
+
+@pytest.mark.integration
+class TestPlanTableSyncTriggers:
+    """Tests for sync triggers on fct_customer_plan_monthly table (Story 7.6-16)."""
+
+    def test_customer_name_sync_to_plan_table(
+        self, customer_mdm_test_db: str, test_period: str
+    ):
+        """Verify trg_sync_fct_plan_customer_name propagates customer name changes.
+
+        When 年金客户.客户名称 is updated, the trigger should propagate
+        the new name to fct_customer_plan_monthly.
+        """
+        _validate_test_database(customer_mdm_test_db)
+
+        from work_data_hub.customer_mdm import (
+            refresh_monthly_snapshot,
+            sync_contract_status,
+        )
+
+        # Setup: Populate both tables
+        with use_test_database(customer_mdm_test_db):
+            sync_contract_status(period=test_period, dry_run=False)
+            refresh_monthly_snapshot(period=test_period, dry_run=False)
+
+        engine = create_engine(customer_mdm_test_db)
+
+        with engine.begin() as conn:
+            # Verify initial state
+            initial_result = conn.execute(
+                text(
+                    """
+                    SELECT DISTINCT customer_name
+                    FROM customer.fct_customer_plan_monthly
+                    WHERE company_id = 'TEST_C001'
+                    """
+                )
+            )
+            initial_name = initial_result.scalar()
+
+            # Act: Update customer name in source table
+            conn.execute(
+                text(
+                    """
+                    UPDATE customer."年金客户"
+                    SET "客户名称" = '测试客户A(改名)'
+                    WHERE company_id = 'TEST_C001'
+                    """
+                )
+            )
+
+            # Assert: Trigger propagated to plan table
+            updated_result = conn.execute(
+                text(
+                    """
+                    SELECT DISTINCT customer_name
+                    FROM customer.fct_customer_plan_monthly
+                    WHERE company_id = 'TEST_C001'
+                    """
+                )
+            )
+            updated_name = updated_result.scalar()
+            assert updated_name == "测试客户A(改名)", (
+                f"Trigger should update plan table customer_name, got {updated_name}"
+            )
+
+            # Cleanup
+            conn.execute(
+                text(
+                    """
+                    UPDATE customer."年金客户"
+                    SET "客户名称" = '测试客户A'
+                    WHERE company_id = 'TEST_C001'
+                    """
+                )
+            )
+
+    def test_plan_name_sync_to_plan_table(
+        self, customer_mdm_test_db: str, test_period: str
+    ):
+        """Verify trg_sync_fct_plan_plan_name propagates plan name changes.
+
+        When 年金计划.计划全称 is updated, the trigger should propagate
+        the new name to fct_customer_plan_monthly.
+        """
+        _validate_test_database(customer_mdm_test_db)
+
+        from work_data_hub.customer_mdm import (
+            refresh_monthly_snapshot,
+            sync_contract_status,
+        )
+
+        # Setup: Populate both tables
+        with use_test_database(customer_mdm_test_db):
+            sync_contract_status(period=test_period, dry_run=False)
+            refresh_monthly_snapshot(period=test_period, dry_run=False)
+
+        engine = create_engine(customer_mdm_test_db)
+
+        with engine.begin() as conn:
+            # Get a plan_code that exists in our test data
+            plan_result = conn.execute(
+                text(
+                    """
+                    SELECT plan_code
+                    FROM customer.fct_customer_plan_monthly
+                    LIMIT 1
+                    """
+                )
+            )
+            test_plan_code = plan_result.scalar()
+
+            if test_plan_code is None:
+                pytest.skip("No plan data available for trigger test")
+
+            # Act: Update plan name in source table
+            conn.execute(
+                text(
+                    """
+                    UPDATE mapping."年金计划"
+                    SET "计划全称" = '测试计划(改名)'
+                    WHERE "年金计划号" = :plan_code
+                    """
+                ),
+                {"plan_code": test_plan_code},
+            )
+
+            # Assert: Trigger propagated to plan table
+            updated_result = conn.execute(
+                text(
+                    """
+                    SELECT DISTINCT plan_name
+                    FROM customer.fct_customer_plan_monthly
+                    WHERE plan_code = :plan_code
+                    """
+                ),
+                {"plan_code": test_plan_code},
+            )
+            updated_name = updated_result.scalar()
+            assert updated_name == "测试计划(改名)", (
+                f"Trigger should update plan_name, got {updated_name}"
+            )
+
+            # Cleanup: Revert the name change
+            conn.execute(
+                text(
+                    """
+                    UPDATE mapping."年金计划"
+                    SET "计划全称" = '测试计划'
+                    WHERE "年金计划号" = :plan_code
+                    """
+                ),
+                {"plan_code": test_plan_code},
             )

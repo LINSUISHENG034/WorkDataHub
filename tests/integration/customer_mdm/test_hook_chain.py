@@ -87,7 +87,10 @@ class TestPostEtlHookExecution:
         ):
             # Mock return values to prevent actual execution
             mock_sync.return_value = {"inserted": 0, "updated": 0, "total": 0}
-            mock_refresh.return_value = {"upserted": 0, "total": 0}
+            mock_refresh.return_value = {
+                "product_line_upserted": 0,
+                "plan_upserted": 0,
+            }
 
             from work_data_hub.cli.etl.hooks import run_post_etl_hooks
 
@@ -128,7 +131,12 @@ class TestPostEtlHookExecution:
 
         def track_refresh(**kwargs):
             execution_order.append("snapshot_refresh")
-            return {"upserted": 0, "total": 0}
+            return {
+                "product_line_upserted": 0,
+                "plan_upserted": 0,
+                "total_product_lines": 0,
+                "total_plans": 0,
+            }
 
         with (
             patch(
@@ -175,9 +183,7 @@ class TestHookIdempotency:
                 text("SELECT COUNT(*) FROM customer.customer_plan_contract")
             ).scalar()
             snapshot_count_1 = conn.execute(
-                text(
-                    "SELECT COUNT(*) FROM customer.fct_customer_business_monthly_status"
-                )
+                text("SELECT COUNT(*) FROM customer.fct_customer_product_line_monthly")
             ).scalar()
 
         # Second execution (should be idempotent)
@@ -189,9 +195,7 @@ class TestHookIdempotency:
                 text("SELECT COUNT(*) FROM customer.customer_plan_contract")
             ).scalar()
             snapshot_count_2 = conn.execute(
-                text(
-                    "SELECT COUNT(*) FROM customer.fct_customer_business_monthly_status"
-                )
+                text("SELECT COUNT(*) FROM customer.fct_customer_product_line_monthly")
             ).scalar()
 
         # Counts should be identical (idempotent)
