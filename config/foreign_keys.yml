@@ -405,7 +405,7 @@ domains:
         backfill_columns:
           - source: "company_id"
             target: "company_id"
-          - source: "客户全称"
+          - source: "客户名称"
             target: "客户名称"
             optional: true
 
@@ -425,6 +425,6 @@ domains:
         backfill_columns:
           - source: "company_id"
             target: "company_id"
-          - source: "客户全称"
+          - source: "客户名称"
             target: "客户名称"
             optional: true
