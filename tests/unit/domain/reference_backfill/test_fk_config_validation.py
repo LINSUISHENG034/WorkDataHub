@@ -10,6 +10,8 @@ import pytest
 from pydantic import ValidationError
 
 from work_data_hub.domain.reference_backfill.models import (
+    AggregationConfig,
+    AggregationType,
     BackfillColumnMapping,
     ForeignKeyConfig,
     DomainForeignKeysConfig,
@@ -301,3 +303,23 @@ class TestDomainForeignKeysConfig:
                 source="源列", target="目标列", extra_field="not_allowed"
             )
         assert "Extra inputs are not permitted" in str(exc_info.value)
+
+
+class TestJsonbAppendAggregationType:
+    """Test JSONB_APPEND aggregation type validation."""
+
+    def test_jsonb_append_aggregation_type_exists(self):
+        """JSONB_APPEND aggregation type should be available."""
+        assert hasattr(AggregationType, "JSONB_APPEND")
+        assert AggregationType.JSONB_APPEND.value == "jsonb_append"
+
+    def test_jsonb_append_requires_code(self):
+        """JSONB_APPEND aggregation requires code field."""
+        # Should raise validation error without code
+        with pytest.raises(ValidationError) as exc_info:
+            AggregationConfig(type="jsonb_append")
+        assert "code is required" in str(exc_info.value)
+
+        # Should pass with code
+        config = AggregationConfig(type="jsonb_append", code='lambda g: ["tag1"]')
+        assert config.code == 'lambda g: ["tag1"]'

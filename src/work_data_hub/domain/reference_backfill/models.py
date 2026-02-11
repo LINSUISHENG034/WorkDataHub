@@ -34,6 +34,7 @@ class AggregationType(str, Enum):
     TEMPLATE = "template"
     COUNT_DISTINCT = "count_distinct"
     LAMBDA = "lambda"
+    JSONB_APPEND = "jsonb_append"  # Story 7.6-18: JSONB array append mode
 
 
 class AggregationConfig(BaseModel):
@@ -74,7 +75,8 @@ class AggregationConfig(BaseModel):
 
     type: AggregationType = Field(
         ...,
-        description="Aggregation strategy: first, max_by, concat_distinct, template, count_distinct, or lambda",
+        description="Aggregation strategy: first, max_by, concat_distinct, "
+        "template, count_distinct, lambda, or jsonb_append",
     )
     order_column: Optional[str] = Field(
         default=None, description="Column to order by for max_by aggregation"
@@ -89,7 +91,7 @@ class AggregationConfig(BaseModel):
     # Story 6.2-P18: New fields for advanced aggregations
     template: Optional[str] = Field(
         default=None,
-        description="Template string with {field} placeholders for template aggregation",
+        description="Template string with {field} placeholders",
     )
     template_fields: List[str] = Field(
         default_factory=list,
@@ -97,7 +99,7 @@ class AggregationConfig(BaseModel):
     )
     code: Optional[str] = Field(
         default=None,
-        description="Python lambda expression string (e.g., \"lambda g: g['col'].max()\")",
+        description="Python lambda expression string",
     )
 
     @model_validator(mode="after")
@@ -111,6 +113,8 @@ class AggregationConfig(BaseModel):
             raise ValueError("template is required when type is 'template'")
         if self.type == AggregationType.LAMBDA and not self.code:
             raise ValueError("code is required when type is 'lambda'")
+        if self.type == AggregationType.JSONB_APPEND and not self.code:
+            raise ValueError("code is required when type is 'jsonb_append'")
         return self
 
 
@@ -174,7 +178,7 @@ class BackfillColumnMapping(BaseModel):
     )
     aggregation: Optional[AggregationConfig] = Field(
         default=None,
-        description="Aggregation strategy for this column (default: 'first' non-null value)",
+        description="Aggregation strategy for this column (default: 'first')",
     )
 
     @field_validator("source", "target")
@@ -215,7 +219,7 @@ class ForeignKeyConfig(BaseModel):
     )
     mode: Literal["insert_missing", "fill_null_only"] = Field(
         default="insert_missing",
-        description="Processing mode: insert_missing adds new records, fill_null_only updates nulls",
+        description="Processing mode: insert_missing or fill_null_only",
     )
     depends_on: List[str] = Field(
         default_factory=list,
@@ -223,7 +227,7 @@ class ForeignKeyConfig(BaseModel):
     )
     skip_blank_values: bool = Field(
         default=False,
-        description="Skip blank-like FK values (e.g., empty strings, '(空白)') during candidate derivation",
+        description="Skip blank-like FK values during candidate derivation",
     )
 
     @field_validator("name")
