@@ -701,6 +701,14 @@ class GenericBackfillService:
             builder = InsertBuilder(dialect)
             update_columns = [col for col in columns if col != config.target_key]
 
+            # Story 7.6-18: Detect JSONB_APPEND columns for merge syntax
+            jsonb_merge_columns = [
+                col_mapping.target
+                for col_mapping in config.backfill_columns
+                if col_mapping.aggregation
+                and col_mapping.aggregation.type == AggregationType.JSONB_APPEND
+            ]
+
             if config.mode == "fill_null_only":
                 query = builder.upsert(
                     schema=config.target_schema,
@@ -711,6 +719,20 @@ class GenericBackfillService:
                     mode="do_update",
                     update_columns=update_columns,
                     null_guard=True,
+                    jsonb_merge_columns=jsonb_merge_columns,
+                )
+            elif jsonb_merge_columns:
+                # Story 7.6-18: insert_missing with JSONB columns needs merge
+                query = builder.upsert(
+                    schema=config.target_schema,
+                    table=config.target_table,
+                    columns=columns,
+                    placeholders=placeholders,
+                    conflict_columns=conflict_columns,
+                    mode="do_update",
+                    update_columns=jsonb_merge_columns,
+                    null_guard=False,
+                    jsonb_merge_columns=jsonb_merge_columns,
                 )
             else:
                 query = builder.upsert(
