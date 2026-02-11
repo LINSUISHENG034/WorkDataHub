@@ -1523,3 +1523,72 @@ class TestLambdaAggregation:
         candidates = service.derive_candidates(df, config)
         # Should only count P001, P002 (blanks excluded)
         assert candidates.iloc[0]["关联计划数"] == 2
+
+
+class TestJsonbAppendAggregation:
+    """Test JSONB_APPEND aggregation type."""
+
+    def test_aggregate_jsonb_append_generates_list(self):
+        """JSONB_APPEND aggregation should generate Python list values."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_customer",
+            source_column="company_id",
+            target_table="年金客户",
+            target_key="company_id",
+            backfill_columns=[
+                BackfillColumnMapping(source="company_id", target="company_id"),
+                BackfillColumnMapping(
+                    source="month",
+                    target="tags",
+                    optional=True,
+                    aggregation=AggregationConfig(
+                        type="jsonb_append",
+                        code='lambda g: [g["month"].iloc[0][:4] + "中标"]',
+                    ),
+                ),
+            ],
+        )
+
+        df = pd.DataFrame(
+            [
+                {"company_id": "C001", "month": "202511"},
+                {"company_id": "C001", "month": "202510"},
+                {"company_id": "C002", "month": "202511"},
+            ]
+        )
+
+        candidates = service.derive_candidates(df, config)
+
+        assert candidates.iloc[0]["tags"] == ["2025中标"]
+        assert candidates.iloc[1]["tags"] == ["2025中标"]
+        assert isinstance(candidates.iloc[0]["tags"], list)
+
+    def test_aggregate_jsonb_append_returns_empty_list_on_none(self):
+        """JSONB_APPEND should return empty list when lambda returns None."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_customer",
+            source_column="company_id",
+            target_table="年金客户",
+            target_key="company_id",
+            backfill_columns=[
+                BackfillColumnMapping(source="company_id", target="company_id"),
+                BackfillColumnMapping(
+                    source="month",
+                    target="tags",
+                    optional=True,
+                    aggregation=AggregationConfig(
+                        type="jsonb_append",
+                        code="lambda g: None",
+                    ),
+                ),
+            ],
+        )
+
+        df = pd.DataFrame([{"company_id": "C001", "month": "202511"}])
+
+        candidates = service.derive_candidates(df, config)
+        assert candidates.iloc[0]["tags"] == []

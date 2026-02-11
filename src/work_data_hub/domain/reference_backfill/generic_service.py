@@ -365,6 +365,15 @@ class GenericBackfillService:
                     .reindex(grouped_first.index)
                     .to_numpy()
                 )
+            elif col_mapping.aggregation.type == AggregationType.JSONB_APPEND:
+                # Story 7.6-18: JSONB array append aggregation
+                candidates_df[col_mapping.target] = (
+                    self._aggregate_jsonb_append(
+                        source_df, config.source_column, col_mapping
+                    )
+                    .reindex(grouped_first.index)
+                    .to_numpy()
+                )
 
         # Match legacy behavior: optional missing values are represented as Python None
         for col_mapping in config.backfill_columns:
@@ -588,6 +597,49 @@ class GenericBackfillService:
         return df.groupby(group_col, sort=False).apply(
             lambda_func, include_groups=False
         )
+
+    def _aggregate_jsonb_append(
+        self, df: pd.DataFrame, group_col: str, mapping: BackfillColumnMapping
+    ) -> pd.Series:
+        """
+        Execute lambda and ensure result is a JSON-serializable list.
+
+        Story 7.6-18: JSONB array append mode for tags field.
+
+        The lambda must return a list. If it returns a non-list value,
+        it will be wrapped in a list automatically.
+
+        Args:
+            df: Source DataFrame
+            group_col: Column to group by
+            mapping: Column mapping with aggregation config
+
+        Returns:
+            Series with list values indexed by group
+        """
+        import json
+
+        code = mapping.aggregation.code
+        try:
+            func = eval(code)  # noqa: S307
+        except Exception as e:
+            self.logger.error(f"Failed to compile jsonb_append lambda: {e}")
+            raise ValueError(f"Invalid jsonb_append lambda: {code}") from e
+
+        def safe_apply(group):
+            try:
+                result = func(group)
+                if result is None:
+                    return []
+                if not isinstance(result, list):
+                    return [result]
+                json.dumps(result)  # Validate JSON serializable
+                return result
+            except Exception as e:
+                self.logger.warning(f"jsonb_append lambda error: {e}")
+                return []
+
+        return df.groupby(group_col, sort=False).apply(safe_apply, include_groups=False)
 
     def backfill_table(
         self,
