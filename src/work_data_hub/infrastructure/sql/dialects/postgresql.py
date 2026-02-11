@@ -81,6 +81,7 @@ class PostgreSQLDialect:
         update_columns: List[str],
         null_guard: bool = True,
         schema: Optional[str] = None,
+        jsonb_merge_columns: Optional[List[str]] = None,
     ) -> str:
         """
         Build INSERT ... ON CONFLICT DO UPDATE statement.
@@ -93,6 +94,7 @@ class PostgreSQLDialect:
             update_columns: Columns to update on conflict
             null_guard: If True, only update if existing value is NULL
             schema: Optional schema name
+            jsonb_merge_columns: Columns that should use JSONB array merge
 
         Returns:
             INSERT ... ON CONFLICT DO UPDATE SQL statement
@@ -100,19 +102,31 @@ class PostgreSQLDialect:
         qualified_table = self.qualify(table, schema)
         base_insert = self.build_insert(table, columns, placeholders, schema)
         conflict_cols = ", ".join(self.quote(c) for c in conflict_columns)
+        jsonb_merge_set = set(jsonb_merge_columns or [])
 
-        if null_guard:
-            # Only update if existing value is NULL
-            update_set = ", ".join(
-                f"{self.quote(col)} = CASE WHEN {qualified_table}.{self.quote(col)} IS NULL "
-                f"THEN EXCLUDED.{self.quote(col)} ELSE {qualified_table}.{self.quote(col)} END"
-                for col in update_columns
-            )
-        else:
-            # Always update
-            update_set = ", ".join(
-                f"{self.quote(col)} = EXCLUDED.{self.quote(col)}"
-                for col in update_columns
-            )
+        update_parts = []
+        for col in update_columns:
+            quoted_col = self.quote(col)
+            if col in jsonb_merge_set:
+                # JSONB array merge: append new values, deduplicate
+                update_parts.append(
+                    f"{quoted_col} = ("
+                    f"SELECT jsonb_agg(DISTINCT elem) "
+                    f"FROM jsonb_array_elements("
+                    f"COALESCE({qualified_table}.{quoted_col}, '[]'::jsonb) || "
+                    f"COALESCE(EXCLUDED.{quoted_col}, '[]'::jsonb)"
+                    f") AS elem"
+                    f")"
+                )
+            elif null_guard:
+                update_parts.append(
+                    f"{quoted_col} = CASE WHEN "
+                    f"{qualified_table}.{quoted_col} IS NULL "
+                    f"THEN EXCLUDED.{quoted_col} "
+                    f"ELSE {qualified_table}.{quoted_col} END"
+                )
+            else:
+                update_parts.append(f"{quoted_col} = EXCLUDED.{quoted_col}")
 
+        update_set = ", ".join(update_parts)
         return f"{base_insert} ON CONFLICT ({conflict_cols}) DO UPDATE SET {update_set}"

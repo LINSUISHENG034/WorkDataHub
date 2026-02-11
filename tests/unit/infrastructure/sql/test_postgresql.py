@@ -142,3 +142,22 @@ class TestInsertBuilder:
         assert "DO UPDATE" in sql
         assert '"计划全称"' in sql
         assert '"计划类型"' in sql
+
+    def test_upsert_with_jsonb_merge_columns(self, builder):
+        """JSONB columns should use array merge syntax on conflict."""
+        sql = builder.upsert(
+            schema="customer",
+            table="年金客户",
+            columns=["company_id", "客户名称", "tags"],
+            placeholders=[":col_0", ":col_1", ":col_2"],
+            conflict_columns=["company_id"],
+            mode="do_update",
+            update_columns=["客户名称", "tags"],
+            null_guard=True,
+            jsonb_merge_columns=["tags"],
+        )
+
+        # tags should use JSONB merge syntax
+        assert "COALESCE" in sql
+        assert "||" in sql
+        assert "jsonb_agg" in sql

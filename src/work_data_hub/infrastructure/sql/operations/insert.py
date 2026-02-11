@@ -94,6 +94,7 @@ class InsertBuilder:
         mode: Literal["do_nothing", "do_update"] = "do_nothing",
         update_columns: Optional[List[str]] = None,
         null_guard: bool = True,
+        jsonb_merge_columns: Optional[List[str]] = None,
     ) -> str:
         """
         Build an INSERT ... ON CONFLICT (upsert) statement.
@@ -105,8 +106,9 @@ class InsertBuilder:
             placeholders: List of parameter placeholders
             conflict_columns: Columns for conflict detection
             mode: "do_nothing" or "do_update"
-            update_columns: Columns to update on conflict (required if mode="do_update")
+            update_columns: Columns to update on conflict
             null_guard: If True, only update if existing value is NULL
+            jsonb_merge_columns: Columns that should use JSONB array merge
 
         Returns:
             INSERT ... ON CONFLICT SQL statement
@@ -117,7 +119,6 @@ class InsertBuilder:
             )
         else:
             if not update_columns:
-                # Default: update all non-conflict columns
                 update_columns = [c for c in columns if c not in conflict_columns]
             return self.dialect.build_insert_on_conflict_do_update(
                 table,
@@ -127,4 +128,5 @@ class InsertBuilder:
                 update_columns,
                 null_guard,
                 schema,
+                jsonb_merge_columns,
             )
