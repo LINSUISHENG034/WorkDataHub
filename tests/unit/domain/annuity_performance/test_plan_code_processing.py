@@ -11,8 +11,10 @@ import pandas as pd
 import pytest
 
 from work_data_hub.domain.annuity_performance.pipeline_builder import (
-    _apply_plan_code_defaults,
     build_bronze_to_silver_pipeline,
+)
+from work_data_hub.infrastructure.transforms.plan_portfolio_helpers import (
+    apply_plan_code_defaults as _apply_plan_code_defaults,
 )
 from work_data_hub.domain.pipelines.types import PipelineContext
 from work_data_hub.infrastructure.enrichment import EqcLookupConfig

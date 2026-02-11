@@ -63,6 +63,13 @@ from .company_enrichment import (
 
 # Demonstration/sample ops
 from .demo_ops import load_to_db_op, read_csv_op, validate_op
+
+# Deprecated ops (for backward compatibility with tests)
+from .deprecated_ops import (
+    process_annuity_income_op,
+    process_annuity_performance_op,
+    process_sandbox_trustee_performance_op,
+)
 from .file_processing import (
     DiscoverFilesConfig,
     ReadDataOpConfig,
@@ -154,4 +161,8 @@ __all__ = [
     "process_annuity_income_with_enrichment",
     # Protocol-based Domain Registry (Phase 0 refactor)
     "DOMAIN_SERVICE_REGISTRY",
+    # Deprecated ops (backward compatibility)
+    "process_annuity_income_op",
+    "process_annuity_performance_op",
+    "process_sandbox_trustee_performance_op",
 ]

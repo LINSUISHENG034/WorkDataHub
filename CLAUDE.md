@@ -40,6 +40,7 @@ Avoid building functionality on speculation. Implement features only when they a
 **Examples of common mistakes:**
 ```bash
 # ❌ WRONG - Windows CMD syntax (will fail)
+cd /d E:\Projects\WorkDataHub   # /d flag is CMD-only, causes "too many arguments"
 if exist "file.txt" del "file.txt"
 dir /b
 copy source.txt dest.txt

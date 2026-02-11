@@ -127,6 +127,15 @@ JOB_REGISTRY: Dict[str, JobEntry] = {
     ),
 }
 
+# Backward-compatible aliases for legacy imports
+# These jobs are now accessed via JOB_REGISTRY but some modules still import directly
+sandbox_trustee_performance_multi_file_job = generic_domain_multi_file_job
+sandbox_trustee_performance_job = generic_domain_job
+annuity_performance_job = generic_domain_job
+annuity_performance_story45_job = generic_domain_job
+annuity_income_job = generic_domain_job
+sample_pipeline_job = generic_domain_job
+
 
 def _parse_pk_override(pk_arg: Any) -> List[str]:
     """Parse CLI --pk override into a clean list of column names.

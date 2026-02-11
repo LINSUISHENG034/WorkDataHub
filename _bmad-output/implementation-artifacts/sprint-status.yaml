@@ -246,12 +246,17 @@ development_status:
   7.6-8-power-bi-star-schema-integration: done
   7.6-9-index-trigger-optimization: done
   7.6-10-integration-testing-documentation: done
-  7.6-11-customer-status-field-enhancement: in-progress
+  7.6-11-customer-status-field-enhancement: done
   7.6-12-scd2-implementation-fix: done
   7.6-13-customer-plan-contract-name-fields: done
   7.6-14-annual-cutover-implementation: done
   7.6-15-ratchet-rule-implementation: done
   7.6-16-fact-table-refactoring: done
+  # Stories added 2026-02-11 via Sprint Change Proposal (Customer MDM Optimization)
+  # Reference: _bmad-output/planning-artifacts/sprint-change-proposal-2026-02-11-customer-mdm-optimization.md
+  7.6-17-fk-backfill-annual-award-loss: review
+  7.6-18-config-driven-status-evaluation: backlog
+  7.6-19-table-rename-migration: backlog
   epic-7.6-retrospective: optional
 
   # ============================================================================
