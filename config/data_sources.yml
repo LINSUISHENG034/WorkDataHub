@@ -147,8 +147,8 @@ domains:
         - "上报月份"
         - "业务类型"
 
-    # No FK backfill until customer_plan_contract table is created
-    requires_backfill: false
+    # Story 7.6-17: Enable FK backfill to 年金客户 table
+    requires_backfill: true
 
   # Annual Loss Domain (当年流失)
   # Story: Domain Migration - Merged TrusteeLossCleaner + InvesteeLossCleaner
@@ -176,8 +176,8 @@ domains:
         - "上报月份"
         - "业务类型"
 
-    # No FK backfill until customer_plan_contract table is created
-    requires_backfill: false
+    # Story 7.6-17: Enable FK backfill to 年金客户 table
+    requires_backfill: true
 
   # Future domains (Epic 9) can be added here:
   # Minimal config using defaults inheritance:

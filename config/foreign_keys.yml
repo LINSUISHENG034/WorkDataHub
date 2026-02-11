@@ -388,3 +388,43 @@ domains:
             aggregation:
               type: "template"
               template: "新客*"
+
+  # Annual Award Domain (当年中标)
+  # Story 7.6-17: FK backfill to 年金客户 table
+  # Simplified config - no aggregations needed (single record per company)
+  annual_award:
+    foreign_keys:
+      # 年金客户 (Annuity Customer) reference table backfill
+      - name: "fk_customer"
+        source_column: "company_id"
+        target_table: "年金客户"
+        target_key: "company_id"
+        target_schema: "customer"
+        mode: "insert_missing"
+        skip_blank_values: true
+        backfill_columns:
+          - source: "company_id"
+            target: "company_id"
+          - source: "客户全称"
+            target: "客户名称"
+            optional: true
+
+  # Annual Loss Domain (当年流失)
+  # Story 7.6-17: FK backfill to 年金客户 table
+  # Simplified config - no aggregations needed (single record per company)
+  annual_loss:
+    foreign_keys:
+      # 年金客户 (Annuity Customer) reference table backfill
+      - name: "fk_customer"
+        source_column: "company_id"
+        target_table: "年金客户"
+        target_key: "company_id"
+        target_schema: "customer"
+        mode: "insert_missing"
+        skip_blank_values: true
+        backfill_columns:
+          - source: "company_id"
+            target: "company_id"
+          - source: "客户全称"
+            target: "客户名称"
+            optional: true
