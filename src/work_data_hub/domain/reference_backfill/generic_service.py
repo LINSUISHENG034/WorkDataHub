@@ -630,14 +630,14 @@ class GenericBackfillService:
             try:
                 result = func(group)
                 if result is None:
-                    return []
+                    return json.dumps([], ensure_ascii=False)
                 if not isinstance(result, list):
-                    return [result]
-                json.dumps(result)  # Validate JSON serializable
-                return result
+                    result = [result]
+                # Return JSON string for PostgreSQL JSONB compatibility
+                return json.dumps(result, ensure_ascii=False)
             except Exception as e:
                 self.logger.warning(f"jsonb_append lambda error: {e}")
-                return []
+                return json.dumps([], ensure_ascii=False)
 
         return df.groupby(group_col, sort=False).apply(safe_apply, include_groups=False)
 

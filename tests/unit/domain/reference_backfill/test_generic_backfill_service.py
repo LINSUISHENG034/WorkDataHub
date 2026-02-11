@@ -1561,9 +1561,9 @@ class TestJsonbAppendAggregation:
 
         candidates = service.derive_candidates(df, config)
 
-        assert candidates.iloc[0]["tags"] == ["2025中标"]
-        assert candidates.iloc[1]["tags"] == ["2025中标"]
-        assert isinstance(candidates.iloc[0]["tags"], list)
+        assert candidates.iloc[0]["tags"] == '["2025中标"]'
+        assert candidates.iloc[1]["tags"] == '["2025中标"]'
+        assert isinstance(candidates.iloc[0]["tags"], str)
 
     def test_aggregate_jsonb_append_returns_empty_list_on_none(self):
         """JSONB_APPEND should return empty list when lambda returns None."""
@@ -1591,4 +1591,4 @@ class TestJsonbAppendAggregation:
         df = pd.DataFrame([{"company_id": "C001", "month": "202511"}])
 
         candidates = service.derive_candidates(df, config)
-        assert candidates.iloc[0]["tags"] == []
+        assert candidates.iloc[0]["tags"] == '[]'

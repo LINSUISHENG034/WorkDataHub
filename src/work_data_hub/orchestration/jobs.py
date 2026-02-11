@@ -114,11 +114,11 @@ JOB_REGISTRY: Dict[str, JobEntry] = {
     ),
     "annual_award": JobEntry(
         job=generic_domain_job,
-        supports_backfill=False,
+        supports_backfill=True,
     ),
     "annual_loss": JobEntry(
         job=generic_domain_job,
-        supports_backfill=False,
+        supports_backfill=True,
     ),
     "sandbox_trustee_performance": JobEntry(
         job=generic_domain_job,
