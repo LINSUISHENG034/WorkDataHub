@@ -2,6 +2,7 @@
 
 Story 7.6-7: Monthly Snapshot Refresh (Post-ETL Hook)
 Story 7.6-16: Fact Table Refactoring (双表粒度分离)
+Story 7.6-18: Config-Driven Status Evaluation Framework
 
 Populates two fact tables from customer.customer_plan_contract:
 1. fct_customer_product_line_monthly - ProductLine granularity
@@ -12,16 +13,16 @@ ProductLine Table (fct_customer_product_line_monthly):
   Status derivation:
     - is_strategic: Aggregated from contract attributes (BOOL_OR)
     - is_existing: Aggregated from contract attributes (BOOL_OR)
-    - is_winning_this_year: Derived from customer.当年中标
-    - is_churned_this_year: Derived from customer.当年流失 (aggregated)
-    - is_new: is_winning AND NOT is_existing
+    - is_winning_this_year: Derived from customer.当年中标 (config-driven)
+    - is_churned_this_year: Derived from customer.当年流失 (config-driven)
+    - is_new: is_winning AND NOT is_existing (config-driven)
     - aum_balance: Aggregated from business.规模明细
     - plan_count: COUNT DISTINCT plan_code
 
 Plan Table (fct_customer_plan_monthly):
   Granularity: Customer + Plan + Product Line
   Status derivation:
-    - is_churned_this_year: Plan-level churn from customer.当年流失
+    - is_churned_this_year: Plan-level churn from customer.当年流失 (config-driven)
     - contract_status: Current contract status
     - aum_balance: Plan-level AUM from business.规模明细
 """
@@ -37,12 +38,39 @@ import psycopg
 from dotenv import load_dotenv
 from structlog import get_logger
 
+from work_data_hub.customer_mdm.status_evaluator import StatusEvaluator
+
 logger = get_logger(__name__)
+
+# Singleton evaluator instance (lazy loaded)
+_evaluator: Optional[StatusEvaluator] = None
+
+
+def get_status_evaluator() -> StatusEvaluator:
+    """Get or create StatusEvaluator singleton."""
+    global _evaluator
+    if _evaluator is None:
+        _evaluator = StatusEvaluator()
+        logger.debug("status_evaluator.singleton_created")
+    return _evaluator
+
+
+def reset_status_evaluator() -> None:
+    """Reset StatusEvaluator singleton for testing purposes.
+
+    This allows tests to start with a fresh evaluator instance,
+    preventing test pollution from cached state.
+    """
+    global _evaluator
+    _evaluator = None
+    logger.debug("status_evaluator.singleton_reset")
+
 
 # Period format constants
 PERIOD_LENGTH = 6  # YYYYMM format
 MIN_MONTH = 1
 MAX_MONTH = 12
+LOG_SQL_TRUNCATE_LENGTH = 100  # Max chars for SQL in debug logs
 
 
 def period_to_snapshot_month(period: str) -> str:
@@ -87,6 +115,8 @@ def _refresh_product_line_snapshot(
 ) -> int:
     """Refresh ProductLine-level snapshot table.
 
+    Story 7.6-18: Uses StatusEvaluator for config-driven status derivation.
+
     Args:
         cur: Database cursor
         snapshot_month: End-of-month date string
@@ -95,7 +125,29 @@ def _refresh_product_line_snapshot(
     Returns:
         Number of records upserted
     """
-    refresh_sql = """
+    evaluator = get_status_evaluator()
+    params = {"snapshot_year": snapshot_year}
+
+    # Generate config-driven SQL fragments
+    is_winning_sql = evaluator.generate_sql_fragment(
+        "is_winning_this_year", "c", params
+    )
+    is_churned_sql = evaluator.generate_sql_fragment(
+        "is_churned_this_year", "c", params
+    )
+    is_new_sql = evaluator.generate_sql_fragment("is_new", "c", params)
+
+    logger.debug(
+        "status_evaluator.sql_generated",
+        is_winning_sql=is_winning_sql[:LOG_SQL_TRUNCATE_LENGTH] + "..."
+        if len(is_winning_sql) > LOG_SQL_TRUNCATE_LENGTH
+        else is_winning_sql,
+        is_churned_sql=is_churned_sql[:LOG_SQL_TRUNCATE_LENGTH] + "..."
+        if len(is_churned_sql) > LOG_SQL_TRUNCATE_LENGTH
+        else is_churned_sql,
+    )
+
+    refresh_sql = f"""
         INSERT INTO customer.fct_customer_product_line_monthly (
             snapshot_month,
             company_id,
@@ -121,32 +173,14 @@ def _refresh_product_line_snapshot(
             BOOL_OR(c.is_strategic) as is_strategic,
             BOOL_OR(c.is_existing) as is_existing,
 
-            -- Derived is_new: Winning this year AND NOT Existing
-            (
-                EXISTS (
-                    SELECT 1 FROM customer.当年中标 w
-                    WHERE w.company_id = c.company_id
-                        AND w.产品线代码 = c.product_line_code
-                        AND EXTRACT(YEAR FROM w.上报月份) = %(snapshot_year)s
-                )
-                AND NOT BOOL_OR(c.is_existing)
-            ) as is_new,
+            -- Config-driven is_new (Story 7.6-18)
+            {is_new_sql} as is_new,
 
-            -- 当年中标判定 (Aggregated to Product Line level)
-            EXISTS (
-                SELECT 1 FROM customer.当年中标 w
-                WHERE w.company_id = c.company_id
-                  AND w.产品线代码 = c.product_line_code
-                  AND EXTRACT(YEAR FROM w.上报月份) = %(snapshot_year)s
-            ) as is_winning_this_year,
+            -- Config-driven is_winning_this_year (Story 7.6-18)
+            {is_winning_sql} as is_winning_this_year,
 
-            -- 当年流失判定 (Aggregated to Product Line level)
-            EXISTS (
-                SELECT 1 FROM customer.当年流失 l
-                WHERE l.company_id = c.company_id
-                  AND l.产品线代码 = c.product_line_code
-                  AND EXTRACT(YEAR FROM l.上报月份) = %(snapshot_year)s
-            ) as is_churned_this_year,
+            -- Config-driven is_churned_this_year (Story 7.6-18)
+            {is_churned_sql} as is_churned_this_year,
 
             -- 月末资产规模 (Aggregated AUM)
             COALESCE((
@@ -177,8 +211,8 @@ def _refresh_product_line_snapshot(
             updated_at = CURRENT_TIMESTAMP;
     """
 
-    params = {"snapshot_month": snapshot_month, "snapshot_year": snapshot_year}
-    cur.execute(refresh_sql, params)
+    query_params = {"snapshot_month": snapshot_month, "snapshot_year": snapshot_year}
+    cur.execute(refresh_sql, query_params)
     return cur.rowcount
 
 
@@ -189,6 +223,8 @@ def _refresh_plan_snapshot(
 ) -> int:
     """Refresh Plan-level snapshot table.
 
+    Story 7.6-18: Uses StatusEvaluator for config-driven status derivation.
+
     Args:
         cur: Database cursor
         snapshot_month: End-of-month date string
@@ -197,7 +233,22 @@ def _refresh_plan_snapshot(
     Returns:
         Number of records upserted
     """
-    refresh_sql = """
+    evaluator = get_status_evaluator()
+    params = {"snapshot_year": snapshot_year}
+
+    # Generate config-driven SQL fragment for plan-level churn
+    is_churned_plan_sql = evaluator.generate_sql_fragment(
+        "is_churned_this_year_plan", "c", params
+    )
+
+    logger.debug(
+        "status_evaluator.plan_sql_generated",
+        is_churned_plan_sql=is_churned_plan_sql[:LOG_SQL_TRUNCATE_LENGTH] + "..."
+        if len(is_churned_plan_sql) > LOG_SQL_TRUNCATE_LENGTH
+        else is_churned_plan_sql,
+    )
+
+    refresh_sql = f"""
         INSERT INTO customer.fct_customer_plan_monthly (
             snapshot_month,
             company_id,
@@ -219,13 +270,8 @@ def _refresh_plan_snapshot(
             c.plan_name,
             c.product_line_name,
 
-            -- Plan-level churn (matches plan_code)
-            EXISTS (
-                SELECT 1 FROM customer.当年流失 l
-                WHERE l.company_id = c.company_id
-                  AND l.年金计划号 = c.plan_code
-                  AND EXTRACT(YEAR FROM l.上报月份) = %(snapshot_year)s
-            ) as is_churned_this_year,
+            -- Config-driven plan-level churn (Story 7.6-18)
+            {is_churned_plan_sql} as is_churned_this_year,
 
             c.contract_status,
 
@@ -253,8 +299,8 @@ def _refresh_plan_snapshot(
             updated_at = CURRENT_TIMESTAMP;
     """
 
-    params = {"snapshot_month": snapshot_month, "snapshot_year": snapshot_year}
-    cur.execute(refresh_sql, params)
+    query_params = {"snapshot_month": snapshot_month, "snapshot_year": snapshot_year}
+    cur.execute(refresh_sql, query_params)
     return cur.rowcount
 
 

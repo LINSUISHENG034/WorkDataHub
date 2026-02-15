@@ -1,0 +1,117 @@
+# Customer Status Evaluation Rules Configuration
+# Story 7.6-18: Config-Driven Status Evaluation Framework
+# Created: 2026-02-11
+#
+# This file defines business rules for customer status evaluation,
+# replacing hardcoded SQL in snapshot_refresh.py with config-driven logic.
+#
+# Usage: Loaded by work_data_hub.customer_mdm.status_evaluator.StatusEvaluator
+
+schema_version: "1.0"
+
+# Source table definitions
+sources:
+  annuity_performance:
+    schema: business
+    table: "规模明细"
+    key_fields: [company_id, product_line_code, snapshot_month]
+
+  annual_award:
+    schema: customer
+    table: "当年中标"
+    key_fields: [company_id, 产品线代码, 上报月份]
+
+  annual_loss:
+    schema: customer
+    table: "当年流失"
+    key_fields: [company_id, 产品线代码, 上报月份]
+
+# Status field definitions with business context
+status_definitions:
+  is_winning_this_year:
+    description: "新中标 - Has award record this year"
+    source: annual_award
+    time_scope: yearly
+
+  is_loss_reported:
+    description: "申报流失 - Has loss report this year"
+    source: annual_loss
+    time_scope: yearly
+
+  is_churned_this_year:
+    description: "已流失 - Disappeared or zero AUM"
+    source: annuity_performance
+    time_scope: monthly
+
+  is_new:
+    description: "新到账 - Winning this year AND NOT existing"
+    source: derived
+    time_scope: yearly
+
+# Evaluation rules for SQL generation
+# Each rule generates a SQL fragment for the corresponding status field
+evaluation_rules:
+  # ProductLine-level: EXISTS check on 当年中标
+  is_winning_this_year:
+    granularity: product_line
+    conditions:
+      - type: exists_in_year
+        source: annual_award
+        year_field: 上报月份
+        match_fields:
+          - source_field: company_id
+            target_field: company_id
+          - source_field: product_line_code
+            target_field: 产品线代码
+
+  # ProductLine-level: EXISTS check on 当年流失
+  is_loss_reported:
+    granularity: product_line
+    conditions:
+      - type: exists_in_year
+        source: annual_loss
+        year_field: 上报月份
+        match_fields:
+          - source_field: company_id
+            target_field: company_id
+          - source_field: product_line_code
+            target_field: 产品线代码
+
+  # ProductLine-level: EXISTS check on 当年流失 (aggregated)
+  is_churned_this_year:
+    granularity: product_line
+    conditions:
+      - type: exists_in_year
+        source: annual_loss
+        year_field: 上报月份
+        match_fields:
+          - source_field: company_id
+            target_field: company_id
+          - source_field: product_line_code
+            target_field: 产品线代码
+
+  # Plan-level: EXISTS check on 当年流失 with plan_code match
+  is_churned_this_year_plan:
+    granularity: plan
+    conditions:
+      - type: exists_in_year
+        source: annual_loss
+        year_field: 上报月份
+        match_fields:
+          - source_field: company_id
+            target_field: company_id
+          - source_field: plan_code
+            target_field: 年金计划号
+
+  # Derived status: is_winning AND NOT is_existing
+  is_new:
+    granularity: product_line
+    operator: AND
+    conditions:
+      - type: status_reference
+        status: is_winning_this_year
+      - type: negation
+        condition:
+          type: aggregated_field
+          field: is_existing
+          aggregation: BOOL_OR

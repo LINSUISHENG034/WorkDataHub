@@ -86,7 +86,8 @@ def test_refresh_monthly_snapshot_dry_run_uses_tuple_distinct(
         result = module.refresh_monthly_snapshot(period="202601", dry_run=True)
 
     assert "COUNT(DISTINCT (company_id, product_line_code))" in cursor.queries[0]
-    assert result == {
-        "product_line_upserted": 0,
-        "plan_upserted": 0,
-    }
+    # Dry run returns counts but no upserts
+    assert result["product_line_upserted"] == 0
+    assert result["plan_upserted"] == 0
+    assert result["total_product_lines"] == 3
+    assert result["total_plans"] == 5
