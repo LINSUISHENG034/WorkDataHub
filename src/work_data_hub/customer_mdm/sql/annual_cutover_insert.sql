@@ -99,7 +99,7 @@ SELECT
     CURRENT_TIMESTAMP as updated_at
 FROM prior_year_dec pyd
 LEFT JOIN mapping."产品线" p ON pyd.product_line_code = p.产品线代码
-LEFT JOIN customer."年金客户" cust ON pyd.company_id = cust.company_id
+LEFT JOIN customer."年金关联公司" cust ON pyd.company_id = cust.company_id
 LEFT JOIN mapping."年金计划" plan ON pyd.plan_code = plan.年金计划号
 LEFT JOIN strategic_whitelist sw
     ON pyd.company_id = sw.company_id

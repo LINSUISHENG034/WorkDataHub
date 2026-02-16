@@ -1149,7 +1149,7 @@ class TestTemplateAggregation:
         config = ForeignKeyConfig(
             name="fk_customer",
             source_column="company_id",
-            target_table="年金客户",
+            target_table="年金关联公司",
             target_key="company_id",
             backfill_columns=[
                 BackfillColumnMapping(source="company_id", target="company_id"),
@@ -1186,7 +1186,7 @@ class TestTemplateAggregation:
         config = ForeignKeyConfig(
             name="fk_customer",
             source_column="company_id",
-            target_table="年金客户",
+            target_table="年金关联公司",
             target_key="company_id",
             backfill_columns=[
                 BackfillColumnMapping(source="company_id", target="company_id"),
@@ -1219,7 +1219,7 @@ class TestTemplateAggregation:
         config = ForeignKeyConfig(
             name="fk_customer",
             source_column="company_id",
-            target_table="年金客户",
+            target_table="年金关联公司",
             target_key="company_id",
             backfill_columns=[
                 BackfillColumnMapping(source="company_id", target="company_id"),
@@ -1246,7 +1246,7 @@ class TestTemplateAggregation:
         config = ForeignKeyConfig(
             name="fk_customer",
             source_column="company_id",
-            target_table="年金客户",
+            target_table="年金关联公司",
             target_key="company_id",
             backfill_columns=[
                 BackfillColumnMapping(source="company_id", target="company_id"),
@@ -1281,7 +1281,7 @@ class TestCountDistinctAggregation:
         config = ForeignKeyConfig(
             name="fk_customer",
             source_column="company_id",
-            target_table="年金客户",
+            target_table="年金关联公司",
             target_key="company_id",
             backfill_columns=[
                 BackfillColumnMapping(source="company_id", target="company_id"),
@@ -1317,7 +1317,7 @@ class TestCountDistinctAggregation:
         config = ForeignKeyConfig(
             name="fk_customer",
             source_column="company_id",
-            target_table="年金客户",
+            target_table="年金关联公司",
             target_key="company_id",
             backfill_columns=[
                 BackfillColumnMapping(source="company_id", target="company_id"),
@@ -1348,7 +1348,7 @@ class TestCountDistinctAggregation:
         config = ForeignKeyConfig(
             name="fk_customer",
             source_column="company_id",
-            target_table="年金客户",
+            target_table="年金关联公司",
             target_key="company_id",
             backfill_columns=[
                 BackfillColumnMapping(source="company_id", target="company_id"),
@@ -1379,7 +1379,7 @@ class TestCountDistinctAggregation:
         config = ForeignKeyConfig(
             name="fk_customer",
             source_column="company_id",
-            target_table="年金客户",
+            target_table="年金关联公司",
             target_key="company_id",
             backfill_columns=[
                 BackfillColumnMapping(source="company_id", target="company_id"),
@@ -1411,7 +1411,7 @@ class TestLambdaAggregation:
         config = ForeignKeyConfig(
             name="fk_customer",
             source_column="company_id",
-            target_table="年金客户",
+            target_table="年金关联公司",
             target_key="company_id",
             backfill_columns=[
                 BackfillColumnMapping(source="company_id", target="company_id"),
@@ -1444,7 +1444,7 @@ class TestLambdaAggregation:
         config = ForeignKeyConfig(
             name="fk_customer",
             source_column="company_id",
-            target_table="年金客户",
+            target_table="年金关联公司",
             target_key="company_id",
             backfill_columns=[
                 BackfillColumnMapping(source="company_id", target="company_id"),
@@ -1471,7 +1471,7 @@ class TestLambdaAggregation:
         config = ForeignKeyConfig(
             name="fk_customer",
             source_column="company_id",
-            target_table="年金客户",
+            target_table="年金关联公司",
             target_key="company_id",
             backfill_columns=[
                 BackfillColumnMapping(source="company_id", target="company_id"),
@@ -1498,7 +1498,7 @@ class TestLambdaAggregation:
         config = ForeignKeyConfig(
             name="fk_customer",
             source_column="company_id",
-            target_table="年金客户",
+            target_table="年金关联公司",
             target_key="company_id",
             backfill_columns=[
                 BackfillColumnMapping(source="company_id", target="company_id"),
@@ -1535,7 +1535,7 @@ class TestJsonbAppendAggregation:
         config = ForeignKeyConfig(
             name="fk_customer",
             source_column="company_id",
-            target_table="年金客户",
+            target_table="年金关联公司",
             target_key="company_id",
             backfill_columns=[
                 BackfillColumnMapping(source="company_id", target="company_id"),
@@ -1572,7 +1572,7 @@ class TestJsonbAppendAggregation:
         config = ForeignKeyConfig(
             name="fk_customer",
             source_column="company_id",
-            target_table="年金客户",
+            target_table="年金关联公司",
             target_key="company_id",
             backfill_columns=[
                 BackfillColumnMapping(source="company_id", target="company_id"),
@@ -1591,4 +1591,4 @@ class TestJsonbAppendAggregation:
         df = pd.DataFrame([{"company_id": "C001", "month": "202511"}])
 
         candidates = service.derive_candidates(df, config)
-        assert candidates.iloc[0]["tags"] == '[]'
+        assert candidates.iloc[0]["tags"] == "[]"

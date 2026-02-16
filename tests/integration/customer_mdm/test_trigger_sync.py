@@ -247,7 +247,7 @@ class TestPlanTableSyncTriggers:
     ):
         """Verify trg_sync_fct_plan_customer_name propagates customer name changes.
 
-        When 年金客户.客户名称 is updated, the trigger should propagate
+        When 年金关联公司.客户名称 is updated, the trigger should propagate
         the new name to fct_customer_plan_monthly.
         """
         _validate_test_database(customer_mdm_test_db)
@@ -281,7 +281,7 @@ class TestPlanTableSyncTriggers:
             conn.execute(
                 text(
                     """
-                    UPDATE customer."年金客户"
+                    UPDATE customer."年金关联公司"
                     SET "客户名称" = '测试客户A(改名)'
                     WHERE company_id = 'TEST_C001'
                     """
@@ -307,7 +307,7 @@ class TestPlanTableSyncTriggers:
             conn.execute(
                 text(
                     """
-                    UPDATE customer."年金客户"
+                    UPDATE customer."年金关联公司"
                     SET "客户名称" = '测试客户A'
                     WHERE company_id = 'TEST_C001'
                     """

@@ -58,7 +58,7 @@ SELECT DISTINCT ON (s.company_id, s.计划代码, s.产品线代码)
     '9999-12-31'::date as valid_to
 FROM business.规模明细 s
 LEFT JOIN mapping."产品线" p ON s.产品线代码 = p.产品线代码
-LEFT JOIN customer."年金客户" cust ON s.company_id = cust.company_id
+LEFT JOIN customer."年金关联公司" cust ON s.company_id = cust.company_id
 LEFT JOIN mapping."年金计划" plan ON s.计划代码 = plan.年金计划号
 LEFT JOIN strategic_whitelist sw
     ON s.company_id = sw.company_id

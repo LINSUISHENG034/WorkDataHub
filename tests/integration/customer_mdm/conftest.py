@@ -60,13 +60,13 @@ def customer_mdm_test_db(
     """Extend base fixture with Customer MDM test data.
 
     Creates deterministic test data in the following tables:
-    - customer."年金客户" (customer dimension, appended to seed data)
+    - customer."年金关联公司" (customer dimension, appended to seed data)
     - business.规模明细 (source AUM data)
     - customer.当年中标 (annual awards)
     - customer.当年流失 (annual churn)
 
     Note: mapping."产品线" already has seed data (PL201-PL204 etc.)
-    Note: customer."年金客户" already has seed data, test IDs use TEST_ prefix
+    Note: customer."年金关联公司" already has seed data, test IDs use TEST_ prefix
 
     Yields:
         str: DSN for test database with Customer MDM data populated
@@ -95,11 +95,11 @@ def customer_mdm_test_db(
                 """
             )
 
-            # 2. Insert test customers into customer."年金客户"
+            # 2. Insert test customers into customer."年金关联公司"
             # Uses TEST_ prefix to avoid collision with seed data
             cur.execute(
                 """
-                INSERT INTO customer."年金客户" (
+                INSERT INTO customer."年金关联公司" (
                     company_id, "客户名称", "年金客户类型"
                 ) VALUES
                     ('TEST_C001', '测试公司A', '企业年金'),
