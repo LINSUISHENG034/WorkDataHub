@@ -1,22 +1,38 @@
 # References
 
 **Research Documents:**
-- `docs/deep_research/1.md` - Modern Data Processing Architectures (Gemini Deep Research, 37 pages)
-- `docs/deep_research/2.md` - Refactoring Strategy Comparison Matrix (Strangler Fig vs Branch by Abstraction vs Big Bang)
-- `docs/deep_research/3.md` - Strangler Fig Implementation Guide with Python Examples
-- `docs/deep_research/4.md` - Data Contracts with Pandera (DataFrame Validation Best Practices)
-- `docs/research-deep-prompt-2025-11-08.md` - Original Research Prompt for AI Platforms
+- `docs/initial/research-deep-prompt*.md` - Original Research Prompt for AI Platforms
 
-**Archive Documents:**
-- `docs/archive/prd.md` - Previous Annuity Performance Pipeline Migration PRD
-- `docs/archive/architecture.md` - Brownfield Enhancement Architecture
+**Architecture & Patterns Documentation:**
+- `docs/architecture-patterns/` - Pipeline integration guide, tiered retry, error message quality
+- `docs/guides/infrastructure/` - Company enrichment, DB connection, EQC token, schemas deep-dive, transforms
+- `docs/guides/domain-migration/` - Code mapping, development guide, workflow, troubleshooting
+
+**Business Context:**
+- `docs/business-background/` - Annuity plan types, customer MDM backfill analysis, 战客身份定义
+- `docs/cleansing-rules/` - Annuity income, annuity performance cleansing rules
+
+**Development Standards:**
+- `docs/context-engineering/` - Core dev philosophy, debugging tools, dev environment, error handling, git workflow, monitoring, performance, security, style, testing
+
+**Operational Guides:**
+- `docs/runbooks/` - Annuity performance, intranet migration verification, legacy parity validation
+- `docs/guides/troubleshooting/` - Troubleshooting guides
+- `docs/database-migrations.md` - Database migration guide
+- `docs/database-schema-panorama.md` - Full database schema overview
+
+**Planning Artifacts:**
+- `_bmad-output/planning-artifacts/architecture/` - Full architecture documentation (12 files)
+- `_bmad-output/planning-artifacts/epics/` - Epic 1-6 + Epic 5.5
+- `_bmad-output/planning-artifacts/plans/` - Implementation plans (CLI, customer MDM, etc.)
 
 **Existing Codebase:**
-- `src/work_data_hub/` - Partially refactored with Dagster + Pydantic + Pipeline framework
-- `legacy/annuity_hub/` - Original monolithic implementation (to be replaced)
+- `src/work_data_hub/` - 8 business domains, infrastructure layer, CLI, GUI, orchestration
+- `legacy/annuity_hub/` - Original monolithic implementation (quarantined, import ban enforced)
 
-**Data Domains:**
-- `reference/monthly/202501/收集数据/` - Example monthly data structure with 6+ domains
+**Configuration:**
+- `config/data_sources.yml` - Domain file discovery patterns (schema v1.2)
+- `config/mappings/` - Business mapping YAML files
+- `config/seeds/` - Seed data (CSV + dump files)
 
 ---
-

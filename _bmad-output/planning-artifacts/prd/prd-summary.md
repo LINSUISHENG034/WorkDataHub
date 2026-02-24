@@ -12,17 +12,20 @@
 - **Strangler Fig** migration (domain-by-domain replacement)
 - **Pydantic + pandera** multi-layer validation (row + DataFrame contracts)
 - **Dagster** orchestration with jobs, schedules, sensors
-- **Clean Architecture** with strict dependency boundaries
+- **SQLAlchemy + Alembic** schema management (13 active migrations)
+- **Clean Architecture** with strict dependency boundaries (domain → infrastructure → io → orchestration)
+- **Customer MDM** lifecycle management (sync, snapshot, validate, cutover)
+- **EQC Integration** via Playwright automation + CAPTCHA solving
 
 **Success Metrics:**
-- <30 min full monthly processing (6+ domains, 50K rows)
+- <30 min full monthly processing (8 domains, 50K rows)
 - >98% pipeline success rate
 - 100% legacy parity validated
 - <4 hours to add new domain
 
 **Scope:**
 - **MVP:** Annuity domain migration with golden dataset tests
-- **Growth:** All 6+ domains migrated, legacy deleted
+- **Growth:** All 8 domains implemented, Customer MDM operational, legacy quarantined
 - **Vision:** Predictive quality, self-healing, schema evolution
 
 **Requirements:**
@@ -37,3 +40,4 @@ When monthly data arrives, WorkDataHub automatically finds the latest versions a
 _This PRD captures the essence of WorkDataHub: transforming manual, error-prone data processing into an effortless, reliable, automated system that the team can confidently maintain and extend._
 
 _Created through collaborative discovery between Link and AI Product Manager (Mary), 2025-11-08._
+_Last validated and updated against actual codebase state: 2026-02-24._

@@ -87,51 +87,77 @@ WorkDataHub follows the **Strangler Fig pattern** to safely replace legacy code 
 
 **Adopted from Gemini Research (docs/deep_research/1.md - Separation of Concerns)**
 
-**Directory Structure:**
+**Directory Structure (Actual):**
 ```
 src/work_data_hub/
+├── cli/                 # CLI ENTRY POINTS (argparse-based)
+│   ├── __main__.py           # Subcommand router
+│   ├── etl/                  # ETL job execution (--domains, --period, --execute)
+│   ├── auth.py               # Authentication token management
+│   ├── eqc_refresh.py        # EQC data refresh from API
+│   ├── cleanse_data.py       # Data cleansing operations
+│   └── customer_mdm/         # Customer MDM sub-commands (sync, snapshot, init-year, validate, cutover)
+│
+├── config/              # CONFIGURATION LOADING
+│   ├── settings.py           # Application settings (pydantic-settings)
+│   └── mapping_loader.py     # YAML mapping file loader
+│
+├── customer_mdm/        # CUSTOMER MASTER DATA MANAGEMENT
+│   # Lifecycle management: sync, snapshot, init-year, validate, cutover
+│
 ├── domain/              # BUSINESS LOGIC (core transformations)
-│   ├── annuity_performance/
-│   │   ├── models.py         # Pydantic In/Out models
-│   │   ├── service.py        # Pure transformation functions
-│   │   └── pipeline_steps.py # Pipeline step implementations
-│   ├── pipelines/            # Shared pipeline framework
-│   │   ├── core.py           # Pipeline execution engine
-│   │   ├── builder.py        # Pipeline construction
-│   │   └── types.py          # Common types
+│   ├── annuity_performance/  # MVP domain (adapter, constants, helpers, models, pipeline_builder, schemas, service)
+│   ├── annuity_income/       # Annuity income domain (same pattern)
+│   ├── annual_award/         # Annual award domain (same pattern)
+│   ├── annual_loss/          # Annual loss domain (same pattern)
+│   ├── company_enrichment/   # Company ID resolution (lookup_queue, models, observability, service)
+│   ├── reference_backfill/   # Reference data backfill (config_loader, generic/hybrid/sync_service)
+│   ├── sandbox_trustee_performance/  # Dev/test sandbox domain
+│   └── pipelines/            # Shared pipeline framework (core, builder, adapters, steps, exceptions, config)
 │
-├── io/                  # INFRASTRUCTURE (I/O operations)
-│   ├── readers/
-│   │   └── excel_reader.py   # Excel file reading
-│   ├── loader/
-│   │   └── warehouse_loader.py # PostgreSQL loading
-│   └── connectors/
-│       └── file_connector.py # File system operations
+├── gui/                 # DESKTOP GUI
+│   ├── eqc_query/            # Tkinter GUI for EQC lookups
+│   └── eqc_query_fluent/     # PyQt6 Fluent-style GUI
 │
-├── orchestration/       # ORCHESTRATION (Dagster jobs)
-│   ├── jobs.py          # Dagster job definitions
-│   ├── ops.py           # Dagster operation implementations
-│   ├── schedules.py     # Scheduled triggers
-│   └── sensors.py       # Event-driven triggers
+├── infrastructure/      # SHARED INFRASTRUCTURE (replaces old cleansing/)
+│   ├── cleansing/            # Rule engine, registry, normalizers, rules, validators, biz_label_parser
+│   ├── enrichment/           # Company ID resolver, EQC provider, multi-strategy resolver, repository
+│   ├── schema/               # Core DDL generator, domain registry, definitions per domain
+│   ├── sql/                  # SQL core (identifier, parameters), dialects (postgresql), operations
+│   ├── transforms/           # Base, cleansing_step, projection_step, standard_steps
+│   ├── validation/           # Domain validators, error handler, failure exporter, report generator
+│   ├── settings/             # Customer status schema, data source schema, loader
+│   ├── helpers/              # Shared infrastructure helpers
+│   ├── mappings/             # Infrastructure-level mappings
+│   └── models/               # Infrastructure-level models
 │
-├── cleansing/           # CLEANSING (data quality rules)
-│   ├── registry.py      # Central rule registry
-│   └── rules/           # Specific cleansing rules
+├── io/                  # I/O LAYER
+│   ├── readers/              # Excel file reading
+│   ├── loaders/              # PostgreSQL loading (warehouse_loader)
+│   ├── connectors/           # File system operations
+│   ├── auth/                 # Authentication (EQC token via Playwright)
+│   └── schema/               # Alembic migrations (13 active versions)
 │
-├── config/              # CONFIGURATION
-│   ├── settings.py      # Application settings
-│   ├── data_sources.yml # File discovery patterns
-│   └── mappings/        # Domain-specific mappings
+├── orchestration/       # ORCHESTRATION (Dagster)
+│   ├── jobs.py               # Dagster job definitions
+│   ├── ops.py                # Dagster operation implementations
+│   ├── schedules.py          # Scheduled triggers
+│   └── sensors.py            # Event-driven triggers
 │
 └── utils/               # SHARED UTILITIES
-    ├── date_parser.py   # Chinese date parsing
-    └── column_normalizer.py
+    ├── date_parser.py        # Chinese date parsing
+    ├── column_normalizer.py  # Column name normalization
+    ├── logging.py            # Structured logging (structlog)
+    └── types.py              # Shared type definitions
 ```
 
 **Dependency Rule (Critical):**
 - **`domain/` imports from:** NOTHING (pure business logic, zero dependencies)
-- **`io/` imports from:** `domain/` only (knows about models, not how to transform them)
-- **`orchestration/` imports from:** `domain/` + `io/` (wires everything together)
+- **`infrastructure/` imports from:** `domain/` only (shared infra: cleansing, enrichment, schema, sql, transforms, validation)
+- **`io/` imports from:** `domain/` + `infrastructure/` (knows about models and infra, handles I/O)
+- **`orchestration/` imports from:** `domain/` + `infrastructure/` + `io/` (wires everything together)
+- **`cli/` imports from:** All layers (entry point, wires user commands to orchestration)
+- **`customer_mdm/` imports from:** `domain/` + `infrastructure/` + `io/` (independent MDM module)
 
 **Benefit:** Business logic in `domain/` is 100% testable without database, files, or external services.
 
@@ -146,26 +172,57 @@ src/work_data_hub/
 
 - **Pandas** - Data manipulation
   - Rationale: Mature, widely used, team familiarity
-  - Alternative considered: Polars (faster) - deferred to optimization phase
   - Usage: All DataFrame transformations
 
-- **Pydantic v2** - Data validation (row-level)
+- **Pydantic v2** (>=2.11.7) - Data validation (row-level) + settings management
   - Rationale: Type-safe models, excellent error messages, Python 3.10+ native
-  - Usage: Validate individual rows during transformation
+  - Usage: Validate individual rows during transformation; `pydantic-settings` for config
 
-- **pandera** - Data validation (DataFrame-level)
+- **pandera** (>=0.18.0) - Data validation (DataFrame-level)
   - Rationale: Complements Pydantic, enforces schema contracts at layer boundaries
-  - Usage: Bronze/Silver/Gold layer validation (see Gemini research file 4)
+  - Usage: Bronze/Silver/Gold layer validation
 
-- **PostgreSQL** - Target database
+- **SQLAlchemy** (>=2.0) + **Alembic** - ORM and database migrations
+  - Rationale: Industry standard ORM, Alembic provides versioned schema migrations
+  - Usage: Schema definitions, DDL generation, 13 active migration versions
+
+- **PostgreSQL** + **psycopg2** - Target database
   - Rationale: Corporate standard, mature, reliable
   - Usage: Final data storage for PowerBI consumption
 
+- **structlog** - Structured logging
+  - Rationale: JSON-structured logs for easy parsing and debugging
+  - Usage: All application logging
+
+**Integration & Automation:**
+- **Playwright** + **playwright-stealth** - Browser automation
+  - Usage: EQC platform token acquisition, intranet authentication
+- **OpenCV** (`opencv-python-headless`) + **NumPy** - Image processing
+  - Usage: Slider CAPTCHA solving for EQC authentication
+- **gmssl** - Chinese national cryptography (SM2/SM3/SM4)
+  - Usage: EQC API encryption requirements
+- **dukpy** - JavaScript execution engine
+  - Usage: EQC platform encryption logic execution
+- **sqlglot** - SQL parsing and transpilation
+  - Usage: SQL dialect handling and query generation
+
+**GUI:**
+- **PyQt6** + **pyqt6-fluent-widgets** - Desktop GUI (optional)
+  - Usage: Fluent-style EQC query interface
+- **Tkinter** - Lightweight GUI (built-in)
+  - Usage: Simple EQC query tool
+
 **Development Tools:**
-- **mypy** - Static type checking (100% coverage required)
-- **ruff** - Linting and formatting (replaces black + flake8 + isort)
-- **pytest** - Unit and integration testing
-- **pyarrow** - Parquet file support (for intermediate data storage if needed)
+- **mypy** (>=1.17.1) - Static type checking (100% coverage required)
+- **ruff** (>=0.12.12) - Linting and formatting (replaces black + flake8 + isort)
+- **pytest** + **pytest-cov** + **pytest-asyncio** - Testing framework
+- **pre-commit** - Git hooks for code quality
+- **pyarrow** (>=21.0.0) - Columnar data support
+- **uv** - Ultra-fast package and virtual environment management (replaces pip/poetry)
+
+**Package Management:**
+- **uv** + `pyproject.toml` - All execution via `PYTHONPATH=src uv run`
+- Python version: `>=3.10`
 
 ---
 

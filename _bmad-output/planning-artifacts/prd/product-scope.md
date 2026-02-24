@@ -56,40 +56,49 @@
 
 **Additional Domains to Migrate:**
 
-Based on `reference/monthly/202501/收集数据/`:
+Based on actual implemented domains in `src/work_data_hub/domain/`:
 
-1. **业务收集 (Business Collection)**
-   - Multiple sub-domains with V1/V2 versioning
-   - KPI tracking, fee collection, investment metrics
-   - Pattern: Similar to annuity (multi-sheet Excel, enrichment needed)
+1. **annuity_income (年金收入)**
+   - Annuity income tracking and reporting
+   - Pattern: Similar to annuity_performance (adapter, models, pipeline_builder, schemas, service)
+   - Status: Implemented
 
-2. **数据采集 (Data Collection)**
-   - Investment portfolio aggregations
-   - Regional performance analytics
-   - Pattern: Simpler than annuity (fewer transformations)
+2. **annual_award (年度奖励)**
+   - Annual award calculations and tracking
+   - Pattern: Standard domain pattern (adapter, constants, helpers, models, pipeline_builder, schemas, service)
+   - Status: Implemented
 
-3. **战区收集 (Regional Collection)**
-   - Geographic/regional performance breakdowns
-   - Pattern: Medium complexity (aggregations + mapping)
+3. **annual_loss (年度亏损)**
+   - Annual loss tracking and reporting
+   - Pattern: Standard domain pattern (same as annual_award)
+   - Status: Implemented
 
-4. **组合排名 (Portfolio Rankings)**
-   - Portfolio performance rankings and comparisons
-   - Pattern: Calculation-heavy (less data quality issues)
+4. **company_enrichment (企业信息enrichment)**
+   - Company ID resolution via multi-tier strategy (internal mapping → EQC API → async queue)
+   - Pattern: Specialized (lookup_queue, models, observability, service)
+   - Status: Implemented with full provider abstraction
 
-5. **绩效归因 (Performance Attribution)**
-   - Performance analysis and attribution reporting
-   - Pattern: Complex calculations (similar to annuity)
+5. **reference_backfill (参考数据回填)**
+   - Reference data backfill with generic/hybrid/sync service patterns
+   - Pattern: Specialized (config_loader, generic_service, hybrid_service, sync_service, models, observability)
+   - Status: Implemented
 
-6. **其他数据 (Other Data)**
-   - Miscellaneous supplementary datasets
-   - Pattern: Case-by-case assessment
+6. **sandbox_trustee_performance (受托人业绩沙盒)**
+   - Dev/test sandbox for trustee performance domain
+   - Pattern: Lightweight (adapter, models, service)
+   - Status: Sandbox/experimental
+
+7. **customer_mdm (客户主数据管理)** — Standalone module
+   - Customer lifecycle management: sync, snapshot, init-year, validate, cutover
+   - Has dedicated CLI sub-commands
+   - Status: Implemented as independent module outside domain/
 
 **Growth Features:**
 
-1. **Domain Migration Pipeline**
-   - Create reusable migration checklist/template
-   - Standardize golden dataset test creation
-   - Document domain-specific patterns (enrichment, multi-sheet, calculations)
+1. **Remaining Domain Migration**
+   - Migrate any remaining data domains from legacy system
+   - Standardize golden dataset test creation per domain
+   - Document domain-specific patterns
 
 2. **Enhanced Orchestration**
    - Cross-domain dependency management (if domain B needs domain A output)
@@ -107,7 +116,8 @@ Based on `reference/monthly/202501/收集数据/`:
    - Reconciliation reports (new vs legacy output comparison)
 
 **Growth Success Criteria:**
-- ✅ All 6+ core domains migrated and validated
+- ✅ All core domains migrated and validated (8 domains currently implemented)
+- ✅ Customer MDM module operational with full lifecycle management
 - ✅ Legacy `legacy/annuity_hub/` completely deleted
 - ✅ Monthly data processing runs unattended across all domains
 - ✅ <2% failure rate in production

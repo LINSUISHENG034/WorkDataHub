@@ -217,7 +217,8 @@ Organized by **capability** (not technology), with acceptance criteria that conn
 - **Description:** Define pipelines as Dagster jobs for execution and monitoring
 - **User Value:** Centralized control over all data processing
 - **Acceptance Criteria:**
-  - ✅ Each domain has corresponding Dagster job: `annuity_performance_job`, `business_collection_job`, etc.
+  - ✅ Each domain has corresponding Dagster job: `annuity_performance_job`, `annuity_income_job`, `annual_award_job`, `annual_loss_job`, etc.
+  - ✅ CLI entry point: `python -m work_data_hub.cli etl --domains <domain> --period <YYYYMM> --execute`
   - ✅ Jobs composed of ops (operations): read → transform → validate → load
   - ✅ Op outputs are typed and validated (Dagster type system)
   - ✅ Dagster UI shows execution history, logs, and metrics
@@ -306,7 +307,8 @@ Organized by **capability** (not technology), with acceptance criteria that conn
 - **Description:** All domain-specific settings in declarative YAML files
 - **User Value:** Add/modify domains without code changes
 - **Acceptance Criteria:**
-  - ✅ File: `config/data_sources.yml` defines all domains
+  - ✅ File: `config/data_sources.yml` defines all domains (schema v1.2 with defaults/overrides inheritance)
+  - ✅ Additional config files: `config/customer_mdm.yaml`, `config/customer_status_rules.yml`, `config/eqc_confidence.yml`, `config/foreign_keys.yml`, `config/reference_sync.yml`
   - ✅ Per-domain config includes: file paths, patterns, sheet names, version strategy
   - ✅ Configuration validated on load: errors if required fields missing
   - ✅ Hot reload: config changes apply without restart (dev mode)
@@ -315,7 +317,8 @@ Organized by **capability** (not technology), with acceptance criteria that conn
 - **Description:** Value mappings externalized from code
 - **User Value:** Business users can update mappings without developer
 - **Acceptance Criteria:**
-  - ✅ Mappings stored in `config/mappings/`: `company_id_overrides.yml`, `business_type_codes.yml`, etc.
+  - ✅ Mappings stored in `config/mappings/`: `business_type_code.yml`, `company_branch.yml`, `company_id/` (overrides: hardcode, name, plan), `default_plan_institution_code.yml`, `default_portfolio_code.yml`
+  - ✅ Seed data in `config/seeds/`: CSV files for 年金关联公司, 年金计划, 组合计划, 产品明细, etc.
   - ✅ Format: `key: value` pairs or nested structures
   - ✅ Loaded once at startup, cached in memory
   - ✅ Validation: warn if mapping key not found during lookup
@@ -324,10 +327,10 @@ Organized by **capability** (not technology), with acceptance criteria that conn
 - **Description:** Different config for dev vs. production
 - **User Value:** Test against sample data without touching production database
 - **Acceptance Criteria:**
-  - ✅ Settings loaded from: `.env` file, environment variables, or `config/settings.py`
+  - ✅ Settings loaded from: `.wdh_env` file (WDH_ prefix), environment variables, or `config/settings.py` (pydantic-settings)
   - ✅ Environment profiles: `development`, `staging`, `production`
-  - ✅ Database connections, file paths, log levels configurable per environment
-  - ✅ Secrets not committed to git (use environment variables or secret manager)
+  - ✅ Database connections, file paths, log levels configurable per environment (WDH_DATABASE_*, WDH_LEGACY_*, WDH_LOG_LEVEL)
+  - ✅ Dual-DB support: main DB (WDH_DATABASE_*) + legacy DB (WDH_LEGACY_*)
 
 ---
 

@@ -2,9 +2,9 @@
 
 **WorkDataHub** is a systematic refactoring of the legacy `annuity_hub` data processing system into a modern, maintainable, and highly automated data pipeline platform. The project transforms a bloated, tangled monolithic ETL system into an elegant, configuration-driven architecture that processes multiple enterprise data domains (annuity performance, business metrics, portfolio rankings, performance attribution, etc.) and delivers clean, analysis-ready data to downstream BI tools like PowerBI.
 
-**Current State:** Internal data processing tool used by Link, with plans to transfer to team members after stabilization.
+**Current State:** Internal data processing platform actively in use by Link, with 8 business domains implemented, a Customer MDM module, desktop GUI tools, and 13 Alembic-managed database migrations. Plans to transfer to team members after stabilization.
 
-**Core Problem Solved:** Eliminates the maintenance nightmare of legacy code by replacing manual, error-prone data processing with automated, versioned pipelines that intelligently identify the latest data versions across multiple domains and systematically clean, transform, and load data into the corporate database.
+**Core Problem Solved:** Eliminates the maintenance nightmare of legacy code by replacing manual, error-prone data processing with automated, versioned pipelines that intelligently identify the latest data versions across multiple domains and systematically clean, transform, and load data into the corporate database. Additionally provides Customer Master Data Management (MDM) capabilities for unified customer identity resolution across data domains.
 
 **Primary Users:** Internal data analysts and business intelligence team members who need reliable, automated data processing to feed downstream analytics.
 

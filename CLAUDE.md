@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **📚 Detailed Standards:** See [`docs/project-context.md`](docs/project-context.md) for complete development standards, architecture documentation, CLI reference, and domain terminology.
+> **📚 Detailed Standards:** See [`_bmad-output/project-context.md`](_bmad-output/project-context.md) for complete development standards, architecture documentation, CLI reference, and domain terminology.
 
 ## Project Context Protocol:
 

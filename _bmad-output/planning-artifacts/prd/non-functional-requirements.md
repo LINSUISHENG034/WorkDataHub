@@ -153,15 +153,16 @@ Focused on **performance, reliability, maintainability, and security** - the att
   - ✅ Code review required for domain changes (single reviewer sufficient)
 
 **NFR-3.5: Dependency Management**
-- **Requirement:** Pin all dependency versions; reproducible builds
+- **Requirement:** Pin all dependency versions; reproducible builds via `uv` + `pyproject.toml`
 - **Rationale:** Avoid "works on my machine" issues during team handoff
 - **Measurement:**
   - Check `pyproject.toml` for pinned versions
   - Test fresh install in clean environment
 - **Acceptance:**
-  - ✅ All dependencies pinned: `pandas==2.1.0` (not `pandas>=2.0`)
-  - ✅ `requirements.txt` (or Poetry lock file) version-locked
+  - ✅ All dependencies pinned in `pyproject.toml` with version constraints
+  - ✅ `uv.lock` version-locked for reproducible builds
   - ✅ Python version specified: `requires-python = ">=3.10"`
+  - ✅ All execution via `PYTHONPATH=src uv run` (no direct `python` calls)
   - ✅ Fresh install + test passes on clean machine
 
 ---
@@ -176,8 +177,8 @@ Focused on **performance, reliability, maintainability, and security** - the att
   - Manual code review for hardcoded secrets
   - Use tools like `git-secrets` or `trufflehog`
 - **Acceptance:**
-  - ✅ Database passwords in environment variables or `.env` (gitignored)
-  - ✅ EQC API credentials in environment variables
+  - ✅ Database passwords in environment variables or `.wdh_env` (gitignored)
+  - ✅ EQC API credentials in environment variables (WDH_EQC_TOKEN, PA_OTP_PIN, etc.)
   - ✅ `.env.example` template provided (without actual secrets)
   - ✅ Pre-commit hook prevents committing `.env` or credential files
 
@@ -259,7 +260,9 @@ Focused on **performance, reliability, maintainability, and security** - the att
   - Task analysis: how many steps for common operations?
   - Operator feedback on ease of use
 - **Acceptance:**
-  - ✅ Process monthly data: `dagster job launch annuity_performance_job --config month=202501`
+  - ✅ Process monthly data: `PYTHONPATH=src uv run python -m work_data_hub.cli etl --domains annuity_performance --period 202501 --execute`
+  - ✅ Customer MDM operations: `python -m work_data_hub.cli customer-mdm sync|snapshot|init-year|validate|cutover`
+  - ✅ EQC data refresh: `python -m work_data_hub.cli eqc-refresh`
   - ✅ View pipeline status: Dagster UI dashboard
   - ✅ Re-run failed domain: Single button click in Dagster UI
   - ✅ No manual SQL scripts required for normal operations

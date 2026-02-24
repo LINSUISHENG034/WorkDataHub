@@ -6,22 +6,24 @@
 
 **Classification Rationale:**
 
-- **Project Type**: This is an internal developer/data engineering tool - a Python-based data pipeline platform similar to modern ETL tools (Airflow, Prefect), but purpose-built for your specific enterprise data domains
-- **Domain**: Enterprise Business Intelligence / Data Engineering (annuity performance, business metrics, portfolio analytics) - not high-regulation fintech/healthcare, but business-critical internal data
-- **Complexity**: Medium - Multiple data sources with versioning, complex transformations, and critical BI dependencies, but manageable scope with modern frameworks
+- **Project Type**: This is an internal developer/data engineering tool - a Python-based data pipeline platform similar to modern ETL tools (Airflow, Prefect), but purpose-built for your specific enterprise data domains. Includes Customer MDM capabilities and desktop GUI tools for operational use.
+- **Domain**: Enterprise Business Intelligence / Data Engineering (annuity performance, annuity income, annual awards/losses, customer MDM, company enrichment) - not high-regulation fintech/healthcare, but business-critical internal data
+- **Complexity**: Medium-High - Multiple data sources with versioning, complex transformations, EQC API integration with browser automation (Playwright + CAPTCHA solving), Customer MDM lifecycle management, and critical BI dependencies
 
 **Reference Context:**
 - **Research Documents:**
-  - `docs/deep_research/1.md` - Modern Data Processing Architectures (Gemini Deep Research, 2025-11-08)
-  - `docs/deep_research/2.md` - Refactoring Strategy Comparison Matrix
-  - `docs/deep_research/3.md` - Strangler Fig Implementation Guide
-  - `docs/deep_research/4.md` - Data Contracts with Pandera (DataFrame Validation)
-  - `docs/research-deep-prompt-2025-11-08.md` - Research Prompt for AI Platforms
-- **Archive Documents:**
-  - `docs/archive/prd.md` - Previous Annuity Performance Pipeline Migration PRD
-  - `docs/archive/architecture.md` - Brownfield Enhancement Architecture
-- **Existing Codebase:** `src/work_data_hub/` - Partially refactored with Dagster + Pydantic + Pipeline framework
-- **Legacy System:** `legacy/annuity_hub/` - Original monolithic implementation (to be replaced)
+  - `docs/initial/research-deep-prompt*.md` - Original Research Prompt for AI Platforms
+- **Architecture Documentation:**
+  - `docs/architecture-patterns/` - Pipeline integration guide, tiered retry, error message quality
+  - `docs/guides/infrastructure/` - Company enrichment, DB connection, EQC token, schemas deep-dive, transforms
+  - `docs/guides/domain-migration/` - Code mapping, development guide, workflow, troubleshooting
+- **Business Context:**
+  - `docs/business-background/` - Annuity plan types, customer MDM analysis, 战客身份定义
+- **Planning Artifacts:**
+  - `_bmad-output/planning-artifacts/architecture/` - Full architecture documentation (12 files)
+  - `_bmad-output/planning-artifacts/epics/` - Epic 1-6 + Epic 5.5
+- **Existing Codebase:** `src/work_data_hub/` - 8 business domains, infrastructure layer, CLI, GUI, orchestration
+- **Legacy System:** `legacy/annuity_hub/` - Original monolithic implementation (quarantined, linting/typing disabled)
 
 ---
 

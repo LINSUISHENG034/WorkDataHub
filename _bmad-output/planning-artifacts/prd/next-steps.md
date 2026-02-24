@@ -3,42 +3,39 @@
 ### Immediate Next Steps
 
 1. **✅ PRD Complete** - This document captures comprehensive requirements for WorkDataHub refactoring
+   - _Last validated against actual codebase: 2026-02-24_
 
-2. **Epic & Story Breakdown** (Required)
-   - Run: `/bmad:bmm:workflows:create-epics-and-stories`
-   - Purpose: Decompose requirements into implementable bite-sized stories
-   - Output: Epic files in `docs/epics/` with detailed user stories
+2. **✅ Epic & Story Breakdown** (Completed)
+   - Epics 1-6 + Epic 5.5 created in `_bmad-output/planning-artifacts/epics/`
 
-3. **Architecture Document** (Recommended)
-   - Run: `/bmad:bmm:workflows:architecture`
-   - Purpose: Define technical architecture decisions and patterns
-   - Output: Architecture document with technology choices, patterns, ADRs
+3. **✅ Architecture Document** (Completed)
+   - Full architecture documentation in `_bmad-output/planning-artifacts/architecture/` (12 files)
 
-4. **Solutioning Gate Check** (Required before implementation)
-   - Run: `/bmad:bmm:workflows:solutioning-gate-check`
-   - Purpose: Validate all planning complete before coding begins
-   - Ensures: PRD ↔ Architecture ↔ Stories are aligned
+4. **Project Context Maintenance** (Ongoing)
+   - Regenerate `docs/project-context.md` when significant changes occur
+   - Run: `/bmad:bmm:workflows:generate-project-context`
 
 ### Recommended Implementation Sequence
 
 Following the **Strangler Fig pattern** from Gemini research:
 
-**Phase 1: MVP (Prove the Pattern)**
+**Phase 1: MVP (Prove the Pattern) — ✅ COMPLETED**
 - Epic 1: Complete annuity_performance domain migration
 - Epic 2: Golden dataset regression test suite
 - Epic 3: Version detection system
 - Epic 4: Pandera data contracts (Bronze/Silver/Gold)
 
-**Phase 2: Growth (Complete Migration)**
+**Phase 2: Growth (Complete Migration) — IN PROGRESS**
 - Epic 5: Infrastructure Layer Architecture (Critical - Unblocks Epic 6+)
-- Epic 6-11: Migrate remaining 5+ domains (业务收集, 数据采集, etc.)
-- Epic 12: Enhanced orchestration (cross-domain dependencies)
-- Epic 13: Operational tooling (CLI, monitoring dashboards)
+- Epic 5.5: Customer MDM module
+- Epic 6+: Migrate remaining domains (annuity_income, annual_award, annual_loss, etc.)
+- Enhanced orchestration (cross-domain dependencies)
+- Operational tooling (CLI commands, GUI tools)
 
-**Phase 3: Vision (Intelligent Platform)**
-- Epic 14: Predictive data quality (ML anomaly detection)
-- Epic 15: Self-healing pipelines
-- Epic 16: Schema evolution automation
+**Phase 3: Vision (Intelligent Platform) — FUTURE**
+- Predictive data quality (ML anomaly detection)
+- Self-healing pipelines
+- Schema evolution automation
 
 ---
 
