@@ -3,25 +3,29 @@
 ### Epic Dependency Graph
 
 ```
-Epic 1 (Foundation)
-  ├─> Epic 2 (Validation)
-  ├─> Epic 3 (File Discovery)
-  ├─> Epic 6 (Enrichment - MVP stub only)
-  ├─> Epic 7 (Testing)
-  ├─> Epic 8 (Orchestration)
-  └─> Epic 9 (Monitoring)
+Epic 1 (Foundation) ✅
+  ├─> Epic 2 (Validation) ✅
+  ├─> Epic 3 (File Discovery) ✅
+  ├─> Epic 6 (Enrichment — full 5-layer architecture) ✅
+  ├─> Epic 7 (Testing/Modularization) ✅
+  └─> Epic 8 (Orchestration — Dagster active) ✅
 
-Epic 4 (Annuity Migration)
-  ├─ depends on: Epic 1, 2, 3, 6 (stub), 7
-  └─> Epic 5 (Infrastructure Layer)
+Epic 4 (Annuity Migration) ✅
+  ├─ depends on: Epic 1, 2, 3, 6
+  └─> Epic 5 (Infrastructure Layer) ✅
 
-Epic 5 (Infrastructure Layer)
+Epic 5 (Infrastructure Layer) ✅
   ├─ depends on: Epic 4 (refactors annuity implementation)
-  └─> Epic 10 (Growth Domains)
+  └─> Growth Domains (annual_award, annual_loss)
 
-Epic 10 (Growth Domains)
+Epic 7.6 (Customer MDM) ✅
+  ├─ depends on: Epic 4 (annuity_performance source data)
+  └─> Post-ETL Hook pattern (contract sync, snapshot refresh)
+
+Growth Domains (in progress)
   ├─ depends on: Epic 5 (infrastructure components)
-  └─> Epic 6 (full enrichment), Epic 11 (config/tooling)
+  ├─ annual_award ✅, annual_loss ✅, sandbox_trustee_performance ✅
+  └─> Additional domains TBD
 ```
 
 ### Key Integration Points
@@ -51,16 +55,23 @@ Epic 10 (Growth Domains)
 
 **Epic 6 → Epic 4:**
 - `EnrichmentGateway.enrich()` called in annuity pipeline (Story 4.3)
-- MVP: Returns temporary IDs (Decision #2, Decision #6)
-- Growth: Returns real company IDs (Epic 10)
+- Full 5-layer resolution: YAML Config → DB Cache → Existing Column → EQC API → Temp ID
+- EQC API with confidence scoring and budget control (Decision #6, updated)
 
 **Epic 7 → All:**
 - Parity tests enforce legacy compatibility (Strangler Fig pattern)
 - CI blocks deployment if parity fails
+- Epic 7 also covers package modularization (800-line limit enforcement)
 
 **Epic 8 → All:**
-- Dagster definitions wrap pipelines for UI monitoring (deferred to post-MVP)
-- CLI remains primary execution method for MVP
+- Dagster active — `JOB_REGISTRY` maps domains to Dagster JobDefinitions
+- CLI and Dagster UI both serve as execution interfaces
+- `DOMAIN_SERVICE_REGISTRY` enables dynamic domain dispatch in pipeline ops
+
+**Epic 7.6 (Customer MDM) → Epic 4:**
+- Post-ETL hooks triggered after `annuity_performance` ETL completion
+- `contract_status_sync` → `customer.customer_plan_contract`
+- `snapshot_refresh` → `customer.fct_customer_product_line_monthly`
 
 **Epic 9 → All:**
 - `structlog` (Decision #8) used by all modules

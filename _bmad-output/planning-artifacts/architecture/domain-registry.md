@@ -99,20 +99,30 @@ class DomainServiceEntry:
 ```python
 JOB_REGISTRY: Dict[str, JobEntry] = {
     "annuity_performance": JobEntry(
-        job=annuity_performance_job,
+        job=generic_domain_job,
         supports_backfill=True,
     ),
     "annuity_income": JobEntry(
-        job=annuity_income_job,
+        job=generic_domain_job,
+        supports_backfill=True,
+    ),
+    "annual_award": JobEntry(
+        job=generic_domain_job,
+        supports_backfill=True,
+    ),
+    "annual_loss": JobEntry(
+        job=generic_domain_job,
         supports_backfill=True,
     ),
     "sandbox_trustee_performance": JobEntry(
-        job=sandbox_trustee_performance_job,
-        multi_file_job=sandbox_trustee_performance_multi_file_job,
+        job=generic_domain_job,
+        multi_file_job=generic_domain_multi_file_job,
         supports_backfill=True,
     ),
 }
 ```
+
+> **Note (Phase 4 update):** All domains now use `generic_domain_job` via Protocol registry pattern, replacing per-domain job functions.
 
 ### How CLI Uses It (Story 7.4-1)
 
@@ -159,28 +169,30 @@ if max_files > 1 and job_entry.multi_file_job:
 
 ### Location
 
-`src/work_data_hub/orchestration/ops/pipeline_ops.py`
+`src/work_data_hub/domain/registry.py` (moved from `orchestration/ops/pipeline_ops.py` in Phase 4 refactor)
 
 ### Structure
 
+> **Phase 4 update:** Registry now uses `DomainServiceProtocol` instead of `DomainServiceEntry` dataclass. Services are adapter classes implementing the protocol, registered at module load time.
+
 ```python
-DOMAIN_SERVICE_REGISTRY: Dict[str, DomainServiceEntry] = {
-    "annuity_performance": DomainServiceEntry(
-        service_fn=process_with_enrichment,
-        supports_enrichment=True,
-        domain_name="Annuity Performance (规模明细)",
-    ),
-    "annuity_income": DomainServiceEntry(
-        service_fn=process_annuity_income_with_enrichment,
-        supports_enrichment=False,
-        domain_name="Annuity Income (收入明细)",
-    ),
-    "sandbox_trustee_performance": DomainServiceEntry(
-        service_fn=process,
-        supports_enrichment=False,
-        domain_name="Sandbox Trustee Performance",
-    ),
-}
+# domain/registry.py
+from work_data_hub.domain.protocols import DomainServiceProtocol
+
+DOMAIN_SERVICE_REGISTRY: Dict[str, DomainServiceProtocol] = {}
+
+def register_domain(name: str, service: DomainServiceProtocol) -> None:
+    DOMAIN_SERVICE_REGISTRY[name] = service
+
+# Auto-registration at import time
+def _register_all_domains() -> None:
+    register_domain("annuity_performance", AnnuityPerformanceService())
+    register_domain("annuity_income", AnnuityIncomeService())
+    register_domain("sandbox_trustee_performance", SandboxTrusteePerformanceService())
+    register_domain("annual_award", AnnualAwardService())
+    register_domain("annual_loss", AnnualLossService())
+
+_register_all_domains()
 ```
 
 ### How Ops Uses It (Story 7.4-3)

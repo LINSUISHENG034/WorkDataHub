@@ -7,11 +7,12 @@
 | Full monthly processing | <30 min | Epic 7 Story 7.4 (performance testing) |
 | Single domain (50K rows) | <5 min | Epic 4 Story 4.7 (annuity perf test) |
 | File discovery | <10 sec | Epic 3 Story 3.6 (discovery perf) |
-| Company enrichment (MVP stub) | <1 ms/company | Epic 6 Story 6.1 (stub implementation) |
+| Company enrichment (5-layer) | Variable (API-dependent) | Epic 6 (full implementation, budget-controlled) |
 
 **Architecture Support:**
 - **Decision #3:** DataFrame steps for vectorized operations (10-100x faster than row iteration)
 - **Decision #1:** Fast version detection (no filesystem stat calls for performance)
+- **Decision #6:** 5-layer enrichment with budget control limits EQC API calls per run
 
 ### Reliability (NFR §1016-1026)
 
@@ -31,11 +32,16 @@
 |-------------|--------|--------------|
 | Type coverage (mypy) | 100% | CI enforces strict mode |
 | Test coverage | >80% | CI blocks <80% coverage |
+| File size limit | MAX 800 lines | Pre-commit hook enforcement |
+| Function size limit | MAX 50 lines | Ruff PLR max-statements=50 |
+| Cyclomatic complexity | MAX 12 branches | Ruff PLR max-branches=12 |
 | Documentation | All public APIs | Epic 1 Story 1.2 (API docs) |
 
 **Architecture Support:**
 - **Decision #7:** Naming conventions ensure consistency
 - **Decision #3:** Clear protocols for DataFrame vs Row steps
+- **Decision #10:** Infrastructure layer extraction enables reuse across domains
+- **Epic 7:** Package modularization enforces 800-line limit via pre-commit hooks
 
 ### Security (NFR §1033-1045)
 

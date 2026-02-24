@@ -47,17 +47,22 @@ Epic 9 by centralizing common transformation, validation, and enrichment logic.
 ```
 src/work_data_hub/infrastructure/
 ├── __init__.py
+├── constants.py                 # Shared infrastructure constants
 ├── cleansing/
 │   ├── __init__.py
 │   ├── registry.py              # CleansingRegistry singleton
 │   ├── validators.py            # [Story 7.3-2] Shared validators & constants
+│   ├── constants.py             # Cleansing-specific constants
 │   ├── rule_engine.py           # Rule execution engine
 │   ├── biz_label_parser.py      # Business label parsing
 │   ├── business_info_cleanser.py # Business info cleansing
 │   ├── rules/
 │   │   ├── __init__.py
+│   │   ├── date_rules.py        # Date cleansing rules
 │   │   ├── numeric_rules.py     # Numeric cleansing rules
 │   │   └── string_rules.py      # String cleansing rules
+│   ├── normalizers/             # [New] Name normalization
+│   │   └── customer_name.py     # Customer name normalization
 │   ├── settings/
 │   │   └── cleansing_rules.yml  # Domain-specific rule config
 │   └── integrations/
@@ -85,10 +90,14 @@ src/work_data_hub/infrastructure/
 │   │   ├── yaml_strategy.py     # Layer 1: YAML config
 │   │   ├── db_strategy.py       # Layer 2: DB cache (enrichment_index)
 │   │   ├── eqc_strategy.py      # Layer 4: EQC API
-│   │   └── backflow.py          # Result backflow to cache
+│   │   ├── backflow.py          # Result backflow to cache
+│   │   ├── cache_warming.py     # [New] Cache pre-warming
+│   │   └── progress.py          # [New] Resolution progress tracking
+│   ├── factory.py               # [New] Enrichment service factory
 │   ├── mapping_repository.py    # Company mapping repository
 │   ├── business_info_repository.py  # Business info operations
 │   ├── biz_label_repository.py  # Business label operations
+│   ├── base_info_parser.py      # [New] Base info parsing
 │   └── csv_exporter.py          # CSV export utility
 ├── schema/                      # [Epic 7 Story 7.5: Domain Registry]
 │   ├── __init__.py              # Public API: DomainRegistry, get_schema
@@ -104,6 +113,7 @@ src/work_data_hub/infrastructure/
 │       └── portfolio_plans.py
 ├── settings/
 │   ├── __init__.py
+│   ├── customer_status_schema.py # [New] Customer status rule schema
 │   ├── data_source_schema.py    # Pydantic schemas for config
 │   └── loader.py                # YAML config loader
 ├── transforms/
@@ -111,11 +121,28 @@ src/work_data_hub/infrastructure/
 │   ├── base.py                  # TransformStep ABC, Pipeline class
 │   ├── projection_step.py       # Gold layer projection & validation
 │   ├── standard_steps.py        # MappingStep, ReplacementStep, etc.
-│   └── cleansing_step.py        # CleansingStep integration
+│   ├── cleansing_step.py        # CleansingStep integration
+│   └── plan_portfolio_helpers.py # [New] Plan/portfolio transform helpers
+├── helpers/                     # [New] Shared infrastructure helpers
+│   └── shared.py
+├── mappings/                    # [New] Shared mapping utilities
+│   └── shared.py
+├── models/                      # [New] Shared infrastructure models
+│   └── shared.py
+├── sql/                         # [New] SQL generation framework
+│   ├── core/
+│   │   ├── identifier.py        # SQL identifier quoting
+│   │   └── parameters.py        # Parameter binding
+│   ├── dialects/
+│   │   └── postgresql.py        # PostgreSQL dialect
+│   └── operations/
+│       └── insert.py            # INSERT statement generation
 └── validation/
     ├── __init__.py
     ├── domain_validators.py     # [Epic 6.2-P13] Registry-driven validation
     ├── error_handler.py         # handle_validation_errors()
+    ├── failed_record.py         # [New] Failed record tracking
+    ├── failure_exporter.py      # [New] Failure export to CSV
     ├── report_generator.py      # Validation report generation
     ├── schema_helpers.py        # Schema utility functions
     ├── schema_steps.py          # Reusable schema validation steps
@@ -135,18 +162,40 @@ src/work_data_hub/io/
 │   ├── models.py                # LoadResult, exceptions
 │   ├── company_enrichment_loader.py # Company enrichment DB loading
 │   └── warehouse_loader.py      # Facade (backward-compatible re-exports)
+├── auth/                        # [New] Authentication
+│   ├── auto_eqc_auth.py         # Automated EQC auth via Playwright
+│   ├── eqc_auth_handler.py      # EQC auth flow handler
+│   └── models.py                # Auth data models
 ├── connectors/
+│   ├── adapter_factory.py       # [New] Source adapter factory
+│   ├── config_file_connector.py # [New] Config-based file connector
+│   ├── eqc_client.py            # EQC API client (facade)
+│   ├── exceptions.py            # [New] Connector exceptions
+│   ├── file_connector.py        # File system connector
+│   ├── file_pattern_matcher.py  # [New] File pattern matching
+│   ├── legacy_mysql_connector.py # Legacy MySQL connector
+│   ├── mysql_source_adapter.py  # [New] MySQL source adapter
+│   ├── postgres_source_adapter.py # [New] PostgreSQL source adapter
+│   ├── version_scanner.py       # Version folder scanner
 │   ├── eqc/                     # [Story 7.2: eqc_client.py decomposition]
-│   │   ├── __init__.py          # EQCClient exports
 │   │   ├── core.py              # EQCClient class
 │   │   ├── transport.py         # HTTP transport layer
 │   │   ├── parsers.py           # Response parsing
 │   │   ├── models.py            # Data models
 │   │   └── utils.py             # Rate limiting
 │   └── discovery/               # [Story 7.2: file_connector.py decomposition]
-│       ├── __init__.py          # FileDiscoveryService exports
 │       ├── service.py           # FileDiscoveryService class
 │       └── models.py            # Discovery result models
+├── readers/                     # [New] Data readers
+│   ├── excel_reader.py          # Excel file reader
+│   └── multi_table_loader.py    # Multi-table data loader
+├── repositories/                # [New] Data repositories
+│   └── sync_state_repository.py # Sync state tracking
+├── schema/                      # [New] I/O schema management
+│   ├── domain_registry.py       # I/O domain registry
+│   ├── migration_runner.py      # Schema migration runner
+│   ├── seed_loader.py           # Seed data loader
+│   └── seed_resolver.py         # Seed file resolver
 └── warehouse_loader.py          # Facade (backward-compatible re-exports)
 ```
 
@@ -171,6 +220,8 @@ src/work_data_hub/orchestration/
     ├── company_enrichment.py    # Company ID enrichment step
     ├── loading.py               # Database loading step
     ├── generic_backfill.py      # FK backfill operations
+    ├── generic_ops.py           # [New] Generic domain ops (Protocol-based)
+    ├── deprecated_ops.py        # [New] Deprecated ops (backward compat)
     ├── hybrid_reference.py      # Hybrid reference service
     ├── reference_backfill.py    # Reference data backfill
     └── demo_ops.py              # Demo/test operations
@@ -181,11 +232,27 @@ src/work_data_hub/orchestration/
 ```
 src/work_data_hub/cli/
 ├── __init__.py
+├── __main__.py                  # [New] Module entry point
+├── auth.py                      # [New] Top-level auth commands
+├── cleanse_data.py              # [New] Data cleansing CLI
+├── eqc_refresh.py               # [New] EQC data refresh CLI
+├── customer_mdm/                # [New: Epic 7.6] Customer MDM commands
+│   ├── __init__.py
+│   ├── cutover.py               # Annual cutover operations
+│   ├── init_year.py             # Year initialization
+│   ├── snapshot.py              # Snapshot refresh
+│   ├── sync.py                  # Contract sync
+│   └── validate.py              # MDM validation
 ├── etl/                         # [Story 7.4: etl.py decomposition]
 │   ├── __init__.py              # CLI entry point
 │   ├── main.py                  # Main CLI command
 │   ├── config.py                # CLI configuration
+│   ├── console.py               # [New] Console output formatting
+│   ├── dagster_logging.py       # [New] Dagster log integration
 │   ├── executors.py             # Command execution handlers
+│   ├── error_formatter.py       # [New] Error formatting
+│   ├── hooks.py                 # [New] Post-ETL hook execution
+│   ├── sample_parser.py         # [New] Sample data parsing
 │   ├── auth.py                  # Authentication handling
 │   ├── diagnostics.py           # Database diagnostics
 │   └── domain_validation.py     # Domain validation utilities
@@ -344,22 +411,27 @@ def process_annuity_performance(
 | Memory usage (1K rows) | <200MB | ~150MB   |
 | Code lines (domain)    | <1,100 | ~1,100   |
 
-## Migration Guide for New Domains (6-File Standard)
+## Migration Guide for New Domains (7-File Standard + Adapter)
 
-Follow the standard 6-file domain structure:
+> **Updated 2026-02:** Reflects actual domain structure with `DomainServiceProtocol` adapter pattern.
+
+Follow the standard 7-file domain structure:
 
 1. **`__init__.py`** - Module exports
-2. **`service.py`** - Lightweight orchestration (<200 lines)
-3. **`models.py`** - Pydantic models for input/output (<400 lines)
-4. **`schemas.py`** - Pandera schemas only (<250 lines)
-5. **`constants.py`** - Business constants (~200 lines)
-6. **`pipeline_builder.py`** - Pipeline assembly using infra steps (<150 lines)
-7. **`helpers.py`** - Domain-specific helpers (<150 lines)
+2. **`adapter.py`** - `DomainServiceProtocol` implementation (registered in `domain/registry.py`)
+3. **`service.py`** - Lightweight orchestration (<200 lines)
+4. **`models.py`** - Pydantic models for input/output (<400 lines)
+5. **`schemas.py`** - Pandera schemas only (<250 lines)
+6. **`constants.py`** - Business constants (~200 lines)
+7. **`pipeline_builder.py`** - Pipeline assembly using infra steps (<150 lines)
+8. **`helpers.py`** - Domain-specific helpers (<150 lines, optional)
 
 See `src/work_data_hub/domain/annuity_performance/` as the reference implementation.
+
+**Registration:** Add domain adapter to `domain/registry.py:_register_all_domains()` and configure in `config/data_sources.yml`.
 
 ## Related Documentation
 
 - [Architectural Decisions](./architectural-decisions.md) - AD-010
 - [Implementation Patterns](./implementation-patterns.md)
-- [Domain: Annuity Performance](../domains/annuity_performance.md)
+- [Domain Registry](./domain-registry.md) - Registry pattern and adding new domains
