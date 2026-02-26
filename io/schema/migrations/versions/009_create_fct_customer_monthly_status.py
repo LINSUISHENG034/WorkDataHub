@@ -1,10 +1,10 @@
-"""Create fct_customer_product_line_monthly table for monthly snapshots.
+"""Create 客户业务月度快照 table for monthly snapshots.
 
 Story 7.6-7: Monthly Snapshot Refresh (Post-ETL Hook)
 Story 7.6-16: Fact Table Refactoring (双表粒度分离)
 
 Task 1: Create table with composite PK, status flags, and measures
-- Renamed from fct_customer_business_monthly_status to fct_customer_product_line_monthly
+- Renamed from fct_customer_business_monthly_status to 客户业务月度快照
 - Added customer_name field with sync trigger (merged from 7.6-13)
 
 Purpose: Track monthly snapshots of customer business status with AUM,
@@ -31,7 +31,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    """Create fct_customer_product_line_monthly table with all constraints,
+    """Create 客户业务月度快照 table with all constraints,
     indexes, and triggers."""
     conn = op.get_bind()
 
@@ -39,7 +39,7 @@ def upgrade() -> None:
     conn.execute(
         sa.text(
             """
-            CREATE TABLE IF NOT EXISTS customer.fct_customer_product_line_monthly (
+            CREATE TABLE IF NOT EXISTS customer."客户业务月度快照" (
                 -- Composite primary key (Granularity: Customer + Product Line)
                 snapshot_month DATE NOT NULL,
                 company_id VARCHAR NOT NULL,
@@ -68,7 +68,7 @@ def upgrade() -> None:
 
                 -- Foreign key constraints
                 CONSTRAINT fk_fct_pl_company FOREIGN KEY (company_id)
-                    REFERENCES customer."年金客户"(company_id),
+                    REFERENCES customer."客户明细"(company_id),
                 CONSTRAINT fk_fct_pl_product_line FOREIGN KEY (product_line_code)
                     REFERENCES mapping."产品线"(产品线代码)
             );
@@ -81,29 +81,29 @@ def upgrade() -> None:
         sa.text(
             """
             CREATE INDEX IF NOT EXISTS idx_fct_pl_snapshot_month
-                ON customer.fct_customer_product_line_monthly(snapshot_month);
+                ON customer."客户业务月度快照"(snapshot_month);
 
             CREATE INDEX IF NOT EXISTS idx_fct_pl_company
-                ON customer.fct_customer_product_line_monthly(company_id);
+                ON customer."客户业务月度快照"(company_id);
 
             CREATE INDEX IF NOT EXISTS idx_fct_pl_product_line
-                ON customer.fct_customer_product_line_monthly(product_line_code);
+                ON customer."客户业务月度快照"(product_line_code);
 
             CREATE INDEX IF NOT EXISTS idx_fct_pl_month_product
-                ON customer.fct_customer_product_line_monthly(
+                ON customer."客户业务月度快照"(
                     snapshot_month, product_line_code
                 );
 
             CREATE INDEX IF NOT EXISTS idx_fct_pl_month_brin
-                ON customer.fct_customer_product_line_monthly
+                ON customer."客户业务月度快照"
                 USING BRIN (snapshot_month);
 
             CREATE INDEX IF NOT EXISTS idx_fct_pl_strategic
-                ON customer.fct_customer_product_line_monthly(snapshot_month)
+                ON customer."客户业务月度快照"(snapshot_month)
                 WHERE is_strategic = TRUE;
 
             CREATE INDEX IF NOT EXISTS idx_fct_pl_customer_name
-                ON customer.fct_customer_product_line_monthly(customer_name);
+                ON customer."客户业务月度快照"(customer_name);
             """
         )
     )
@@ -129,10 +129,10 @@ def upgrade() -> None:
         sa.text(
             """
             DROP TRIGGER IF EXISTS update_fct_pl_monthly_timestamp
-                ON customer.fct_customer_product_line_monthly;
+                ON customer."客户业务月度快照";
 
             CREATE TRIGGER update_fct_pl_monthly_timestamp
-                BEFORE UPDATE ON customer.fct_customer_product_line_monthly
+                BEFORE UPDATE ON customer."客户业务月度快照"
                 FOR EACH ROW
                 EXECUTE FUNCTION
                     customer.update_fct_pl_monthly_timestamp();
@@ -148,7 +148,7 @@ def upgrade() -> None:
             RETURNS TRIGGER AS $$
             BEGIN
                 IF OLD.客户名称 IS DISTINCT FROM NEW.客户名称 THEN
-                    UPDATE customer.fct_customer_product_line_monthly
+                    UPDATE customer."客户业务月度快照"
                     SET customer_name = NEW.客户名称,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE company_id = NEW.company_id;
@@ -158,10 +158,10 @@ def upgrade() -> None:
             $$ LANGUAGE plpgsql;
 
             DROP TRIGGER IF EXISTS trg_sync_fct_pl_customer_name
-                ON customer."年金客户";
+                ON customer."客户明细";
 
             CREATE TRIGGER trg_sync_fct_pl_customer_name
-                AFTER UPDATE OF 客户名称 ON customer."年金客户"
+                AFTER UPDATE OF 客户名称 ON customer."客户明细"
                 FOR EACH ROW
                 EXECUTE FUNCTION customer.sync_fct_pl_customer_name();
             """
@@ -170,7 +170,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Remove fct_customer_product_line_monthly table and associated objects."""
+    """Remove 客户业务月度快照 table and associated objects."""
     conn = op.get_bind()
 
     # Drop sync trigger first
@@ -178,7 +178,7 @@ def downgrade() -> None:
         sa.text(
             """
             DROP TRIGGER IF EXISTS trg_sync_fct_pl_customer_name
-                ON customer."年金客户";
+                ON customer."客户明细";
             """
         )
     )
@@ -187,7 +187,7 @@ def downgrade() -> None:
     conn.execute(
         sa.text(
             """
-            DROP TABLE IF EXISTS customer.fct_customer_product_line_monthly CASCADE;
+            DROP TABLE IF EXISTS customer."客户业务月度快照" CASCADE;
             """
         )
     )

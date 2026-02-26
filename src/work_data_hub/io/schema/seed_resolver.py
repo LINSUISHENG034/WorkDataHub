@@ -7,10 +7,10 @@ Directory structure expected:
     config/seeds/
     ├── 001/  # Version 1
     │   ├── company_types_classification.csv
-    │   ├── 年金关联公司.csv
+    │   ├── 客户明细.csv
     │   └── ...
     ├── 002/  # Version 2 (may have subset of files)
-    │   ├── 年金关联公司.csv  # Updated version
+    │   ├── 客户明细.csv  # Updated version
     │   └── base_info.dump  # pg_dump format for large tables
     └── README.md
 
@@ -111,9 +111,9 @@ def get_seed_file_path(
         >>> get_seed_file_path("产品线.csv", Path("config/seeds"))
         Path("config/seeds/001/产品线.csv")
 
-        If 001/ has 年金关联公司.csv and 002/ also has 年金关联公司.csv:
-        >>> get_seed_file_path("年金关联公司.csv", Path("config/seeds"))
-        Path("config/seeds/002/年金关联公司.csv")
+        If 001/ has 客户明细.csv and 002/ also has 客户明细.csv:
+        >>> get_seed_file_path("客户明细.csv", Path("config/seeds"))
+        Path("config/seeds/002/客户明细.csv")
     """
     # Explicit version override
     if version is not None:

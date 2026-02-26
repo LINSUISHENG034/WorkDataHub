@@ -1,4 +1,4 @@
-"""Create customer.当年流失 table for Annual Loss domain.
+"""Create customer.流失客户明细 table for Annual Loss domain.
 
 This migration creates the unified annual loss table that consolidates:
 - Legacy: 企年受托流失 (TrusteeLossCleaner)
@@ -43,17 +43,17 @@ def _table_exists(conn, table_name: str, schema: str) -> bool:
 
 
 def upgrade() -> None:
-    """Create customer.当年流失 table."""
+    """Create customer.流失客户明细 table."""
     conn = op.get_bind()
 
     # Create customer schema if not exists
     conn.execute(sa.text("CREATE SCHEMA IF NOT EXISTS customer"))
 
-    if not _table_exists(conn, "当年流失", "customer"):
+    if not _table_exists(conn, "流失客户明细", "customer"):
         conn.execute(
             sa.text(
                 """
-            CREATE TABLE customer."当年流失" (
+            CREATE TABLE customer."流失客户明细" (
                 -- Primary key
                 id SERIAL PRIMARY KEY,
 
@@ -105,7 +105,7 @@ def _create_indexes(conn) -> None:
         sa.text(
             """
         CREATE INDEX idx_annual_loss_report_month
-        ON customer."当年流失"("上报月份")
+        ON customer."流失客户明细"("上报月份")
         """
         )
     )
@@ -113,7 +113,7 @@ def _create_indexes(conn) -> None:
         sa.text(
             """
         CREATE INDEX idx_annual_loss_business_type
-        ON customer."当年流失"("业务类型")
+        ON customer."流失客户明细"("业务类型")
         """
         )
     )
@@ -121,7 +121,7 @@ def _create_indexes(conn) -> None:
         sa.text(
             """
         CREATE INDEX idx_annual_loss_company_id
-        ON customer."当年流失"(company_id)
+        ON customer."流失客户明细"(company_id)
         """
         )
     )
@@ -129,7 +129,7 @@ def _create_indexes(conn) -> None:
         sa.text(
             """
         CREATE INDEX idx_annual_loss_plan_code
-        ON customer."当年流失"("年金计划号")
+        ON customer."流失客户明细"("年金计划号")
         """
         )
     )
@@ -155,7 +155,7 @@ def _create_trigger(conn) -> None:
         sa.text(
             """
         CREATE TRIGGER trg_annual_loss_updated_at
-        BEFORE UPDATE ON customer."当年流失"
+        BEFORE UPDATE ON customer."流失客户明细"
         FOR EACH ROW EXECUTE FUNCTION update_annual_loss_updated_at()
         """
         )
@@ -163,11 +163,11 @@ def _create_trigger(conn) -> None:
 
 
 def downgrade() -> None:
-    """Drop customer.当年流失 table."""
+    """Drop customer.流失客户明细 table."""
     conn = op.get_bind()
 
-    if _table_exists(conn, "当年流失", "customer"):
-        conn.execute(sa.text('DROP TABLE IF EXISTS customer."当年流失" CASCADE'))
+    if _table_exists(conn, "流失客户明细", "customer"):
+        conn.execute(sa.text('DROP TABLE IF EXISTS customer."流失客户明细" CASCADE'))
 
     # Drop trigger function
     conn.execute(

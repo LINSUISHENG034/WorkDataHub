@@ -187,17 +187,17 @@ def _load_csv_seed_data(conn, csv_filename: str, table_name: str, schema: str) -
     # Build INSERT statement with ON CONFLICT DO NOTHING
     columns = list(rows[0].keys())
     # Exclude 'id' for tables with GENERATED ALWAYS AS IDENTITY columns
-    # Story 7.5: Added 年金客户 to the list (id is now IDENTITY)
+    # Story 7.5: Added 客户明细 to the list (id is now IDENTITY)
     if "id" in columns and table_name in [
         "年金计划",
         "组合计划",
-        "年金客户",
+        "客户明细",
     ]:
         columns.remove("id")
 
     # Exclude created_at/updated_at for tables with server_default=now()
     # These columns should use database defaults, not CSV values (which may be empty)
-    if table_name == "年金客户":
+    if table_name == "客户明细":
         if "created_at" in columns:
             columns.remove("created_at")
         if "updated_at" in columns:
@@ -373,11 +373,11 @@ def upgrade() -> None:
         count = _load_csv_seed_data(conn, "利润指标.csv", "利润指标", "mapping")
         print(f"Seeded {count} rows into mapping.利润指标")
 
-    # === 8. 年金客户 (985 rows - cascade filtered from 年金计划.company_id) ===
+    # === 8. 客户明细 (985 rows - cascade filtered from 年金计划.company_id) ===
     # Story 7.6: Migrated from mapping to customer schema
-    if _table_exists(conn, "年金客户", "customer"):
-        count = _load_csv_seed_data(conn, "年金客户.csv", "年金客户", "customer")
-        print(f"Seeded {count} rows into customer.年金客户")
+    if _table_exists(conn, "客户明细", "customer"):
+        count = _load_csv_seed_data(conn, "客户明细.csv", "客户明细", "customer")
+        print(f"Seeded {count} rows into customer.客户明细")
 
     # === 9. 年金计划 (1,128 rows - base table, company_id NOT LIKE 'IN%') ===
     if _table_exists(conn, "年金计划", "mapping"):
@@ -417,7 +417,7 @@ def downgrade() -> None:
         ("base_info", "enterprise"),
         ("组合计划", "mapping"),
         ("年金计划", "mapping"),
-        ("年金客户", "customer"),  # Story 7.6: Migrated to customer schema
+        ("客户明细", "customer"),  # Story 7.6: Migrated to customer schema
         ("利润指标", "mapping"),
         ("产品明细", "mapping"),
         ("计划层规模", "mapping"),

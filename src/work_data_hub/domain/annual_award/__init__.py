@@ -1,4 +1,4 @@
-"""Annual Award (当年中标) domain.
+"""Annual Award (中标客户明细) domain.
 
 This domain unifies TrusteeAwardCleaner (企年受托中标) and
 InvesteeAwardCleaner (企年投资中标) from the legacy system into a single domain.
@@ -7,7 +7,7 @@ Implements requirements:
 1. Drop columns: 区域, 年金中心, 上报人
 2. Conditional update: Keep original 年金计划号 and company_id if non-empty
 3. Customer name transformation: 客户全称 → 上报客户名称, cleaned to 客户名称
-4. Plan code update: Based on customer_plan_contract table (Phase 2)
+4. Plan code update: Based on 客户年金计划 table (Phase 2)
 """
 
 from .models import AnnualAwardIn, AnnualAwardOut, AnnualAwardProcessingResult

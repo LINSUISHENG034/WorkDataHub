@@ -1,4 +1,4 @@
-"""Annual Loss (当年流失) domain - Models.
+"""Annual Loss (流失客户明细) domain - Models.
 
 This domain unifies TrusteeLossCleaner (企年受托流失) and
 InvesteeLossCleaner (企年投资流失) from legacy system into a single domain.

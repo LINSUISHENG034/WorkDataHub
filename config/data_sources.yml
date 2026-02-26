@@ -141,16 +141,16 @@ domains:
 
     # Output destination configuration
     output:
-      table: "当年中标"
+      table: "中标客户明细"
       schema_name: "customer"
       pk:
         - "上报月份"
         - "业务类型"
 
-    # Story 7.6-17: Enable FK backfill to 年金关联公司 table
+    # Story 7.6-17: Enable FK backfill to 客户明细 table
     requires_backfill: true
 
-  # Annual Loss Domain (当年流失)
+  # Annual Loss Domain (流失客户明细)
   # Story: Domain Migration - Merged TrusteeLossCleaner + InvesteeLossCleaner
   # Supports both 企年受托流失 and 企年投资流失 sheets
   annual_loss:
@@ -170,13 +170,13 @@ domains:
 
     # Output destination configuration
     output:
-      table: "当年流失"
+      table: "流失客户明细"
       schema_name: "customer"
       pk:
         - "上报月份"
         - "业务类型"
 
-    # Story 7.6-17: Enable FK backfill to 年金关联公司 table
+    # Story 7.6-17: Enable FK backfill to 客户明细 table
     requires_backfill: true
 
   # Future domains (Epic 9) can be added here:

@@ -1,4 +1,4 @@
-"""Annual Award (当年中标) domain - Helper functions.
+"""Annual Award (中标客户明细) domain - Helper functions.
 
 Data transformation utilities for the annual award domain.
 """
@@ -92,7 +92,7 @@ def conditional_update_plan_and_company(df: pd.DataFrame) -> pd.DataFrame:
     - Otherwise, apply enrichment logic
     """
     # For now, just pass through - enrichment will be handled in Phase 2
-    # when customer_plan_contract table is created
+    # when 客户年金计划 table is created
     return df
 
 

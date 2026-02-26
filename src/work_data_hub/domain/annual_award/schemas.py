@@ -1,4 +1,4 @@
-"""Annual Award (当年中标) domain - Pandera schemas.
+"""Annual Award (中标客户明细) domain - Pandera schemas.
 
 DataFrame-level validation schemas for Bronze and Gold layers.
 """

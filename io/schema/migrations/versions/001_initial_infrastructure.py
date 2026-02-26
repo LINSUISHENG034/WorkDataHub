@@ -6,7 +6,7 @@ Phase 2: Create 001_initial_infrastructure.py with 17 infrastructure tables
 This migration establishes the foundation tables for the WorkDataHub:
 - Public schema: Pipeline execution tracking and data quality metrics
 - Enterprise schema: Company information and enrichment infrastructure
-- Mapping schema: Reference data tables (产品线, 组织架构, 计划层规模, 年金客户,
+- Mapping schema: Reference data tables (产品线, 组织架构, 计划层规模, 客户明细,
   产品明细, 利润指标)
 - System schema: Incremental sync state tracking
 
@@ -573,19 +573,19 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
         )
 
     # ========================================================================
-    # CUSTOMER SCHEMA (1 table: 年金客户)
+    # CUSTOMER SCHEMA (1 table: 客户明细)
     # ========================================================================
 
     # Create customer schema if not exists
     conn.execute(sa.text("CREATE SCHEMA IF NOT EXISTS customer"))
 
-    # === 14. 年金客户 (Annuity Customers - reference table, not a domain) ===
+    # === 14. 客户明细 (Customer Details - reference table, not a domain) ===
     # Story 7.5: id column changed to IDENTITY for FK backfill compatibility
     # Story 7.5-1: Replace 更新时间 with created_at/updated_at for audit consistency
     # Story 7.6: Migrated from mapping to customer schema for Customer MDM consistency
-    if not _table_exists(conn, "年金客户", "customer"):
+    if not _table_exists(conn, "客户明细", "customer"):
         op.create_table(
-            "年金客户",
+            "客户明细",
             sa.Column(
                 "id",
                 sa.Integer(),
@@ -630,9 +630,9 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
                 nullable=False,
                 server_default=func.now(),
             ),
-            sa.PrimaryKeyConstraint("company_id", name="年金客户_pkey"),
+            sa.PrimaryKeyConstraint("company_id", name="客户明细_pkey"),
             schema="customer",
-            comment="Reference table: Annuity customers (10,997 rows, manual DDL)",
+            comment="Reference table: Customer details (10,997 rows, manual DDL)",
         )
 
     # ========================================================================
@@ -689,12 +689,12 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
             comment="Reference data: Plan scale levels (7 rows, to be seeded)",
         )
 
-    # === 14. 年金客户 兼容性视图 (Compatibility View for BI backward compat) ===
-    # Story 7.6: Table migrated to customer schema, create view in mapping
+    # === 14. 客户明细 映射视图 (Mapping schema compatibility view) ===
+    # Story 7.6: Table migrated to customer schema, expose in mapping schema
     conn.execute(
         sa.text("""
-        CREATE OR REPLACE VIEW mapping."年金客户" AS
-        SELECT * FROM customer."年金客户"
+        CREATE OR REPLACE VIEW mapping."客户明细" AS
+        SELECT * FROM customer."客户明细"
     """)
     )
 
@@ -783,9 +783,9 @@ def downgrade() -> None:
         op.drop_table("sync_state", schema="system")
 
     # Customer schema - drop view first, then table
-    conn.execute(sa.text('DROP VIEW IF EXISTS mapping."年金客户"'))
-    if _table_exists(conn, "年金客户", "customer"):
-        op.drop_table("年金客户", schema="customer")
+    conn.execute(sa.text('DROP VIEW IF EXISTS mapping."客户明细"'))
+    if _table_exists(conn, "客户明细", "customer"):
+        op.drop_table("客户明细", schema="customer")
 
     # Mapping schema
     for table in [

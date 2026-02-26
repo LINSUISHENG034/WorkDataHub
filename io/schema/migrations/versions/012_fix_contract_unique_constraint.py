@@ -1,4 +1,4 @@
-"""Fix customer_plan_contract unique constraint for SCD Type 2.
+"""Fix 客户年金计划 unique constraint for SCD Type 2.
 
 Story 7.6-15: Ratchet Rule Implementation
 Fix: Change unique constraint from valid_to to valid_from
@@ -33,7 +33,7 @@ def upgrade() -> None:
     conn.execute(
         sa.text(
             """
-            ALTER TABLE customer.customer_plan_contract
+            ALTER TABLE customer."客户年金计划"
             DROP CONSTRAINT IF EXISTS uq_active_contract;
             """
         )
@@ -43,7 +43,7 @@ def upgrade() -> None:
     conn.execute(
         sa.text(
             """
-            DELETE FROM customer.customer_plan_contract
+            DELETE FROM customer."客户年金计划"
             WHERE contract_id IN (
                 SELECT contract_id FROM (
                     SELECT contract_id,
@@ -52,7 +52,7 @@ def upgrade() -> None:
                                    product_line_code, valid_from
                                ORDER BY valid_to DESC, contract_id DESC
                            ) as rn
-                    FROM customer.customer_plan_contract
+                    FROM customer."客户年金计划"
                 ) ranked
                 WHERE rn > 1
             );
@@ -64,7 +64,7 @@ def upgrade() -> None:
     conn.execute(
         sa.text(
             """
-            ALTER TABLE customer.customer_plan_contract
+            ALTER TABLE customer."客户年金计划"
             ADD CONSTRAINT uq_contract_version
             UNIQUE (company_id, plan_code, product_line_code, valid_from);
             """
@@ -76,7 +76,7 @@ def upgrade() -> None:
         sa.text(
             """
             COMMENT ON CONSTRAINT uq_contract_version
-            ON customer.customer_plan_contract IS
+            ON customer."客户年金计划" IS
             'SCD Type 2: Each contract version has unique start date';
             """
         )
@@ -91,7 +91,7 @@ def downgrade() -> None:
     conn.execute(
         sa.text(
             """
-            ALTER TABLE customer.customer_plan_contract
+            ALTER TABLE customer."客户年金计划"
             DROP CONSTRAINT IF EXISTS uq_contract_version;
             """
         )
@@ -101,7 +101,7 @@ def downgrade() -> None:
     conn.execute(
         sa.text(
             """
-            ALTER TABLE customer.customer_plan_contract
+            ALTER TABLE customer."客户年金计划"
             ADD CONSTRAINT uq_active_contract
             UNIQUE (company_id, plan_code, product_line_code, valid_to);
             """

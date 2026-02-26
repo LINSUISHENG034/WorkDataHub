@@ -1,4 +1,4 @@
-"""Annual Loss (当年流失) domain.
+"""Annual Loss (流失客户明细) domain.
 
 This domain unifies TrusteeLossCleaner (企年受托流失) and
 InvesteeLossCleaner (企年投资流失) from the legacy system into a single domain.
@@ -10,7 +10,7 @@ Implements requirements:
 3. Rename: 受托人 → 原受托人
 4. Conditional update: Keep original 年金计划号 and company_id if non-empty
 5. Customer name transformation: 客户全称 → 上报客户名称
-6. Plan code update: Based on customer_plan_contract table
+6. Plan code update: Based on 客户年金计划 table
 """
 
 from .models import AnnualLossIn, AnnualLossOut, AnnualLossProcessingResult

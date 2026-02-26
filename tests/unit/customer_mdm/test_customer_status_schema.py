@@ -31,7 +31,7 @@ class TestCustomerStatusRulesConfig:
 
         annual_award = config.sources["annual_award"]
         assert annual_award.schema_name == "customer"
-        assert annual_award.table == "当年中标"
+        assert annual_award.table == "中标客户明细"
         assert "company_id" in annual_award.key_fields
 
     def test_status_definition_structure(self):

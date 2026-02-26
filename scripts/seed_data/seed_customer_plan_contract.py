@@ -1,6 +1,6 @@
-"""Seed customer_plan_contract table from business.规模明细 for testing.
+"""Seed 客户年金计划 table from business.规模明细 for testing.
 
-This script creates the customer.customer_plan_contract table and populates it
+This script creates the customer."客户年金计划" table and populates it
 with test data derived from business.规模明细 for the 202510 period.
 
 Usage:
@@ -53,20 +53,20 @@ def table_exists(conn, table_name: str, schema: str = "customer") -> bool:
 
 
 def create_table(conn) -> None:
-    """Create customer.customer_plan_contract table."""
-    logger.info("Creating customer.customer_plan_contract table...")
+    """Create customer."客户年金计划" table."""
+    logger.info('Creating customer."客户年金计划" table...')
 
     # Create schema if not exists
     execute_sql(conn, "CREATE SCHEMA IF NOT EXISTS customer")
 
     # Drop table if exists (for clean re-run)
-    if table_exists(conn, "customer_plan_contract"):
+    if table_exists(conn, "客户年金计划"):
         logger.info("  Dropping existing table...")
-        execute_sql(conn, "DROP TABLE customer.customer_plan_contract CASCADE")
+        execute_sql(conn, 'DROP TABLE customer."客户年金计划" CASCADE')
 
     # Create table
     create_table_sql = """
-    CREATE TABLE customer.customer_plan_contract (
+    CREATE TABLE customer."客户年金计划" (
         -- Primary key
         contract_id SERIAL PRIMARY KEY,
 
@@ -77,7 +77,7 @@ def create_table(conn) -> None:
 
         -- Redundant fields (for query convenience)
         product_line_name VARCHAR(50) NOT NULL,
-        customer_name VARCHAR(200),             -- From customer.年金客户.客户名称
+        customer_name VARCHAR(200),             -- From customer.客户明细.客户名称
         plan_name VARCHAR(200),                 -- From mapping.年金计划.计划全称
 
         -- Annual initialization status (updated every January)
@@ -111,26 +111,26 @@ def create_table(conn) -> None:
     # Create indexes
     indexes = [
         """CREATE INDEX idx_contract_company
-            ON customer.customer_plan_contract(company_id)""",
+            ON customer."客户年金计划"(company_id)""",
         """CREATE INDEX idx_contract_plan
-            ON customer.customer_plan_contract(plan_code)""",
+            ON customer."客户年金计划"(plan_code)""",
         """CREATE INDEX idx_contract_product_line
-            ON customer.customer_plan_contract(product_line_code)""",
+            ON customer."客户年金计划"(product_line_code)""",
         """CREATE INDEX idx_contract_strategic
-            ON customer.customer_plan_contract(is_strategic)
+            ON customer."客户年金计划"(is_strategic)
             WHERE is_strategic = TRUE""",
         """CREATE INDEX idx_contract_status_year
-            ON customer.customer_plan_contract(status_year)""",
+            ON customer."客户年金计划"(status_year)""",
         """CREATE INDEX idx_active_contracts
-            ON customer.customer_plan_contract(
+            ON customer."客户年金计划"(
                 company_id, plan_code, product_line_code
             ) WHERE valid_to = '9999-12-31'""",
         """CREATE INDEX idx_contract_valid_from_brin
-            ON customer.customer_plan_contract USING BRIN (valid_from)""",
+            ON customer."客户年金计划" USING BRIN (valid_from)""",
         """CREATE INDEX idx_contract_customer_name
-            ON customer.customer_plan_contract(customer_name)""",
+            ON customer."客户年金计划"(customer_name)""",
         """CREATE INDEX idx_contract_plan_name
-            ON customer.customer_plan_contract(plan_name)""",
+            ON customer."客户年金计划"(plan_name)""",
     ]
 
     for idx_sql in indexes:
@@ -147,7 +147,7 @@ def create_table(conn) -> None:
     $$ LANGUAGE plpgsql;
 
     CREATE TRIGGER trg_contract_updated_at
-    BEFORE UPDATE ON customer.customer_plan_contract
+    BEFORE UPDATE ON customer."客户年金计划"
     FOR EACH ROW EXECUTE FUNCTION update_contract_updated_at();
     """
     execute_sql(conn, trigger_sql)
@@ -161,7 +161,7 @@ def seed_data(conn) -> None:
 
     # Insert SQL - derive contract records from 规模明细
     insert_sql = """
-    INSERT INTO customer.customer_plan_contract (
+    INSERT INTO customer."客户年金计划" (
         company_id,
         plan_code,
         product_line_code,
@@ -194,7 +194,7 @@ def seed_data(conn) -> None:
         '9999-12-31'::date as valid_to
     FROM business.规模明细 s
     LEFT JOIN mapping.产品线 p ON s.产品线代码 = p.产品线代码
-    LEFT JOIN customer."年金客户" cust ON s.company_id = cust.company_id
+    LEFT JOIN customer."客户明细" cust ON s.company_id = cust.company_id
     LEFT JOIN mapping."年金计划" plan ON s.计划代码 = plan.年金计划号
     WHERE s.月度 = %s
       AND s.company_id IS NOT NULL
@@ -218,14 +218,14 @@ def verify_data(conn) -> None:
 
     with conn.cursor(cursor_factory=RealDictCursor) as cursor:
         # Total count
-        cursor.execute("SELECT COUNT(*) as total FROM customer.customer_plan_contract")
+        cursor.execute('SELECT COUNT(*) as total FROM customer."客户年金计划"')
         total = cursor.fetchone()["total"]
         logger.info(f"  Total records: {total:,}")
 
         # By product line
         cursor.execute("""
             SELECT product_line_code, product_line_name, COUNT(*) as count
-            FROM customer.customer_plan_contract
+            FROM customer."客户年金计划"
             GROUP BY product_line_code, product_line_name
             ORDER BY count DESC
         """)
@@ -239,7 +239,7 @@ def verify_data(conn) -> None:
         # By contract status
         cursor.execute("""
             SELECT contract_status, COUNT(*) as count
-            FROM customer.customer_plan_contract
+            FROM customer."客户年金计划"
             GROUP BY contract_status
             ORDER BY contract_status
         """)
@@ -252,7 +252,7 @@ def verify_data(conn) -> None:
             SELECT cpc.company_id, cpc.plan_code, cpc.product_line_name,
                    cpc.customer_name, cpc.plan_name,
                    cpc.contract_status, cpc.valid_from
-            FROM customer.customer_plan_contract cpc
+            FROM customer."客户年金计划" cpc
             ORDER BY cpc.contract_id
             LIMIT 5
         """)
@@ -270,7 +270,7 @@ def verify_data(conn) -> None:
 def main():
     """Main entry point."""
     logger.info("=" * 60)
-    logger.info("Seeding customer_plan_contract table")
+    logger.info("Seeding 客户年金计划 table")
     logger.info("=" * 60)
 
     conn = psycopg2.connect(**DB_CONFIG)

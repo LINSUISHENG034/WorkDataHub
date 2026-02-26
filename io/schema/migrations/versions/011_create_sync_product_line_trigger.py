@@ -7,8 +7,8 @@ Purpose: Automatically propagate 产品线 name changes from the source dimensio
 table to denormalized columns in customer tables, ensuring data consistency.
 
 Target Tables:
-- customer.customer_plan_contract.product_line_name
-- customer.fct_customer_business_monthly_status.product_line_name
+- customer."客户年金计划".product_line_name
+- customer."客户业务月度快照".product_line_name
 
 Revision ID: 20260129_000011
 Revises: 20260129_000010
@@ -40,8 +40,8 @@ def upgrade() -> None:
                 v_contract_count INTEGER;
                 v_snapshot_count INTEGER;
             BEGIN
-                -- Sync to customer_plan_contract (use IS DISTINCT FROM for NULL safety)
-                UPDATE customer.customer_plan_contract
+                -- Sync to customer."客户年金计划" (use IS DISTINCT FROM for NULL safety)
+                UPDATE customer."客户年金计划"
                 SET product_line_name = NEW."产品线",
                     updated_at = CURRENT_TIMESTAMP
                 WHERE product_line_code = NEW."产品线代码"
@@ -49,8 +49,8 @@ def upgrade() -> None:
 
                 GET DIAGNOSTICS v_contract_count = ROW_COUNT;
 
-                -- Sync to fct_customer_business_monthly_status
-                UPDATE customer.fct_customer_business_monthly_status
+                -- Sync to customer."客户业务月度快照"
+                UPDATE customer."客户业务月度快照"
                 SET product_line_name = NEW."产品线",
                     updated_at = CURRENT_TIMESTAMP
                 WHERE product_line_code = NEW."产品线代码"
@@ -93,8 +93,8 @@ def upgrade() -> None:
                 EXECUTE FUNCTION customer.sync_product_line_name();
 
             COMMENT ON TRIGGER trg_sync_product_line_name ON mapping."产品线" IS
-                'Syncs product_line_name to customer.customer_plan_contract and '
-                'customer.fct_customer_business_monthly_status when 产品线 changes';
+                'Syncs product_line_name to customer."客户年金计划" and '
+                'customer."客户业务月度快照" when 产品线 changes';
             """
         )
     )

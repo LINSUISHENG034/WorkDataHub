@@ -1,4 +1,4 @@
-"""Annual Loss (当年流失) domain - Pipeline Builder.
+"""Annual Loss (流失客户明细) domain - Pipeline Builder.
 
 Composes the Bronze → Silver transformation pipeline for annual loss data.
 Unifies TrusteeLossCleaner and InvesteeLossCleaner from legacy system.
@@ -174,10 +174,10 @@ class CompanyIdResolutionStep(TransformStep):
 
 
 class PlanCodeEnrichmentStep(TransformStep):
-    """Enrich 年金计划号 from customer_plan_contract table.
+    """Enrich 年金计划号 from 客户年金计划 table.
 
     Per requirement #6: 年金计划号 will be updated based on
-    customer_plan_contract table. Only updates rows where
+    客户年金计划 table. Only updates rows where
     年金计划号 is empty (per requirement #4).
     """
 
@@ -248,7 +248,7 @@ class PlanCodeEnrichmentStep(TransformStep):
 
         query = text("""
             SELECT company_id, product_line_code, plan_code
-            FROM customer.customer_plan_contract
+            FROM customer."客户年金计划"
             WHERE company_id = ANY(:company_ids)
             ORDER BY company_id, product_line_code, plan_code
         """)

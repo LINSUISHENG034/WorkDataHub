@@ -227,7 +227,7 @@ class TestAnnualCutoverSQLFiles:
 
         sql = load_sql("annual_cutover_close.sql")
         assert "UPDATE" in sql.upper()
-        assert "customer.customer_plan_contract" in sql
+        assert 'customer."客户年金计划"' in sql
 
     def test_close_sql_sets_valid_to(self):
         """Close SQL should set valid_to to cutover date."""

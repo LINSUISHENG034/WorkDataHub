@@ -1,4 +1,4 @@
-"""Annual Award (当年中标) domain - Models.
+"""Annual Award (中标客户明细) domain - Models.
 
 This domain unifies TrusteeAwardCleaner (企年受托中标) and
 InvesteeAwardCleaner (企年投资中标) from legacy system into a single domain.

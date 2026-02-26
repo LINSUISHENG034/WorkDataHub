@@ -74,9 +74,7 @@ def validate_status_distribution(
         with conn.cursor() as cur:
             # Get reference year (for reporting only - we validate ALL contracts)
             if status_year is None:
-                cur.execute(
-                    "SELECT MAX(status_year) FROM customer.customer_plan_contract"
-                )
+                cur.execute('SELECT MAX(status_year) FROM customer."客户年金计划"')
                 status_year = cur.fetchone()[0]
 
             # Get distribution stats for ALL contracts
@@ -88,7 +86,7 @@ def validate_status_distribution(
                     SUM(CASE WHEN is_strategic THEN 1 ELSE 0 END) as strategic,
                     SUM(CASE WHEN is_existing THEN 1 ELSE 0 END) as existing,
                     SUM(CASE WHEN contract_status = '正常' THEN 1 ELSE 0 END) as normal
-                FROM customer.customer_plan_contract
+                FROM customer."客户年金计划"
                 """
             )
             row = cur.fetchone()

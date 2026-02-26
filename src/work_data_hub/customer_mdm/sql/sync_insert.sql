@@ -18,7 +18,7 @@ WITH
 -- Include common CTEs
 {common_ctes}
 
-INSERT INTO customer.customer_plan_contract (
+INSERT INTO customer."客户年金计划" (
     company_id,
     plan_code,
     product_line_code,
@@ -58,7 +58,7 @@ SELECT DISTINCT ON (s.company_id, s.计划代码, s.产品线代码)
     '9999-12-31'::date as valid_to
 FROM business.规模明细 s
 LEFT JOIN mapping."产品线" p ON s.产品线代码 = p.产品线代码
-LEFT JOIN customer."年金关联公司" cust ON s.company_id = cust.company_id
+LEFT JOIN customer."客户明细" cust ON s.company_id = cust.company_id
 LEFT JOIN mapping."年金计划" plan ON s.计划代码 = plan.年金计划号
 LEFT JOIN strategic_whitelist sw
     ON s.company_id = sw.company_id
@@ -77,7 +77,7 @@ WHERE s.company_id IS NOT NULL
   AND s.计划代码 IS NOT NULL
   AND NOT EXISTS (
       -- SCD Type 2: Skip if current record exists OR same-day record exists
-      SELECT 1 FROM customer.customer_plan_contract existing
+      SELECT 1 FROM customer."客户年金计划" existing
       WHERE existing.company_id = s.company_id
         AND existing.plan_code = s.计划代码
         AND existing.product_line_code = s.产品线代码

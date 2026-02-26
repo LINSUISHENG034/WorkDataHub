@@ -8,14 +8,14 @@ Power BI consumption. This enables BI analysts to perform self-service analysis
 with clear dimensional relationships.
 
 Views Created:
-- bi.dim_customer: Customer dimension from customer."年金客户"
+- bi.dim_customer: Customer dimension from customer."客户明细"
 - bi.dim_product_line: Product line dimension from mapping."产品线"
 - bi.dim_time: Time dimension generated from distinct snapshot_month
-- bi.fct_customer_monthly_summary: Fact view from fct_customer_business_monthly_status
+- bi.fct_customer_monthly_summary: Fact view from customer."客户业务月度快照"
 
 Dependencies:
-- Story 7.6-7: fct_customer_business_monthly_status (Migration 009)
-- Story 7.6-4: customer."年金客户".tags JSONB column (Migration 007)
+- Story 7.6-7: customer."客户业务月度快照" (Migration 009)
+- Story 7.6-4: customer."客户明细".tags JSONB column (Migration 007)
 
 Revision ID: 20260129_000010
 Revises: 20260121_000009
@@ -41,7 +41,7 @@ def upgrade() -> None:
     conn.execute(sa.text("CREATE SCHEMA IF NOT EXISTS bi"))
 
     # 2. Create dim_customer view
-    # Source: customer."年金客户" filtered to customers with contract data
+    # Source: customer."客户明细" filtered to customers with contract data
     # Using EXISTS for better performance with large datasets
     conn.execute(
         sa.text(
@@ -57,9 +57,9 @@ def upgrade() -> None:
                 c."最新投管规模" AS latest_investment_aum,
                 c."规模区间" AS aum_tier,
                 c."关联计划数" AS plan_count
-            FROM customer."年金客户" c
+            FROM customer."客户明细" c
             WHERE EXISTS (
-                SELECT 1 FROM customer.fct_customer_business_monthly_status f
+                SELECT 1 FROM customer."客户业务月度快照" f
                 WHERE f.company_id = c.company_id
             );
 
@@ -99,7 +99,7 @@ def upgrade() -> None:
                 EXTRACT(MONTH FROM snapshot_month)::INTEGER AS month_number,
                 TO_CHAR(snapshot_month, 'FMMonth') AS month_name,
                 TO_CHAR(snapshot_month, 'YYYY-MM') AS year_month_label
-            FROM customer.fct_customer_business_monthly_status;
+            FROM customer."客户业务月度快照";
 
             COMMENT ON VIEW bi.dim_time IS 'Time dimension derived from snapshot_month';
             """
@@ -107,7 +107,7 @@ def upgrade() -> None:
     )
 
     # 5. Create fct_customer_monthly_summary fact view
-    # Source: customer.fct_customer_business_monthly_status
+    # Source: customer."客户业务月度快照"
     conn.execute(
         sa.text(
             """
@@ -132,7 +132,7 @@ def upgrade() -> None:
 
                 -- Audit
                 updated_at
-            FROM customer.fct_customer_business_monthly_status;
+            FROM customer."客户业务月度快照";
 
             COMMENT ON VIEW bi.fct_customer_monthly_summary IS 'Monthly status fact';
             """

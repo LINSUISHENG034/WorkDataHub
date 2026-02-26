@@ -1,4 +1,4 @@
-"""Annual Award (当年中标) domain - Pipeline Builder.
+"""Annual Award (中标客户明细) domain - Pipeline Builder.
 
 Composes the Bronze → Silver transformation pipeline for annual award data.
 Implements fixes for:
@@ -210,9 +210,9 @@ class CompanyIdResolutionStep(TransformStep):
 
 
 class PlanCodeEnrichmentStep(TransformStep):
-    """Enrich 年金计划号 from customer_plan_contract table.
+    """Enrich 年金计划号 from 客户年金计划 table.
 
-    This step fills empty 年金计划号 values by looking up the customer_plan_contract
+    This step fills empty 年金计划号 values by looking up the 客户年金计划
     table using company_id + 产品线代码 as join keys.
 
     Plan Code Selection Priority (based on 计划类型):
@@ -242,7 +242,7 @@ class PlanCodeEnrichmentStep(TransformStep):
         return "plan_code_enrichment"
 
     def apply(self, df: pd.DataFrame, context: PipelineContext) -> pd.DataFrame:
-        """Apply plan code enrichment from customer_plan_contract table."""
+        """Apply plan code enrichment from 客户年金计划 table."""
         if self._connection is None:
             logger.bind(domain="annual_award", step=self.name).warning(
                 "No database connection provided, skipping plan code enrichment"
@@ -267,7 +267,7 @@ class PlanCodeEnrichmentStep(TransformStep):
         if rows_to_enrich.empty:
             return df
 
-        # Query customer_plan_contract table
+        # Query 客户年金计划 table
         try:
             # Build lookup mapping:
             # (company_id, product_line_code) -> list of plan_codes
@@ -312,10 +312,10 @@ class PlanCodeEnrichmentStep(TransformStep):
         if not company_ids:
             return {}
 
-        # Query customer_plan_contract table
+        # Query 客户年金计划 table
         query = text("""
             SELECT company_id, product_line_code, plan_code
-            FROM customer.customer_plan_contract
+            FROM customer."客户年金计划"
             WHERE company_id = ANY(:company_ids)
             ORDER BY company_id, product_line_code, plan_code
         """)
@@ -391,7 +391,7 @@ def build_bronze_to_silver_pipeline(
     8. CalculationStep: Generate cleaned 客户名称
     9. CleansingStep: Apply domain cleansing rules
     10. CompanyIdResolutionStep: Resolve company_id (if eqc_config provided)
-    11. PlanCodeEnrichmentStep: Enrich 年金计划号 from customer_plan_contract
+    11. PlanCodeEnrichmentStep: Enrich 年金计划号 from 客户年金计划
     12. DropStep: Remove excluded columns
 
     Args:
@@ -467,7 +467,7 @@ def build_bronze_to_silver_pipeline(
             )
         )
 
-    # Step 11: Plan code enrichment from customer_plan_contract
+    # Step 11: Plan code enrichment from 客户年金计划
     # Must run AFTER company_id resolution (needs resolved company_id for lookup)
     if db_connection:
         steps.append(PlanCodeEnrichmentStep(db_connection=db_connection))

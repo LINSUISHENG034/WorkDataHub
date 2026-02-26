@@ -60,13 +60,13 @@ def customer_mdm_test_db(
     """Extend base fixture with Customer MDM test data.
 
     Creates deterministic test data in the following tables:
-    - customer."年金关联公司" (customer dimension, appended to seed data)
+    - customer."客户明细" (customer dimension, appended to seed data)
     - business.规模明细 (source AUM data)
-    - customer.当年中标 (annual awards)
-    - customer.当年流失 (annual churn)
+    - customer."中标客户明细" (annual awards)
+    - customer."流失客户明细" (annual churn)
 
     Note: mapping."产品线" already has seed data (PL201-PL204 etc.)
-    Note: customer."年金关联公司" already has seed data, test IDs use TEST_ prefix
+    Note: customer."客户明细" already has seed data, test IDs use TEST_ prefix
 
     Yields:
         str: DSN for test database with Customer MDM data populated
@@ -95,11 +95,11 @@ def customer_mdm_test_db(
                 """
             )
 
-            # 2. Insert test customers into customer."年金关联公司"
+            # 2. Insert test customers into customer."客户明细"
             # Uses TEST_ prefix to avoid collision with seed data
             cur.execute(
                 """
-                INSERT INTO customer."年金关联公司" (
+                INSERT INTO customer."客户明细" (
                     company_id, "客户名称", "年金客户类型"
                 ) VALUES
                     ('TEST_C001', '测试公司A', '企业年金'),
@@ -143,11 +143,11 @@ def customer_mdm_test_db(
                 """
             )
 
-            # 4. Insert annual award data (当年中标)
+            # 4. Insert annual award data (中标客户明细)
             # Required NOT NULL columns: 上报月份, 业务类型, 上报客户名称
             cur.execute(
                 """
-                INSERT INTO customer."当年中标" (
+                INSERT INTO customer."中标客户明细" (
                     company_id, "产品线代码", "上报月份",
                     "业务类型", "上报客户名称"
                 ) VALUES
@@ -156,11 +156,11 @@ def customer_mdm_test_db(
                 """
             )
 
-            # 5. Insert annual churn data (当年流失)
+            # 5. Insert annual churn data (流失客户明细)
             # Required NOT NULL columns: 上报月份, 业务类型, 上报客户名称
             cur.execute(
                 """
-                INSERT INTO customer."当年流失" (
+                INSERT INTO customer."流失客户明细" (
                     company_id, "产品线代码", "上报月份",
                     "业务类型", "上报客户名称"
                 ) VALUES

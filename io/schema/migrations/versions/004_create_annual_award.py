@@ -1,4 +1,4 @@
-"""Create customer.当年中标 table for Annual Award domain.
+"""Create customer.中标客户明细 table for Annual Award domain.
 
 This migration creates the unified annual award table that consolidates:
 - Legacy: 企年受托中标 (TrusteeAwardCleaner)
@@ -43,17 +43,17 @@ def _table_exists(conn, table_name: str, schema: str) -> bool:
 
 
 def upgrade() -> None:
-    """Create customer.当年中标 table."""
+    """Create customer.中标客户明细 table."""
     conn = op.get_bind()
 
     # Create customer schema if not exists
     conn.execute(sa.text("CREATE SCHEMA IF NOT EXISTS customer"))
 
-    if not _table_exists(conn, "当年中标", "customer"):
+    if not _table_exists(conn, "中标客户明细", "customer"):
         conn.execute(
             sa.text(
                 """
-            CREATE TABLE customer."当年中标" (
+            CREATE TABLE customer."中标客户明细" (
                 -- Primary key
                 id SERIAL PRIMARY KEY,
                 
@@ -100,7 +100,7 @@ def upgrade() -> None:
             sa.text(
                 """
             CREATE INDEX idx_annual_award_report_month 
-            ON customer."当年中标"("上报月份")
+            ON customer."中标客户明细"("上报月份")
             """
             )
         )
@@ -108,7 +108,7 @@ def upgrade() -> None:
             sa.text(
                 """
             CREATE INDEX idx_annual_award_business_type 
-            ON customer."当年中标"("业务类型")
+            ON customer."中标客户明细"("业务类型")
             """
             )
         )
@@ -116,7 +116,7 @@ def upgrade() -> None:
             sa.text(
                 """
             CREATE INDEX idx_annual_award_company_id 
-            ON customer."当年中标"(company_id)
+            ON customer."中标客户明细"(company_id)
             """
             )
         )
@@ -124,7 +124,7 @@ def upgrade() -> None:
             sa.text(
                 """
             CREATE INDEX idx_annual_award_plan_code 
-            ON customer."当年中标"("年金计划号")
+            ON customer."中标客户明细"("年金计划号")
             """
             )
         )
@@ -149,7 +149,7 @@ def upgrade() -> None:
             sa.text(
                 """
             CREATE TRIGGER trg_annual_award_updated_at
-            BEFORE UPDATE ON customer."当年中标"
+            BEFORE UPDATE ON customer."中标客户明细"
             FOR EACH ROW EXECUTE FUNCTION update_annual_award_updated_at()
             """
             )
@@ -157,11 +157,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Drop customer.当年中标 table."""
+    """Drop customer.中标客户明细 table."""
     conn = op.get_bind()
 
-    if _table_exists(conn, "当年中标", "customer"):
-        conn.execute(sa.text('DROP TABLE IF EXISTS customer."当年中标" CASCADE'))
+    if _table_exists(conn, "中标客户明细", "customer"):
+        conn.execute(sa.text('DROP TABLE IF EXISTS customer."中标客户明细" CASCADE'))
 
     # Drop trigger function
     conn.execute(

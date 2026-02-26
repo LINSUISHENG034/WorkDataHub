@@ -1,4 +1,4 @@
-"""Annual Loss (当年流失) domain - Helper functions.
+"""Annual Loss (流失客户明细) domain - Helper functions.
 
 Data transformation utilities for the annual loss domain.
 """

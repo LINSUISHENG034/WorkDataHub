@@ -1,4 +1,4 @@
-"""Create customer_plan_contract table with SCD Type 2 support.
+"""Create 客户年金计划 table with SCD Type 2 support.
 
 Story 7.6-6: Contract Status Sync (Post-ETL Hook)
 Task 1: Create table with business key, annual/monthly status fields, and time dimension
@@ -25,7 +25,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    """Create customer_plan_contract table with all constraints, indexes,
+    """Create 客户年金计划 table with all constraints, indexes,
     and triggers."""
     conn = op.get_bind()
 
@@ -33,7 +33,7 @@ def upgrade() -> None:
     conn.execute(
         sa.text(
             """
-            CREATE TABLE IF NOT EXISTS customer.customer_plan_contract (
+            CREATE TABLE IF NOT EXISTS customer."客户年金计划" (
                 -- Primary key
                 contract_id SERIAL PRIMARY KEY,
 
@@ -65,7 +65,7 @@ def upgrade() -> None:
 
                 -- Foreign key constraints
                 CONSTRAINT fk_contract_company FOREIGN KEY (company_id)
-                    REFERENCES customer."年金客户"(company_id),
+                    REFERENCES customer."客户明细"(company_id),
                 CONSTRAINT fk_contract_product_line FOREIGN KEY (product_line_code)
                     REFERENCES mapping."产品线"(产品线代码),
 
@@ -83,34 +83,34 @@ def upgrade() -> None:
         sa.text(
             """
             CREATE INDEX IF NOT EXISTS idx_contract_company
-                ON customer.customer_plan_contract(company_id);
+                ON customer."客户年金计划"(company_id);
 
             CREATE INDEX IF NOT EXISTS idx_contract_plan
-                ON customer.customer_plan_contract(plan_code);
+                ON customer."客户年金计划"(plan_code);
 
             CREATE INDEX IF NOT EXISTS idx_contract_product_line
-                ON customer.customer_plan_contract(product_line_code);
+                ON customer."客户年金计划"(product_line_code);
 
             CREATE INDEX IF NOT EXISTS idx_contract_strategic
-                ON customer.customer_plan_contract(is_strategic)
+                ON customer."客户年金计划"(is_strategic)
                 WHERE is_strategic = TRUE;
 
             CREATE INDEX IF NOT EXISTS idx_contract_status_year
-                ON customer.customer_plan_contract(status_year);
+                ON customer."客户年金计划"(status_year);
 
             CREATE INDEX IF NOT EXISTS idx_active_contracts
-                ON customer.customer_plan_contract(
+                ON customer."客户年金计划"(
                     company_id, plan_code, product_line_code
                 ) WHERE valid_to = '9999-12-31';
 
             CREATE INDEX IF NOT EXISTS idx_contract_valid_from_brin
-                ON customer.customer_plan_contract USING BRIN (valid_from);
+                ON customer."客户年金计划" USING BRIN (valid_from);
 
             CREATE INDEX IF NOT EXISTS idx_contract_customer_name
-                ON customer.customer_plan_contract(customer_name);
+                ON customer."客户年金计划"(customer_name);
 
             CREATE INDEX IF NOT EXISTS idx_contract_plan_name
-                ON customer.customer_plan_contract(plan_name);
+                ON customer."客户年金计划"(plan_name);
             """
         )
     )
@@ -136,10 +136,10 @@ def upgrade() -> None:
         sa.text(
             """
             DROP TRIGGER IF EXISTS update_customer_plan_contract_timestamp
-                ON customer.customer_plan_contract;
+                ON customer."客户年金计划";
 
             CREATE TRIGGER update_customer_plan_contract_timestamp
-                BEFORE UPDATE ON customer.customer_plan_contract
+                BEFORE UPDATE ON customer."客户年金计划"
                 FOR EACH ROW
                 EXECUTE FUNCTION customer.update_customer_plan_contract_timestamp();
             """
@@ -154,7 +154,7 @@ def upgrade() -> None:
             RETURNS TRIGGER AS $$
             BEGIN
                 IF OLD.客户名称 IS DISTINCT FROM NEW.客户名称 THEN
-                    UPDATE customer.customer_plan_contract
+                    UPDATE customer."客户年金计划"
                     SET customer_name = NEW.客户名称,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE company_id = NEW.company_id;
@@ -164,10 +164,10 @@ def upgrade() -> None:
             $$ LANGUAGE plpgsql;
 
             DROP TRIGGER IF EXISTS trg_sync_contract_customer_name
-                ON customer."年金客户";
+                ON customer."客户明细";
 
             CREATE TRIGGER trg_sync_contract_customer_name
-                AFTER UPDATE OF 客户名称 ON customer."年金客户"
+                AFTER UPDATE OF 客户名称 ON customer."客户明细"
                 FOR EACH ROW
                 EXECUTE FUNCTION customer.sync_contract_customer_name();
             """
@@ -182,7 +182,7 @@ def upgrade() -> None:
             RETURNS TRIGGER AS $$
             BEGIN
                 IF OLD.计划全称 IS DISTINCT FROM NEW.计划全称 THEN
-                    UPDATE customer.customer_plan_contract
+                    UPDATE customer."客户年金计划"
                     SET plan_name = NEW.计划全称,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE plan_code = NEW.年金计划号;
@@ -204,7 +204,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Remove customer_plan_contract table and all associated objects."""
+    """Remove 客户年金计划 table and all associated objects."""
     conn = op.get_bind()
 
     # Drop sync triggers first
@@ -212,7 +212,7 @@ def downgrade() -> None:
         sa.text(
             """
             DROP TRIGGER IF EXISTS trg_sync_contract_customer_name
-                ON customer."年金客户";
+                ON customer."客户明细";
             DROP TRIGGER IF EXISTS trg_sync_contract_plan_name
                 ON mapping."年金计划";
             """
@@ -223,7 +223,7 @@ def downgrade() -> None:
     conn.execute(
         sa.text(
             """
-            DROP TABLE IF EXISTS customer.customer_plan_contract CASCADE;
+            DROP TABLE IF EXISTS customer."客户年金计划" CASCADE;
             """
         )
     )

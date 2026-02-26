@@ -147,7 +147,7 @@ class TestInsertBuilder:
         """JSONB columns should use array merge syntax on conflict."""
         sql = builder.upsert(
             schema="customer",
-            table="年金关联公司",
+            table="客户明细",
             columns=["company_id", "客户名称", "tags"],
             placeholders=[":col_0", ":col_1", ":col_2"],
             conflict_columns=["company_id"],

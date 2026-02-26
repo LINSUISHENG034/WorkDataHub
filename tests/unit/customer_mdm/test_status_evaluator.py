@@ -43,7 +43,7 @@ class TestStatusEvaluator:
         )
 
         assert "EXISTS" in sql
-        assert "当年中标" in sql
+        assert "中标客户明细" in sql
         assert "company_id" in sql
         assert "产品线代码" in sql
         assert "EXTRACT(YEAR FROM" in sql
@@ -58,7 +58,7 @@ class TestStatusEvaluator:
         )
 
         assert "EXISTS" in sql
-        assert "当年流失" in sql
+        assert "流失客户明细" in sql
 
     def test_generate_churned_sql(self, evaluator: StatusEvaluator):
         """Test is_churned_this_year generates correct SQL."""
@@ -69,7 +69,7 @@ class TestStatusEvaluator:
         )
 
         assert "EXISTS" in sql
-        assert "当年流失" in sql
+        assert "流失客户明细" in sql
 
     def test_generate_is_new_sql(self, evaluator: StatusEvaluator):
         """Test is_new generates combined SQL with AND."""

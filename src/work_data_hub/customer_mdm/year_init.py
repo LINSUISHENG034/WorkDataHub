@@ -92,7 +92,7 @@ def initialize_year_status(
             cur.execute(
                 """
                 SELECT COUNT(*)
-                FROM customer.customer_plan_contract
+                FROM customer."客户年金计划"
                 """
             )
             total = cur.fetchone()[0]
@@ -119,7 +119,7 @@ def _dry_run_counts(cur, year: int) -> dict[str, int]:
     cur.execute(
         """
         SELECT COUNT(*)
-        FROM customer.customer_plan_contract
+        FROM customer."客户年金计划"
         """
     )
     total = cur.fetchone()[0]
@@ -160,7 +160,7 @@ def _update_strategic(
             WHERE rank_in_branch <= %s
                OR total_aum >= %s
         )
-        UPDATE customer.customer_plan_contract c
+        UPDATE customer."客户年金计划" c
         SET is_strategic = TRUE
         FROM strategic_whitelist sw
         WHERE c.company_id = sw.company_id
@@ -183,7 +183,7 @@ def _update_existing(cur, year: int, prior_year: int) -> int:
               AND 期末资产规模 > 0
               AND company_id IS NOT NULL
         )
-        UPDATE customer.customer_plan_contract c
+        UPDATE customer."客户年金计划" c
         SET is_existing = TRUE
         FROM prior_year_dec pyd
         WHERE c.company_id = pyd.company_id
@@ -196,7 +196,7 @@ def _update_existing(cur, year: int, prior_year: int) -> int:
 
 
 def annual_cutover(year: int, dry_run: bool = False) -> dict[str, int]:
-    """Execute annual cutover for customer_plan_contract.
+    """Execute annual cutover for 客户年金计划.
 
     Story 7.6-14: Annual Cutover Implementation (年度切断逻辑)
 

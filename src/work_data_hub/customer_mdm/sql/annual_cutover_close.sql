@@ -8,7 +8,7 @@
 --
 -- Parameters: cutover_date (e.g., '2026-01-01')
 
-UPDATE customer.customer_plan_contract
+UPDATE customer."客户年金计划"
 SET valid_to = %s::date,
     updated_at = CURRENT_TIMESTAMP
 WHERE valid_to = '9999-12-31'

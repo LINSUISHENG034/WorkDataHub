@@ -4,25 +4,25 @@ Story 7.6-7: Monthly Snapshot Refresh (Post-ETL Hook)
 Story 7.6-16: Fact Table Refactoring (双表粒度分离)
 Story 7.6-18: Config-Driven Status Evaluation Framework
 
-Populates two fact tables from customer.customer_plan_contract:
-1. fct_customer_product_line_monthly - ProductLine granularity
-2. fct_customer_plan_monthly - Plan granularity
+Populates two fact tables from customer."客户年金计划" (客户年金计划):
+1. "客户业务月度快照" - ProductLine granularity
+2. "客户计划月度快照" - Plan granularity
 
-ProductLine Table (fct_customer_product_line_monthly):
+ProductLine Table ("客户业务月度快照"):
   Granularity: Customer + Product Line
   Status derivation:
     - is_strategic: Aggregated from contract attributes (BOOL_OR)
     - is_existing: Aggregated from contract attributes (BOOL_OR)
-    - is_winning_this_year: Derived from customer.当年中标 (config-driven)
-    - is_churned_this_year: Derived from customer.当年流失 (config-driven)
+    - is_winning_this_year: Derived from customer.中标客户明细 (config-driven)
+    - is_churned_this_year: Derived from customer.流失客户明细 (config-driven)
     - is_new: is_winning AND NOT is_existing (config-driven)
     - aum_balance: Aggregated from business.规模明细
     - plan_count: COUNT DISTINCT plan_code
 
-Plan Table (fct_customer_plan_monthly):
+Plan Table ("客户计划月度快照"):
   Granularity: Customer + Plan + Product Line
   Status derivation:
-    - is_churned_this_year: Plan-level churn from customer.当年流失 (config-driven)
+    - is_churned_this_year: Plan-level churn from customer.流失客户明细 (config-driven)
     - contract_status: Current contract status
     - aum_balance: Plan-level AUM from business.规模明细
 """
@@ -148,7 +148,7 @@ def _refresh_product_line_snapshot(
     )
 
     refresh_sql = f"""
-        INSERT INTO customer.fct_customer_product_line_monthly (
+        INSERT INTO customer."客户业务月度快照" (
             snapshot_month,
             company_id,
             product_line_code,
@@ -193,7 +193,7 @@ def _refresh_product_line_snapshot(
 
             COUNT(DISTINCT c.plan_code) as plan_count
 
-        FROM customer.customer_plan_contract c
+        FROM customer."客户年金计划" c
         WHERE c.valid_to = '9999-12-31'
         GROUP BY c.company_id, c.product_line_code
 
@@ -249,7 +249,7 @@ def _refresh_plan_snapshot(
     )
 
     refresh_sql = f"""
-        INSERT INTO customer.fct_customer_plan_monthly (
+        INSERT INTO customer."客户计划月度快照" (
             snapshot_month,
             company_id,
             plan_code,
@@ -285,7 +285,7 @@ def _refresh_plan_snapshot(
                   AND s.月度 = DATE_TRUNC('month', %(snapshot_month)s::date)
             ), 0) as aum_balance
 
-        FROM customer.customer_plan_contract c
+        FROM customer."客户年金计划" c
         WHERE c.valid_to = '9999-12-31'
 
         ON CONFLICT (snapshot_month, company_id, plan_code, product_line_code)
@@ -311,8 +311,8 @@ def refresh_monthly_snapshot(
     """Refresh monthly snapshots for both ProductLine and Plan tables.
 
     Performs idempotent UPSERT operations on both fact tables:
-    1. fct_customer_product_line_monthly (ProductLine granularity)
-    2. fct_customer_plan_monthly (Plan granularity)
+    1. "客户业务月度快照" (ProductLine granularity)
+    2. "客户计划月度快照" (Plan granularity)
 
     Args:
         period: Period to refresh (YYYYMM format).
@@ -356,7 +356,7 @@ def refresh_monthly_snapshot(
                 cur.execute(
                     """
                     SELECT COUNT(DISTINCT (company_id, product_line_code))
-                    FROM customer.customer_plan_contract
+                    FROM customer."客户年金计划"
                     WHERE valid_to = '9999-12-31'
                     """
                 )
@@ -365,7 +365,7 @@ def refresh_monthly_snapshot(
                 cur.execute(
                     """
                     SELECT COUNT(*)
-                    FROM customer.customer_plan_contract
+                    FROM customer."客户年金计划"
                     WHERE valid_to = '9999-12-31'
                     """
                 )

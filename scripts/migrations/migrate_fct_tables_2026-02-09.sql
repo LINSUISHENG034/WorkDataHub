@@ -3,7 +3,7 @@
 -- Story: 7.6-16
 -- Date: 2026-02-09
 -- Purpose: Rename fct_customer_business_monthly_status to
---          fct_customer_product_line_monthly and create fct_customer_plan_monthly
+--          "客户业务月度快照" and create "客户计划月度快照"
 -- ============================================================================
 -- IMPORTANT: This script is for EXISTING databases only.
 --            New deployments should use Alembic migrations (009, 013).
@@ -15,16 +15,44 @@ BEGIN;
 -- Part 1: Rename Table
 -- ============================================================================
 
--- Rename main table
-ALTER TABLE IF EXISTS customer.fct_customer_business_monthly_status
-    RENAME TO fct_customer_product_line_monthly;
+-- Rename main table (legacy -> canonical)
+DO $$
+BEGIN
+    IF to_regclass('customer.fct_customer_business_monthly_status') IS NOT NULL
+       AND to_regclass('customer."客户业务月度快照"') IS NULL THEN
+        ALTER TABLE customer.fct_customer_business_monthly_status
+            RENAME TO "客户业务月度快照";
+    END IF;
+END $$;
 
--- Rename foreign key constraints
-ALTER TABLE customer.fct_customer_product_line_monthly
-    RENAME CONSTRAINT fk_snapshot_company TO fk_fct_pl_company;
+-- Rename foreign key constraints only when legacy names exist
+DO $$
+BEGIN
+    IF to_regclass('customer."客户业务月度快照"') IS NOT NULL
+       AND EXISTS (
+           SELECT 1
+           FROM pg_constraint
+           WHERE conname = 'fk_snapshot_company'
+             AND conrelid = to_regclass('customer."客户业务月度快照"')
+       ) THEN
+        ALTER TABLE customer."客户业务月度快照"
+            RENAME CONSTRAINT fk_snapshot_company TO fk_fct_pl_company;
+    END IF;
+END $$;
 
-ALTER TABLE customer.fct_customer_product_line_monthly
-    RENAME CONSTRAINT fk_snapshot_product_line TO fk_fct_pl_product_line;
+DO $$
+BEGIN
+    IF to_regclass('customer."客户业务月度快照"') IS NOT NULL
+       AND EXISTS (
+           SELECT 1
+           FROM pg_constraint
+           WHERE conname = 'fk_snapshot_product_line'
+             AND conrelid = to_regclass('customer."客户业务月度快照"')
+       ) THEN
+        ALTER TABLE customer."客户业务月度快照"
+            RENAME CONSTRAINT fk_snapshot_product_line TO fk_fct_pl_product_line;
+    END IF;
+END $$;
 
 -- ============================================================================
 -- Part 2: Rename Indexes
@@ -52,24 +80,30 @@ ALTER INDEX IF EXISTS customer.idx_snapshot_strategic
 -- Part 3: Add customer_name Column (Story 7.6-13 merged)
 -- ============================================================================
 
-ALTER TABLE customer.fct_customer_product_line_monthly
+ALTER TABLE customer."客户业务月度快照"
     ADD COLUMN IF NOT EXISTS customer_name VARCHAR(200);
 
 CREATE INDEX IF NOT EXISTS idx_fct_pl_customer_name
-    ON customer.fct_customer_product_line_monthly(customer_name);
+    ON customer."客户业务月度快照"(customer_name);
 
 -- ============================================================================
 -- Part 4: Update Trigger Functions
 -- ============================================================================
 
--- Drop old trigger
+-- Drop old triggers
 DROP TRIGGER IF EXISTS update_fct_customer_monthly_status_timestamp
-    ON customer.fct_customer_product_line_monthly;
+    ON customer."客户业务月度快照";
+DROP TRIGGER IF EXISTS update_fct_pl_monthly_timestamp
+    ON customer."客户业务月度快照";
+DROP TRIGGER IF EXISTS update_fct_pl_monthly_timestamp
+    ON customer."客户业务月度快照";
 
--- Drop old function
+-- Drop old functions
 DROP FUNCTION IF EXISTS customer.update_fct_customer_monthly_status_timestamp();
+DROP FUNCTION IF EXISTS customer.update_fct_pl_monthly_timestamp();
+DROP FUNCTION IF EXISTS customer.update_fct_pl_monthly_timestamp();
 
--- Create new updated_at trigger function
+-- Create canonical updated_at trigger function
 CREATE OR REPLACE FUNCTION customer.update_fct_pl_monthly_timestamp()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -78,9 +112,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Attach new trigger
+-- Attach canonical trigger
 CREATE TRIGGER update_fct_pl_monthly_timestamp
-    BEFORE UPDATE ON customer.fct_customer_product_line_monthly
+    BEFORE UPDATE ON customer."客户业务月度快照"
     FOR EACH ROW
     EXECUTE FUNCTION customer.update_fct_pl_monthly_timestamp();
 
@@ -88,11 +122,18 @@ CREATE TRIGGER update_fct_pl_monthly_timestamp
 -- Part 5: Create customer_name Sync Trigger for ProductLine Table
 -- ============================================================================
 
+DROP TRIGGER IF EXISTS trg_sync_fct_pl_customer_name
+    ON customer."客户明细";
+DROP TRIGGER IF EXISTS trg_sync_fct_pl_customer_name
+    ON customer."客户明细";
+DROP FUNCTION IF EXISTS customer.sync_fct_pl_customer_name();
+DROP FUNCTION IF EXISTS customer.sync_fct_pl_customer_name();
+
 CREATE OR REPLACE FUNCTION customer.sync_fct_pl_customer_name()
 RETURNS TRIGGER AS $$
 BEGIN
     IF OLD.客户名称 IS DISTINCT FROM NEW.客户名称 THEN
-        UPDATE customer.fct_customer_product_line_monthly
+        UPDATE customer."客户业务月度快照"
         SET customer_name = NEW.客户名称,
             updated_at = CURRENT_TIMESTAMP
         WHERE company_id = NEW.company_id;
@@ -101,19 +142,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_sync_fct_pl_customer_name
-    ON customer."年金客户";
-
 CREATE TRIGGER trg_sync_fct_pl_customer_name
-    AFTER UPDATE OF 客户名称 ON customer."年金客户"
+    AFTER UPDATE OF 客户名称 ON customer."客户明细"
     FOR EACH ROW
     EXECUTE FUNCTION customer.sync_fct_pl_customer_name();
 
 -- ============================================================================
--- Part 6: Create fct_customer_plan_monthly Table
+-- Part 6: Create "客户计划月度快照" Table
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS customer.fct_customer_plan_monthly (
+CREATE TABLE IF NOT EXISTS customer."客户计划月度快照" (
     -- Composite primary key (Granularity: Customer + Plan + ProductLine)
     snapshot_month DATE NOT NULL,
     company_id VARCHAR NOT NULL,
@@ -140,7 +178,7 @@ CREATE TABLE IF NOT EXISTS customer.fct_customer_plan_monthly (
 
     -- Foreign key constraints
     CONSTRAINT fk_fct_plan_company FOREIGN KEY (company_id)
-        REFERENCES customer."年金客户"(company_id),
+        REFERENCES customer."客户明细"(company_id),
     CONSTRAINT fk_fct_plan_product_line FOREIGN KEY (product_line_code)
         REFERENCES mapping."产品线"(产品线代码)
 );
@@ -150,36 +188,43 @@ CREATE TABLE IF NOT EXISTS customer.fct_customer_plan_monthly (
 -- ============================================================================
 
 CREATE INDEX IF NOT EXISTS idx_fct_plan_snapshot_month
-    ON customer.fct_customer_plan_monthly(snapshot_month);
+    ON customer."客户计划月度快照"(snapshot_month);
 
 CREATE INDEX IF NOT EXISTS idx_fct_plan_company
-    ON customer.fct_customer_plan_monthly(company_id);
+    ON customer."客户计划月度快照"(company_id);
 
 CREATE INDEX IF NOT EXISTS idx_fct_plan_plan_code
-    ON customer.fct_customer_plan_monthly(plan_code);
+    ON customer."客户计划月度快照"(plan_code);
 
 CREATE INDEX IF NOT EXISTS idx_fct_plan_product_line
-    ON customer.fct_customer_plan_monthly(product_line_code);
+    ON customer."客户计划月度快照"(product_line_code);
 
 CREATE INDEX IF NOT EXISTS idx_fct_plan_month_brin
-    ON customer.fct_customer_plan_monthly
+    ON customer."客户计划月度快照"
     USING BRIN (snapshot_month);
 
 CREATE INDEX IF NOT EXISTS idx_fct_plan_churned
-    ON customer.fct_customer_plan_monthly(snapshot_month)
+    ON customer."客户计划月度快照"(snapshot_month)
     WHERE is_churned_this_year = TRUE;
 
 CREATE INDEX IF NOT EXISTS idx_fct_plan_customer_name
-    ON customer.fct_customer_plan_monthly(customer_name);
+    ON customer."客户计划月度快照"(customer_name);
 
 CREATE INDEX IF NOT EXISTS idx_fct_plan_plan_name
-    ON customer.fct_customer_plan_monthly(plan_name);
+    ON customer."客户计划月度快照"(plan_name);
 
 -- ============================================================================
 -- Part 8: Create Triggers for Plan Table
 -- ============================================================================
 
 -- updated_at trigger function
+DROP TRIGGER IF EXISTS update_fct_plan_monthly_timestamp
+    ON customer."客户计划月度快照";
+DROP TRIGGER IF EXISTS update_fct_plan_monthly_timestamp
+    ON customer."客户计划月度快照";
+DROP FUNCTION IF EXISTS customer.update_fct_plan_monthly_timestamp();
+DROP FUNCTION IF EXISTS customer.update_fct_plan_monthly_timestamp();
+
 CREATE OR REPLACE FUNCTION customer.update_fct_plan_monthly_timestamp()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -189,7 +234,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER update_fct_plan_monthly_timestamp
-    BEFORE UPDATE ON customer.fct_customer_plan_monthly
+    BEFORE UPDATE ON customer."客户计划月度快照"
     FOR EACH ROW
     EXECUTE FUNCTION customer.update_fct_plan_monthly_timestamp();
 
@@ -198,11 +243,18 @@ CREATE TRIGGER update_fct_plan_monthly_timestamp
 -- ============================================================================
 
 -- customer_name sync trigger
+DROP TRIGGER IF EXISTS trg_sync_fct_plan_customer_name
+    ON customer."客户明细";
+DROP TRIGGER IF EXISTS trg_sync_fct_plan_customer_name
+    ON customer."客户明细";
+DROP FUNCTION IF EXISTS customer.sync_fct_plan_customer_name();
+DROP FUNCTION IF EXISTS customer.sync_fct_plan_customer_name();
+
 CREATE OR REPLACE FUNCTION customer.sync_fct_plan_customer_name()
 RETURNS TRIGGER AS $$
 BEGIN
     IF OLD.客户名称 IS DISTINCT FROM NEW.客户名称 THEN
-        UPDATE customer.fct_customer_plan_monthly
+        UPDATE customer."客户计划月度快照"
         SET customer_name = NEW.客户名称,
             updated_at = CURRENT_TIMESTAMP
         WHERE company_id = NEW.company_id;
@@ -211,20 +263,24 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_sync_fct_plan_customer_name
-    ON customer."年金客户";
-
 CREATE TRIGGER trg_sync_fct_plan_customer_name
-    AFTER UPDATE OF 客户名称 ON customer."年金客户"
+    AFTER UPDATE OF 客户名称 ON customer."客户明细"
     FOR EACH ROW
     EXECUTE FUNCTION customer.sync_fct_plan_customer_name();
 
 -- plan_name sync trigger
+DROP TRIGGER IF EXISTS trg_sync_fct_plan_plan_name
+    ON mapping."年金计划";
+DROP TRIGGER IF EXISTS trg_sync_fct_plan_plan_name
+    ON mapping."年金计划";
+DROP FUNCTION IF EXISTS customer.sync_fct_plan_plan_name();
+DROP FUNCTION IF EXISTS customer.sync_fct_plan_plan_name();
+
 CREATE OR REPLACE FUNCTION customer.sync_fct_plan_plan_name()
 RETURNS TRIGGER AS $$
 BEGIN
     IF OLD.计划全称 IS DISTINCT FROM NEW.计划全称 THEN
-        UPDATE customer.fct_customer_plan_monthly
+        UPDATE customer."客户计划月度快照"
         SET plan_name = NEW.计划全称,
             updated_at = CURRENT_TIMESTAMP
         WHERE plan_code = NEW.年金计划号;
@@ -232,9 +288,6 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_sync_fct_plan_plan_name
-    ON mapping."年金计划";
 
 CREATE TRIGGER trg_sync_fct_plan_plan_name
     AFTER UPDATE OF 计划全称 ON mapping."年金计划"
@@ -245,7 +298,7 @@ CREATE TRIGGER trg_sync_fct_plan_plan_name
 -- Part 10: Backfill Plan Table from Existing Contract History
 -- ============================================================================
 
-INSERT INTO customer.fct_customer_plan_monthly (
+INSERT INTO customer."客户计划月度快照" (
     snapshot_month,
     company_id,
     plan_code,
@@ -268,7 +321,7 @@ SELECT
 
     -- Plan-level churn (matches plan_code)
     EXISTS (
-        SELECT 1 FROM customer.当年流失 l
+        SELECT 1 FROM customer."流失客户明细" l
         WHERE l.company_id = c.company_id
           AND l.年金计划号 = c.plan_code
           AND EXTRACT(YEAR FROM l.上报月份) = EXTRACT(YEAR FROM pl.snapshot_month)
@@ -279,8 +332,8 @@ SELECT
     -- Plan-level AUM
     COALESCE(SUM(s.期末资产规模), 0) as aum_balance
 
-FROM customer.fct_customer_product_line_monthly pl
-JOIN customer.customer_plan_contract c
+FROM customer."客户业务月度快照" pl
+JOIN customer."客户年金计划" c
   ON c.company_id = pl.company_id
  AND c.product_line_code = pl.product_line_code
  AND c.valid_from <= pl.snapshot_month
@@ -312,9 +365,9 @@ DO UPDATE SET
 -- Part 11: Backfill customer_name in ProductLine Table
 -- ============================================================================
 
-UPDATE customer.fct_customer_product_line_monthly f
+UPDATE customer."客户业务月度快照" f
 SET customer_name = c.客户名称
-FROM customer."年金客户" c
+FROM customer."客户明细" c
 WHERE f.company_id = c.company_id
   AND f.customer_name IS NULL;
 
@@ -326,6 +379,6 @@ COMMIT;
 -- SELECT table_name FROM information_schema.tables
 -- WHERE table_schema = 'customer' AND table_name LIKE 'fct_%';
 --
--- SELECT COUNT(*) FROM customer.fct_customer_product_line_monthly
+-- SELECT COUNT(*) FROM customer."客户业务月度快照"
 -- WHERE customer_name IS NULL;
 -- Expected: 0

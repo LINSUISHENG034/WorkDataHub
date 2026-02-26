@@ -6,8 +6,8 @@ AC-8: Verify product_line_name sync trigger propagates changes correctly
 
 Tests the trigger created in Migration 011 that syncs product_line_name
 from mapping."产品线" to denormalized columns in:
-- customer.customer_plan_contract
-- customer.fct_customer_product_line_monthly
+- customer."客户年金计划"
+- customer."客户业务月度快照"
 """
 
 from __future__ import annotations
@@ -28,10 +28,10 @@ class TestProductLineNameSyncTrigger:
     def test_trigger_propagates_name_change_to_contract_table(
         self, customer_mdm_test_db: str, test_period: str
     ):
-        """AC-8: Verify trigger updates customer_plan_contract.product_line_name.
+        """AC-8: Verify trigger updates 客户年金计划.product_line_name.
 
         When 产品线.产品线 is updated, the trigger should propagate
-        the new name to customer_plan_contract.
+        the new name to 客户年金计划.
         """
         _validate_test_database(customer_mdm_test_db)
 
@@ -49,7 +49,7 @@ class TestProductLineNameSyncTrigger:
                 text(
                     """
                     SELECT DISTINCT product_line_name
-                    FROM customer.customer_plan_contract
+                    FROM customer."客户年金计划"
                     WHERE product_line_code = 'PL202'
                     """
                 )
@@ -75,7 +75,7 @@ class TestProductLineNameSyncTrigger:
                 text(
                     """
                     SELECT DISTINCT product_line_name
-                    FROM customer.customer_plan_contract
+                    FROM customer."客户年金计划"
                     WHERE product_line_code = 'PL202'
                     """
                 )
@@ -99,7 +99,7 @@ class TestProductLineNameSyncTrigger:
     def test_trigger_propagates_name_change_to_snapshot_table(
         self, customer_mdm_test_db: str, test_period: str
     ):
-        """AC-8: Verify trigger updates fct_customer_product_line_monthly.product_line_name.
+        """AC-8: Verify trigger updates "客户业务月度快照".product_line_name.
 
         When 产品线.产品线 is updated, the trigger should propagate
         the new name to the monthly snapshot fact table.
@@ -124,7 +124,7 @@ class TestProductLineNameSyncTrigger:
                 text(
                     """
                     SELECT DISTINCT product_line_name
-                    FROM customer.fct_customer_product_line_monthly
+                    FROM customer."客户业务月度快照"
                     WHERE product_line_code = 'PL202'
                     """
                 )
@@ -148,7 +148,7 @@ class TestProductLineNameSyncTrigger:
                 text(
                     """
                     SELECT DISTINCT product_line_name
-                    FROM customer.fct_customer_product_line_monthly
+                    FROM customer."客户业务月度快照"
                     WHERE product_line_code = 'PL202'
                     """
                 )
@@ -193,7 +193,7 @@ class TestProductLineNameSyncTrigger:
                 text(
                     """
                     SELECT MAX(updated_at)
-                    FROM customer.customer_plan_contract
+                    FROM customer."客户年金计划"
                     WHERE product_line_code = 'PL202'
                     """
                 )
@@ -216,7 +216,7 @@ class TestProductLineNameSyncTrigger:
                 text(
                     """
                     SELECT MAX(updated_at)
-                    FROM customer.customer_plan_contract
+                    FROM customer."客户年金计划"
                     WHERE product_line_code = 'PL202'
                     """
                 )
@@ -240,15 +240,15 @@ class TestProductLineNameSyncTrigger:
 
 @pytest.mark.integration
 class TestPlanTableSyncTriggers:
-    """Tests for sync triggers on fct_customer_plan_monthly table (Story 7.6-16)."""
+    """Tests for sync triggers on "客户计划月度快照" table (Story 7.6-16)."""
 
     def test_customer_name_sync_to_plan_table(
         self, customer_mdm_test_db: str, test_period: str
     ):
         """Verify trg_sync_fct_plan_customer_name propagates customer name changes.
 
-        When 年金关联公司.客户名称 is updated, the trigger should propagate
-        the new name to fct_customer_plan_monthly.
+        When 客户明细.客户名称 is updated, the trigger should propagate
+        the new name to "客户计划月度快照".
         """
         _validate_test_database(customer_mdm_test_db)
 
@@ -270,7 +270,7 @@ class TestPlanTableSyncTriggers:
                 text(
                     """
                     SELECT DISTINCT customer_name
-                    FROM customer.fct_customer_plan_monthly
+                    FROM customer."客户计划月度快照"
                     WHERE company_id = 'TEST_C001'
                     """
                 )
@@ -281,7 +281,7 @@ class TestPlanTableSyncTriggers:
             conn.execute(
                 text(
                     """
-                    UPDATE customer."年金关联公司"
+                    UPDATE customer."客户明细"
                     SET "客户名称" = '测试客户A(改名)'
                     WHERE company_id = 'TEST_C001'
                     """
@@ -293,7 +293,7 @@ class TestPlanTableSyncTriggers:
                 text(
                     """
                     SELECT DISTINCT customer_name
-                    FROM customer.fct_customer_plan_monthly
+                    FROM customer."客户计划月度快照"
                     WHERE company_id = 'TEST_C001'
                     """
                 )
@@ -307,7 +307,7 @@ class TestPlanTableSyncTriggers:
             conn.execute(
                 text(
                     """
-                    UPDATE customer."年金关联公司"
+                    UPDATE customer."客户明细"
                     SET "客户名称" = '测试客户A'
                     WHERE company_id = 'TEST_C001'
                     """
@@ -320,7 +320,7 @@ class TestPlanTableSyncTriggers:
         """Verify trg_sync_fct_plan_plan_name propagates plan name changes.
 
         When 年金计划.计划全称 is updated, the trigger should propagate
-        the new name to fct_customer_plan_monthly.
+        the new name to "客户计划月度快照".
         """
         _validate_test_database(customer_mdm_test_db)
 
@@ -342,7 +342,7 @@ class TestPlanTableSyncTriggers:
                 text(
                     """
                     SELECT plan_code
-                    FROM customer.fct_customer_plan_monthly
+                    FROM customer."客户计划月度快照"
                     LIMIT 1
                     """
                 )
@@ -369,7 +369,7 @@ class TestPlanTableSyncTriggers:
                 text(
                     """
                     SELECT DISTINCT plan_name
-                    FROM customer.fct_customer_plan_monthly
+                    FROM customer."客户计划月度快照"
                     WHERE plan_code = :plan_code
                     """
                 ),

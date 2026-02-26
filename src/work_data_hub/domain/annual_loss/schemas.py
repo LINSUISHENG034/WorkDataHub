@@ -1,4 +1,4 @@
-"""Annual Loss (当年流失) domain - Pandera schemas.
+"""Annual Loss (流失客户明细) domain - Pandera schemas.
 
 DataFrame-level validation schemas for Bronze and Gold layers.
 """

@@ -68,7 +68,7 @@ def main():
     enrichment_file = OUTPUT_DIR / "enrichment_index.csv"
     enrichment_count = export_table_to_csv(enrichment_query, enrichment_file)
 
-    # Export base_info as 年金客户.csv (matching existing v001 naming)
+    # Export base_info as 客户明细.csv (matching existing v001 naming)
     base_info_query = """
         SELECT id, company_id, search_key_word, name, name_display, symbol,
                rank_score, country, company_en_name, smdb_code, is_hk,
@@ -82,12 +82,12 @@ def main():
         FROM enterprise.base_info
         ORDER BY id
     """
-    base_info_file = OUTPUT_DIR / "年金客户.csv"
+    base_info_file = OUTPUT_DIR / "客户明细.csv"
     base_info_count = export_table_to_csv(base_info_query, base_info_file)
 
     print("\nExport summary:")
     print(f"  enrichment_index.csv: {enrichment_count:,} rows")
-    print(f"  年金客户.csv: {base_info_count:,} rows")
+    print(f"  客户明细.csv: {base_info_count:,} rows")
     print(f"\nFiles saved to: {OUTPUT_DIR}")
 
 

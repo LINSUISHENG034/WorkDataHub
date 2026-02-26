@@ -153,13 +153,13 @@ domains:
             target: "机构"
             optional: true
 
-      # 年金关联公司 (Annuity Associated Company) reference table backfill
-      # Story 7.3-7: Add company_id → 年金关联公司 FK relationship (BF-001)
+      # 客户明细 (Customer Master) reference table backfill
+      # Story 7.3-7: Add company_id → 客户明细 FK relationship (BF-001)
       # Story 7.6: Table migrated from mapping to customer schema
       # Uses max_by aggregation (Story 6.2-P15) for 主拓机构代码/主拓机构
       - name: "fk_customer"
         source_column: "company_id"
-        target_table: "年金关联公司"
+        target_table: "客户明细"
         target_key: "company_id"
         target_schema: "customer"
         mode: "insert_missing"
@@ -316,12 +316,12 @@ domains:
             target: "机构"
             optional: true
 
-      # 年金关联公司 (Annuity Associated Company) reference table backfill
+      # 客户明细 (Customer Master) reference table backfill
       # NOTE: No max_by aggregation - 期末资产规模 not available in annuity_income
       # Story 7.6: Table migrated from mapping to customer schema
       - name: "fk_customer"
         source_column: "company_id"
-        target_table: "年金关联公司"
+        target_table: "客户明细"
         target_key: "company_id"
         target_schema: "customer"
         mode: "insert_missing"
@@ -390,14 +390,14 @@ domains:
               template: "新客*"
 
   # Annual Award Domain (当年中标)
-  # Story 7.6-17: FK backfill to 年金关联公司 table
+  # Story 7.6-17: FK backfill to 客户明细 table
   # Enhanced: Full column mapping with aggregations for multi-record scenarios
   annual_award:
     foreign_keys:
-      # 年金关联公司 (Annuity Associated Company) reference table backfill
+      # 客户明细 (Customer Master) reference table backfill
       - name: "fk_customer"
         source_column: "company_id"
-        target_table: "年金关联公司"
+        target_table: "客户明细"
         target_key: "company_id"
         target_schema: "customer"
         mode: "insert_missing"
@@ -478,14 +478,14 @@ domains:
               template: "中标客户"
 
   # Annual Loss Domain (当年流失)
-  # Story 7.6-17: FK backfill to 年金关联公司 table
+  # Story 7.6-17: FK backfill to 客户明细 table
   # Enhanced: Full column mapping with aggregations for multi-record scenarios
   annual_loss:
     foreign_keys:
-      # 年金关联公司 (Annuity Associated Company) reference table backfill
+      # 客户明细 (Customer Master) reference table backfill
       - name: "fk_customer"
         source_column: "company_id"
-        target_table: "年金关联公司"
+        target_table: "客户明细"
         target_key: "company_id"
         target_schema: "customer"
         mode: "insert_missing"

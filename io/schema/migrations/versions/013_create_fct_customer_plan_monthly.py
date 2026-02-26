@@ -1,10 +1,10 @@
-"""Create fct_customer_plan_monthly table for plan-level monthly snapshots.
+"""Create 客户计划月度快照 table for plan-level monthly snapshots.
 
 Story 7.6-16: Fact Table Refactoring (双表粒度分离)
 Task 2: Create Plan-level fact table
 
 Purpose: Track monthly snapshots of customer-plan status with churn tracking
-at plan granularity. Complements fct_customer_product_line_monthly which
+at plan granularity. Complements 客户业务月度快照 which
 tracks at ProductLine granularity.
 
 Granularity: Customer + Plan + Product Line
@@ -27,14 +27,14 @@ depends_on = None
 
 
 def upgrade() -> None:
-    """Create fct_customer_plan_monthly table with constraints and triggers."""
+    """Create 客户计划月度快照 table with constraints and triggers."""
     conn = op.get_bind()
 
     # 1. Create main table
     conn.execute(
         sa.text(
             """
-            CREATE TABLE IF NOT EXISTS customer.fct_customer_plan_monthly (
+            CREATE TABLE IF NOT EXISTS customer."客户计划月度快照" (
                 -- Composite primary key (Granularity: Customer + Plan + ProductLine)
                 snapshot_month DATE NOT NULL,
                 company_id VARCHAR NOT NULL,
@@ -61,7 +61,7 @@ def upgrade() -> None:
 
                 -- Foreign key constraints
                 CONSTRAINT fk_fct_plan_company FOREIGN KEY (company_id)
-                    REFERENCES customer."年金客户"(company_id),
+                    REFERENCES customer."客户明细"(company_id),
                 CONSTRAINT fk_fct_plan_product_line FOREIGN KEY (product_line_code)
                     REFERENCES mapping."产品线"(产品线代码)
             );
@@ -74,30 +74,30 @@ def upgrade() -> None:
         sa.text(
             """
             CREATE INDEX IF NOT EXISTS idx_fct_plan_snapshot_month
-                ON customer.fct_customer_plan_monthly(snapshot_month);
+                ON customer."客户计划月度快照"(snapshot_month);
 
             CREATE INDEX IF NOT EXISTS idx_fct_plan_company
-                ON customer.fct_customer_plan_monthly(company_id);
+                ON customer."客户计划月度快照"(company_id);
 
             CREATE INDEX IF NOT EXISTS idx_fct_plan_plan_code
-                ON customer.fct_customer_plan_monthly(plan_code);
+                ON customer."客户计划月度快照"(plan_code);
 
             CREATE INDEX IF NOT EXISTS idx_fct_plan_product_line
-                ON customer.fct_customer_plan_monthly(product_line_code);
+                ON customer."客户计划月度快照"(product_line_code);
 
             CREATE INDEX IF NOT EXISTS idx_fct_plan_month_brin
-                ON customer.fct_customer_plan_monthly
+                ON customer."客户计划月度快照"
                 USING BRIN (snapshot_month);
 
             CREATE INDEX IF NOT EXISTS idx_fct_plan_churned
-                ON customer.fct_customer_plan_monthly(snapshot_month)
+                ON customer."客户计划月度快照"(snapshot_month)
                 WHERE is_churned_this_year = TRUE;
 
             CREATE INDEX IF NOT EXISTS idx_fct_plan_customer_name
-                ON customer.fct_customer_plan_monthly(customer_name);
+                ON customer."客户计划月度快照"(customer_name);
 
             CREATE INDEX IF NOT EXISTS idx_fct_plan_plan_name
-                ON customer.fct_customer_plan_monthly(plan_name);
+                ON customer."客户计划月度快照"(plan_name);
             """
         )
     )
@@ -123,10 +123,10 @@ def upgrade() -> None:
         sa.text(
             """
             DROP TRIGGER IF EXISTS update_fct_plan_monthly_timestamp
-                ON customer.fct_customer_plan_monthly;
+                ON customer."客户计划月度快照";
 
             CREATE TRIGGER update_fct_plan_monthly_timestamp
-                BEFORE UPDATE ON customer.fct_customer_plan_monthly
+                BEFORE UPDATE ON customer."客户计划月度快照"
                 FOR EACH ROW
                 EXECUTE FUNCTION
                     customer.update_fct_plan_monthly_timestamp();
@@ -142,7 +142,7 @@ def upgrade() -> None:
             RETURNS TRIGGER AS $$
             BEGIN
                 IF OLD.客户名称 IS DISTINCT FROM NEW.客户名称 THEN
-                    UPDATE customer.fct_customer_plan_monthly
+                    UPDATE customer."客户计划月度快照"
                     SET customer_name = NEW.客户名称,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE company_id = NEW.company_id;
@@ -152,10 +152,10 @@ def upgrade() -> None:
             $$ LANGUAGE plpgsql;
 
             DROP TRIGGER IF EXISTS trg_sync_fct_plan_customer_name
-                ON customer."年金客户";
+                ON customer."客户明细";
 
             CREATE TRIGGER trg_sync_fct_plan_customer_name
-                AFTER UPDATE OF 客户名称 ON customer."年金客户"
+                AFTER UPDATE OF 客户名称 ON customer."客户明细"
                 FOR EACH ROW
                 EXECUTE FUNCTION customer.sync_fct_plan_customer_name();
             """
@@ -170,7 +170,7 @@ def upgrade() -> None:
             RETURNS TRIGGER AS $$
             BEGIN
                 IF OLD.计划全称 IS DISTINCT FROM NEW.计划全称 THEN
-                    UPDATE customer.fct_customer_plan_monthly
+                    UPDATE customer."客户计划月度快照"
                     SET plan_name = NEW.计划全称,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE plan_code = NEW.年金计划号;
@@ -192,7 +192,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Remove fct_customer_plan_monthly table and associated objects."""
+    """Remove 客户计划月度快照 table and associated objects."""
     conn = op.get_bind()
 
     # Drop sync triggers first
@@ -200,7 +200,7 @@ def downgrade() -> None:
         sa.text(
             """
             DROP TRIGGER IF EXISTS trg_sync_fct_plan_customer_name
-                ON customer."年金客户";
+                ON customer."客户明细";
             DROP TRIGGER IF EXISTS trg_sync_fct_plan_plan_name
                 ON mapping."年金计划";
             """
@@ -211,7 +211,7 @@ def downgrade() -> None:
     conn.execute(
         sa.text(
             """
-            DROP TABLE IF EXISTS customer.fct_customer_plan_monthly CASCADE;
+            DROP TABLE IF EXISTS customer."客户计划月度快照" CASCADE;
             """
         )
     )

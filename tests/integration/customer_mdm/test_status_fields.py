@@ -39,7 +39,7 @@ class TestIsStrategicField:
                     """
                     SELECT COUNT(*) as total,
                            SUM(CASE WHEN is_strategic THEN 1 ELSE 0 END) as strategic_count
-                    FROM customer.customer_plan_contract
+                    FROM customer."客户年金计划"
                     WHERE status_year = 2026
                     """
                 )
@@ -74,7 +74,7 @@ class TestIsExistingField:
                 text(
                     """
                     SELECT company_id, is_existing
-                    FROM customer.customer_plan_contract
+                    FROM customer."客户年金计划"
                     WHERE company_id IN ('TEST_C001', 'TEST_C002', 'TEST_C003')
                       AND status_year = 2026
                     ORDER BY company_id
@@ -111,7 +111,7 @@ class TestContractStatusV2:
                 text(
                     """
                     SELECT company_id, plan_code, contract_status
-                    FROM customer.customer_plan_contract
+                    FROM customer."客户年金计划"
                     WHERE company_id = 'TEST_C001'
                       AND status_year = 2026
                     ORDER BY plan_code
@@ -139,7 +139,7 @@ class TestContractStatusV2:
                 text(
                     """
                     SELECT contract_status
-                    FROM customer.customer_plan_contract
+                    FROM customer."客户年金计划"
                     WHERE company_id = 'TEST_C003'
                       AND status_year = 2026
                     """
@@ -178,7 +178,7 @@ class TestSCDType2Versioning:
             initial_count = conn.execute(
                 text(
                     """
-                    SELECT COUNT(*) FROM customer.customer_plan_contract
+                    SELECT COUNT(*) FROM customer."客户年金计划"
                     WHERE company_id LIKE 'TEST_%'
                     """
                 )
@@ -210,7 +210,7 @@ class TestSCDType2Versioning:
             historical_count = conn.execute(
                 text(
                     """
-                    SELECT COUNT(*) FROM customer.customer_plan_contract
+                    SELECT COUNT(*) FROM customer."客户年金计划"
                     WHERE company_id = 'TEST_C001' AND plan_code = 'P001'
                       AND valid_to != '9999-12-31'
                     """
@@ -239,7 +239,7 @@ class TestSCDType2Versioning:
             initial_count = conn.execute(
                 text(
                     """
-                    SELECT COUNT(*) FROM customer.customer_plan_contract
+                    SELECT COUNT(*) FROM customer."客户年金计划"
                     WHERE company_id LIKE 'TEST_%'
                       AND valid_to = '9999-12-31'
                     """
@@ -255,7 +255,7 @@ class TestSCDType2Versioning:
             final_count = conn.execute(
                 text(
                     """
-                    SELECT COUNT(*) FROM customer.customer_plan_contract
+                    SELECT COUNT(*) FROM customer."客户年金计划"
                     WHERE company_id LIKE 'TEST_%'
                       AND valid_to = '9999-12-31'
                     """
@@ -287,7 +287,7 @@ class TestSCDType2Versioning:
             current_records = conn.execute(
                 text(
                     """
-                    SELECT COUNT(*) FROM customer.customer_plan_contract
+                    SELECT COUNT(*) FROM customer."客户年金计划"
                     WHERE company_id LIKE 'TEST_%'
                       AND valid_to = '9999-12-31'
                     """
@@ -326,7 +326,7 @@ class TestSCDType2Versioning:
             final_count = conn.execute(
                 text(
                     """
-                    SELECT COUNT(*) FROM customer.customer_plan_contract
+                    SELECT COUNT(*) FROM customer."客户年金计划"
                     WHERE company_id LIKE 'TEST_%'
                     """
                 )

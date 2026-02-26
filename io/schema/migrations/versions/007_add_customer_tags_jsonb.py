@@ -1,4 +1,4 @@
-"""Add tags JSONB column to customer.年金客户 table.
+"""Add tags JSONB column to customer.客户明细 table.
 
 This migration adds a JSONB column for multi-dimensional customer tagging,
 migrates existing data from the VARCHAR 年金客户标签 column, and creates
@@ -7,7 +7,7 @@ a GIN index for efficient tag queries.
 Purpose: Enable multi-tag support for customer segmentation without schema
 changes. Supports queries like: WHERE tags @> '["VIP"]'
 
-Source table: customer.年金客户 (migrated from mapping schema in Story 7.6)
+Source table: customer.客户明细 (migrated from mapping schema in Story 7.6)
 
 Revision ID: 20260115_000007
 Revises: 20260115_000006
@@ -38,10 +38,10 @@ def upgrade() -> None:
                 IF NOT EXISTS (
                     SELECT 1 FROM information_schema.columns
                     WHERE table_schema = 'customer'
-                    AND table_name = '年金客户'
+                    AND table_name = '客户明细'
                     AND column_name = 'tags'
                 ) THEN
-                    ALTER TABLE customer."年金客户"
+                    ALTER TABLE customer."客户明细"
                     ADD COLUMN tags JSONB DEFAULT '[]'::jsonb;
                 END IF;
             END $$;
@@ -53,7 +53,7 @@ def upgrade() -> None:
     conn.execute(
         sa.text(
             """
-            UPDATE customer."年金客户"
+            UPDATE customer."客户明细"
             SET tags = CASE
                 WHEN "年金客户标签" IS NULL OR "年金客户标签" = '' THEN '[]'::jsonb
                 ELSE jsonb_build_array("年金客户标签")
@@ -66,8 +66,8 @@ def upgrade() -> None:
     conn.execute(
         sa.text(
             """
-            CREATE INDEX idx_年金客户_tags_gin
-            ON customer."年金客户" USING GIN (tags)
+            CREATE INDEX idx_customer_detail_tags_gin
+            ON customer."客户明细" USING GIN (tags)
             """
         )
     )
@@ -76,7 +76,7 @@ def upgrade() -> None:
     conn.execute(
         sa.text(
             """
-            COMMENT ON COLUMN customer."年金客户"."年金客户标签"
+            COMMENT ON COLUMN customer."客户明细"."年金客户标签"
             IS 'DEPRECATED: Use tags JSONB column instead'
             """
         )
@@ -96,7 +96,7 @@ def downgrade() -> None:
     conn.execute(
         sa.text(
             """
-            COMMENT ON COLUMN customer."年金客户"."年金客户标签" IS NULL
+            COMMENT ON COLUMN customer."客户明细"."年金客户标签" IS NULL
             """
         )
     )
@@ -105,7 +105,7 @@ def downgrade() -> None:
     conn.execute(
         sa.text(
             """
-            DROP INDEX IF EXISTS customer.idx_年金客户_tags_gin
+            DROP INDEX IF EXISTS customer.idx_customer_detail_tags_gin
             """
         )
     )
@@ -114,7 +114,7 @@ def downgrade() -> None:
     conn.execute(
         sa.text(
             """
-            ALTER TABLE customer."年金客户" DROP COLUMN IF EXISTS tags
+            ALTER TABLE customer."客户明细" DROP COLUMN IF EXISTS tags
             """
         )
     )

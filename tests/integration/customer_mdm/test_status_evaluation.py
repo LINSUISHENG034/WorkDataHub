@@ -29,14 +29,14 @@ class TestStatusEvaluatorSQLGeneration:
 
         # Original SQL pattern:
         # EXISTS (
-        #     SELECT 1 FROM customer.当年中标 w
+        #     SELECT 1 FROM customer."中标客户明细" w
         #     WHERE w.company_id = c.company_id
         #       AND w.产品线代码 = c.product_line_code
         #       AND EXTRACT(YEAR FROM w.上报月份) = %(snapshot_year)s
         # )
         assert "EXISTS" in sql
         assert "customer" in sql
-        assert "当年中标" in sql
+        assert "中标客户明细" in sql
         assert "company_id" in sql
         assert "产品线代码" in sql
         assert "EXTRACT(YEAR FROM" in sql
@@ -52,14 +52,14 @@ class TestStatusEvaluatorSQLGeneration:
 
         # Original SQL pattern:
         # EXISTS (
-        #     SELECT 1 FROM customer.当年流失 l
+        #     SELECT 1 FROM customer."流失客户明细" l
         #     WHERE l.company_id = c.company_id
         #       AND l.产品线代码 = c.product_line_code
         #       AND EXTRACT(YEAR FROM l.上报月份) = %(snapshot_year)s
         # )
         assert "EXISTS" in sql
         assert "customer" in sql
-        assert "当年流失" in sql
+        assert "流失客户明细" in sql
         assert "company_id" in sql
         assert "产品线代码" in sql
 
@@ -73,13 +73,13 @@ class TestStatusEvaluatorSQLGeneration:
 
         # Original SQL pattern:
         # EXISTS (
-        #     SELECT 1 FROM customer.当年流失 l
+        #     SELECT 1 FROM customer."流失客户明细" l
         #     WHERE l.company_id = c.company_id
         #       AND l.年金计划号 = c.plan_code
         #       AND EXTRACT(YEAR FROM l.上报月份) = %(snapshot_year)s
         # )
         assert "EXISTS" in sql
-        assert "当年流失" in sql
+        assert "流失客户明细" in sql
         assert "年金计划号" in sql
         assert "plan_code" in sql
 
@@ -93,7 +93,7 @@ class TestStatusEvaluatorSQLGeneration:
 
         # is_new = is_winning_this_year AND NOT BOOL_OR(is_existing)
         assert "EXISTS" in sql or "BOOL_OR" in sql
-        assert "is_existing" in sql or "当年中标" in sql
+        assert "is_existing" in sql or "中标客户明细" in sql
 
 
 class TestStatusEvaluatorConfigConsistency:
@@ -120,14 +120,14 @@ class TestStatusEvaluatorConfigConsistency:
 
     def test_source_tables_correctly_referenced(self, evaluator: StatusEvaluator):
         """Verify source tables are correctly referenced in SQL."""
-        # annual_award -> 当年中标
+        # annual_award -> 中标客户明细
         winning_sql = evaluator.generate_sql_fragment(
             "is_winning_this_year", "c", {"snapshot_year": 2026}
         )
-        assert "当年中标" in winning_sql
+        assert "中标客户明细" in winning_sql
 
-        # annual_loss -> 当年流失
+        # annual_loss -> 流失客户明细
         churned_sql = evaluator.generate_sql_fragment(
             "is_churned_this_year", "c", {"snapshot_year": 2026}
         )
-        assert "当年流失" in churned_sql
+        assert "流失客户明细" in churned_sql

@@ -341,19 +341,17 @@ class TestEnterpriseSchemaExists:
             "idx_enrichment_requests_normalized partial unique index should exist"
         )
 
-    def test_年金关联公司_table_exists(self, migrated_db: Engine):
-        """Verify 年金关联公司 table exists with correct structure (Story 7.2-2, 7.6-19)."""
+    def test_客户明细_table_exists(self, migrated_db: Engine):
+        """Verify 客户明细 table exists with correct structure (Story 7.2-2, 7.6-19)."""
         inspector = inspect(migrated_db)
         tables = inspector.get_table_names(schema="customer")
-        assert "年金关联公司" in tables, (
-            "年金关联公司 table should exist in customer schema"
-        )
+        assert "客户明细" in tables, "客户明细 table should exist in customer schema"
 
         columns = {
-            c["name"] for c in inspector.get_columns("年金关联公司", schema="customer")
+            c["name"] for c in inspector.get_columns("客户明细", schema="customer")
         }
 
-        # Expected 27 columns for 年金关联公司 table
+        # Expected 27 columns for 客户明细 table
         expected_columns = {
             "id",
             "客户名称",
@@ -371,11 +369,9 @@ class TestEnterpriseSchemaExists:
             "updated_at",
             # ... plus 13 more columns for total of 27
         }
-        assert len(columns) == 27, (
-            f"年金关联公司 expected 27 columns, got {len(columns)}"
-        )
+        assert len(columns) == 27, f"客户明细 expected 27 columns, got {len(columns)}"
         assert expected_columns.issubset(columns), (
-            f"年金关联公司 missing columns: {expected_columns - columns}"
+            f"客户明细 missing columns: {expected_columns - columns}"
         )
 
     def test_产品明细_table_exists(self, migrated_db: Engine):

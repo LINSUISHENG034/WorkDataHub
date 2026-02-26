@@ -1,4 +1,4 @@
-"""Annual Award (当年中标) domain - Constants.
+"""Annual Award (中标客户明细) domain - Constants.
 
 Mappings and configuration for annual award data processing.
 Uses shared mappings from infrastructure for consistency with other domains.

@@ -3,7 +3,7 @@
 Story 7.6-6: Contract Status Sync (Post-ETL Hook)
 Story 7.6-11: Customer Status Field Enhancement
 
-Populates customer.customer_plan_contract table from business.规模明细
+Populates customer."客户年金计划" table from business.规模明细
 with SCD Type 2 history support.
 
 Contract Status Logic (v2 - Story 7.6-11):
@@ -171,7 +171,7 @@ def sync_contract_status(
     dry_run: bool = False,
 ) -> dict[str, int]:
     """Synchronize contract status from business.规模明细 to
-    customer.customer_plan_contract.
+    customer."客户年金计划".
 
     Story 7.6-12: Implements proper SCD Type 2 versioning:
     - Step 1: Close old records when status changes (UPDATE valid_to)

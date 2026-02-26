@@ -52,7 +52,7 @@ class TestAnnualCutoverIntegration:
                 text(
                     """
                     SELECT COUNT(*)
-                    FROM customer.customer_plan_contract
+                    FROM customer."客户年金计划"
                     WHERE EXTRACT(DAY FROM valid_from) = 1
                       AND EXTRACT(MONTH FROM valid_from) = 1
                       AND EXTRACT(YEAR FROM valid_from) = 2026

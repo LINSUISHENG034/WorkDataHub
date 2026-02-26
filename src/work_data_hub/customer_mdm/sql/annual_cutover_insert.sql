@@ -62,11 +62,11 @@ closed_records AS (
         customer_name,
         plan_name,
         product_line_name
-    FROM customer.customer_plan_contract
+    FROM customer."客户年金计划"
     WHERE valid_to = %s::date
     ORDER BY company_id, plan_code, product_line_code, valid_from DESC
 )
-INSERT INTO customer.customer_plan_contract (
+INSERT INTO customer."客户年金计划" (
     company_id,
     plan_code,
     product_line_code,
@@ -99,7 +99,7 @@ SELECT
     CURRENT_TIMESTAMP as updated_at
 FROM prior_year_dec pyd
 LEFT JOIN mapping."产品线" p ON pyd.product_line_code = p.产品线代码
-LEFT JOIN customer."年金关联公司" cust ON pyd.company_id = cust.company_id
+LEFT JOIN customer."客户明细" cust ON pyd.company_id = cust.company_id
 LEFT JOIN mapping."年金计划" plan ON pyd.plan_code = plan.年金计划号
 LEFT JOIN strategic_whitelist sw
     ON pyd.company_id = sw.company_id

@@ -1,4 +1,4 @@
-"""Annual Loss (当年流失) domain - Business Service Layer.
+"""Annual Loss (流失客户明细) domain - Business Service Layer.
 
 Main entry point for processing annual loss data.
 Unifies TrusteeLossCleaner and InvesteeLossCleaner from legacy system.
@@ -60,7 +60,7 @@ def process_annual_loss(
     refresh_keys: Optional[List[str]] = None,
     is_validation_mode: bool = True,
 ) -> DomainPipelineResult:
-    """Process Annual Loss (当年流失) domain data.
+    """Process Annual Loss (流失客户明细) domain data.
 
     Service API Contract:
     ---------------------
@@ -88,7 +88,7 @@ def process_annual_loss(
             is_validation_mode=is_validation_mode,
         )
         if table_name is None:
-            table_name = config_table or "当年流失"
+            table_name = config_table or "流失客户明细"
         if schema is None:
             schema = config_schema or "customer"
 

@@ -23,14 +23,14 @@ from tests.integration.customer_mdm.conftest import use_test_database
 class TestCustomerMdmEndToEnd:
     """End-to-end tests for Customer MDM pipeline data flow."""
 
-    def test_contract_sync_populates_customer_plan_contract(
+    def test_contract_sync_populates_客户年金计划(
         self, customer_mdm_test_db: str, test_period: str
     ):
         """AC-1: Verify contract sync creates records from 规模明细.
 
         Tests that sync_contract_status():
         - Reads from business.规模明细
-        - Inserts into customer.customer_plan_contract
+        - Inserts into customer."客户年金计划"
         - Uses correct contract status logic (AUM > 0 → 正常)
         """
         _validate_test_database(customer_mdm_test_db)
@@ -52,7 +52,7 @@ class TestCustomerMdmEndToEnd:
                 text(
                     """
                     SELECT company_id, COUNT(*) as contract_count
-                    FROM customer.customer_plan_contract
+                    FROM customer."客户年金计划"
                     WHERE company_id LIKE 'TEST_%'
                     GROUP BY company_id
                     ORDER BY company_id
@@ -71,7 +71,7 @@ class TestCustomerMdmEndToEnd:
                 text(
                     """
                     SELECT company_id, contract_status
-                    FROM customer.customer_plan_contract
+                    FROM customer."客户年金计划"
                     WHERE company_id IN ('TEST_C001', 'TEST_C003')
                     ORDER BY company_id
                     """
@@ -93,7 +93,7 @@ class TestCustomerMdmEndToEnd:
         """AC-1: Verify snapshot refresh aggregates contract data.
 
         Tests that refresh_monthly_snapshot():
-        - Reads from customer.customer_plan_contract
+        - Reads from customer."客户年金计划"
         - Aggregates to (company_id, product_line_code) level
         - Calculates AUM from business.规模明细
         """
@@ -130,7 +130,7 @@ class TestCustomerMdmEndToEnd:
                         product_line_code,
                         plan_count,
                         aum_balance
-                    FROM customer.fct_customer_product_line_monthly
+                    FROM customer."客户业务月度快照"
                     WHERE company_id = 'TEST_C004'
                     """
                 )
@@ -147,7 +147,7 @@ class TestCustomerMdmEndToEnd:
                 text(
                     """
                     SELECT plan_code, aum_balance
-                    FROM customer.fct_customer_plan_monthly
+                    FROM customer."客户计划月度快照"
                     WHERE company_id = 'TEST_C004'
                       AND snapshot_month = :snapshot_month
                     ORDER BY plan_code
@@ -286,7 +286,7 @@ class TestSnapshotRefreshIdempotency:
                 text(
                     """
                     SELECT COUNT(*)
-                    FROM customer.fct_customer_product_line_monthly
+                    FROM customer."客户业务月度快照"
                     """
                 )
             )

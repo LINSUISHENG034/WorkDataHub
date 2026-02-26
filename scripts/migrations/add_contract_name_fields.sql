@@ -1,4 +1,4 @@
--- Add customer_name and plan_name fields to customer.customer_plan_contract
+-- Add customer_name and plan_name fields to customer."客户年金计划"
 -- Story 7.6-13: Name Fields Enhancement
 -- Date: 2026-02-05
 --
@@ -8,25 +8,25 @@
 BEGIN;
 
 -- 1. Add new columns
-ALTER TABLE customer.customer_plan_contract
+ALTER TABLE customer."客户年金计划"
     ADD COLUMN IF NOT EXISTS customer_name VARCHAR(200),
     ADD COLUMN IF NOT EXISTS plan_name VARCHAR(200);
 
 -- 2. Create indexes for new columns
 CREATE INDEX IF NOT EXISTS idx_contract_customer_name
-    ON customer.customer_plan_contract(customer_name);
+    ON customer."客户年金计划"(customer_name);
 
 CREATE INDEX IF NOT EXISTS idx_contract_plan_name
-    ON customer.customer_plan_contract(plan_name);
+    ON customer."客户年金计划"(plan_name);
 
 -- 3. Backfill existing data
-UPDATE customer.customer_plan_contract cpc
+UPDATE customer."客户年金计划" cpc
 SET customer_name = c.客户名称
-FROM customer."年金客户" c
+FROM customer."客户明细" c
 WHERE cpc.company_id = c.company_id
   AND cpc.customer_name IS NULL;
 
-UPDATE customer.customer_plan_contract cpc
+UPDATE customer."客户年金计划" cpc
 SET plan_name = p.计划全称
 FROM mapping."年金计划" p
 WHERE cpc.plan_code = p.年金计划号
@@ -37,7 +37,7 @@ CREATE OR REPLACE FUNCTION customer.sync_contract_customer_name()
 RETURNS TRIGGER AS $$
 BEGIN
     IF OLD.客户名称 IS DISTINCT FROM NEW.客户名称 THEN
-        UPDATE customer.customer_plan_contract
+        UPDATE customer."客户年金计划"
         SET customer_name = NEW.客户名称,
             updated_at = CURRENT_TIMESTAMP
         WHERE company_id = NEW.company_id;
@@ -47,10 +47,12 @@ END;
 $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trg_sync_contract_customer_name
-    ON customer."年金客户";
+    ON customer."客户明细";
+DROP TRIGGER IF EXISTS trg_sync_contract_customer_name
+    ON customer."客户明细";
 
 CREATE TRIGGER trg_sync_contract_customer_name
-    AFTER UPDATE OF 客户名称 ON customer."年金客户"
+    AFTER UPDATE OF 客户名称 ON customer."客户明细"
     FOR EACH ROW
     EXECUTE FUNCTION customer.sync_contract_customer_name();
 
@@ -59,7 +61,7 @@ CREATE OR REPLACE FUNCTION customer.sync_contract_plan_name()
 RETURNS TRIGGER AS $$
 BEGIN
     IF OLD.计划全称 IS DISTINCT FROM NEW.计划全称 THEN
-        UPDATE customer.customer_plan_contract
+        UPDATE customer."客户年金计划"
         SET plan_name = NEW.计划全称,
             updated_at = CURRENT_TIMESTAMP
         WHERE plan_code = NEW.年金计划号;
@@ -68,6 +70,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_sync_contract_plan_name
+    ON mapping."年金计划";
 DROP TRIGGER IF EXISTS trg_sync_contract_plan_name
     ON mapping."年金计划";
 
@@ -82,16 +86,16 @@ COMMIT;
 SELECT
     'Total records' as metric,
     COUNT(*)::text as value
-FROM customer.customer_plan_contract
+FROM customer."客户年金计划"
 UNION ALL
 SELECT
     'Records with customer_name',
     COUNT(*)::text
-FROM customer.customer_plan_contract
+FROM customer."客户年金计划"
 WHERE customer_name IS NOT NULL
 UNION ALL
 SELECT
     'Records with plan_name',
     COUNT(*)::text
-FROM customer.customer_plan_contract
+FROM customer."客户年金计划"
 WHERE plan_name IS NOT NULL;

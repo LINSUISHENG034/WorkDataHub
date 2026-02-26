@@ -7,8 +7,8 @@ Purpose: Enable BI Analysts to quickly analyze award/loss patterns across
 different product lines without writing complex SQL joins.
 
 Source tables:
-- customer.当年中标 (awards)
-- customer.当年流失 (losses)
+- customer.中标客户明细 (awards)
+- customer.流失客户明细 (losses)
 
 Revision ID: 20260115_000006
 Revises: 20260115_000005
@@ -47,10 +47,10 @@ def upgrade() -> None:
         CREATE VIEW customer.v_customer_business_monthly_status_by_type AS
         WITH combined AS (
             SELECT "上报月份", "业务类型", company_id, 'award' AS record_type
-            FROM customer."当年中标"
+            FROM customer."中标客户明细"
             UNION ALL
             SELECT "上报月份", "业务类型", company_id, 'loss' AS record_type
-            FROM customer."当年流失"
+            FROM customer."流失客户明细"
         )
         SELECT
             "上报月份",

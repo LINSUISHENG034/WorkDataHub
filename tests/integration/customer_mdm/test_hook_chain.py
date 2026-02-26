@@ -180,10 +180,10 @@ class TestHookIdempotency:
         engine = create_engine(customer_mdm_test_db)
         with engine.connect() as conn:
             contract_count_1 = conn.execute(
-                text("SELECT COUNT(*) FROM customer.customer_plan_contract")
+                text('SELECT COUNT(*) FROM customer."客户年金计划"')
             ).scalar()
             snapshot_count_1 = conn.execute(
-                text("SELECT COUNT(*) FROM customer.fct_customer_product_line_monthly")
+                text('SELECT COUNT(*) FROM customer."客户业务月度快照"')
             ).scalar()
 
         # Second execution (should be idempotent)
@@ -192,10 +192,10 @@ class TestHookIdempotency:
         # Capture state after second run
         with engine.connect() as conn:
             contract_count_2 = conn.execute(
-                text("SELECT COUNT(*) FROM customer.customer_plan_contract")
+                text('SELECT COUNT(*) FROM customer."客户年金计划"')
             ).scalar()
             snapshot_count_2 = conn.execute(
-                text("SELECT COUNT(*) FROM customer.fct_customer_product_line_monthly")
+                text('SELECT COUNT(*) FROM customer."客户业务月度快照"')
             ).scalar()
 
         # Counts should be identical (idempotent)
