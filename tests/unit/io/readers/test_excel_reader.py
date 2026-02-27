@@ -1,12 +1,10 @@
-"""Unit tests for ExcelReader.read_sheet() method (Story 3.3).
+"""Unit tests for ExcelReader (Story 3.3).
 
-This module tests the new read_sheet functionality including:
-- Sheet selection by name and index
-- Chinese character preservation
-- Error handling for missing sheets
-- Empty row handling with logging
-- Merged cell handling
-- ExcelReadResult metadata accuracy
+This module tests:
+- read_sheet() functionality (sheet selection, Chinese chars, error handling, metadata)
+- read_rows() legacy API (max_rows, headers, NaN handling, string cleaning)
+- read_excel_rows() convenience function
+- get_sheet_names() and validate_file() utilities
 """
 
 from datetime import datetime
@@ -14,7 +12,14 @@ from pathlib import Path
 import pytest
 import pandas as pd
 
-from work_data_hub.io.readers.excel_reader import ExcelReader, ExcelReadResult
+from unittest.mock import patch
+
+from work_data_hub.io.readers.excel_reader import (
+    ExcelReader,
+    ExcelReadResult,
+    ExcelReadError,
+    read_excel_rows,
+)
 from work_data_hub.io.connectors.exceptions import DiscoveryError
 
 
@@ -371,3 +376,217 @@ class TestExcelReadSheetMethod:
         assert result.normalization_duration_ms is None
         assert result.duration_breakdown is not None
         assert "normalization_ms" not in result.duration_breakdown
+
+
+# ============================================================================
+# Legacy read_rows() API Tests
+# (Merged from tests/io/test_excel_reader.py)
+# ============================================================================
+
+
+@pytest.fixture
+def sample_excel_data():
+    """Sample Excel data for testing."""
+    return pd.DataFrame(
+        {
+            "年": ["2024", "2024", "2023"],
+            "月": ["11", "10", "12"],
+            "计划代码": ["PLAN001", "PLAN002", "PLAN003"],
+            "收益率": ["5.5%", "3.2%", "4.1%"],
+            "净值": [1.055, 1.032, 1.041],
+        }
+    )
+
+
+@pytest.fixture
+def temp_excel_file(tmp_path, sample_excel_data):
+    """Create a temporary Excel file for testing."""
+    file_path = tmp_path / "test_file.xlsx"
+    sample_excel_data.to_excel(file_path, index=False, engine="openpyxl")
+    return str(file_path)
+
+
+@pytest.fixture
+def empty_excel_file(tmp_path):
+    """Create an empty Excel file for testing."""
+    file_path = tmp_path / "empty_file.xlsx"
+    empty_df = pd.DataFrame()
+    empty_df.to_excel(file_path, index=False, engine="openpyxl")
+    return str(file_path)
+
+
+@pytest.fixture
+def multi_sheet_file(tmp_path, sample_excel_data):
+    """Create Excel file with multiple sheets."""
+    file_path = tmp_path / "multi_sheet.xlsx"
+    with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
+        sample_excel_data.to_excel(writer, sheet_name="Sheet1", index=False)
+        sample_excel_data.to_excel(writer, sheet_name="Data", index=False)
+    return str(file_path)
+
+
+class TestExcelReaderLegacyAPI:
+    """Test ExcelReader.read_rows() legacy API."""
+
+    @pytest.mark.unit
+    def test_init_default(self):
+        """Test ExcelReader initialization with defaults."""
+        reader = ExcelReader()
+        assert reader.max_rows is None
+
+    @pytest.mark.unit
+    def test_init_with_max_rows(self):
+        """Test ExcelReader initialization with max_rows parameter."""
+        reader = ExcelReader(max_rows=100)
+        assert reader.max_rows == 100
+
+    @pytest.mark.unit
+    def test_read_rows_success(self, temp_excel_file):
+        """Test successful reading of Excel rows."""
+        reader = ExcelReader()
+        rows = reader.read_rows(temp_excel_file)
+
+        assert len(rows) == 3
+        assert isinstance(rows, list)
+        assert all(isinstance(row, dict) for row in rows)
+
+        first_row = rows[0]
+        assert first_row["年"] == "2024"
+        assert first_row["月"] == "11"
+        assert first_row["计划代码"] == "PLAN001"
+        assert first_row["收益率"] == "5.5%"
+
+    @pytest.mark.unit
+    def test_read_rows_with_max_rows(self, temp_excel_file):
+        """Test reading with max_rows limit."""
+        reader = ExcelReader(max_rows=2)
+        rows = reader.read_rows(temp_excel_file)
+        assert len(rows) == 2
+
+    @pytest.mark.unit
+    def test_read_rows_specific_sheet_by_index(self, multi_sheet_file):
+        """Test reading from specific sheet by index."""
+        reader = ExcelReader()
+        rows = reader.read_rows(multi_sheet_file, sheet=1)
+        assert len(rows) == 3
+        assert isinstance(rows[0], dict)
+
+    @pytest.mark.unit
+    def test_read_rows_specific_sheet_by_name(self, multi_sheet_file):
+        """Test reading from specific sheet by name."""
+        reader = ExcelReader()
+        rows = reader.read_rows(multi_sheet_file, sheet="Data")
+        assert len(rows) == 3
+        assert isinstance(rows[0], dict)
+
+    @pytest.mark.unit
+    def test_read_rows_with_header_parameter(self, temp_excel_file):
+        """Test reading with custom header parameter."""
+        reader = ExcelReader()
+        rows = reader.read_rows(temp_excel_file, header=None)
+        assert len(rows) == 4  # 3 data rows + 1 header row
+        first_row = rows[0]
+        assert "0" in first_row  # Columns numbered when header=None
+
+    @pytest.mark.unit
+    def test_read_rows_with_skip_rows(self, temp_excel_file):
+        """Test reading with skip_rows parameter."""
+        reader = ExcelReader()
+        rows = reader.read_rows(temp_excel_file, skip_rows=1)
+        assert len(rows) == 2
+
+    @pytest.mark.unit
+    def test_read_rows_nonexistent_file(self):
+        """Test reading from non-existent file."""
+        reader = ExcelReader()
+        with pytest.raises(FileNotFoundError):
+            reader.read_rows("/nonexistent/file.xlsx")
+
+    @pytest.mark.unit
+    def test_read_rows_empty_file(self, tmp_path):
+        """Test reading completely empty file."""
+        empty_file = tmp_path / "empty.xlsx"
+        empty_file.write_text("")
+        reader = ExcelReader()
+        with pytest.raises(ExcelReadError, match="Excel file is empty"):
+            reader.read_rows(str(empty_file))
+
+    @pytest.mark.unit
+    def test_read_rows_invalid_sheet_name(self, temp_excel_file):
+        """Test reading from non-existent sheet name."""
+        reader = ExcelReader()
+        with pytest.raises(ExcelReadError, match="Sheet.*not found"):
+            reader.read_rows(temp_excel_file, sheet="NonExistentSheet")
+
+    @pytest.mark.unit
+    def test_read_rows_invalid_sheet_index(self, temp_excel_file):
+        """Test reading from invalid sheet index."""
+        reader = ExcelReader()
+        with pytest.raises(ExcelReadError, match="Sheet.*not found"):
+            reader.read_rows(temp_excel_file, sheet=99)
+
+    @pytest.mark.unit
+    def test_read_rows_corrupted_file(self, tmp_path):
+        """Test reading corrupted Excel file."""
+        bad_file = tmp_path / "corrupted.xlsx"
+        bad_file.write_text("This is not an Excel file")
+        reader = ExcelReader()
+        with pytest.raises(ExcelReadError, match="Failed to parse Excel file"):
+            reader.read_rows(str(bad_file))
+
+    @pytest.mark.unit
+    def test_read_rows_empty_dataframe(self, empty_excel_file):
+        """Test reading Excel file with empty dataframe."""
+        reader = ExcelReader()
+        rows = reader.read_rows(empty_excel_file)
+        assert rows == []
+
+
+class TestExcelReaderUtilities:
+    """Test get_sheet_names() and validate_file() utilities."""
+
+    @pytest.mark.unit
+    def test_get_sheet_names_success(self, multi_sheet_file):
+        """Test getting sheet names from Excel file."""
+        reader = ExcelReader()
+        sheet_names = reader.get_sheet_names(multi_sheet_file)
+        assert isinstance(sheet_names, list)
+        assert "Sheet1" in sheet_names
+        assert "Data" in sheet_names
+        assert len(sheet_names) == 2
+
+    @pytest.mark.unit
+    def test_get_sheet_names_nonexistent_file(self):
+        """Test getting sheet names from non-existent file."""
+        reader = ExcelReader()
+        with pytest.raises(FileNotFoundError):
+            reader.get_sheet_names("/nonexistent/file.xlsx")
+
+    @pytest.mark.unit
+    def test_get_sheet_names_invalid_file(self, tmp_path):
+        """Test getting sheet names from invalid file."""
+        bad_file = tmp_path / "not_excel.xlsx"
+        bad_file.write_text("not an excel file")
+        reader = ExcelReader()
+        with pytest.raises(ExcelReadError, match="Cannot read sheet names"):
+            reader.get_sheet_names(str(bad_file))
+
+    @pytest.mark.unit
+    def test_validate_file_success(self, temp_excel_file):
+        """Test file validation with valid file."""
+        reader = ExcelReader()
+        assert reader.validate_file(temp_excel_file) is True
+
+    @pytest.mark.unit
+    def test_validate_file_nonexistent(self):
+        """Test file validation with non-existent file."""
+        reader = ExcelReader()
+        assert reader.validate_file("/nonexistent/file.xlsx") is False
+
+    @pytest.mark.unit
+    def test_validate_file_invalid(self, tmp_path):
+        """Test file validation with invalid file."""
+        bad_file = tmp_path / "invalid.xlsx"
+        bad_file.write_text("not excel")
+        reader = ExcelReader()
+        assert reader.validate_file(str(bad_file)) is False
