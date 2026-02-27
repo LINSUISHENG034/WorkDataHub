@@ -23,7 +23,9 @@ def test_core_tables_exist(test_db_with_migrations: str) -> None:
             text("SELECT version_num FROM alembic_version")
         ).scalar_one()
         # Updated to latest migration revision (includes upsert constraints)
-        assert revision == "20251228_000003"  # 003_seed_static_data (head of new chain)
+        assert (
+            revision == "20260209_000011"
+        )  # 011_create_fct_customer_plan_monthly (head after consolidation)
 
 
 @pytest.mark.integration

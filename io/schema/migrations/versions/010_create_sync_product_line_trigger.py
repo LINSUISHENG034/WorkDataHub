@@ -10,8 +10,8 @@ Target Tables:
 - customer."客户年金计划".product_line_name
 - customer."客户业务月度快照".product_line_name
 
-Revision ID: 20260129_000011
-Revises: 20260129_000010
+Revision ID: 20260129_000010
+Revises: 20260129_000009
 Create Date: 2026-01-29
 """
 
@@ -20,8 +20,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "20260129_000011"
-down_revision = "20260129_000010"
+revision = "20260129_000010"
+down_revision = "20260129_000009"
 branch_labels = None
 depends_on = None
 
@@ -40,7 +40,7 @@ def upgrade() -> None:
                 v_contract_count INTEGER;
                 v_snapshot_count INTEGER;
             BEGIN
-                -- Sync to customer."客户年金计划" (use IS DISTINCT FROM for NULL safety)
+                -- Sync 客户年金计划 (IS DISTINCT FROM for NULL safety)
                 UPDATE customer."客户年金计划"
                 SET product_line_name = NEW."产品线",
                     updated_at = CURRENT_TIMESTAMP

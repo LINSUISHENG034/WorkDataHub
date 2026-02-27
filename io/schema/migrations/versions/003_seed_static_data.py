@@ -379,6 +379,24 @@ def upgrade() -> None:
         count = _load_csv_seed_data(conn, "客户明细.csv", "客户明细", "customer")
         print(f"Seeded {count} rows into customer.客户明细")
 
+        # Migrate 年金客户标签 → tags JSONB (consolidated from 007)
+        conn.execute(
+            sa.text("""
+            UPDATE customer."客户明细"
+            SET tags = CASE
+                WHEN "年金客户标签" IS NULL OR "年金客户标签" = '' THEN '[]'::jsonb
+                ELSE jsonb_build_array("年金客户标签")
+            END
+        """)
+        )
+        conn.execute(
+            sa.text("""
+            COMMENT ON COLUMN customer."客户明细"."年金客户标签"
+            IS 'DEPRECATED: Use tags JSONB column instead'
+        """)
+        )
+        print("  Migrated 年金客户标签 → tags JSONB")
+
     # === 9. 年金计划 (1,128 rows - base table, company_id NOT LIKE 'IN%') ===
     if _table_exists(conn, "年金计划", "mapping"):
         count = _load_csv_seed_data(conn, "年金计划.csv", "年金计划", "mapping")

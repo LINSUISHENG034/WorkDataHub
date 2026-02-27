@@ -351,7 +351,7 @@ class TestEnterpriseSchemaExists:
             c["name"] for c in inspector.get_columns("客户明细", schema="customer")
         }
 
-        # Expected 27 columns for 客户明细 table
+        # Expected 28 columns for 客户明细 table (includes tags JSONB)
         expected_columns = {
             "id",
             "客户名称",
@@ -367,11 +367,19 @@ class TestEnterpriseSchemaExists:
             "备注",
             "created_at",
             "updated_at",
-            # ... plus 13 more columns for total of 27
+            "tags",
+            # ... plus 13 more columns for total of 28
         }
-        assert len(columns) == 27, f"客户明细 expected 27 columns, got {len(columns)}"
+        assert len(columns) == 28, f"客户明细 expected 28 columns, got {len(columns)}"
         assert expected_columns.issubset(columns), (
             f"客户明细 missing columns: {expected_columns - columns}"
+        )
+
+        # Verify GIN index for tags JSONB (consolidated from 007)
+        indexes = inspector.get_indexes("客户明细", schema="customer")
+        index_names = [idx["name"] for idx in indexes]
+        assert "idx_customer_detail_tags_gin" in index_names, (
+            "idx_customer_detail_tags_gin GIN index should exist"
         )
 
     def test_产品明细_table_exists(self, migrated_db: Engine):
@@ -433,6 +441,37 @@ class TestEnterpriseSchemaExists:
             assert row_count == 12, (
                 f"利润指标 expected 12 seed data rows, got {row_count}"
             )
+
+    def test_客户年金计划_unique_constraint(self, migrated_db: Engine):
+        """Verify uq_contract_version uses valid_from (not valid_to) for SCD Type 2."""
+        inspector = inspect(migrated_db)
+        constraints = inspector.get_unique_constraints(
+            "客户年金计划", schema="customer"
+        )
+        uq = {c["name"]: c["column_names"] for c in constraints}
+        assert "uq_contract_version" in uq, (
+            "uq_contract_version constraint should exist"
+        )
+        assert uq["uq_contract_version"] == [
+            "company_id",
+            "plan_code",
+            "product_line_code",
+            "valid_from",
+        ], "SCD Type 2 constraint should use valid_from, not valid_to"
+
+    def test_客户明细_tags_data_migration(self, migrated_db: Engine):
+        """Verify 年金客户标签 → tags JSONB migration in 003 (consolidated from 007)."""
+        with migrated_db.connect() as conn:
+            result = conn.execute(
+                text("""
+                SELECT COUNT(*) FILTER (WHERE tags != '[]'::jsonb) AS has_tags,
+                       COUNT(*) FILTER (WHERE tags = '[]'::jsonb) AS empty_tags
+                FROM customer."客户明细"
+            """)
+            )
+            row = result.one()
+            # Seed data with non-empty 年金客户标签 should have been migrated
+            assert row.has_tags > 0, "tags migration should populate from 年金客户标签"
 
 
 class TestMigrationIdempotency:

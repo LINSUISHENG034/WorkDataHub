@@ -13,8 +13,8 @@ Purpose: Track monthly snapshots of customer business status with AUM,
 Granularity: Customer + Product Line
 Source: docs/specific/customer-mdm/customer-monthly-snapshot-specification.md
 
-Revision ID: 20260121_000009
-Revises: 20260118_000008
+Revision ID: 20260121_000008
+Revises: 20260118_000007
 Create Date: 2026-01-21
 Updated: 2026-02-09 (Story 7.6-16)
 """
@@ -24,8 +24,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "20260121_000009"
-down_revision = "20260118_000008"
+revision = "20260121_000008"
+down_revision = "20260118_000007"
 branch_labels = None
 depends_on = None
 

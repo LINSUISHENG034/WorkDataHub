@@ -178,6 +178,52 @@ def pytest_collection_modifyitems(
             continue
 
 
+def _cleanup_orphaned_test_databases() -> None:
+    """Drop any leftover wdh_test_* databases from previous interrupted test runs."""
+    database_url = os.environ.get("DATABASE_URL") or os.environ.get(
+        "WDH_TEST_DATABASE_URI"
+    )
+    if not database_url or not database_url.startswith("postgres"):
+        return
+
+    parsed = urlparse(database_url)
+    admin_dsn = urlunparse(parsed._replace(path="/postgres"))
+
+    try:
+        conn = psycopg2.connect(admin_dsn)
+        conn.autocommit = True
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT datname FROM pg_database WHERE datname LIKE 'wdh_test_%'"
+            )
+            orphaned = [row[0] for row in cursor.fetchall()]
+            for db_name in orphaned:
+                try:
+                    cursor.execute(
+                        """
+                        SELECT pg_terminate_backend(pid)
+                        FROM pg_stat_activity
+                        WHERE datname = %s AND pid <> pg_backend_pid();
+                        """,
+                        (db_name,),
+                    )
+                    cursor.execute(
+                        sql.SQL("DROP DATABASE IF EXISTS {}").format(
+                            sql.Identifier(db_name)
+                        )
+                    )
+                except Exception:
+                    pass  # Best-effort cleanup
+        conn.close()
+    except Exception:
+        pass  # Don't block test session if cleanup fails
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Clean up orphaned test databases at session start."""
+    _cleanup_orphaned_test_databases()
+
+
 def _resolve_postgres_dsn() -> str:
     database_url = os.environ.get("DATABASE_URL") or os.environ.get(
         "WDH_TEST_DATABASE_URI"

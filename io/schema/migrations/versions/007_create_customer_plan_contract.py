@@ -8,8 +8,8 @@ status changes. Supports BI queries for current and historical contract status.
 
 Source specification: docs/specific/customer-mdm/customer-plan-contract-specification.md
 
-Revision ID: 20260118_000008
-Revises: 20260115_000007
+Revision ID: 20260118_000007
+Revises: 20260115_000006
 Create Date: 2026-01-18
 """
 
@@ -18,8 +18,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "20260118_000008"
-down_revision = "20260115_000007"
+revision = "20260118_000007"
+down_revision = "20260115_000006"
 branch_labels = None
 depends_on = None
 
@@ -70,8 +70,8 @@ def upgrade() -> None:
                     REFERENCES mapping."产品线"(产品线代码),
 
                 -- Compound unique constraint (business key + time)
-                CONSTRAINT uq_active_contract UNIQUE (
-                    company_id, plan_code, product_line_code, valid_to
+                CONSTRAINT uq_contract_version UNIQUE (
+                    company_id, plan_code, product_line_code, valid_from
                 )
             );
             """

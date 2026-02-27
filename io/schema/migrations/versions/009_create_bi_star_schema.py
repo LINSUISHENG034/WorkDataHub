@@ -14,11 +14,11 @@ Views Created:
 - bi.fct_customer_monthly_summary: Fact view from customer."客户业务月度快照"
 
 Dependencies:
-- Story 7.6-7: customer."客户业务月度快照" (Migration 009)
-- Story 7.6-4: customer."客户明细".tags JSONB column (Migration 007)
+- Story 7.6-7: customer."客户业务月度快照" (Migration 008)
+- Story 7.6-4: customer."客户明细".tags JSONB column (consolidated into 001)
 
-Revision ID: 20260129_000010
-Revises: 20260121_000009
+Revision ID: 20260129_000009
+Revises: 20260121_000008
 Create Date: 2026-01-29
 """
 
@@ -27,8 +27,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "20260129_000010"
-down_revision = "20260121_000009"
+revision = "20260129_000009"
+down_revision = "20260121_000008"
 branch_labels = None
 depends_on = None
 

@@ -10,8 +10,8 @@ tracks at ProductLine granularity.
 Granularity: Customer + Plan + Product Line
 Source: Sprint Change Proposal 2026-02-09-fact-table-refactoring
 
-Revision ID: 20260209_000013
-Revises: 20260205_000012
+Revision ID: 20260209_000011
+Revises: 20260129_000010
 Create Date: 2026-02-09
 """
 
@@ -20,8 +20,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "20260209_000013"
-down_revision = "20260205_000012"
+revision = "20260209_000011"
+down_revision = "20260129_000010"
 branch_labels = None
 depends_on = None
 

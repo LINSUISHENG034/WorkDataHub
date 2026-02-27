@@ -1,26 +1,14 @@
 """Initial infrastructure tables for clean migration chain.
 
-Story 7.2-2: New Migration Structure
-Phase 2: Create 001_initial_infrastructure.py with 17 infrastructure tables
-
-This migration establishes the foundation tables for the WorkDataHub:
-- Public schema: Pipeline execution tracking and data quality metrics
-- Enterprise schema: Company information and enrichment infrastructure
-- Mapping schema: Reference data tables (产品线, 组织架构, 计划层规模, 客户明细,
-  产品明细, 利润指标)
-- System schema: Incremental sync state tracking
-
-All tables use idempotent IF NOT EXISTS pattern for safe re-execution.
-
-Revision ID: 20251228_000001
-Revises: None
-Create Date: 2025-12-28
+Story 7.2-2 Phase 2. Idempotent IF NOT EXISTS pattern for safe re-execution.
+Revision ID: 20251228_000001 | Revises: None | Create Date: 2025-12-28
 """
 
 from __future__ import annotations
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 
 revision = "20251228_000001"
@@ -49,10 +37,7 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
     """Create infrastructure tables across all schemas."""
     conn = op.get_bind()
 
-    # ========================================================================
-    # PUBLIC SCHEMA (2 tables)
-    # ========================================================================
-
+    # --- PUBLIC SCHEMA (2 tables) ---
     # Create public schema if not exists
     conn.execute(sa.text("CREATE SCHEMA IF NOT EXISTS public"))
 
@@ -131,10 +116,7 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
             schema="public",
         )
 
-    # ========================================================================
-    # ENTERPRISE SCHEMA (9 tables)
-    # ========================================================================
-
+    # --- ENTERPRISE SCHEMA (9 tables) ---
     # Create enterprise schema if not exists
     conn.execute(sa.text("CREATE SCHEMA IF NOT EXISTS enterprise"))
 
@@ -572,17 +554,11 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
             comment="Validation tracking for EQC API vs Archive data comparison",
         )
 
-    # ========================================================================
-    # CUSTOMER SCHEMA (1 table: 客户明细)
-    # ========================================================================
-
+    # --- CUSTOMER SCHEMA (1 table: 客户明細) ---
     # Create customer schema if not exists
     conn.execute(sa.text("CREATE SCHEMA IF NOT EXISTS customer"))
 
-    # === 14. 客户明细 (Customer Details - reference table, not a domain) ===
-    # Story 7.5: id column changed to IDENTITY for FK backfill compatibility
-    # Story 7.5-1: Replace 更新时间 with created_at/updated_at for audit consistency
-    # Story 7.6: Migrated from mapping to customer schema for Customer MDM consistency
+    # === 14. 客户明细 (Customer Details) ===
     if not _table_exists(conn, "客户明细", "customer"):
         op.create_table(
             "客户明细",
@@ -614,6 +590,9 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
             sa.Column("上报投管规模", sa.Float(), nullable=True),
             sa.Column("关联机构数", sa.Integer(), nullable=True),
             sa.Column("其他开拓机构", sa.String(), nullable=True),
+            sa.Column(
+                "tags", JSONB(), nullable=True, server_default=sa.text("'[]'::jsonb")
+            ),
             sa.Column("计划状态", sa.String(), nullable=True),
             sa.Column("关联计划数", sa.Integer(), nullable=True),
             sa.Column("备注", sa.Text(), nullable=True),
@@ -635,10 +614,15 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
             comment="Reference table: Customer details (10,997 rows, manual DDL)",
         )
 
-    # ========================================================================
-    # MAPPING SCHEMA (5 tables: 3 seed tables + 2 reference tables + 1 view)
-    # ========================================================================
+        # GIN index for tags JSONB queries (consolidated from 007)
+        conn.execute(
+            sa.text("""
+            CREATE INDEX IF NOT EXISTS idx_customer_detail_tags_gin
+            ON customer."客户明细" USING GIN (tags)
+        """)
+        )
 
+    # --- MAPPING SCHEMA (5 tables: 3 seed tables + 2 reference tables + 1 view) ---
     # Create mapping schema if not exists
     conn.execute(sa.text("CREATE SCHEMA IF NOT EXISTS mapping"))
 
@@ -728,10 +712,7 @@ def upgrade() -> None:  # noqa: PLR0912, PLR0915
             "manual DDL)",
         )
 
-    # ========================================================================
-    # SYSTEM SCHEMA (1 table)
-    # ========================================================================
-
+    # --- SYSTEM SCHEMA (1 table) ---
     # Create system schema if not exists
     conn.execute(sa.text("CREATE SCHEMA IF NOT EXISTS system"))
 
