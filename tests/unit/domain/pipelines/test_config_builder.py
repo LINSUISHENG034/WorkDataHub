@@ -183,10 +183,10 @@ class TestDynamicImportFunctionality:
         """Test successful import of step class."""
         # Import our test step class
         step_class = _import_step_class_or_factory(
-            "tests.domain.pipelines.conftest.UpperCaseStep"
+            "tests.unit.domain.pipelines.conftest.UpperCaseStep"
         )
 
-        from tests.domain.pipelines.conftest import UpperCaseStep
+        from tests.unit.domain.pipelines.conftest import UpperCaseStep
 
         assert step_class == UpperCaseStep
 
@@ -204,7 +204,7 @@ class TestDynamicImportFunctionality:
         """Test import with non-existent class."""
         with pytest.raises(PipelineAssemblyError, match="Could not import"):
             _import_step_class_or_factory(
-                "tests.domain.pipelines.conftest.NonexistentClass"
+                "tests.unit.domain.pipelines.conftest.NonexistentClass"
             )
 
     def test_import_step_class_not_transform_step(self):
@@ -216,11 +216,11 @@ class TestDynamicImportFunctionality:
         """Test successful import of factory method."""
         # Test importing a factory method
         factory = _import_step_class_or_factory(
-            "tests.domain.pipelines.conftest.MockTransformStep"
+            "tests.unit.domain.pipelines.conftest.MockTransformStep"
         )
 
         # Should return the class itself
-        from tests.domain.pipelines.conftest import MockTransformStep
+        from tests.unit.domain.pipelines.conftest import MockTransformStep
 
         assert factory == MockTransformStep
 
@@ -228,14 +228,14 @@ class TestDynamicImportFunctionality:
         """Test import of non-existent factory method."""
         with pytest.raises(PipelineAssemblyError, match="Could not import"):
             _import_step_class_or_factory(
-                "tests.domain.pipelines.conftest.UpperCaseStep.nonexistent_method"
+                "tests.unit.domain.pipelines.conftest.UpperCaseStep.nonexistent_method"
             )
 
     def test_create_step_instance_success(self):
         """Test successful step instance creation."""
         config = StepConfig(
             name="uppercase",
-            import_path="tests.domain.pipelines.conftest.UpperCaseStep",
+            import_path="tests.unit.domain.pipelines.conftest.UpperCaseStep",
             options={"fields": ["name", "description"]},
         )
 
@@ -264,19 +264,19 @@ class TestDependencyValidation:
         steps = [
             StepConfig(
                 name="step1",
-                import_path="tests.domain.pipelines.conftest.UpperCaseStep",
+                import_path="tests.unit.domain.pipelines.conftest.UpperCaseStep",
                 options={},
                 requires=[],
             ),
             StepConfig(
                 name="step2",
-                import_path="tests.domain.pipelines.conftest.TrimStep",
+                import_path="tests.unit.domain.pipelines.conftest.TrimStep",
                 options={},
                 requires=["step1"],
             ),
             StepConfig(
                 name="step3",
-                import_path="tests.domain.pipelines.conftest.UpperCaseStep",
+                import_path="tests.unit.domain.pipelines.conftest.UpperCaseStep",
                 options={},
                 requires=["step1", "step2"],
             ),
@@ -290,7 +290,7 @@ class TestDependencyValidation:
         steps = [
             StepConfig(
                 name="step1",
-                import_path="tests.domain.pipelines.conftest.UpperCaseStep",
+                import_path="tests.unit.domain.pipelines.conftest.UpperCaseStep",
                 options={},
                 requires=["nonexistent_step"],
             )
@@ -304,13 +304,13 @@ class TestDependencyValidation:
         steps = [
             StepConfig(
                 name="step1",
-                import_path="tests.domain.pipelines.conftest.UpperCaseStep",
+                import_path="tests.unit.domain.pipelines.conftest.UpperCaseStep",
                 options={},
                 requires=["step2"],  # step2 comes after step1
             ),
             StepConfig(
                 name="step2",
-                import_path="tests.domain.pipelines.conftest.TrimStep",
+                import_path="tests.unit.domain.pipelines.conftest.TrimStep",
                 options={},
                 requires=[],
             ),
@@ -414,7 +414,7 @@ class TestBuildPipelineFunction:
         with patch(
             "src.work_data_hub.domain.pipelines.builder._create_step_instance"
         ) as mock_create:
-            from tests.domain.pipelines.conftest import UpperCaseStep, TrimStep
+            from tests.unit.domain.pipelines.conftest import UpperCaseStep, TrimStep
 
             mock_create.side_effect = [UpperCaseStep(), TrimStep()]
 
@@ -429,7 +429,7 @@ class TestBuildPipelineFunction:
         with patch(
             "src.work_data_hub.domain.pipelines.builder._create_step_instance"
         ) as mock_create:
-            from tests.domain.pipelines.conftest import UpperCaseStep, TrimStep
+            from tests.unit.domain.pipelines.conftest import UpperCaseStep, TrimStep
 
             mock_create.side_effect = [UpperCaseStep(), TrimStep()]
 
@@ -473,12 +473,12 @@ class TestBuildPipelineFunction:
             "steps": [
                 {
                     "name": "uppercase",
-                    "import_path": "tests.domain.pipelines.conftest.UpperCaseStep",
+                    "import_path": "tests.unit.domain.pipelines.conftest.UpperCaseStep",
                     "options": {"fields": ["name"]},
                 },
                 {
                     "name": "trim",
-                    "import_path": "tests.domain.pipelines.conftest.TrimStep",
+                    "import_path": "tests.unit.domain.pipelines.conftest.TrimStep",
                     "options": {"fields": ["name"]},
                 },
             ],

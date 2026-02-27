@@ -282,6 +282,33 @@ class TestPipelineExecution:
         assert result_df.loc[0, "客户名称"] == "测试公司A"
 
 
+class TestPipelineEdgeCases:
+    """Edge case tests merged from legacy test location."""
+
+    def test_pipeline_handles_missing_month_column(self):
+        """Pipeline handles DataFrame without 月度 column gracefully."""
+        eqc_config = EqcLookupConfig.disabled()
+        pipeline = build_bronze_to_silver_pipeline(
+            eqc_config=eqc_config,
+            enrichment_service=None,
+            plan_override_mapping={},
+            mapping_repository=None,
+        )
+
+        df = pd.DataFrame(
+            {
+                "业务类型": ["企业年金受托"],
+                "计划类型": ["集合计划"],
+                "客户名称": ["测试公司"],
+            }
+        )
+        context = make_context("test_missing_month")
+
+        result = pipeline.execute(df, context)
+        assert "月度" in result.columns
+        assert result["月度"].isna().all()
+
+
 class TestAnnuityAccountNumberDerivation:
     """Tests for 年金账户号 derivation from 集团企业客户号 (Story 6.2-P11).
 

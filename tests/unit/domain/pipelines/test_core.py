@@ -651,3 +651,122 @@ def test_no_retry_with_http_404():
 
     assert step.attempt_count == 1  # No retries for permanent error
     assert "Step execution failed" in str(exc_info.value)
+
+
+# ============================================================================
+# Legacy Row-Based Pipeline.execute() Backward Compatibility Tests
+# (Merged from tests/domain/pipelines/test_core.py)
+# ============================================================================
+
+
+class LegacyRowStep:
+    """Row-based step for backward compatibility testing."""
+
+    def __init__(self, name: str):
+        self._name = name
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def apply(self, row: Row, context) -> StepResult:
+        return StepResult(row={**row, f"{self._name}_value": "processed"})
+
+
+def _build_legacy_row_pipeline(stop_on_error: bool = True) -> Pipeline:
+    config = PipelineConfig(
+        name="legacy_row_pipeline",
+        steps=[
+            StepConfig(
+                name="step1",
+                import_path="tests.unit.domain.pipelines.test_core.LegacyRowStep",
+            ),
+            StepConfig(
+                name="step2",
+                import_path="tests.unit.domain.pipelines.test_core.LegacyRowStep",
+            ),
+        ],
+        stop_on_error=stop_on_error,
+    )
+    steps = [LegacyRowStep("step1"), LegacyRowStep("step2")]
+    return Pipeline(steps=steps, config=config)
+
+
+@pytest.mark.unit
+def test_execute_single_row_backwards_compatibility():
+    """Dict-based execute() still works for single-row processing."""
+    pipeline = _build_legacy_row_pipeline()
+    result = pipeline.execute({"value": 1})
+
+    assert result.row["step1_value"] == "processed"
+    assert result.row["step2_value"] == "processed"
+    assert result.metrics.executed_steps == ["step1", "step2"]
+
+
+@pytest.mark.unit
+def test_execute_preserves_input_row():
+    """execute() does not mutate the original input dict."""
+    pipeline = _build_legacy_row_pipeline()
+    row = {"value": 1}
+    pipeline.execute(row)
+
+    assert row == {"value": 1}
+
+
+@pytest.mark.unit
+def test_execute_aggregates_warnings_and_errors():
+    """execute() collects warnings and errors from all steps."""
+
+    class WarningStep(LegacyRowStep):
+        def apply(self, row: Row, context) -> StepResult:
+            return StepResult(row=row, warnings=["warn"], errors=[])
+
+    class ErrorStep(LegacyRowStep):
+        def apply(self, row: Row, context) -> StepResult:
+            return StepResult(row=row, warnings=[], errors=["err"])
+
+    config = PipelineConfig(
+        name="warnings",
+        steps=[
+            StepConfig(
+                name="warn",
+                import_path="tests.unit.domain.pipelines.test_core.LegacyRowStep",
+            ),
+            StepConfig(
+                name="err",
+                import_path="tests.unit.domain.pipelines.test_core.LegacyRowStep",
+            ),
+        ],
+        stop_on_error=False,
+    )
+
+    pipeline = Pipeline(steps=[WarningStep("warn"), ErrorStep("err")], config=config)
+    result = pipeline.execute({"value": 1})
+
+    assert result.warnings == ["warn"]
+    assert result.errors == ["err"]
+
+
+@pytest.mark.unit
+def test_execute_stop_on_error_true():
+    """execute() raises PipelineStepError when stop_on_error=True."""
+
+    class BoomStep(LegacyRowStep):
+        def apply(self, row: Row, context) -> StepResult:
+            raise ValueError("explode")
+
+    config = PipelineConfig(
+        name="boom",
+        steps=[
+            StepConfig(
+                name="boom",
+                import_path="tests.unit.domain.pipelines.test_core.LegacyRowStep",
+            )
+        ],
+        stop_on_error=True,
+    )
+
+    pipeline = Pipeline(steps=[BoomStep("boom")], config=config)
+
+    with pytest.raises(PipelineStepError):
+        pipeline.execute({"value": 1})

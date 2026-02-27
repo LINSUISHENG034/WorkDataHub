@@ -153,12 +153,12 @@ def sample_config():
         steps=[
             StepConfig(
                 name="uppercase",
-                import_path="tests.domain.pipelines.conftest.UpperCaseStep",
+                import_path="tests.unit.domain.pipelines.conftest.UpperCaseStep",
                 options={"fields": ["name"]},
             ),
             StepConfig(
                 name="trim",
-                import_path="tests.domain.pipelines.conftest.TrimStep",
+                import_path="tests.unit.domain.pipelines.conftest.TrimStep",
                 options={"fields": ["name"]},
             ),
         ],
@@ -174,12 +174,12 @@ def sample_config_dict():
         "steps": [
             {
                 "name": "uppercase",
-                "import_path": "tests.domain.pipelines.conftest.UpperCaseStep",
+                "import_path": "tests.unit.domain.pipelines.conftest.UpperCaseStep",
                 "options": {"fields": ["name"]},
             },
             {
                 "name": "trim",
-                "import_path": "tests.domain.pipelines.conftest.TrimStep",
+                "import_path": "tests.unit.domain.pipelines.conftest.TrimStep",
                 "options": {"fields": ["name"]},
             },
         ],
