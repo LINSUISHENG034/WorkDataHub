@@ -8,7 +8,7 @@
 -- - is_strategic (UPGRADE ONLY - Ratchet Rule)
 -- - is_existing
 --
--- Parameters: prior_year, whitelist_top_n, strategic_threshold
+-- Parameters: prior_year, whitelist_top_n, strategic_threshold, period_end_date (×2)
 
 WITH
 -- Include common CTEs
@@ -58,7 +58,7 @@ new_status AS (
         AND ls.产品线代码 = c12.产品线代码
 )
 UPDATE customer."客户年金计划" AS old
-SET valid_to = (CURRENT_DATE - INTERVAL '1 day')::date,
+SET valid_to = %s::date,
     updated_at = CURRENT_TIMESTAMP
 FROM new_status AS new
 WHERE old.company_id = new.company_id

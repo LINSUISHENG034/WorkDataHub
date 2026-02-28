@@ -2,9 +2,11 @@
 -- Story 7.6-12: SCD Type 2 Implementation
 -- BugFix: Use period-based year instead of CURRENT_DATE to avoid
 --         looking up nonexistent future December data.
+-- BugFix: Use period_end_date instead of CURRENT_DATE for 12-month
+--         contribution window, ensuring correct results on historical re-runs.
 --
 -- These CTEs are shared between close_old_records.sql and sync_insert.sql
--- Parameters: prior_year, whitelist_top_n, strategic_threshold
+-- Parameters: prior_year, whitelist_top_n, strategic_threshold, period_end_date
 
 -- CTE 1: Prior year December data for is_existing check
 prior_year_dec AS (
@@ -55,7 +57,7 @@ contribution_12m AS (
         CASE WHEN SUM(COALESCE(供款, 0)) > 0 THEN TRUE ELSE FALSE END
             as has_contribution
     FROM business.规模明细
-    WHERE 月度 >= (CURRENT_DATE - INTERVAL '12 months')
+    WHERE 月度 >= (%s - INTERVAL '12 months')
       AND company_id IS NOT NULL
     GROUP BY company_id, 计划代码, 产品线代码
 )

@@ -17,7 +17,9 @@ Strategic Customer Logic (Story 7.6-11):
 
 from __future__ import annotations
 
+import calendar
 import os
+from datetime import date
 from typing import Optional
 
 import psycopg
@@ -138,7 +140,8 @@ def _build_close_old_records_sql() -> str:
     Story 7.6-12: Implements proper SCD Type 2 versioning.
     Loads SQL from sql/close_old_records.sql with common CTEs injected.
 
-    Parameters order: prior_year, whitelist_top_n, strategic_threshold
+    Parameters order: prior_year, whitelist_top_n, strategic_threshold,
+        period_end_date (×2: contribution_12m CTE + valid_to)
 
     Returns:
         SQL string for closing old records
@@ -159,9 +162,10 @@ def _build_sync_sql() -> str:
     1. prior_year (CTE 1: prior_year_dec)
     2. whitelist_top_n
     3. strategic_threshold
+    4-6. period_end_date (×3: contribution_12m CTE + valid_from + idempotency)
 
     Returns:
-        SQL string for the sync operation (requires 3 parameters)
+        SQL string for the sync operation (requires 6 parameters)
     """
     common_ctes = load_sql("common_ctes.sql")
     insert_sql = load_sql("sync_insert.sql")
@@ -213,28 +217,57 @@ def sync_contract_status(
     strategic_threshold = get_strategic_threshold()
     whitelist_top_n = get_whitelist_top_n()
 
-    # Derive prior_year from period (e.g., '202510' → 2025 → prior = 2024)
-    if period and len(period) >= PERIOD_YEAR_DIGITS:
+    # Derive prior_year and period_end_date from period
+    # e.g., '202510' → year=2025, month=10 → prior=2024, end_date=2025-10-31
+    if period and len(period) >= PERIOD_YEAR_DIGITS + 2:
         period_year = int(period[:PERIOD_YEAR_DIGITS])
+        period_month = int(period[PERIOD_YEAR_DIGITS : PERIOD_YEAR_DIGITS + 2])
+    elif period and len(period) >= PERIOD_YEAR_DIGITS:
+        period_year = int(period[:PERIOD_YEAR_DIGITS])
+        period_month = 12  # Default to December if only year provided
     else:
-        from datetime import datetime
+        from datetime import datetime as _dt
 
-        period_year = datetime.now().year
+        now = _dt.now()
+        period_year = now.year
+        period_month = now.month
         logger.warning(
-            "No period provided, falling back to current year",
+            "No period provided, falling back to current date",
             period_year=period_year,
+            period_month=period_month,
         )
     prior_year = period_year - 1
 
+    # Derive period end date (last day of month)
+    _, last_day = calendar.monthrange(period_year, period_month)
+    period_end_date = date(period_year, period_month, last_day)
+
     logger.info(
-        "Using period-based year for is_existing",
+        "Using period-based dates for SCD2 versioning",
         period=period,
         period_year=period_year,
         prior_year=prior_year,
+        period_end_date=str(period_end_date),
     )
 
-    # SQL parameter tuple: (prior_year, whitelist_top_n, strategic_threshold)
-    sql_params = (prior_year, whitelist_top_n, strategic_threshold)
+    # SQL parameter tuples (common_ctes has 4 params, each SQL adds its own)
+    # close_old_records: common(4) + valid_to(1) = 5 params
+    close_sql_params = (
+        prior_year,
+        whitelist_top_n,
+        strategic_threshold,
+        period_end_date,  # contribution_12m CTE
+        period_end_date,  # valid_to = period_end_date - 1 day
+    )
+    # sync_insert: common(4) + valid_from(1) + idempotency(1) = 6 params
+    insert_sql_params = (
+        prior_year,
+        whitelist_top_n,
+        strategic_threshold,
+        period_end_date,  # contribution_12m CTE
+        period_end_date,  # valid_from
+        period_end_date,  # idempotency check
+    )
 
     with psycopg.connect(database_url) as conn:
         with conn.cursor() as cur:
@@ -258,7 +291,7 @@ def sync_contract_status(
 
             # SCD Type 2 Step 1: Close old records with changed status
             close_sql = _build_close_old_records_sql()
-            cur.execute(close_sql, sql_params)
+            cur.execute(close_sql, close_sql_params)
             closed = cur.rowcount
 
             logger.info(
@@ -268,7 +301,7 @@ def sync_contract_status(
 
             # SCD Type 2 Step 2: Insert new/changed records
             insert_sql = _build_sync_sql()
-            cur.execute(insert_sql, sql_params)
+            cur.execute(insert_sql, insert_sql_params)
             inserted = cur.rowcount
 
             logger.info(

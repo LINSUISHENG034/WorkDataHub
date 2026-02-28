@@ -409,7 +409,7 @@ LIMIT 10;
 -- ② 客户明细 tags 列包含 "中标" 标签
 -- ③ 快照表 is_winning_this_year = true
 SELECT a."客户名称", a.company_id, a."产品线代码",
-       c.tags, c.年金客户类型, c.年金客户标签,
+       c.tags, c.年金客户类型,
        f.is_winning_this_year, f.is_new
 FROM customer."中标客户明细" a
 JOIN customer."客户明细" c ON a.company_id = c.company_id
