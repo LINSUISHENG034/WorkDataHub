@@ -12,7 +12,7 @@
 -- so this INSERT's NOT EXISTS check will skip it (existing current record found).
 -- This ensures strategic customers keep their status even if AUM drops.
 --
--- Parameters: whitelist_top_n, strategic_threshold
+-- Parameters: prior_year, whitelist_top_n, strategic_threshold
 
 WITH
 -- Include common CTEs

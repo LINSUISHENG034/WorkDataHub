@@ -7,12 +7,11 @@
 --
 -- Parameters:
 --   1. year (for prior_year_dec: year - 1)
---   2. year (for strategic_whitelist: year - 1)
---   3. whitelist_top_n
---   4. strategic_threshold
---   5. cutover_date (for closed_records)
---   6. status_year
---   7. cutover_date (for valid_from)
+--   2. whitelist_top_n
+--   3. strategic_threshold
+--   4. cutover_date (for closed_records)
+--   5. status_year
+--   6. cutover_date (for valid_from)
 
 WITH prior_year_dec AS (
     -- Get all active customers from prior year December
@@ -28,7 +27,7 @@ WITH prior_year_dec AS (
       AND 期末资产规模 > 0
 ),
 strategic_whitelist AS (
-    -- Calculate strategic customers based on AUM threshold and top N
+    -- Dynamic strategic evaluation based on latest available source month
     SELECT
         company_id,
         计划代码 as plan_code,
@@ -45,8 +44,7 @@ strategic_whitelist AS (
                 ORDER BY SUM(期末资产规模) DESC
             ) as rank_in_branch
         FROM business.规模明细
-        WHERE EXTRACT(YEAR FROM 月度) = %s - 1
-          AND EXTRACT(MONTH FROM 月度) = 12
+        WHERE 月度 = (SELECT MAX(月度) FROM business.规模明细)
           AND company_id IS NOT NULL
         GROUP BY company_id, 计划代码, 产品线代码, 机构代码
     ) ranked

@@ -140,24 +140,21 @@ WHERE 关联计划数 > 1
 LIMIT 10;
 ```
 
-### 5.4 `jsonb_append` — 业务操作轨迹标签 (tags)
+### 5.4 `jsonb_append` + `lambda` — 业务操作轨迹标签 (tags)
 
 > **重点验证**：`annual_award` 回填追加 `"2510中标"` 标签，`annual_loss` 回填追加 `"2510流失"` 标签。
+> `lambda` 算子生成的日期格式化标签（如 `"2510新建"`）也合并存储在 `tags` 列中。
 
 ```sql
--- 验证 tags 列中的 jsonb 数组是否正确追加了带日期前缀的操作标签
-SELECT company_id, 客户名称, tags, 年金客户类型, 年金客户标签
+-- ① 验证 tags 列中的 jsonb 数组是否正确追加了带日期前缀的中标/流失操作标签
+SELECT company_id, 客户名称, tags, "年金客户类型"
 FROM customer."客户明细"
 WHERE tags::text LIKE '%中标%' OR tags::text LIKE '%流失%';
-```
 
-### 5.5 `lambda` — 日期格式化客户标签
-
-```sql
--- 验证 lambda 算子生成的 年金客户标签 格式正确 (如 "2510新建")
-SELECT company_id, 年金客户标签
+-- ② 验证 lambda 算子生成的日期格式化标签 (如 "2510新建") 也已写入 tags
+SELECT company_id, 客户名称, tags
 FROM customer."客户明细"
-WHERE 年金客户标签 IS NOT NULL AND 年金客户标签 != ''
+WHERE tags IS NOT NULL AND tags::text LIKE '%新建%'
 LIMIT 10;
 ```
 
@@ -492,6 +489,6 @@ SELECT
 | `max_by` | performance/award/loss/income | `主拓机构`、`主拓机构代码`、`关键年金计划` | 按规模最大值取对应记录 |
 | `concat_distinct` | performance/award/loss/income | `管理资格`、`年金计划类型`、`其他年金计划`、`其他开拓机构` | 排重拼接 (separator: +/,/) |
 | `count_distinct` | performance/award/loss/income | `关联计划数`、`关联机构数` | 统计唯一非空值 |
-| `lambda` | performance/income | `年金客户标签` | 日期格式化 (如 `"2510新建"`) |
+| `lambda` | performance/income | `tags` (原 `年金客户标签`，已合并) | 日期格式化 (如 `"2510新建"`)，追加到 tags jsonb 数组 |
 | `jsonb_append` | award/loss | `tags` | JSON数组追加 (如 `["2510中标"]`) |
 | `template` | performance/award/loss/income | `年金客户类型` | 固定值赋值 (`新客`/`中标客户`/`流失客户`/`新客*`) |

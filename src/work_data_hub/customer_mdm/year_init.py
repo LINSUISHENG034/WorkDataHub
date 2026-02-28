@@ -36,19 +36,21 @@ def initialize_year_status(
 ) -> dict[str, int]:
     """Initialize is_strategic and is_existing for ALL contracts.
 
-    Uses prior year data to determine status fields.
+    Uses mixed-time references by design:
+    - is_strategic: dynamic evaluation from latest available AUM month
+    - is_existing: prior-year December asset records
 
     This function updates ALL contracts in the table (regardless of status_year)
     because the contract table uses a single-record-per-contract design.
 
-    The year parameter determines which prior year data to use for whitelist:
-    - is_strategic: Based on (year-1) December AUM threshold and top N per branch
+    The year parameter determines prior-year data for is_existing:
+    - is_strategic: Based on latest available AUM threshold and top N per branch
     - is_existing: Based on (year-1) December asset records
 
     This function is idempotent - safe to re-run multiple times.
 
     Args:
-        year: Reference year (e.g., 2026). Prior year data used for whitelist.
+        year: Reference year (e.g., 2026). Prior year data used for is_existing.
         dry_run: If True, logs actions without executing database changes
 
     Returns:
@@ -85,7 +87,7 @@ def initialize_year_status(
                 return _dry_run_counts(cur, year)
 
             strategic_updated = _update_strategic(
-                cur, year, prior_year, strategic_threshold, whitelist_top_n
+                cur, strategic_threshold, whitelist_top_n
             )
             existing_updated = _update_existing(cur, year, prior_year)
 
@@ -133,9 +135,7 @@ def _dry_run_counts(cur, year: int) -> dict[str, int]:
     }
 
 
-def _update_strategic(
-    cur, year: int, prior_year: int, threshold: int, top_n: int
-) -> int:
+def _update_strategic(cur, threshold: int, top_n: int) -> int:
     """Update is_strategic field based on threshold and whitelist."""
     sql = """
         WITH strategic_whitelist AS (
@@ -152,8 +152,7 @@ def _update_strategic(
                         ORDER BY SUM(期末资产规模) DESC
                     ) as rank_in_branch
                 FROM business.规模明细
-                WHERE EXTRACT(MONTH FROM 月度) = 12
-                  AND EXTRACT(YEAR FROM 月度) = %s
+                WHERE 月度 = (SELECT MAX(月度) FROM business.规模明细)
                   AND company_id IS NOT NULL
                 GROUP BY company_id, 计划代码, 产品线代码, 机构代码
             ) ranked
@@ -168,7 +167,7 @@ def _update_strategic(
           AND c.product_line_code = sw.产品线代码
           AND c.is_strategic = FALSE
     """
-    cur.execute(sql, (prior_year, top_n, threshold))
+    cur.execute(sql, (top_n, threshold))
     return cur.rowcount
 
 
@@ -256,12 +255,11 @@ def annual_cutover(year: int, dry_run: bool = False) -> dict[str, int]:
 
             # Step 2: Insert new records
             insert_sql = load_sql("annual_cutover_insert.sql")
-            # Parameters: year, year, whitelist_top_n, strategic_threshold,
+            # Parameters: year, whitelist_top_n, strategic_threshold,
             #             cutover_date, year, cutover_date
             cur.execute(
                 insert_sql,
                 (
-                    year,
                     year,
                     whitelist_top_n,
                     strategic_threshold,
@@ -290,7 +288,10 @@ def annual_cutover(year: int, dry_run: bool = False) -> dict[str, int]:
                 closed_count=closed_count,
                 inserted_count=inserted_count,
                 dry_run=dry_run,
-                data_source=f"business.规模明细 ({prior_year}-12)",
+                data_source=(
+                    f"is_existing: business.规模明细 ({prior_year}-12), "
+                    "is_strategic: business.规模明细 (MAX(月度))"
+                ),
             )
 
             return {

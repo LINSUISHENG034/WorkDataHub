@@ -4,7 +4,7 @@ Story 7.6-11: Customer Status Field Enhancement
 AC-1: Implement strategic customer identification logic
 
 Strategic customer criteria:
-1. Prior year total AUM >= threshold (default 500M)
+1. Current-period total AUM >= threshold (default 500M)
 2. Top N customers per branch per product line (default top 10)
 """
 

@@ -52,6 +52,36 @@ class TestIsStrategicField:
             # is_strategic should be set (not all NULL/FALSE due to test data)
             assert strategic_count is not None
 
+    def test_new_customer_with_current_high_aum_is_strategic(
+        self, customer_mdm_test_db: str, test_period: str
+    ):
+        """New customer with no prior Dec data but high current AUM should be strategic."""
+        _validate_test_database(customer_mdm_test_db)
+
+        from work_data_hub.customer_mdm import sync_contract_status
+
+        with use_test_database(customer_mdm_test_db):
+            sync_contract_status(period=test_period, dry_run=False)
+
+        engine = create_engine(customer_mdm_test_db)
+        with engine.connect() as conn:
+            result = conn.execute(
+                text(
+                    """
+                    SELECT is_strategic, is_existing
+                    FROM customer."客户年金计划"
+                    WHERE company_id = 'TEST_C005'
+                      AND plan_code = 'P007'
+                      AND product_line_code = 'PL202'
+                      AND status_year = 2026
+                    """
+                )
+            )
+            row = result.fetchone()
+            assert row is not None, "Expected TEST_C005/P007 contract record"
+            assert row[0] is True
+            assert row[1] is False
+
 
 @pytest.mark.integration
 class TestIsExistingField:
@@ -73,21 +103,21 @@ class TestIsExistingField:
             result = conn.execute(
                 text(
                     """
-                    SELECT company_id, is_existing
+                    SELECT company_id, plan_code, is_existing
                     FROM customer."客户年金计划"
                     WHERE company_id IN ('TEST_C001', 'TEST_C002', 'TEST_C003')
                       AND status_year = 2026
-                    ORDER BY company_id
+                    ORDER BY company_id, plan_code
                     """
                 )
             )
-            existing_map = {row[0]: row[1] for row in result}
+            existing_map = {(row[0], row[1]): row[2] for row in result}
 
             # TEST_C001 and TEST_C002 have prior year data
-            assert existing_map.get("TEST_C001") is True
-            assert existing_map.get("TEST_C002") is True
+            assert existing_map.get(("TEST_C001", "P001")) is True
+            assert existing_map.get(("TEST_C002", "P003")) is True
             # TEST_C003 has no prior year data (new customer)
-            assert existing_map.get("TEST_C003") is False
+            assert existing_map.get(("TEST_C003", "P004")) is False
 
 
 @pytest.mark.integration
@@ -335,3 +365,63 @@ class TestSCDType2Versioning:
         assert final_count == results[0]["inserted"], (
             "Total records should match first run's inserted count"
         )
+
+    def test_ratchet_rule_prevents_strategic_downgrade_only_change(
+        self, customer_mdm_test_db: str, test_period: str, monkeypatch
+    ):
+        """Strategic downgrade alone should not create a new SCD version."""
+        _validate_test_database(customer_mdm_test_db)
+
+        from work_data_hub.customer_mdm import sync_contract_status
+
+        # Use top_n=1 so a threshold drop can become non-strategic by calculation.
+        monkeypatch.setattr(
+            "work_data_hub.customer_mdm.contract_sync.get_whitelist_top_n",
+            lambda: 1,
+        )
+
+        engine = create_engine(customer_mdm_test_db)
+
+        # Step 1: Initial sync - TEST_C005 is strategic via threshold.
+        with use_test_database(customer_mdm_test_db):
+            sync_contract_status(period=test_period, dry_run=False)
+
+        # Step 2: Lower TEST_C005 AUM below threshold while keeping contract_status stable.
+        with engine.connect() as conn:
+            conn.execute(
+                text(
+                    """
+                    UPDATE business."规模明细"
+                    SET "期末资产规模" = 1000.00
+                    WHERE company_id = 'TEST_C005'
+                      AND "计划代码" = 'P007'
+                      AND "产品线代码" = 'PL202'
+                    """
+                )
+            )
+            conn.commit()
+
+        # Step 3: Re-sync. Ratchet should keep strategic=True without creating new version.
+        with use_test_database(customer_mdm_test_db):
+            sync_contract_status(period=test_period, dry_run=False)
+
+        with engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT COUNT(*) AS total_versions,
+                           SUM(CASE WHEN valid_to = '9999-12-31' THEN 1 ELSE 0 END)
+                               AS current_versions,
+                           SUM(CASE WHEN is_strategic THEN 1 ELSE 0 END)
+                               AS strategic_versions
+                    FROM customer."客户年金计划"
+                    WHERE company_id = 'TEST_C005'
+                      AND plan_code = 'P007'
+                      AND product_line_code = 'PL202'
+                    """
+                )
+            ).fetchone()
+
+        assert row[0] == 1, "No new version should be created on strategic downgrade"
+        assert row[1] == 1, "There should be exactly one current version"
+        assert row[2] == 1, "Ratchet rule should preserve strategic status"

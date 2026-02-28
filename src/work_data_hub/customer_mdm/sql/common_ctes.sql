@@ -1,8 +1,10 @@
 -- Common CTEs for contract status sync operations
 -- Story 7.6-12: SCD Type 2 Implementation
+-- BugFix: Use period-based year instead of CURRENT_DATE to avoid
+--         looking up nonexistent future December data.
 --
 -- These CTEs are shared between close_old_records.sql and sync_insert.sql
--- Parameters: whitelist_top_n, strategic_threshold
+-- Parameters: prior_year, whitelist_top_n, strategic_threshold
 
 -- CTE 1: Prior year December data for is_existing check
 prior_year_dec AS (
@@ -12,12 +14,13 @@ prior_year_dec AS (
         产品线代码
     FROM business.规模明细
     WHERE EXTRACT(MONTH FROM 月度) = 12
-      AND EXTRACT(YEAR FROM 月度) = EXTRACT(YEAR FROM CURRENT_DATE) - 1
+      AND EXTRACT(YEAR FROM 月度) = %s
       AND 期末资产规模 > 0
       AND company_id IS NOT NULL
 ),
 
 -- CTE 2: Strategic whitelist (top N per branch per product line)
+-- Dynamic evaluation: use latest available source month (not prior-year December)
 strategic_whitelist AS (
     SELECT
         company_id,
@@ -35,8 +38,7 @@ strategic_whitelist AS (
                 ORDER BY SUM(期末资产规模) DESC
             ) as rank_in_branch
         FROM business.规模明细
-        WHERE EXTRACT(MONTH FROM 月度) = 12
-          AND EXTRACT(YEAR FROM 月度) = EXTRACT(YEAR FROM CURRENT_DATE) - 1
+        WHERE 月度 = (SELECT MAX(月度) FROM business.规模明细)
           AND company_id IS NOT NULL
         GROUP BY company_id, 计划代码, 产品线代码, 机构代码
     ) ranked

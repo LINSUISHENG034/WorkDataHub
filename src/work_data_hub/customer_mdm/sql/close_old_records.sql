@@ -8,7 +8,7 @@
 -- - is_strategic (UPGRADE ONLY - Ratchet Rule)
 -- - is_existing
 --
--- Parameters: whitelist_top_n, strategic_threshold
+-- Parameters: prior_year, whitelist_top_n, strategic_threshold
 
 WITH
 -- Include common CTEs

@@ -31,6 +31,7 @@ from work_data_hub.customer_mdm.strategic import (
 )
 
 logger = get_logger(__name__)
+PERIOD_YEAR_DIGITS = 4
 
 
 def apply_ratchet_rule(
@@ -137,7 +138,7 @@ def _build_close_old_records_sql() -> str:
     Story 7.6-12: Implements proper SCD Type 2 versioning.
     Loads SQL from sql/close_old_records.sql with common CTEs injected.
 
-    Parameters order: whitelist_top_n, strategic_threshold
+    Parameters order: prior_year, whitelist_top_n, strategic_threshold
 
     Returns:
         SQL string for closing old records
@@ -155,11 +156,12 @@ def _build_sync_sql() -> str:
     Loads SQL from sql/sync_insert.sql with common CTEs injected.
 
     Note: Uses %s placeholders for parameterized queries. Parameters order:
-    1. whitelist_top_n
-    2. strategic_threshold
+    1. prior_year (CTE 1: prior_year_dec)
+    2. whitelist_top_n
+    3. strategic_threshold
 
     Returns:
-        SQL string for the sync operation (requires 2 parameters)
+        SQL string for the sync operation (requires 3 parameters)
     """
     common_ctes = load_sql("common_ctes.sql")
     insert_sql = load_sql("sync_insert.sql")
@@ -181,7 +183,8 @@ def sync_contract_status(
     queries return correct point-in-time status.
 
     Args:
-        period: Reserved for future use. Currently ignored - syncs all data.
+        period: Period string in YYYYMM format (e.g., '202510'). Used to
+            determine the business year for is_existing lookups.
         dry_run: If True, logs actions without executing database changes
 
     Returns:
@@ -210,6 +213,29 @@ def sync_contract_status(
     strategic_threshold = get_strategic_threshold()
     whitelist_top_n = get_whitelist_top_n()
 
+    # Derive prior_year from period (e.g., '202510' → 2025 → prior = 2024)
+    if period and len(period) >= PERIOD_YEAR_DIGITS:
+        period_year = int(period[:PERIOD_YEAR_DIGITS])
+    else:
+        from datetime import datetime
+
+        period_year = datetime.now().year
+        logger.warning(
+            "No period provided, falling back to current year",
+            period_year=period_year,
+        )
+    prior_year = period_year - 1
+
+    logger.info(
+        "Using period-based year for is_existing",
+        period=period,
+        period_year=period_year,
+        prior_year=prior_year,
+    )
+
+    # SQL parameter tuple: (prior_year, whitelist_top_n, strategic_threshold)
+    sql_params = (prior_year, whitelist_top_n, strategic_threshold)
+
     with psycopg.connect(database_url) as conn:
         with conn.cursor() as cur:
             if dry_run:
@@ -232,7 +258,7 @@ def sync_contract_status(
 
             # SCD Type 2 Step 1: Close old records with changed status
             close_sql = _build_close_old_records_sql()
-            cur.execute(close_sql, (whitelist_top_n, strategic_threshold))
+            cur.execute(close_sql, sql_params)
             closed = cur.rowcount
 
             logger.info(
@@ -242,7 +268,7 @@ def sync_contract_status(
 
             # SCD Type 2 Step 2: Insert new/changed records
             insert_sql = _build_sync_sql()
-            cur.execute(insert_sql, (whitelist_top_n, strategic_threshold))
+            cur.execute(insert_sql, sql_params)
             inserted = cur.rowcount
 
             logger.info(
