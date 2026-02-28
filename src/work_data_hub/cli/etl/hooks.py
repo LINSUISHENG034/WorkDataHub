@@ -52,11 +52,12 @@ def _sync_contract_status_hook(domain: str, period: str | None) -> None:
     logger.info("Triggering contract status sync from post-ETL hook")
 
     result = sync_contract_status(period=period, dry_run=False)
+    closed = result.get("closed", result.get("updated", 0))
 
     logger.info(
         "Contract status sync completed",
         inserted=result["inserted"],
-        updated=result["updated"],
+        closed=closed,
         total=result["total"],
     )
 
@@ -92,11 +93,14 @@ def _snapshot_refresh_hook(domain: str, period: str | None) -> None:
     logger.info("Triggering monthly snapshot refresh from post-ETL hook")
 
     result = refresh_monthly_snapshot(period=period, dry_run=False)
+    product_line_upserted = result.get("product_line_upserted", 0)
+    plan_upserted = result.get("plan_upserted", 0)
 
     logger.info(
         "Monthly snapshot refresh completed",
-        upserted=result["upserted"],
-        total=result["total"],
+        product_line_upserted=product_line_upserted,
+        plan_upserted=plan_upserted,
+        total=product_line_upserted + plan_upserted,
     )
 
 
@@ -163,7 +167,7 @@ POST_ETL_HOOKS: List[PostEtlHook] = [
 ]
 
 
-def run_post_etl_hooks(domain: str, period: str | None) -> None:
+def run_post_etl_hooks(domain: str, period: str | None) -> dict[str, object]:
     """Execute all registered hooks for the given domain.
 
     Hooks are executed in registration order. If a hook fails, it logs
@@ -180,10 +184,18 @@ def run_post_etl_hooks(domain: str, period: str | None) -> None:
         [INFO] Contract status sync completed: inserted=1523, total=1523
     """
     matching_hooks = [hook for hook in POST_ETL_HOOKS if domain in hook.domains]
+    summary: dict[str, object] = {
+        "domain": domain,
+        "period": period,
+        "executed": 0,
+        "succeeded": 0,
+        "failed": 0,
+        "failures": [],
+    }
 
     if not matching_hooks:
         logger.debug("No post-ETL hooks registered for domain", domain=domain)
-        return
+        return summary
 
     logger.info(
         "Executing post-ETL hooks",
@@ -193,16 +205,22 @@ def run_post_etl_hooks(domain: str, period: str | None) -> None:
     )
 
     for hook in matching_hooks:
+        summary["executed"] = int(summary["executed"]) + 1
         logger.info("Running post-ETL hook", hook_name=hook.name, domain=domain)
 
         try:
             hook.hook_fn(domain, period)
+            summary["succeeded"] = int(summary["succeeded"]) + 1
             logger.info(
                 "Post-ETL hook completed",
                 hook_name=hook.name,
                 domain=domain,
             )
         except Exception as e:
+            summary["failed"] = int(summary["failed"]) + 1
+            failures = list(summary["failures"])
+            failures.append({"hook_name": hook.name, "error": str(e)})
+            summary["failures"] = failures
             logger.error(
                 "Post-ETL hook failed",
                 hook_name=hook.name,
@@ -211,6 +229,17 @@ def run_post_etl_hooks(domain: str, period: str | None) -> None:
                 exc_info=True,
             )
             # Continue with remaining hooks even if this one failed
+
+    logger.info(
+        "Post-ETL hooks summary",
+        domain=domain,
+        period=period,
+        executed=summary["executed"],
+        succeeded=summary["succeeded"],
+        failed=summary["failed"],
+    )
+
+    return summary
 
 
 def register_hook(hook: PostEtlHook) -> None:

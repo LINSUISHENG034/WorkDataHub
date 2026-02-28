@@ -86,7 +86,7 @@ class TestPostEtlHookExecution:
             ) as mock_refresh,
         ):
             # Mock return values to prevent actual execution
-            mock_sync.return_value = {"inserted": 0, "updated": 0, "total": 0}
+            mock_sync.return_value = {"inserted": 0, "closed": 0, "total": 0}
             mock_refresh.return_value = {
                 "product_line_upserted": 0,
                 "plan_upserted": 0,
@@ -127,7 +127,7 @@ class TestPostEtlHookExecution:
 
         def track_sync(**kwargs):
             execution_order.append("contract_status_sync")
-            return {"inserted": 0, "updated": 0, "total": 0}
+            return {"inserted": 0, "closed": 0, "total": 0}
 
         def track_refresh(**kwargs):
             execution_order.append("snapshot_refresh")

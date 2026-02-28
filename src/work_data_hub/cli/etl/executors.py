@@ -41,8 +41,8 @@ def _execute_queue_processing_job(args: argparse.Namespace) -> int:
     console.print("🚀 Starting company lookup queue processing...")
     console.print(f"   Domain: {args.domains}")
     console.print(f"   Batch size: {args.batch_size}")
-    console.print(f"   Execute: {args.execute}")
-    console.print(f"   Plan-only: {effective_plan_only}")
+    exec_mode = "Plan-only" if effective_plan_only else "Execute"
+    console.print(f"   Mode: {exec_mode}")
     console.print("=" * 50)
 
     try:
@@ -73,9 +73,8 @@ def _execute_queue_processing_job(args: argparse.Namespace) -> int:
         )
 
         # Report results
-        console.print(f"✅ Job completed successfully: {result.success}")
-
         if result.success:
+            console.print("✅ Job completed successfully")
             queue_result = result.output_for_node("process_company_lookup_queue_op")
 
             console.print("\n📊 Queue Processing Summary:")
@@ -113,8 +112,8 @@ def _execute_reference_sync_job(args: argparse.Namespace) -> int:  # noqa: PLR09
 
     console.print("🚀 Starting reference sync from authoritative sources...")
     console.print(f"   Domain: {args.domains}")
-    console.print(f"   Execute: {args.execute}")
-    console.print(f"   Plan-only: {effective_plan_only}")
+    exec_mode = "Plan-only" if effective_plan_only else "Execute"
+    console.print(f"   Mode: {exec_mode}")
     console.print("=" * 50)
 
     try:
@@ -144,9 +143,8 @@ def _execute_reference_sync_job(args: argparse.Namespace) -> int:  # noqa: PLR09
         )
 
         # Report results
-        console.print(f"✅ Job completed successfully: {result.success}")
-
         if result.success:
+            console.print("✅ Job completed successfully")
             output_data = result.output_for_node("reference_sync_op")
             if output_data:
                 status = output_data.get("status", "unknown")
@@ -221,15 +219,16 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:  # noq
 
     console.print(f"🚀 Starting {domain} job...")
     console.print(f"   Domain: {domain}")
-    console.print(f"   Mode: {args.mode}")
-    console.print(f"   Execute: {args.execute}")
-    console.print(f"   Plan-only: {effective_plan_only}")
-    console.print(f"   Sheet: {args.sheet}")
-    console.print(f"   Max files: {args.max_files}")
-    console.print(f"   Skip facts: {getattr(args, 'skip_facts', False)}")
+    exec_mode = "Plan-only" if effective_plan_only else "Execute"
+    console.print(f"   Mode: {args.mode} | {exec_mode}")
+    if args.sheet:
+        console.print(f"   Sheet: {args.sheet}")
+    if args.max_files and args.max_files > 1:
+        console.print(f"   Max files: {args.max_files}")
+    if getattr(args, "skip_facts", False):
+        console.print("   Skip facts: True")
     if hasattr(args, "backfill_refs") and args.backfill_refs:
-        console.print(f"   Backfill refs: {args.backfill_refs}")
-        console.print(f"   Backfill mode: {args.backfill_mode}")
+        console.print(f"   Backfill refs: {args.backfill_refs} ({args.backfill_mode})")
     console.print("=" * 50)
 
     # Story 7.5-4 AC-2: Display file discovery tree (if files are in run_config)
@@ -304,24 +303,9 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:  # noq
             )
 
         # Report results
-        console.print(f"✅ Job completed successfully: {result.success}")
-
-        # Story 7.5-5: Display hyperlink to failure log if failures occurred
         if result.success:
-            # Check if failure CSV was generated
-            from pathlib import Path
+            console.print("✅ Job completed successfully")
 
-            session_id = getattr(args, "session_id", None)
-            if session_id:
-                failure_log_path = Path("logs") / f"wdh_etl_failures_{session_id}.csv"
-                if failure_log_path.exists():
-                    link_text = console.hyperlink(
-                        f"Saved failure log to {failure_log_path.name}",
-                        failure_log_path,
-                    )
-                    console.print(f"📄 {link_text}")
-
-        if result.success:
             # Extract and display execution summary
             try:
                 backfill_result = result.output_for_node("generic_backfill_refs_op")
@@ -342,21 +326,17 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:  # noq
 
             # Display backfill execution statistics
             if backfill_result:
-                console.print("\n📥 Reference Backfill Summary:")
-                console.print(
-                    f"   Plan-only: {backfill_result.get('plan_only', False)}"
-                )
                 ops = backfill_result.get("operations", []) or []
-                if not ops:
-                    console.print("   Operations: 0 (skipped or no candidates)")
-                for op in ops:
-                    table = op.get("table")
-                    inserted = op.get("inserted")
-                    updated = op.get("updated")
-                    if inserted is not None:
-                        console.print(f"   {table}: inserted={inserted}")
-                    if updated is not None:
-                        console.print(f"   {table}: updated={updated}")
+                if ops:
+                    console.print("\n📥 Reference Backfill:")
+                    for op in ops:
+                        table = op.get("table")
+                        inserted = op.get("inserted")
+                        updated = op.get("updated")
+                        if inserted is not None:
+                            console.print(f"   {table}: inserted={inserted}")
+                        if updated is not None:
+                            console.print(f"   {table}: updated={updated}")
 
             # Display execution statistics for facts
             console.print("\n📊 Execution Summary:")
@@ -388,8 +368,22 @@ def _execute_single_domain(args: argparse.Namespace, domain: str) -> int:  # noq
             period = getattr(args, "period", None)
             console.print("\n🪝 Running Post-ETL hooks...")
             try:
-                run_post_etl_hooks(domain=domain, period=period)
-                console.print("✓ Post-ETL hooks completed")
+                hook_summary = run_post_etl_hooks(domain=domain, period=period)
+                failed_count = int(hook_summary.get("failed", 0))
+                executed_count = int(hook_summary.get("executed", 0))
+
+                if failed_count > 0:
+                    console.print(
+                        f"⚠ Post-ETL hooks completed with {failed_count} failure(s)"
+                    )
+                    for failure in hook_summary.get("failures", []):
+                        hook_name = failure.get("hook_name", "unknown_hook")
+                        error = failure.get("error", "unknown error")
+                        console.print(f"   - {hook_name}: {error}")
+                elif executed_count == 0:
+                    console.print("ℹ No Post-ETL hooks registered for this domain")
+                else:
+                    console.print("✓ Post-ETL hooks completed")
             except Exception as e:
                 console.print(f"⚠ Post-ETL hooks failed: {e}")  # Warning only
                 if args.debug:
