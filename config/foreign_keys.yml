@@ -33,13 +33,15 @@
 # - template: Construct composite text from static template with placeholders
 #     Required: template (string with {field} placeholders)
 #     Optional: template_fields (list of field names, auto-extracted if omitted)
-#     Example: template: "新建客户_{月度}"
+#     Example: template: "客户_{客户名称}_{月度}"
 # - count_distinct: Count unique non-null/non-blank values per group
 #     No additional fields required
 # - lambda: Execute custom Python lambda expression on each group
 #     Required: code (Python lambda expression string)
 #     Example: code: 'lambda g: g["月度"].iloc[0][:4]'
 #     Note: Config files are developer-controlled (trusted source)
+# - jsonb_append: Append list values to JSONB array target (e.g., tags)
+#     Required: code (lambda that returns list, e.g. ["2510新建"])
 
 schema_version: "1.2"
 
@@ -227,12 +229,12 @@ domains:
               separator: ","
               sort: true
           - source: "月度"
-            target: "年金客户标签"
+            target: "tags"
             optional: true
             aggregation:
               # 日期格式化: "2025-10-01" → strftime("%y%m") → "2510新建"
-              type: "lambda"
-              code: 'lambda g: pd.to_datetime(g["月度"].dropna().iloc[0]).strftime("%y%m") + "新建" if len(g["月度"].dropna()) > 0 else ""'
+              type: "jsonb_append"
+              code: 'lambda g: [pd.to_datetime(g["月度"].dropna().iloc[0]).strftime("%y%m") + "新建"] if len(g["月度"].dropna()) > 0 else []'
           # 固定值场景：template 无占位符 = 常量赋值（最简洁方式）
           - source: "月度"
             target: "年金客户类型"
@@ -375,12 +377,12 @@ domains:
               separator: ","
               sort: true
           - source: "月度"
-            target: "年金客户标签"
+            target: "tags"
             optional: true
             aggregation:
               # 日期格式化: "2025-10-01" → strftime("%y%m") → "2510新建"
-              type: "lambda"
-              code: 'lambda g: pd.to_datetime(g["月度"].dropna().iloc[0]).strftime("%y%m") + "新建" if len(g["月度"].dropna()) > 0 else ""'
+              type: "jsonb_append"
+              code: 'lambda g: [pd.to_datetime(g["月度"].dropna().iloc[0]).strftime("%y%m") + "新建"] if len(g["月度"].dropna()) > 0 else []'
           # 固定值场景：template 无占位符 = 常量赋值（最简洁方式）
           - source: "月度"
             target: "年金客户类型"

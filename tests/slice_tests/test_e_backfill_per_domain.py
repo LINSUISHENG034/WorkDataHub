@@ -110,7 +110,7 @@ class TestE16AnnuityPerfFkOrganization:
 # E-17: annuity_performance fk_customer (12 columns, all agg types)
 # ===================================================================
 class TestE17AnnuityPerfFkCustomer:
-    """12 column mappings, max_by+concat_distinct+count_distinct+lambda+template."""
+    """12 column mappings, max_by+concat_distinct+count_distinct+jsonb_append+template."""
 
     def test_fk_customer_config(self, annuity_perf_configs):
         fk = _find_fk(annuity_perf_configs, "fk_customer")
@@ -123,7 +123,7 @@ class TestE17AnnuityPerfFkCustomer:
         assert fk.skip_blank_values is True
 
     def test_fk_customer_agg_types_coverage(self, annuity_perf_configs):
-        """All 5 aggregation types present: max_by, concat_distinct, count_distinct, lambda, template."""
+        """All 5 aggregation types present: max_by, concat_distinct, count_distinct, jsonb_append, template."""
         fk = _find_fk(annuity_perf_configs, "fk_customer")
         assert fk is not None
         agg_types = {
@@ -133,7 +133,7 @@ class TestE17AnnuityPerfFkCustomer:
             "max_by",
             "concat_distinct",
             "count_distinct",
-            "lambda",
+            "jsonb_append",
             "template",
         ):
             assert expected in agg_types, f"Missing aggregation type: {expected}"

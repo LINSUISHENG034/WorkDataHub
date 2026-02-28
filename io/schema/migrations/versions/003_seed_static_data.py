@@ -379,14 +379,37 @@ def upgrade() -> None:
         count = _load_csv_seed_data(conn, "客户明细.csv", "客户明细", "customer")
         print(f"Seeded {count} rows into customer.客户明细")
 
-        # Migrate 年金客户标签 → tags JSONB (consolidated from 007)
+        # Merge deprecated 年金客户标签 into tags JSONB (idempotent)
+        conn.execute(
+            sa.text("""
+            WITH normalized AS (
+                SELECT
+                    company_id,
+                    NULLIF(BTRIM("年金客户标签"), '') AS normalized_tag
+                FROM customer."客户明细"
+            )
+            UPDATE customer."客户明细" AS c
+            SET tags = CASE
+                WHEN n.normalized_tag IS NULL THEN COALESCE(c.tags, '[]'::jsonb)
+                WHEN COALESCE(c.tags, '[]'::jsonb) @> to_jsonb(ARRAY[n.normalized_tag])
+                    THEN COALESCE(c.tags, '[]'::jsonb)
+                ELSE COALESCE(c.tags, '[]'::jsonb)
+                     || jsonb_build_array(n.normalized_tag)
+            END
+            FROM normalized AS n
+            WHERE c.company_id = n.company_id
+              AND (
+                  n.normalized_tag IS NOT NULL
+                  OR c.tags IS NULL
+              )
+        """)
+        )
+        # Clear deprecated source column after merge to avoid dual-write ambiguity.
         conn.execute(
             sa.text("""
             UPDATE customer."客户明细"
-            SET tags = CASE
-                WHEN "年金客户标签" IS NULL OR "年金客户标签" = '' THEN '[]'::jsonb
-                ELSE jsonb_build_array("年金客户标签")
-            END
+            SET "年金客户标签" = NULL
+            WHERE "年金客户标签" IS NOT NULL
         """)
         )
         conn.execute(
@@ -395,7 +418,7 @@ def upgrade() -> None:
             IS 'DEPRECATED: Use tags JSONB column instead'
         """)
         )
-        print("  Migrated 年金客户标签 → tags JSONB")
+        print("  Merged 年金客户标签 into tags JSONB and cleared deprecated column")
 
     # === 9. 年金计划 (1,128 rows - base table, company_id NOT LIKE 'IN%') ===
     if _table_exists(conn, "年金计划", "mapping"):

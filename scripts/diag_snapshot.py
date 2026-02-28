@@ -3,13 +3,17 @@
 Simulates what fk_customer backfill would produce using the same aggregation
 logic from foreign_keys.yml (max_by, concat_distinct, count_distinct, etc.).
 """
-import os, logging
-from dotenv import load_dotenv
-logging.disable(logging.CRITICAL)
-load_dotenv(".wdh_env", override=True)
+
+import logging
+import os
+import sys
 
 import pandas as pd
 import psycopg
+from dotenv import load_dotenv
+
+logging.disable(logging.CRITICAL)
+load_dotenv(".wdh_env", override=True)
 
 conn = psycopg.connect(os.getenv("DATABASE_URL"))
 
@@ -28,7 +32,7 @@ print(f"Found {len(missing_ids)} missing company_ids")
 if not missing_ids:
     print("No missing company_ids found. Exiting.")
     conn.close()
-    exit(0)
+    sys.exit(0)
 
 # Step 2: Pull all raw data for these company_ids from 规模明细
 placeholders = ",".join(["%s"] * len(missing_ids))
@@ -41,13 +45,14 @@ raw_sql = f"""
 raw_df = pd.read_sql(raw_sql, conn, params=missing_ids)
 print(f"Raw records for missing IDs: {len(raw_df)}")
 
-# Step 3: Apply the same aggregation logic as foreign_keys.yml fk_customer for annuity_performance
+# Step 3: Apply the same aggregation logic as foreign_keys.yml fk_customer.
 results = []
 for cid, group in raw_df.groupby("company_id"):
     row = {"company_id": cid}
 
     # 客户名称: first non-null
-    row["客户名称"] = group["客户名称"].dropna().iloc[0] if len(group["客户名称"].dropna()) > 0 else None
+    customer_names = group["客户名称"].dropna()
+    row["客户名称"] = customer_names.iloc[0] if len(customer_names) > 0 else None
 
     # 主拓机构代码: max_by(期末资产规模)
     if "期末资产规模" in group.columns and group["期末资产规模"].notna().any():
@@ -55,8 +60,10 @@ for cid, group in raw_df.groupby("company_id"):
         row["主拓机构代码"] = group.loc[max_idx, "机构代码"]
         row["主拓机构"] = group.loc[max_idx, "机构名称"]
     else:
-        row["主拓机构代码"] = group["机构代码"].dropna().iloc[0] if len(group["机构代码"].dropna()) > 0 else None
-        row["主拓机构"] = group["机构名称"].dropna().iloc[0] if len(group["机构名称"].dropna()) > 0 else None
+        org_codes = group["机构代码"].dropna()
+        org_names = group["机构名称"].dropna()
+        row["主拓机构代码"] = org_codes.iloc[0] if len(org_codes) > 0 else None
+        row["主拓机构"] = org_names.iloc[0] if len(org_names) > 0 else None
 
     # 管理资格: concat_distinct(业务类型, separator="+")
     biz_types = sorted(group["业务类型"].dropna().unique())
@@ -70,7 +77,10 @@ for cid, group in raw_df.groupby("company_id"):
     if "期末资产规模" in group.columns and group["期末资产规模"].notna().any():
         row["关键年金计划"] = group.loc[max_idx, "计划代码"]
     else:
-        row["关键年金计划"] = group["计划代码"].dropna().iloc[0] if len(group["计划代码"].dropna()) > 0 else None
+        plan_codes_non_null = group["计划代码"].dropna()
+        row["关键年金计划"] = (
+            plan_codes_non_null.iloc[0] if len(plan_codes_non_null) > 0 else None
+        )
 
     # 其他年金计划: concat_distinct(计划代码, separator=",")
     plan_codes = sorted(group["计划代码"].dropna().unique())
@@ -86,12 +96,12 @@ for cid, group in raw_df.groupby("company_id"):
     orgs = sorted(group["机构名称"].dropna().unique())
     row["其他开拓机构"] = ",".join(orgs) if orgs else None
 
-    # 年金客户标签: lambda → "YYMM新建" from first 月度
+    # tags: jsonb_append → ["YYMM新建"] from first 月度
     if len(group["月度"].dropna()) > 0:
         first_month = pd.to_datetime(group["月度"].dropna().iloc[0])
-        row["年金客户标签"] = first_month.strftime("%y%m") + "新建"
+        row["tags"] = f'["{first_month.strftime("%y%m")}新建"]'
     else:
-        row["年金客户标签"] = None
+        row["tags"] = "[]"
 
     # 年金客户类型: template → "新客"
     row["年金客户类型"] = "新客"

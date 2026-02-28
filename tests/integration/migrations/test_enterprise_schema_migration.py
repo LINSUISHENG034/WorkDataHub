@@ -351,29 +351,39 @@ class TestEnterpriseSchemaExists:
             c["name"] for c in inspector.get_columns("客户明细", schema="customer")
         }
 
-        # Expected 28 columns for 客户明细 table (includes tags JSONB)
         expected_columns = {
             "id",
+            "company_id",
             "客户名称",
-            "统一社会信用代码",
-            "机构代码",
-            "企业类型",
-            "联系人",
-            "联系电话",
-            "注册地址",
-            "成立日期",
-            "注册资本",
-            "经营范围",
+            "年金客户类型",
+            "年金计划类型",
+            "关键年金计划",
+            "主拓机构代码",
+            "主拓机构",
+            "其他年金计划",
+            "客户简称",
+            "最新受托规模",
+            "最新投管规模",
+            "管理资格",
+            "规模区间",
+            "计划层规模",
+            "年缴费规模",
+            "外部受托规模",
+            "上报受托规模",
+            "上报投管规模",
+            "关联机构数",
+            "其他开拓机构",
+            "tags",
+            "计划状态",
+            "关联计划数",
             "备注",
             "created_at",
             "updated_at",
-            "tags",
-            # ... plus 13 more columns for total of 28
         }
-        assert len(columns) == 28, f"客户明细 expected 28 columns, got {len(columns)}"
-        assert expected_columns.issubset(columns), (
-            f"客户明细 missing columns: {expected_columns - columns}"
+        assert columns == expected_columns, (
+            f"客户明细 expected columns: {expected_columns}, got: {columns}"
         )
+        assert "年金客户标签" not in columns, "legacy 年金客户标签 should be dropped"
 
         # Verify GIN index for tags JSONB (consolidated from 007)
         indexes = inspector.get_indexes("客户明细", schema="customer")
@@ -460,18 +470,30 @@ class TestEnterpriseSchemaExists:
         ], "SCD Type 2 constraint should use valid_from, not valid_to"
 
     def test_客户明细_tags_data_migration(self, migrated_db: Engine):
-        """Verify 年金客户标签 → tags JSONB migration in 003 (consolidated from 007)."""
+        """Verify migrated tags exist and legacy 年金客户标签 column is removed."""
         with migrated_db.connect() as conn:
             result = conn.execute(
                 text("""
-                SELECT COUNT(*) FILTER (WHERE tags != '[]'::jsonb) AS has_tags,
-                       COUNT(*) FILTER (WHERE tags = '[]'::jsonb) AS empty_tags
+                SELECT COUNT(*) FILTER (WHERE tags != '[]'::jsonb) AS has_tags
                 FROM customer."客户明细"
             """)
             )
             row = result.one()
-            # Seed data with non-empty 年金客户标签 should have been migrated
-            assert row.has_tags > 0, "tags migration should populate from 年金客户标签"
+            assert row.has_tags > 0, "tags should contain migrated labels"
+            column_exists = conn.execute(
+                text(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_schema = 'customer'
+                          AND table_name = '客户明细'
+                          AND column_name = '年金客户标签'
+                    )
+                    """
+                )
+            ).scalar_one()
+            assert column_exists is False, "legacy 年金客户标签 should be dropped"
 
 
 class TestMigrationIdempotency:

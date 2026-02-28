@@ -208,7 +208,8 @@ def test_h4_backfill_annuity_customer_aggregation_contract(
     assert target["主拓机构代码"] == expected_main_code
     assert int(target["关联计划数"]) == int(expected_plan_count)
     assert actual_qual_set == expected_qual_set
-    assert str(target["年金客户标签"]).endswith("新建")
+    customer_tags = json.loads(target["tags"])
+    assert any(tag.endswith("新建") for tag in customer_tags)
     assert target["年金客户类型"] == "新客"
 
 

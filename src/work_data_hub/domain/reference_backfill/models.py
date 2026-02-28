@@ -59,7 +59,7 @@ class AggregationConfig(BaseModel):
     Example for template (construct composite text):
         aggregation:
           type: template
-          template: "新建客户_{月度}"
+          template: "客户_{客户名称}_{月度}"
 
     Example for count_distinct (count unique values):
         aggregation:

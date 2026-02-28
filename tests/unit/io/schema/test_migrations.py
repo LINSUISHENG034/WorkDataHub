@@ -22,10 +22,10 @@ def test_core_tables_exist(test_db_with_migrations: str) -> None:
         revision = connection.execute(
             text("SELECT version_num FROM alembic_version")
         ).scalar_one()
-        # Updated to latest migration revision (includes upsert constraints)
+        # Updated to latest migration revision
         assert (
-            revision == "20260209_000011"
-        )  # 011_create_fct_customer_plan_monthly (head after consolidation)
+            revision == "20260228_000012"
+        )  # 012_drop_customer_legacy_label_column (head)
 
 
 @pytest.mark.integration
