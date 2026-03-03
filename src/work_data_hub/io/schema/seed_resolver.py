@@ -10,20 +10,17 @@ Directory structure expected:
     │   ├── 客户明细.csv
     │   └── ...
     ├── 002/  # Version 2 (may have subset of files)
-    │   ├── 客户明细.csv  # Updated version
-    │   └── base_info.dump  # pg_dump format for large tables
+    │   └── 客户明细.csv  # Updated version
+    ├── 003/  # Version 3
+    │   ├── base_info.csv
+    │   └── enrichment_index.csv
     └── README.md
 
 Each file independently resolves to its highest available version.
 Empty directories are ignored.
 
 Supported formats:
-    - .csv: Standard CSV files for small/medium tables
-    - .dump: pg_dump custom format for large tables with complex fields (JSON, etc.)
-
-Format priority (when multiple formats exist for same table):
-    1. .dump (preferred for large data)
-    2. .csv (fallback for compatibility)
+    - .csv: Standard CSV files (the only supported format)
 """
 
 from __future__ import annotations
@@ -31,23 +28,18 @@ from __future__ import annotations
 import enum
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 
 class SeedFormat(enum.Enum):
     """Supported seed data formats."""
 
     CSV = "csv"
-    DUMP = "dump"  # pg_dump custom format
 
     @property
     def extension(self) -> str:
         """Get file extension for this format."""
         return f".{self.value}"
-
-
-# Format priority: higher index = higher priority
-SEED_FORMAT_PRIORITY: List[SeedFormat] = [SeedFormat.CSV, SeedFormat.DUMP]
 
 
 @dataclass
@@ -65,7 +57,7 @@ class SeedFileInfo:
         return self.path.exists()
 
 
-def get_versions_containing_file(seeds_base_dir: Path, filename: str) -> List[str]:
+def get_versions_containing_file(seeds_base_dir: Path, filename: str) -> list[str]:
     """Find all version directories that contain the specified file.
 
     Args:
@@ -179,47 +171,38 @@ def get_versioned_seeds_dir(seeds_base_dir: Path) -> Path:
 
 def _find_table_files_in_version(
     seeds_base_dir: Path, version: str, table_name: str
-) -> List[tuple[Path, SeedFormat]]:
-    """Find all format variants of a table in a specific version directory."""
+) -> Optional[tuple[Path, SeedFormat]]:
+    """Find CSV file for a table in a specific version directory."""
     version_dir = seeds_base_dir / version
     if not version_dir.exists():
-        return []
+        return None
 
-    found = []
-    for fmt in SEED_FORMAT_PRIORITY:
-        file_path = version_dir / f"{table_name}{fmt.extension}"
-        if file_path.exists():
-            found.append((file_path, fmt))
+    file_path = version_dir / f"{table_name}.csv"
+    if file_path.exists():
+        return (file_path, SeedFormat.CSV)
 
-    return found
+    return None
 
 
-def resolve_seed_file(  # noqa: PLR0911, PLR0912
+def resolve_seed_file(
     table_name: str,
     seeds_base_dir: Path,
     version: Optional[str] = None,
     preferred_format: Optional[SeedFormat] = None,
 ) -> Optional[SeedFileInfo]:
-    """Resolve seed file for a table with format awareness.
+    """Resolve seed file for a table.
 
-    Searches for seed files across all supported formats and returns
-    the best match based on version and format priority.
+    Searches for CSV seed files and returns the best match
+    based on version (highest version wins).
 
     Args:
         table_name: Name of the table (without extension)
         seeds_base_dir: Path to the base seeds directory
         version: Optional explicit version override
-        preferred_format: Optional format preference override
+        preferred_format: Ignored (kept for API compatibility)
 
     Returns:
         SeedFileInfo if found, None otherwise.
-
-    Example:
-        >>> info = resolve_seed_file("base_info", Path("config/seeds"))
-        >>> if info and info.format == SeedFormat.DUMP:
-        ...     # Use pg_restore
-        >>> elif info and info.format == SeedFormat.CSV:
-        ...     # Use CSV loader
     """
     if not seeds_base_dir.exists():
         return None
@@ -234,40 +217,23 @@ def resolve_seed_file(  # noqa: PLR0911, PLR0912
 
     # If explicit version, search only that version
     if version is not None:
-        files = _find_table_files_in_version(seeds_base_dir, version, table_name)
-        if not files:
+        result = _find_table_files_in_version(seeds_base_dir, version, table_name)
+        if result is None:
             return None
-
-        # Select by preferred format or highest priority
-        if preferred_format:
-            for path, fmt in files:
-                if fmt == preferred_format:
-                    return SeedFileInfo(path, fmt, table_name, version)
-
-        # Return highest priority format
-        path, fmt = files[-1]  # Last item has highest priority
+        path, fmt = result
         return SeedFileInfo(path, fmt, table_name, version)
 
-    # Search all versions, find highest version with any format
-    versions_with_table: dict[str, List[tuple[Path, SeedFormat]]] = {}
+    # Search all versions, find highest version with the file
+    versions_with_table: dict[str, tuple[Path, SeedFormat]] = {}
     for ver in version_dirs:
-        files = _find_table_files_in_version(seeds_base_dir, ver, table_name)
-        if files:
-            versions_with_table[ver] = files
+        result = _find_table_files_in_version(seeds_base_dir, ver, table_name)
+        if result is not None:
+            versions_with_table[ver] = result
 
     if not versions_with_table:
         return None
 
     # Get highest version
     highest_version = max(versions_with_table.keys(), key=int)
-    files = versions_with_table[highest_version]
-
-    # Select by preferred format or highest priority
-    if preferred_format:
-        for path, fmt in files:
-            if fmt == preferred_format:
-                return SeedFileInfo(path, fmt, table_name, highest_version)
-
-    # Return highest priority format
-    path, fmt = files[-1]
+    path, fmt = versions_with_table[highest_version]
     return SeedFileInfo(path, fmt, table_name, highest_version)

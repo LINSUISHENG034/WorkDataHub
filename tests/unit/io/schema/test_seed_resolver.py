@@ -206,3 +206,14 @@ class TestEdgeCases:
 
         result = get_versions_containing_file(temp_seeds_dir, "test.csv")
         assert result == ["001"]  # Only version dir, not base
+
+
+class TestCsvOnlyFormat:
+    """Tests verifying dump format support has been removed."""
+
+    def test_seed_format_has_no_dump(self) -> None:
+        """SeedFormat should only have CSV after dump removal."""
+        from work_data_hub.io.schema.seed_resolver import SeedFormat
+
+        assert list(SeedFormat) == [SeedFormat.CSV]
+        assert not hasattr(SeedFormat, "DUMP")

@@ -5,14 +5,14 @@ Phase 2: Create 003_seed_static_data.py with ~1,350 rows of seed data
 
 This migration populates reference data tables from CSV files:
 - Enterprise schema: company_types_classification (104 rows),
-  industrial_classification (1,183 rows)
+  industrial_classification (1,183 rows), base_info (~27K rows),
+  enrichment_index (~45K rows)
 - Mapping schema: 产品线 (12 rows), 组织架构 (38 rows), 计划层规模 (7 rows),
   产品明细 (18 rows), 利润指标 (12 rows)
 
 All INSERT statements use ON CONFLICT DO NOTHING for idempotency.
 
-CRITICAL: All seed data comes from legacy database (config/seeds/*.csv),
-version-controlled.
+CRITICAL: All seed data comes from CSV files in config/seeds/.
 No embedded data - all values loaded from CSV files.
 
 Revision ID: 20251228_000003
@@ -23,28 +23,13 @@ Create Date: 2025-12-28
 from __future__ import annotations
 
 import csv
-import enum
-import os
-import subprocess
 from pathlib import Path
 
 import sqlalchemy as sa
 from alembic import op
 
-
-class _SeedFormat(enum.Enum):
-    """Supported seed data formats (self-contained for migration stability)."""
-
-    CSV = "csv"
-    DUMP = "dump"  # pg_dump custom format
-
-    @property
-    def extension(self) -> str:
-        return f".{self.value}"
-
-
-# Format priority: higher index = higher priority
-_SEED_FORMAT_PRIORITY = [_SeedFormat.CSV, _SeedFormat.DUMP]
+# base_info has JSONB fields up to ~100KB per row; raise CSV field limit
+csv.field_size_limit(2**31 - 1)
 
 revision = "20251228_000003"
 down_revision = "20251228_000002"
@@ -108,51 +93,6 @@ def _get_seed_file_path(filename: str) -> Path:
         return base_dir / highest / filename
 
     return base_dir / filename  # Fallback for backward compatibility
-
-
-def _resolve_seed_file(table_name: str) -> tuple[Path, _SeedFormat] | None:
-    """Resolve seed file for a table with format awareness.
-
-    Searches for seed files across all supported formats and returns
-    the best match based on version and format priority.
-
-    Args:
-        table_name: Name of the table (without extension)
-
-    Returns:
-        Tuple of (path, format) if found, None otherwise.
-    """
-    base_dir = _get_seeds_base_dir()
-
-    if not base_dir.exists():
-        return None
-
-    version_dirs = [
-        d.name for d in base_dir.iterdir() if d.is_dir() and d.name.isdigit()
-    ]
-
-    if not version_dirs:
-        return None
-
-    # Search all versions, find highest version with any format
-    versions_with_table: dict[str, list[tuple[Path, _SeedFormat]]] = {}
-    for ver in version_dirs:
-        version_dir = base_dir / ver
-        found = []
-        for fmt in _SEED_FORMAT_PRIORITY:
-            file_path = version_dir / f"{table_name}{fmt.extension}"
-            if file_path.exists():
-                found.append((file_path, fmt))
-        if found:
-            versions_with_table[ver] = found
-
-    if not versions_with_table:
-        return None
-
-    # Get highest version, highest priority format
-    highest_version = max(versions_with_table.keys(), key=int)
-    files = versions_with_table[highest_version]
-    return files[-1]  # Last item has highest priority
 
 
 def _normalize_value(value: str) -> str | None:
@@ -229,88 +169,6 @@ def _load_csv_seed_data(conn, csv_filename: str, table_name: str, schema: str) -
         inserted += 1
 
     return inserted
-
-
-def _load_dump_seed_data(conn, dump_path: Path, table_name: str, schema: str) -> int:
-    """Load seed data from pg_dump custom format file.
-
-    Args:
-        conn: SQLAlchemy connection
-        dump_path: Path to .dump file
-        table_name: Target table name
-        schema: Target schema name
-
-    Returns:
-        Number of rows loaded
-    """
-    url = conn.engine.url
-
-    cmd = [
-        "pg_restore",
-        "-h",
-        str(url.host or "localhost"),
-        "-p",
-        str(url.port or 5432),
-        "-U",
-        str(url.username or "postgres"),
-        "-d",
-        str(url.database or "postgres"),
-        "--data-only",
-        "--no-owner",
-        "--no-privileges",
-        str(dump_path),
-    ]
-
-    env = dict(os.environ)
-    if url.password:
-        env["PGPASSWORD"] = str(url.password)
-
-    try:
-        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
-        if result.returncode != 0 and "error" in result.stderr.lower():
-            print(f"Warning: pg_restore issue: {result.stderr}")
-
-        # Count rows after restore
-        count_result = conn.execute(
-            sa.text(f'SELECT COUNT(*) FROM {schema}."{table_name}"')
-        )
-        return count_result.scalar() or 0
-
-    except FileNotFoundError:
-        print("Warning: pg_restore not found. Skipping dump file.")
-        return 0
-
-
-def _load_seed_data(conn, table_name: str, schema: str) -> int:
-    """Load seed data using format-aware resolution.
-
-    Automatically detects the best format (dump > csv) and loads accordingly.
-
-    Args:
-        conn: SQLAlchemy connection
-        table_name: Target table name
-        schema: Target schema name
-
-    Returns:
-        Number of rows loaded
-    """
-    resolved = _resolve_seed_file(table_name)
-
-    if resolved is None:
-        # Fallback to CSV for backward compatibility
-        csv_path = _get_seed_file_path(f"{table_name}.csv")
-        if csv_path.exists():
-            return _load_csv_seed_data(conn, f"{table_name}.csv", table_name, schema)
-        print(f"Warning: No seed file found for {table_name}")
-        return 0
-
-    path, fmt = resolved
-    print(f"  Using {fmt.value} format: {path.name}")
-
-    if fmt == _SeedFormat.DUMP:
-        return _load_dump_seed_data(conn, path, table_name, schema)
-    else:
-        return _load_csv_seed_data(conn, path.name, table_name, schema)
 
 
 def upgrade() -> None:
@@ -434,14 +292,16 @@ def upgrade() -> None:
     # ENTERPRISE SCHEMA (Enrichment Cache)
     # ========================================================================
 
-    # === 11. base_info (27,535 rows - uses pg_dump format for JSON fields) ===
+    # === 11. base_info (27,535 rows - CSV, JSONB fields auto-cast) ===
     if _table_exists(conn, "base_info", "enterprise"):
-        count = _load_seed_data(conn, "base_info", "enterprise")
+        count = _load_csv_seed_data(conn, "base_info.csv", "base_info", "enterprise")
         print(f"Seeded {count} rows into enterprise.base_info")
 
-    # === 12. enrichment_index (32,052 rows - format auto-detected) ===
+    # === 12. enrichment_index (44,891 rows - CSV) ===
     if _table_exists(conn, "enrichment_index", "enterprise"):
-        count = _load_seed_data(conn, "enrichment_index", "enterprise")
+        count = _load_csv_seed_data(
+            conn, "enrichment_index.csv", "enrichment_index", "enterprise"
+        )
         print(f"Seeded {count} rows into enterprise.enrichment_index")
 
 

@@ -1,7 +1,7 @@
-"""Seed data loader abstraction for unified loading interface.
+"""Seed data loader for loading CSV seed data into the database.
 
 This module provides a unified interface for loading seed data from
-different formats (CSV, pg_dump) into the database.
+CSV files into the database.
 
 Usage in migration scripts:
     from work_data_hub.io.schema.seed_loader import load_seed_data
@@ -13,13 +13,12 @@ Usage in migration scripts:
 from __future__ import annotations
 
 import csv
-import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 import sqlalchemy as sa
 
-from .seed_resolver import SeedFormat, resolve_seed_file
+from .seed_resolver import resolve_seed_file
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Connection
@@ -85,69 +84,6 @@ def _load_csv_seed_data(
     return inserted
 
 
-def _load_dump_seed_data(
-    conn: Connection,
-    dump_path: Path,
-    table_name: str,
-    schema: str,
-) -> int:
-    """Load seed data from pg_dump custom format file.
-
-    Args:
-        conn: SQLAlchemy connection
-        dump_path: Path to .dump file
-        table_name: Target table name (for logging)
-        schema: Target schema name (for logging)
-
-    Returns:
-        Number of rows inserted (estimated from pg_restore output)
-    """
-    # Get connection URL from SQLAlchemy connection
-    url = conn.engine.url
-
-    cmd = [
-        "pg_restore",
-        "-h",
-        str(url.host or "localhost"),
-        "-p",
-        str(url.port or 5432),
-        "-U",
-        str(url.username or "postgres"),
-        "-d",
-        str(url.database or "postgres"),
-        "--data-only",
-        "--no-owner",
-        "--no-privileges",
-        "-t",
-        f"{schema}.{table_name}",
-        str(dump_path),
-    ]
-
-    env = {}
-    if url.password:
-        env["PGPASSWORD"] = str(url.password)
-
-    try:
-        result = subprocess.run(
-            cmd,
-            env={**subprocess.os.environ, **env},
-            capture_output=True,
-            text=True,
-        )
-        # pg_restore may return non-zero even on partial success
-        if result.returncode != 0 and "error" in result.stderr.lower():
-            raise RuntimeError(f"pg_restore failed: {result.stderr}")
-
-        # Count rows after restore
-        count_result = conn.execute(
-            sa.text(f'SELECT COUNT(*) FROM {schema}."{table_name}"')
-        )
-        return count_result.scalar() or 0
-
-    except FileNotFoundError:
-        raise RuntimeError("pg_restore not found. Ensure PostgreSQL is installed.")
-
-
 def load_seed_data(  # noqa: PLR0913
     conn: Connection,
     table_name: str,
@@ -156,35 +92,27 @@ def load_seed_data(  # noqa: PLR0913
     exclude_columns: Optional[list[str]] = None,
     version: Optional[str] = None,
 ) -> int:
-    """Load seed data for a table using the appropriate format.
-
-    Automatically resolves the seed file format and loads data accordingly.
+    """Load seed data for a table from CSV.
 
     Args:
         conn: SQLAlchemy connection
         table_name: Target table name
         schema: Target schema name
         seeds_base_dir: Path to seeds base directory
-        exclude_columns: Columns to exclude for CSV format
+        exclude_columns: Columns to exclude
         version: Optional explicit version override
 
     Returns:
         Number of rows loaded
 
     Raises:
-        FileNotFoundError: If no seed file found
-        RuntimeError: If loading fails
+        FileNotFoundError: If no seed CSV found
     """
     seed_info = resolve_seed_file(table_name, seeds_base_dir, version)
 
     if seed_info is None or not seed_info.exists:
-        raise FileNotFoundError(f"No seed file found for {table_name}")
+        raise FileNotFoundError(f"No seed CSV found for {table_name}")
 
-    if seed_info.format == SeedFormat.CSV:
-        return _load_csv_seed_data(
-            conn, seed_info.path, table_name, schema, exclude_columns
-        )
-    elif seed_info.format == SeedFormat.DUMP:
-        return _load_dump_seed_data(conn, seed_info.path, table_name, schema)
-    else:
-        raise ValueError(f"Unsupported format: {seed_info.format}")
+    return _load_csv_seed_data(
+        conn, seed_info.path, table_name, schema, exclude_columns
+    )
