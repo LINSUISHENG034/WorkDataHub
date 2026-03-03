@@ -64,6 +64,9 @@ uv sync
 uv run pre-commit install
 ```
 
+> [!NOTE]
+> **内网离线环境**：如果部署环境无法访问外部 PyPI（如公司内网隔离），所有依赖（含中文 Windows 所需的 psycopg v3）已预下载至 `vendor/wheels/` 目录。请参阅 [内网离线部署指南](../vendor/INTRANET_DEPLOY.md) 进行离线安装。
+
 ### 1.4 环境变量配置
 
 项目的数据库连接、外部配置路径及 Python 导入路径均通过环境变量文件注入。
@@ -84,6 +87,13 @@ EQC_API_KEY=your_api_key_here
 
 > [!CAUTION]
 > `.wdh_env` 文件包含数据库凭证，**不要**提交到 Git。请确保 `.gitignore` 中已忽略此文件。
+
+> [!WARNING]
+> **Windows 路径配置防坑**：在 `.wdh_env` 中配置目录路径（如 `WDH_DATA_BASE_DIR`）时，**千万不要直接复制不带引号的反斜杠路径**（如 `D:\Share\Data`），这会导致 uv 环境变量解析失败（报 `Failed to parse environment file`），进而导致 `PYTHONPATH=src` 失效，爆出 `ModuleNotFoundError: No module named 'work_data_hub'`。
+> 
+> **正确写法**（二选一）：
+> 1. 用单引号包裹：`WDH_DATA_BASE_DIR='D:\Share\Data'`
+> 2. 将反斜杠改为正斜杠：`WDH_DATA_BASE_DIR=D:/Share/Data`
 
 ---
 
@@ -418,5 +428,6 @@ uv run --env-file .wdh_env pytest tests\io\schema\ -v
 | 快照状态与事实不匹配 | 检查 `config/customer_status_rules.yml` 中 match_fields 是否与明细表列名对齐 |
 | `contract_status` 全为 NULL | 确认 `contract_status_sync` Hook 已执行（未使用 `--no-post-hooks`） |
 | `aum_balance = 0` 但规模明细有数据 | 确认 `snapshot_month` 格式为月末日期（如 `2025-10-31`），日期必须对齐 |
+| `alembic upgrade head` 报 `UnicodeDecodeError: 'utf-8' codec can't decode byte 0xd6` | 中文 Windows（GBK 区域）下 psycopg2 的 C 扩展无法解码 libpq 返回的信息。安装 `psycopg`（v3）：`uv pip install psycopg`，项目已自动切换驱动 |
 
 > 更多详尽的验证 SQL 与端到端一致性校验流程，请参阅 [实盘数据验证指南](verification_guide_real_data.md)。

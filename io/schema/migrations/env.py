@@ -52,6 +52,14 @@ else:
             fallback_url=fallback_url,
         )
 
+# GBK-locale Windows fix: psycopg2's C extension crashes with
+# UnicodeDecodeError when libpq returns GBK-encoded error messages.
+# Switch to psycopg v3 (pure Python) which handles encoding correctly.
+_url = config.get_main_option("sqlalchemy.url")
+if _url and _url.startswith("postgresql://"):
+    _url = _url.replace("postgresql://", "postgresql+psycopg://", 1)
+    config.set_main_option("sqlalchemy.url", _url)
+
 target_metadata = None
 
 
