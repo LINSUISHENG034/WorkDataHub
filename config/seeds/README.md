@@ -30,23 +30,21 @@ config/seeds/
 │   ├── enrichment_index.csv
 │   ├── 客户明细.csv
 │   └── ...
-├── 002/                              # 版本 2 (客户明细更新)
-│   └── 客户明细.csv
-├── 003/                              # 版本 3 (base_info/enrichment_index CSV化)
+├── 002/                              # 版本 2 (客户明细更新 + base_info/enrichment_index CSV化)
+│   ├── 客户明细.csv
 │   ├── base_info.csv
 │   └── enrichment_index.csv
 └── README.md
 ```
 
 **当前版本状态**:
-| 文件 | v001 | v002 | v003 | 使用版本 | 格式 |
-|------|------|------|------|----------|------|
-| base_info | - | - | 27,689 行 | v003 | csv |
-| enrichment_index | 32,052 行 | - | 45,105 行 | v003 | csv |
-| 客户明细 | 9,822 行 | 10,306 行 | - | v002 | csv |
+| 文件 | v001 | v002 |使用版本 | 格式 |
+|------|------|------|----------|------|
+| base_info | - | 27,689 行 | v002 | csv |
+| enrichment_index | 32,052 行 | 45,105 行 | v002 | csv |
+| 客户明细 | 9,822 行 | 10,306 行 | v002 | csv |
 
-> **Note:** v002 目录中仍有旧 `.dump` 文件 (base_info.dump, enrichment_index.dump)，
-> 它们不会被加载，因为 v003 CSV 文件优先级更高。业务数据备份已移至 `data/backups/`。
+> **Note:** 业务数据备份已移至 `data/backups/`。
 
 ---
 
@@ -85,9 +83,9 @@ config/seeds/
 | `产品明细.csv`                     | `\COPY mapping.产品明细 TO ... WITH CSV HEADER`                        |
 | `利润指标.csv`                     | `\COPY mapping.利润指标 TO ... WITH CSV HEADER`                        |
 
-### 3.2 版本 003 数据导出 (2026-03-03)
+### 3.2 版本 002 数据导出 (2026-03-03)
 
-**v003 使用纯 Python CSV 导出**，消除 pg_dump/pg_restore 外部工具依赖：
+**v002 使用纯 Python CSV 导出**，消除 pg_dump/pg_restore 外部工具依赖：
 
 **导出脚本**: `scripts/seed_data/export_seed_csv.py`
 

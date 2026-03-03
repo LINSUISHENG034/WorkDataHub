@@ -81,7 +81,7 @@ class TestGetDomainReturnsExpectedSchema:
     def test_annuity_performance_has_correct_delete_scope_key(self) -> None:
         """annuity_performance delete_scope_key should match DDL."""
         schema = get_domain("annuity_performance")
-        assert schema.delete_scope_key == ["月度", "计划代码", "company_id"]
+        assert schema.delete_scope_key == ["月度", "业务类型", "计划类型"]
 
     def test_annuity_performance_has_correct_composite_key(self) -> None:
         """annuity_performance composite_key should include 组合代码."""
@@ -91,7 +91,7 @@ class TestGetDomainReturnsExpectedSchema:
     def test_annuity_income_has_correct_delete_scope_key(self) -> None:
         """annuity_income delete_scope_key should match expected."""
         schema = get_domain("annuity_income")
-        assert schema.delete_scope_key == ["月度", "计划代码", "company_id"]
+        assert schema.delete_scope_key == ["月度", "业务类型", "计划类型"]
 
     def test_portfolio_plans_has_correct_delete_scope_key(self) -> None:
         """portfolio_plans delete_scope_key should match DDL."""
@@ -237,7 +237,7 @@ class TestHelperFunctions:
     def test_get_delete_scope_key(self) -> None:
         """get_delete_scope_key should return correct values."""
         key = get_delete_scope_key("annuity_performance")
-        assert key == ["月度", "计划代码", "company_id"]
+        assert key == ["月度", "业务类型", "计划类型"]
 
     def test_get_composite_key_raises_for_unknown_domain(self) -> None:
         """get_composite_key should raise KeyError for unknown domain."""
