@@ -9,6 +9,7 @@ Story 6.6: Migrated from auth/ to io/auth/ for Clean Architecture compliance.
 
 import asyncio
 import logging
+import os
 import re
 from pathlib import Path
 from typing import Optional
@@ -26,6 +27,7 @@ TARGET_API_PATH = "/kg-api-hfd/api/search/"
 DEFAULT_TIMEOUT_SECONDS = 300  # 5 minutes
 DEFAULT_ENV_FILE = ".wdh_env"
 EQC_TOKEN_KEY = "WDH_EQC_TOKEN"
+CHROMIUM_PATH_ENV_KEY = "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"
 
 logger = logging.getLogger(__name__)
 
@@ -131,8 +133,12 @@ async def get_auth_token_interactively(
             browser = None
             try:
                 # Launch headed browser for user interaction
-                logger.debug("Launching Chromium browser in headed mode")
-                browser = await playwright.chromium.launch(headless=False)
+                exec_path = os.environ.get(CHROMIUM_PATH_ENV_KEY)
+                if exec_path:
+                    logger.info("Using custom browser: %s", exec_path)
+                browser = await playwright.chromium.launch(
+                    headless=False, executable_path=exec_path or None
+                )
 
                 # --- START: 浏览器伪装配置 ---
 

@@ -139,6 +139,10 @@ DATABASE_URL=postgresql://user:password@localhost:5432/postgres
 
 # 【可选】天眼查 API Key（内网离线环境可跳过，运行时使用 --no-enrichment 参数即可）
 EQC_API_KEY=your_api_key_here
+
+# 【内网必须】Playwright 浏览器路径（auth refresh 命令使用）
+# 内网无法下载 Playwright 自带 Chromium，需指向系统已安装的 Edge 或 Chrome
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH='C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 ```
 
 > [!CAUTION]
@@ -458,5 +462,6 @@ uv run python -m pip download psycopg psycopg-binary -d vendor/wheels --only-bin
 | 快照状态与事实不匹配 | match_fields 与明细表列名不对齐 | 检查 `config/customer_status_rules.yml` |
 | `contract_status` 全为 NULL | Hook 未执行 | 确认未使用 `--no-post-hooks` |
 | `aum_balance = 0` 但规模明细有数据 | 日期格式不对齐 | 确认 `snapshot_month` 为月末日期（如 `2025-10-31`） |
+| `auth refresh` 报 `Executable doesn't exist` | Playwright 自带 Chromium 未安装（内网无法下载） | 在 `.wdh_env` 中设置 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` 指向系统 Edge/Chrome |
 
 > 更多详尽的验证 SQL 与端到端一致性校验流程，请参阅 [实盘数据验证指南](verification_guide_real_data.md)。

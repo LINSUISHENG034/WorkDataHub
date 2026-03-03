@@ -7,6 +7,7 @@ browsing to the QR code login section, reducing manual user steps.
 import asyncio
 import logging
 import multiprocessing
+import os
 import sys
 import tkinter as tk
 from datetime import datetime
@@ -25,6 +26,7 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright_stealth import Stealth
 
 from work_data_hub.io.auth.eqc_auth_handler import (
+    CHROMIUM_PATH_ENV_KEY,
     DEFAULT_ENV_FILE,
     DEFAULT_TIMEOUT_SECONDS,
     EQC_TOKEN_KEY,
@@ -266,8 +268,12 @@ async def get_auth_token_auto_qr(
             browser = None
             try:
                 # Launch browser in headless mode for better experience
-                logger.debug("Launching Chromium browser in headless mode")
-                browser = await playwright.chromium.launch(headless=True)
+                exec_path = os.environ.get(CHROMIUM_PATH_ENV_KEY)
+                if exec_path:
+                    logger.info("Using custom browser: %s", exec_path)
+                browser = await playwright.chromium.launch(
+                    headless=True, executable_path=exec_path or None
+                )
 
                 # --- Stealth Config ---
                 user_agent = (

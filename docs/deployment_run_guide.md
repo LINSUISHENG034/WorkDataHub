@@ -83,6 +83,10 @@ DATABASE_URL=postgresql://user:password@localhost:5432/postgres
 
 # 【可选】天眼查 API Key（外部企业检索服务，内网离线环境可跳过）
 EQC_API_KEY=your_api_key_here
+
+# 【可选】Playwright 浏览器路径（auth refresh 命令使用）
+# 若未安装 Playwright 自带 Chromium（如内网环境），可指向系统 Edge/Chrome
+# PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH='C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 ```
 
 > [!CAUTION]
