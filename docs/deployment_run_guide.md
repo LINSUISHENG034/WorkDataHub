@@ -9,7 +9,7 @@
 > - 请根据你使用的终端选择对应代码块。
 
 > **相关文档导航**
-> - [核心业务数据处理流程指南](domain_processing_flows.md) — ETL 六阶段处理机制与业务领域详解
+> - [数据处理指南](data_processing_guide.md) — ETL 六阶段处理机制、核心系统机制与业务领域详解
 > - [实盘数据验证指南](verification_guide_real_data.md) — 端到端数据验证 SQL 与排障手册
 > - [数据库 Schema 全景图](database-schema-panorama.md) — 表结构、ER 图与 Schema 分层说明
 
@@ -65,7 +65,7 @@ uv run pre-commit install
 ```
 
 > [!NOTE]
-> **内网离线环境**：如果部署环境无法访问外部 PyPI（如公司内网隔离），所有依赖（含中文 Windows 所需的 psycopg v3）已预下载至 `vendor/wheels/` 目录。请参阅 [内网离线部署指南](../vendor/INTRANET_DEPLOY.md) 进行离线安装。
+> **内网离线环境**：如果部署环境无法访问外部 PyPI（如公司内网隔离），所有依赖（含中文 Windows 所需的 psycopg v3）已预下载至 `vendor/wheels/` 目录。请参阅 [内网部署与运行指南](deployment_run_guide_intranet.md)，该文档完整覆盖内网环境下的依赖安装、配置与 CLI 运行全流程。
 
 ### 1.4 环境变量配置
 
@@ -176,7 +176,7 @@ ETL 会按以下生命周期自动进行流转：
 文件发现 → 数据读取 → 领域管线处理(清洗+企业解析) → 外键维表回填 → 关卡校验 → 最终入库 → Post-ETL Hooks
 ```
 
-> 💡 各阶段的详细机制解析请参阅 [核心业务数据处理流程指南](domain_processing_flows.md)。
+> 💡 各阶段的详细机制解析请参阅 [数据处理指南](data_processing_guide.md)。
 
 **Bash / PowerShell：**
 ```bash
