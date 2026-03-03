@@ -23,6 +23,7 @@ Create Date: 2025-12-28
 from __future__ import annotations
 
 import csv
+from itertools import chain
 from pathlib import Path
 
 import sqlalchemy as sa
@@ -30,6 +31,7 @@ from alembic import op
 
 # base_info has JSONB fields up to ~100KB per row; raise CSV field limit
 csv.field_size_limit(2**31 - 1)
+_BATCH_SIZE = 1000
 
 revision = "20251228_000003"
 down_revision = "20251228_000002"
@@ -96,14 +98,10 @@ def _get_seed_file_path(filename: str) -> Path:
 
 
 def _normalize_value(value: str) -> str | None:
-    """Normalize CSV value by stripping whitespace and newlines.
-
-    Returns None for empty strings to handle numeric columns correctly.
-    """
+    """Normalize CSV value while preserving content fidelity."""
     if value is None:
         return None
-    cleaned = value.strip().replace("\r\n", "").replace("\n", "").replace("\r", "")
-    return cleaned if cleaned else None
+    return None if value == "" else value
 
 
 def _load_csv_seed_data(conn, csv_filename: str, table_name: str, schema: str) -> int:
@@ -117,58 +115,68 @@ def _load_csv_seed_data(conn, csv_filename: str, table_name: str, schema: str) -
         print(f"Warning: CSV file not found: {csv_path}")
         return 0
 
-    with open(csv_path, "r", encoding="utf-8-sig") as f:
+    with open(csv_path, "r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
-        rows = list(reader)
+        first_row = next(reader, None)
 
-    if not rows:
-        return 0
+        if first_row is None:
+            return 0
 
-    # Build INSERT statement with ON CONFLICT DO NOTHING
-    columns = list(rows[0].keys())
-    # Exclude 'id' for tables with GENERATED ALWAYS AS IDENTITY columns
-    # Story 7.5: Added 客户明细 to the list (id is now IDENTITY)
-    if "id" in columns and table_name in [
-        "年金计划",
-        "组合计划",
-        "客户明细",
-    ]:
-        columns.remove("id")
+        # Build INSERT statement with ON CONFLICT DO NOTHING
+        columns = list(first_row.keys())
+        # Exclude 'id' for tables with GENERATED ALWAYS AS IDENTITY columns
+        # Story 7.5: Added 客户明细 to the list (id is now IDENTITY)
+        if "id" in columns and table_name in [
+            "年金计划",
+            "组合计划",
+            "客户明细",
+        ]:
+            columns.remove("id")
 
-    # Exclude created_at/updated_at for tables with server_default=now()
-    # These columns should use database defaults, not CSV values (which may be empty)
-    if table_name == "客户明细":
-        if "created_at" in columns:
-            columns.remove("created_at")
-        if "updated_at" in columns:
-            columns.remove("updated_at")
+        # Exclude created_at/updated_at for tables with server_default=now().
+        # These columns should use database defaults, not CSV values.
+        if table_name == "客户明细":
+            if "created_at" in columns:
+                columns.remove("created_at")
+            if "updated_at" in columns:
+                columns.remove("updated_at")
 
-    columns_str = ", ".join(f'"{col}"' for col in columns)
-    # Use safe parameter names (param_0, param_1, etc.) to handle special chars
-    # in column names
-    placeholders_str = ", ".join(f":param_{i}" for i in range(len(columns)))
+        columns_str = ", ".join(f'"{col}"' for col in columns)
+        # Use safe parameter names (param_0, param_1, etc.) to handle special chars
+        # in column names
+        placeholders_str = ", ".join(f":param_{i}" for i in range(len(columns)))
 
-    insert_sql = f"""
-        INSERT INTO {schema}."{table_name}" ({columns_str})
-        VALUES ({placeholders_str})
-        ON CONFLICT DO NOTHING
-    """
+        insert_sql = f"""
+            INSERT INTO {schema}."{table_name}" ({columns_str})
+            VALUES ({placeholders_str})
+            ON CONFLICT DO NOTHING
+        """
 
-    # Execute batch insert with remapped parameter names and normalized values
-    inserted = 0
-    for row in rows:
-        # Map original column names to safe parameter names with normalization
-        params = {
-            f"param_{i}": _normalize_value(row[col]) for i, col in enumerate(columns)
-        }
-        # Skip empty rows (all values are None because _normalize_value returns None
-        # for empty strings)
-        if all(v is None for v in params.values()):
-            continue
-        conn.execute(sa.text(insert_sql), params)
-        inserted += 1
+        statement = sa.text(insert_sql)
+        inserted = 0
+        batch: list[dict[str, str | None]] = []
 
-    return inserted
+        for row in chain([first_row], reader):
+            # Map original column names to safe parameter names with normalization
+            params = {
+                f"param_{i}": _normalize_value(row[col])
+                for i, col in enumerate(columns)
+            }
+            # Skip empty rows (all values are None because _normalize_value returns None
+            # for empty strings)
+            if all(v is None for v in params.values()):
+                continue
+            batch.append(params)
+            if len(batch) >= _BATCH_SIZE:
+                conn.execute(statement, batch)
+                inserted += len(batch)
+                batch.clear()
+
+        if batch:
+            conn.execute(statement, batch)
+            inserted += len(batch)
+
+        return inserted
 
 
 def upgrade() -> None:

@@ -171,7 +171,9 @@ real_data/
 sample_data/
 monthly/
 scripts/migrations/legacy_db/
-config/seeds/
+config/seeds/**
+!config/seeds/
+!config/seeds/README.md
 
 # Reference and documentation
 reference/

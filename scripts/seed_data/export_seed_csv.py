@@ -21,10 +21,12 @@ Usage::
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
 import psycopg
+from psycopg import sql
 
 from work_data_hub.config import get_settings
 
@@ -33,6 +35,8 @@ DEFAULT_TABLES: list[tuple[str, str]] = [
     ("enterprise", "base_info"),
     ("enterprise", "enrichment_index"),
 ]
+
+_IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def get_connection_string() -> str:
@@ -64,14 +68,20 @@ def export_table_to_csv(
     with psycopg.connect(conn_string) as conn:
         with conn.cursor() as cur:
             # Get row count first
-            cur.execute(f'SELECT COUNT(*) FROM {schema}."{table}"')
+            cur.execute(
+                sql.SQL("SELECT COUNT(*) FROM {}.{}").format(
+                    sql.Identifier(schema),
+                    sql.Identifier(table),
+                )
+            )
             row_count = cur.fetchone()[0]
 
             # Export using COPY protocol (no external tools)
-            copy_sql = (
-                f'COPY {schema}."{table}" TO STDOUT'
-                " WITH (FORMAT CSV, HEADER true,"
-                " ENCODING 'UTF8')"
+            copy_sql = sql.SQL(
+                "COPY {}.{} TO STDOUT WITH (FORMAT CSV, HEADER true, ENCODING 'UTF8')"
+            ).format(
+                sql.Identifier(schema),
+                sql.Identifier(table),
             )
             with open(output_path, "wb") as f:
                 with cur.copy(copy_sql) as copy:
@@ -90,7 +100,18 @@ def parse_table_identifier(table_id: str) -> tuple[str, str]:
     if "." not in table_id:
         raise ValueError(f"Invalid format: {table_id}. Use schema.table")
     schema, table = table_id.split(".", 1)
-    return schema, table.strip('"')
+    schema = schema.strip()
+    table = table.strip().strip('"')
+
+    if not schema or not table:
+        raise ValueError(f"Invalid format: {table_id}. Use schema.table")
+
+    if not _IDENTIFIER_PATTERN.fullmatch(schema):
+        raise ValueError(f"Invalid schema identifier: {schema}")
+    if not _IDENTIFIER_PATTERN.fullmatch(table):
+        raise ValueError(f"Invalid table identifier: {table}")
+
+    return schema, table
 
 
 def main() -> int:

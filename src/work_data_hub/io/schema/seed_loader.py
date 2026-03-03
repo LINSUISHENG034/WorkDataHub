@@ -13,6 +13,7 @@ Usage in migration scripts:
 from __future__ import annotations
 
 import csv
+from itertools import chain
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
@@ -23,13 +24,17 @@ from .seed_resolver import resolve_seed_file
 if TYPE_CHECKING:
     from sqlalchemy.engine import Connection
 
+# base_info CSV contains large JSON payloads that exceed Python's default limit.
+csv.field_size_limit(2**31 - 1)
+
+_BATCH_SIZE = 1000
+
 
 def _normalize_value(value: str) -> str | None:
-    """Normalize CSV value by stripping whitespace and newlines."""
+    """Normalize CSV value while preserving content fidelity."""
     if value is None:
         return None
-    cleaned = value.strip().replace("\r\n", "").replace("\n", "").replace("\r", "")
-    return cleaned if cleaned else None
+    return None if value == "" else value
 
 
 def _load_csv_seed_data(
@@ -53,35 +58,45 @@ def _load_csv_seed_data(
     """
     exclude_columns = exclude_columns or []
 
-    with open(csv_path, "r", encoding="utf-8-sig") as f:
+    with open(csv_path, "r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
-        rows = list(reader)
+        first_row = next(reader, None)
+        if first_row is None:
+            return 0
 
-    if not rows:
-        return 0
+        # Filter columns
+        columns = [c for c in first_row.keys() if c not in exclude_columns]
+        columns_str = ", ".join(f'"{col}"' for col in columns)
+        placeholders_str = ", ".join(f":param_{i}" for i in range(len(columns)))
 
-    # Filter columns
-    columns = [c for c in rows[0].keys() if c not in exclude_columns]
-    columns_str = ", ".join(f'"{col}"' for col in columns)
-    placeholders_str = ", ".join(f":param_{i}" for i in range(len(columns)))
+        insert_sql = f"""
+            INSERT INTO {schema}."{table_name}" ({columns_str})
+            VALUES ({placeholders_str})
+            ON CONFLICT DO NOTHING
+        """
 
-    insert_sql = f"""
-        INSERT INTO {schema}."{table_name}" ({columns_str})
-        VALUES ({placeholders_str})
-        ON CONFLICT DO NOTHING
-    """
+        statement = sa.text(insert_sql)
+        inserted = 0
+        batch: list[dict[str, str | None]] = []
 
-    inserted = 0
-    for row in rows:
-        params = {
-            f"param_{i}": _normalize_value(row[col]) for i, col in enumerate(columns)
-        }
-        if all(v is None for v in params.values()):
-            continue
-        conn.execute(sa.text(insert_sql), params)
-        inserted += 1
+        for row in chain([first_row], reader):
+            params = {
+                f"param_{i}": _normalize_value(row[col])
+                for i, col in enumerate(columns)
+            }
+            if all(v is None for v in params.values()):
+                continue
+            batch.append(params)
+            if len(batch) >= _BATCH_SIZE:
+                conn.execute(statement, batch)
+                inserted += len(batch)
+                batch.clear()
 
-    return inserted
+        if batch:
+            conn.execute(statement, batch)
+            inserted += len(batch)
+
+        return inserted
 
 
 def load_seed_data(  # noqa: PLR0913
