@@ -24,11 +24,11 @@ PYTHONPATH=src uv run python scripts/migrations/migrate_legacy_to_enrichment_ind
 # Reference: docs/templates/cleansing-rules-template.md
 
 # Step 4: Implement domain (2-3 days)
-# Create 7 files: adapter.py, models.py, schemas.py, etc.
+# Create 8 files: __init__.py, adapter.py, constants.py, models.py, schemas.py, helpers.py, service.py, pipeline_builder.py
 # Use: docs/guides/domain-migration/development-guide.md
 
-# Step 5: Register Protocol adapter (NEW)
-# Edit domain/registry.py to register your {Domain}Service
+# Step 5: Register Protocol adapter
+# Edit domain/registry.py to register your {Domain}Service (5 domains currently registered)
 
 # Step 6: Validate mappings (critical!)
 # Verify all mappings from legacy are present and correctly handled

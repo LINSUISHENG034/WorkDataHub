@@ -1,7 +1,7 @@
 # Domain Migration Workflow
 
-**Version:** 2.0
-**Last Updated:** 2026-01-14
+**Version:** 2.1
+**Last Updated:** 2026-03-04
 **Purpose:** Single entry point for complete domain migration from legacy to new architecture
 
 > [!TIP]
@@ -19,7 +19,7 @@ This document provides a complete end-to-end workflow for migrating a legacy dom
 |-------|------|-------|--------|----------|-------|
 | **Phase 1** | Dependency Preparation | Legacy code analysis | Dependencies migrated | 1-2 days | [Section 1](#phase-1-dependency-preparation) |
 | **Phase 2** | Documentation | Legacy code | `cleansing-rules/{domain}.md` | 1-2 days | [Section 2](#phase-2-documentation) |
-| **Phase 3** | Implementation | Cleansing rules doc | 6-file domain structure | 2-3 days | [Section 3](#phase-3-implementation) |
+| **Phase 3** | Implementation | Cleansing rules doc | 8-file domain structure | 2-3 days | [Section 3](#phase-3-implementation) |
 | **Phase 4** | Validation | Legacy + New outputs | 100% parity match | 1-2 days | [Section 4](#phase-4-validation) |
 
 ---
@@ -39,7 +39,7 @@ This document provides a complete end-to-end workflow for migrating a legacy dom
 │         │                  │                  │                  │         │
 │         ▼                  ▼                  ▼                  ▼         │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐  │
-│  │ Dependencies│    │ cleansing-  │    │ 6-file      │    │ 100% match  │  │
+│  │ Dependencies│    │ cleansing-  │    │ 8-file      │    │ 100% match  │  │
 │  │ migrated to │    │ rules/      │    │ domain      │    │ parity      │  │
 │  │ enrichment  │    │ {domain}.md │    │ structure   │    │ report      │  │
 │  │ index       │    │             │    │             │    │             │  │
@@ -162,8 +162,8 @@ This document provides a complete end-to-end workflow for migrating a legacy dom
   ```
   src/work_data_hub/domain/{domain_name}/
   ├── __init__.py
-  ├── adapter.py            # [NEW] Protocol adapter
-  ├── constants.py
+  ├── adapter.py            # Protocol adapter
+  ├── constants.py          # Domain-specific constants
   ├── models.py
   ├── schemas.py
   ├── helpers.py
@@ -219,7 +219,7 @@ This document provides a complete end-to-end workflow for migrating a legacy dom
 
 ### Exit Criteria
 
-- [ ] All 6 files implemented
+- [ ] All 8 files implemented
 - [ ] Unit tests passing
 - [ ] Integration tests passing
 - [ ] Code reviewed
@@ -285,7 +285,7 @@ This document provides a complete end-to-end workflow for migrating a legacy dom
 
 ### Code Complete
 
-- [ ] `src/work_data_hub/domain/{domain_name}/` - 7-file structure (incl. adapter.py)
+- [ ] `src/work_data_hub/domain/{domain_name}/` - 8-file structure (incl. adapter.py)
 - [ ] `domain/registry.py` - Domain registered
 - [ ] `tests/unit/domain/{domain_name}/` - Unit tests
 - [ ] `tests/integration/domain/{domain_name}/` - Integration tests
@@ -311,6 +311,9 @@ This document provides a complete end-to-end workflow for migrating a legacy dom
 |--------|-----------------|------|--------|
 | `annuity_performance` | (implicit) | `domain/annuity_performance/` | Migrated |
 | `annuity_income` | [annuity-income.md](../../cleansing-rules/annuity-income.md) | `domain/annuity_income/` | Migrated |
+| `annual_award` | — | `domain/annual_award/` | Migrated |
+| `annual_loss` | — | `domain/annual_loss/` | Migrated |
+| `sandbox_trustee_performance` | — | `domain/sandbox_trustee_performance/` | Migrated |
 
 ### Pending Migrations
 
@@ -381,15 +384,15 @@ Use this checklist to ensure all steps are completed before marking a domain mig
 - [ ] Domain added to cleansing-rules/index.md
 
 ### 💻 Phase 3: Implementation
-- [ ] Domain directory created with all 7 files
+- [ ] Domain directory created with all 8 files
   - [ ] `__init__.py` - Module exports
-  - [ ] `adapter.py` - Protocol adapter (NEW)
+  - [ ] `adapter.py` - Protocol adapter
   - [ ] `constants.py` - Mappings and configurations
   - [ ] `models.py` - Pydantic models
   - [ ] `schemas.py` - Pandera schemas
   - [ ] `helpers.py` - Transformation functions
-  - [ ] `pipeline_builder.py` - Pipeline steps
   - [ ] `service.py` - Business logic
+  - [ ] `pipeline_builder.py` - Pipeline steps
 - [ ] Code follows patterns from development-guide.md
 - [ ] Unit tests written and passing
 - [ ] Integration tests written and passing
@@ -410,7 +413,7 @@ Use this checklist to ensure all steps are completed before marking a domain mig
   - [ ] `docs/domains/{domain}.md` (optional)
   - [ ] `docs/runbooks/{domain}.md` (optional)
 - [ ] Code complete
-  - [ ] All 6 domain files
+  - [ ] All 8 domain files
   - [ ] Unit tests
   - [ ] Integration tests
 - [ ] Validation complete

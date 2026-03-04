@@ -1,7 +1,7 @@
 # Cleansing Rules to Code Mapping Guide
 
-**Version:** 1.1
-**Last Updated:** 2026-01-09
+**Version:** 1.2
+**Last Updated:** 2026-03-04
 **Purpose:** Translate cleansing rules documentation into implementation code
 
 ---

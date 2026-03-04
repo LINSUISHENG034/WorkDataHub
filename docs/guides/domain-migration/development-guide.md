@@ -1,7 +1,7 @@
 # Domain Development Guide
 
-**Version:** 2.0
-**Last Updated:** 2026-01-14
+**Version:** 2.1
+**Last Updated:** 2026-03-04
 **Based On:** Orchestration Layer Refactor (Protocol + Registry + Factory)
 
 ---
@@ -29,7 +29,7 @@ This guide provides comprehensive instructions for implementing new data domains
 ### Purpose
 
 - Enable developers to independently create new domains following established patterns
-- Document the 6-file standard domain structure
+- Document the 8-file standard domain structure
 - Capture best practices and common pitfalls discovered during Epic 5.5
 - Provide reusable code templates and configuration examples
 
@@ -68,20 +68,20 @@ Before implementing a new domain, ensure you have:
 
 ---
 
-## Domain Directory Structure (7-File Standard)
+## Domain Directory Structure (8-File Standard)
 
-Each domain follows a standardized 7-file structure (updated with Protocol adapter):
+Each domain follows a standardized 8-file structure (updated with Protocol adapter):
 
 ```
 src/work_data_hub/domain/{domain_name}/
 ├── __init__.py          # Module exports
-├── adapter.py           # [NEW] DomainServiceProtocol implementation
+├── adapter.py           # DomainServiceProtocol implementation
+├── constants.py         # Domain-specific constants
 ├── models.py            # Pydantic data models (Bronze/Silver/Gold)
 ├── schemas.py           # Pandera DataFrame schemas
 ├── helpers.py           # Data transformation helpers
 ├── service.py           # Business service layer
-├── pipeline_builder.py  # Pipeline step configuration
-└── constants.py         # Domain-specific constants (optional)
+└── pipeline_builder.py  # Pipeline step configuration
 ```
 
 ### File Responsibilities
@@ -253,6 +253,7 @@ domains:
 | `count_distinct` | Count unique non-null values per group | None |
 | `template` | Construct text from template with placeholders | `template` |
 | `lambda` | Execute custom Python lambda expression | `code` |
+| `jsonb_append` | Append list values to JSONB array column | `code` |
 
 **Lambda Security Note:**
 > [!CAUTION]
@@ -276,7 +277,7 @@ domains:
 |---------|----------|----------------|
 | 1.0 | Basic `foreign_keys`, `depends_on`, `optional` | N/A (initial) |
 | 1.1 | `target_schema`, `skip_blank_values` | Additive, 1.0 compatible |
-| 1.2 (current) | Advanced aggregations (`max_by`, `concat_distinct`, `count_distinct`, `template`, `lambda`) | Additive, 1.x compatible |
+| 1.2 (current) | Advanced aggregations (`max_by`, `concat_distinct`, `count_distinct`, `template`, `lambda`, `jsonb_append`) | Additive, 1.x compatible |
 | 2.0 (future) | Breaking changes (if any) | Migration script + deprecation warnings |
 
 **Version Compatibility Rules:**
@@ -287,114 +288,48 @@ domains:
 
 ### Data Loading Mode Configuration
 
-WorkDataHub supports two data loading modes. Choose based on your table type:
+WorkDataHub uses a CLI-driven data loading approach. The final loading step (`load_op`) performs an **idempotent delete-then-insert** operation on the target table, driven by the composite primary key (`pk`) defined in `config/data_sources.yml`.
 
-#### Mode 1: REFRESH Mode (DELETE + INSERT) - For Detail Tables
+#### Default Mode: `delete_insert`
 
-Use this mode when:
-- Table contains **detail records** (明细数据)
-- Same key combination can have **multiple rows**
-- You want to **replace all records** matching certain criteria
+The default (and most common) mode:
+1. Delete existing rows matching the PK values found in the input data
+2. Bulk insert all new records
 
-**Configuration:**
+This is **not** an `ON CONFLICT` upsert — it is a delete-then-insert pattern that ensures idempotent reloads.
 
-```python
-# service.py
+#### Alternative Mode: `append`
 
-# Enable/disable UPSERT mode (requires UNIQUE constraint on upsert_keys)
-ENABLE_UPSERT_MODE = False  # Detail table - use refresh mode instead
+For append-only use cases where existing data should never be deleted.
 
-# UPSERT keys (only used when ENABLE_UPSERT_MODE = True)
-DEFAULT_UPSERT_KEYS: Optional[List[str]] = None
+#### Configuration in `data_sources.yml`
 
-# REFRESH keys (used when ENABLE_UPSERT_MODE = False)
-# Defines scope for DELETE before INSERT (Legacy: update_based_on_field)
-DEFAULT_REFRESH_KEYS = ["月度", "业务类型", "计划类型"]
+```yaml
+# config/data_sources.yml
+domains:
+  annuity_performance:
+    output:
+      table_name: "规模明细"
+      pk: ["月度", "业务类型", "计划类型"]  # Composite key for delete_insert
+    # ...
 ```
 
-**Behavior:**
-1. Extract unique combinations of `refresh_keys` from input data
-2. DELETE all existing records matching those combinations
-3. INSERT all new records
+The `pk` attribute defines which columns scope the DELETE before INSERT. All existing records matching the PK combinations present in the input data are deleted, then all new records are inserted.
 
-**Example:** If input has records for `月度=202401, 业务类型=受托, 计划类型=企业年金`:
-- All existing records with that combination are deleted
-- All new records are inserted (even if >1 record per combination)
+#### CLI Behavior
 
-**Database Requirements:** No UNIQUE constraint needed.
-
-**Usage in service function:**
-
-```python
-def process_{domain}(
-    month: str,
-    *,
-    refresh_keys: Optional[List[str]] = None,
-    # ... other parameters
-) -> DomainPipelineResult:
-    if ENABLE_UPSERT_MODE:
-        # UPSERT mode
-        load_result = warehouse_loader.load_dataframe(...)
-    else:
-        # REFRESH mode
-        actual_refresh_keys = refresh_keys if refresh_keys is not None else DEFAULT_REFRESH_KEYS
-        load_result = warehouse_loader.load_with_refresh(
-            dataframe,
-            table=table_name,
-            schema=schema,
-            refresh_keys=actual_refresh_keys,
-        )
-```
-
-#### Mode 2: UPSERT Mode (ON CONFLICT DO UPDATE) - For Aggregate Tables
-
-Use this mode when:
-- Table contains **aggregate records** (汇总数据)
-- Each key combination has **exactly one row**
-- You want to **update existing records** or insert new ones
-
-**Configuration:**
-
-```python
-# service.py
-
-ENABLE_UPSERT_MODE = True  # Aggregate table - use upsert mode
-
-# Keys for conflict detection (must be UNIQUE in database)
-DEFAULT_UPSERT_KEYS = ["月度", "计划代码"]
-
-# Not used in UPSERT mode
-DEFAULT_REFRESH_KEYS: Optional[List[str]] = None
-```
-
-**Behavior:**
-- INSERT new records
-- UPDATE existing records when key conflict occurs
-
-**Database Requirements:** UNIQUE constraint required on `upsert_keys`.
-
-```sql
--- Add unique constraint for upsert support
-ALTER TABLE {schema}.{table_name}
-ADD CONSTRAINT uq_{table_name}_upsert_key
-UNIQUE ({upsert_key_columns});
-```
-
-#### Quick Reference
-
-| Table Type | Mode | Config | DB Constraint |
-|------------|------|--------|---------------|
-| Detail (明细) | REFRESH | `ENABLE_UPSERT_MODE = False` | None |
-| Aggregate (汇总) | UPSERT | `ENABLE_UPSERT_MODE = True` | UNIQUE required |
+- Without `--execute`, the CLI runs in **plan-only mode** (no database writes)
+- `generic_backfill_refs_op` is always invoked but returns 0 operations if no FK config exists for the domain
 
 #### Current Domain Configurations
 
-| Domain | Table Type | Mode | Refresh/Upsert Keys |
-|--------|------------|------|---------------------|
-| `annuity_performance` | Detail | REFRESH | `["月度", "业务类型", "计划类型"]` |
-| `annuity_income` | Detail | REFRESH | `["月度", "业务类型", "计划类型"]` |
-
-> **Reference:** [Sprint Change Proposal - Upsert Keys Redesign](../sprint-artifacts/sprint-change-proposal/sprint-change-proposal-2025-12-06-upsert-keys-redesign.md)
+| Domain | Output Table | Output Schema | PK (delete scope) |
+|--------|-------------|---------------|-------------------|
+| `annuity_performance` | `规模明细` | `business` | `["月度", "业务类型", "计划类型"]` |
+| `annuity_income` | `收入明细` | `business` | `["月度", "业务类型", "计划类型"]` |
+| `annual_award` | `中标客户明细` | `customer` | `["上报月份", "业务类型"]` |
+| `annual_loss` | `流失客户明细` | `customer` | `["上报月份", "业务类型"]` |
+| `sandbox_trustee_performance` | `sandbox_trustee_performance` | `sandbox` | (none — sandbox domain) |
 
 ### Cleansing Registry Configuration
 
@@ -744,14 +679,8 @@ from .pipeline_builder import build_bronze_to_silver_pipeline
 
 logger = structlog.get_logger(__name__)
 
-# Choose loading strategy based on table type
-ENABLE_UPSERT_MODE = False  # Detail tables -> REFRESH; Aggregate -> True (UPSERT)
-
-# UPSERT keys (used when ENABLE_UPSERT_MODE = True)
-DEFAULT_UPSERT_KEYS = ["report_date", "primary_key"]
-
-# REFRESH keys (used when ENABLE_UPSERT_MODE = False)
-DEFAULT_REFRESH_KEYS = ["report_date", "business_type", "plan_type"]
+# Composite primary key for delete_insert loading (must match data_sources.yml pk)
+DEFAULT_PK_KEYS = ["report_date", "business_type", "plan_type"]
 
 
 def process_{domain}(
@@ -762,8 +691,7 @@ def process_{domain}(
     domain: str = "{domain}",
     table_name: str = "{domain}_table",
     schema: str = "public",
-    upsert_keys: Optional[List[str]] = None,
-    refresh_keys: Optional[List[str]] = None,
+    pk_keys: Optional[List[str]] = None,
 ) -> DomainPipelineResult:
     """Process {domain} data for a given month."""
     normalized_month = normalize_month(month)
@@ -783,7 +711,6 @@ def process_{domain}(
     context = PipelineContext(
         pipeline_name="bronze_to_silver",
         domain=domain,
-        # ... other context fields
     )
     result_df = pipeline.execute(discovery_result.df.copy(), context)
 
@@ -796,24 +723,15 @@ def process_{domain}(
         # ... export failed records logic
         pass
 
-    # Step 5: Load to warehouse (UPSERT for aggregate, REFRESH for detail)
+    # Step 5: Load to warehouse (delete_insert mode driven by CLI/data_sources.yml)
     dataframe = pd.DataFrame([r.model_dump() for r in records])
-    if ENABLE_UPSERT_MODE:
-        actual_upsert_keys = upsert_keys if upsert_keys is not None else DEFAULT_UPSERT_KEYS
-        load_result = warehouse_loader.load_dataframe(
-            dataframe,
-            table=table_name,
-            schema=schema,
-            upsert_keys=actual_upsert_keys,
-        )
-    else:
-        actual_refresh_keys = refresh_keys if refresh_keys is not None else DEFAULT_REFRESH_KEYS
-        load_result = warehouse_loader.load_with_refresh(
-            dataframe,
-            table=table_name,
-            schema=schema,
-            refresh_keys=actual_refresh_keys,
-        )
+    actual_pk = pk_keys if pk_keys is not None else DEFAULT_PK_KEYS
+    load_result = warehouse_loader.load_dataframe(
+        dataframe,
+        table=table_name,
+        schema=schema,
+        pk_keys=actual_pk,
+    )
 
     duration_ms = (time.perf_counter() - start_time) * 1000
     logger.bind(domain=domain).info("pipeline.completed", duration_ms=duration_ms)
@@ -878,7 +796,9 @@ def build_bronze_to_silver_pipeline() -> Pipeline:
     return pipeline
 ---
 
-### adapter.py Template (NEW - DomainServiceProtocol)
+### adapter.py Template — Pattern A: Service Delegation
+
+Use this pattern when the adapter delegates to an existing `service.py` function (e.g., `annuity_performance`, `annuity_income`).
 
 ```python
 """Domain Service Adapter implementing DomainServiceProtocol.
@@ -959,29 +879,158 @@ from work_data_hub.domain.{domain_name}.adapter import {Domain}Service
 register_domain("{domain_name}", {Domain}Service())
 ```
 
+### adapter.py Template — Pattern B: Direct Pipeline Execution
+
+Use this pattern when the adapter builds and executes the pipeline directly in `process()`, bypassing `service.py` (e.g., `annual_award`, `annual_loss`). This is appropriate when the domain has no standalone service function and the adapter *is* the orchestration layer.
+
+```python
+"""Domain Service Adapter — Direct Pipeline Execution.
+
+The adapter builds the pipeline in process(), managing DB connections
+and pipeline lifecycle directly.
+"""
+import time
+from datetime import datetime, timezone
+from typing import Any, Dict, List
+
+import pandas as pd
+
+from work_data_hub.domain.protocols import (
+    DomainProcessingResult,
+    ProcessingContext,
+)
+
+
+class {Domain}Service:
+    """{Domain} 领域服务适配器 (Direct Pipeline pattern)."""
+
+    @property
+    def domain_name(self) -> str:
+        return "{domain}"
+
+    @property
+    def requires_enrichment(self) -> bool:
+        return True
+
+    @property
+    def requires_backfill(self) -> bool:
+        return False  # FK backfill handled at orchestration level via config
+
+    def process(
+        self,
+        rows: List[Dict[str, Any]],
+        context: ProcessingContext,
+    ) -> DomainProcessingResult:
+        """Build and execute pipeline directly."""
+        from .helpers import convert_dataframe_to_models
+        from .pipeline_builder import build_bronze_to_silver_pipeline
+        from work_data_hub.domain.pipelines.types import PipelineContext
+        from work_data_hub.infrastructure.enrichment import EqcLookupConfig
+        from work_data_hub.infrastructure.enrichment.mapping_repository import (
+            CompanyMappingRepository,
+        )
+
+        start = time.perf_counter()
+
+        # Create mapping repository if enrichment is enabled
+        mapping_repository = None
+        repo_connection = None
+
+        if context.enrichment_service is not None:
+            try:
+                from sqlalchemy import create_engine
+                from work_data_hub.config.settings import get_settings
+
+                settings = get_settings()
+                engine = create_engine(settings.get_database_connection_string())
+                repo_connection = engine.connect()
+                mapping_repository = CompanyMappingRepository(repo_connection)
+            except Exception:
+                pass  # Continue without mapping repository
+
+        try:
+            df = pd.DataFrame(rows)
+
+            eqc_config = (
+                context.eqc_config
+                if context.eqc_config
+                else EqcLookupConfig.disabled()
+            )
+
+            pipeline = build_bronze_to_silver_pipeline(
+                eqc_config=eqc_config,
+                mapping_repository=mapping_repository,
+                db_connection=repo_connection,
+            )
+
+            pipeline_context = PipelineContext(
+                pipeline_name="bronze_to_silver",
+                execution_id=f"{domain}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+                timestamp=datetime.now(timezone.utc),
+                config={"domain": "{domain}"},
+                domain="{domain}",
+                run_id=f"{domain}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+                extra={"data_source": context.data_source},
+            )
+
+            result_df = pipeline.execute(df, pipeline_context)
+            records, failed_count = convert_dataframe_to_models(result_df)
+
+            elapsed_ms = (time.perf_counter() - start) * 1000
+
+            return DomainProcessingResult(
+                records=records,
+                total_input=len(rows),
+                total_output=len(records),
+                failed_count=failed_count,
+                processing_time_ms=elapsed_ms,
+            )
+
+        finally:
+            if repo_connection is not None:
+                try:
+                    repo_connection.commit()  # Persist backflow data
+                except Exception:
+                    repo_connection.rollback()
+                repo_connection.close()
+```
+
+**When to use which pattern:**
+
+| Pattern | When to Use | Reference Implementations |
+|---------|------------|--------------------------|
+| **A: Service Delegation** | Domain has an existing `process_*()` or `process_with_enrichment()` function in `service.py` | `annuity_performance`, `annuity_income` |
+| **B: Direct Pipeline** | Adapter *is* the orchestration layer; no standalone service function | `annual_award`, `annual_loss` |
+
 ---
 
 ## Reference Implementations
 
-### annuity_performance (Primary Reference)
+### annuity_performance (Primary Reference — Service Delegation Pattern)
 
 - **Location:** `src/work_data_hub/domain/annuity_performance/`
 - **Documentation:** `docs/domains/annuity_performance.md`
 - **Runbook:** `docs/runbooks/annuity_performance.md`
-- **Features:** Full 7-file structure, Protocol adapter, company ID enrichment, complex transformations
+- **Features:** Full 8-file structure, Protocol adapter (Pattern A), company ID enrichment, complex transformations, FK backfill
 
-### annuity_income (Validation Reference)
+### annuity_income (Validation Reference — Service Delegation Pattern)
 
 - **Location:** `src/work_data_hub/domain/annuity_income/`
 - **Documentation:** Not yet published; reference source code for patterns
 - **Purpose:** Validates Infrastructure Layer architecture generality
-- **Features:** Protocol adapter, simpler structure, demonstrates pattern reusability
+- **Features:** Protocol adapter (Pattern A), simpler structure, demonstrates pattern reusability
 
-### annual_award (Pipeline Architecture Reference)
+### annual_award (Direct Pipeline Pattern Reference)
 
 - **Location:** `src/work_data_hub/domain/annual_award/`
-- **Purpose:** Demonstrates common pitfalls and required infrastructure integrations
-- **Features:** Multi-sheet support, plan code enrichment, company ID resolution
+- **Purpose:** Reference for Direct Pipeline Execution adapter pattern (Pattern B)
+- **Features:** Multi-sheet support (`sheet_names` config), plan code enrichment (`PlanCodeEnrichmentStep`), company ID resolution, `customer` schema output
+
+### annual_loss (Direct Pipeline Pattern Reference)
+
+- **Location:** `src/work_data_hub/domain/annual_loss/`
+- **Purpose:** Structurally identical to `annual_award`; validates Pattern B reusability
+- **Features:** Multi-sheet support, plan code enrichment, company ID resolution, `customer` schema output
 
 ---
 
@@ -1140,6 +1189,84 @@ from work_data_hub.infrastructure.transforms import apply_plan_code_defaults
 
 # For custom column names, create adapter function
 ```
+
+---
+
+## Plan Code Enrichment (PlanCodeEnrichmentStep)
+
+Domains that need to fill empty `年金计划号` values can use the `PlanCodeEnrichmentStep` pipeline step. This step performs a DB lookup against the `客户年金计划` table.
+
+**Domains using this step:** `annual_award`, `annual_loss`
+
+### How It Works
+
+1. Identifies rows where `年金计划号` is empty
+2. Queries the `客户年金计划` table using `company_id` + `产品线代码` as join keys
+3. Selects the best plan code based on `计划类型` prefix rules:
+   - **集合计划** → Prefer plan codes starting with `P` (e.g., P0001, P0002)
+   - **单一计划** → Prefer plan codes starting with `S` (e.g., S0001, S0002)
+4. If no matching prefix is found, uses any available plan code for the company
+5. Only updates rows where `年金计划号` is empty (preserves existing values)
+
+### Usage in pipeline_builder.py
+
+```python
+from .pipeline_builder import PlanCodeEnrichmentStep
+
+# Requires a DB connection (passed via build_bronze_to_silver_pipeline)
+steps.append(PlanCodeEnrichmentStep(db_connection=db_connection))
+```
+
+> **Note:** This step is distinct from `PLAN_CODE_DEFAULTS` (which provides static fallback codes). `PlanCodeEnrichmentStep` performs actual DB lookups for dynamic plan code resolution.
+
+---
+
+## Multi-Sheet Configuration
+
+Some domains read from multiple Excel sheets within the same file. Configure this via `sheet_names` in `config/data_sources.yml`.
+
+### Configuration Example (from `annual_award`)
+
+```yaml
+# config/data_sources.yml
+domains:
+  annual_award:
+    sheet_name: "企年受托中标(空白)"        # Fallback for single-sheet mode
+    sheet_names:                            # Multi-sheet support
+      - "企年受托中标(空白)"
+      - "企年投资中标(空白)"
+    # ...
+```
+
+**Behavior:**
+- When `sheet_names` is present, the loader reads all listed sheets and concatenates them into a single DataFrame
+- `sheet_name` serves as a fallback for single-sheet mode (backwards compatible)
+- Each sheet typically represents a different `业务类型` (e.g., trustee vs. investee)
+
+**Domains using multi-sheet:** `annual_award` (2 sheets), `annual_loss` (2 sheets)
+
+---
+
+## `requires_backfill` Property Semantics
+
+The `requires_backfill` adapter property and the FK backfill configuration in `config/foreign_keys.yml` serve different purposes:
+
+| Mechanism | Purpose | Who Uses It |
+|-----------|---------|-------------|
+| `adapter.requires_backfill` property | Protocol-level flag for orchestration checks | Orchestrator queries this to decide whether to *attempt* backfill |
+| `config/foreign_keys.yml` domain entry | Actual FK backfill rules | CLI config builder always configures `generic_backfill_refs_op`; it returns 0 ops if no FK config exists |
+
+**In practice:** Even if `requires_backfill = False` on the adapter, the CLI config builder always wires up `generic_backfill_refs_op`. The op itself is a no-op when no FK rules exist for the domain. Setting `requires_backfill = True` signals to the orchestration layer that the domain *expects* FK backfill to run as part of its processing contract.
+
+**Current domain settings:**
+
+| Domain | `requires_backfill` | Has FK config? |
+|--------|-------------------|---------------|
+| `annuity_performance` | `True` | Yes (5 FK rules) |
+| `annuity_income` | `True` | Yes (5 FK rules) |
+| `annual_award` | `False` | Yes (1 FK rule: `fk_customer`) |
+| `annual_loss` | `False` | Yes (1 FK rule: `fk_customer`) |
+| `sandbox_trustee_performance` | `False` | No |
 
 ---
 
