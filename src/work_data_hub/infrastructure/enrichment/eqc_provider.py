@@ -130,8 +130,28 @@ def validate_eqc_token(token: str, base_url: str) -> bool:
         endpoint=endpoint_path,
         timeout_seconds=REQUEST_TIMEOUT_SECONDS,
     )
+
+    # Build session: PACSession for intranet, plain requests for normal
+    settings = get_settings()
+    if settings.intranet:
+        import urllib3
+
+        from pypac import PACSession  # type: ignore[import-untyped]
+
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        session = PACSession(
+            pac_url=settings.pac_url,
+            proxy_auth=requests.auth.HTTPProxyAuth(
+                settings.pac_proxy_user,
+                settings.pac_proxy_password,
+            ),
+        )
+        session.verify = False
+    else:
+        session = requests.Session()
+
     try:
-        response = requests.get(
+        response = session.get(
             url,
             params=params,
             headers={"token": token},

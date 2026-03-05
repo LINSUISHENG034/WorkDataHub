@@ -32,6 +32,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "rich>=13.0.0",
     "pyperclip>=1.11.0",
+    "pypac>=0.16.0",
 ]
  
 [tool.setuptools.packages.find]
@@ -195,6 +196,7 @@ module = [
     "playwright_stealth",
     "cv2",
     "gmssl.*",
+    "pypac",
 ]
 ignore_missing_imports = true
 

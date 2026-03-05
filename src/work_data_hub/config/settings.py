@@ -182,6 +182,24 @@ class Settings(BaseSettings):
         description="Limit processing to N rows for development (None = no limit)",
     )
 
+    # Intranet Configuration - PAC proxy for closed network environments
+    intranet: bool = Field(
+        default=False,
+        description="Enable intranet mode (PAC proxy for EQC, verify=False)",
+    )
+    pac_url: str = Field(
+        default="http://proxy.paic.com.cn/proxyformwg.pac",
+        description="PAC proxy URL for intranet HTTP requests",
+    )
+    pac_proxy_user: str = Field(
+        default="",
+        description="Proxy auth username for PAC session",
+    )
+    pac_proxy_password: str = Field(
+        default="",
+        description="Proxy auth password for PAC session",
+    )
+
     # EQC Configuration - Enterprise Query Center API settings
     eqc_token: str = Field(
         default="",

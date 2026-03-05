@@ -1,8 +1,3 @@
-"""
-HTTP Transport layer for EQC connector.
-Handles connection, configuration, rate limiting, and retries.
-"""
-
 import logging
 import random
 import time
@@ -11,6 +6,7 @@ from http import HTTPStatus
 from typing import Deque, Optional
 
 import requests
+import urllib3
 
 from work_data_hub.config.settings import get_settings
 
@@ -80,8 +76,26 @@ class EQCTransport:
         )
         self.base_url = base_url if base_url is not None else self.settings.eqc_base_url
 
-        # Initialize requests session with proper headers
-        self.session = requests.Session()
+        # Initialize HTTP session: PACSession for intranet, requests.Session otherwise
+        if self.settings.intranet:
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            from pypac import PACSession  # type: ignore[import-untyped]
+
+            self.session: requests.Session = PACSession(
+                pac_url=self.settings.pac_url,
+                proxy_auth=requests.auth.HTTPProxyAuth(
+                    self.settings.pac_proxy_user,
+                    self.settings.pac_proxy_password,
+                ),
+            )
+            self.session.verify = False  # type: ignore[assignment]
+            logger.info(
+                "Using PACSession for intranet proxy",
+                extra={"pac_url": self.settings.pac_url},
+            )
+        else:
+            self.session = requests.Session()
+
         self.session.headers.update(
             {
                 "token": self.token,
