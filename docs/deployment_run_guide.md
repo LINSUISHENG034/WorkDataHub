@@ -88,10 +88,10 @@ EQC_API_KEY=your_api_key_here
 # 若未安装 Playwright 自带 Chromium（如内网环境），可指向系统 Edge/Chrome
 # PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH='C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 
-# 【可选】内网模式（启用后 EQC 请求将通过 PAC 代理）
+# 【可选】内网模式（启用后 EQC 请求将通过 PAC 代理，使用 PA_UM_ACCOUNT/PA_UM_PASSWORD 认证）
 # WDH_INTRANET=true
-# WDH_PAC_PROXY_USER=你的工号
-# WDH_PAC_PROXY_PASSWORD=你的密码
+# PA_UM_ACCOUNT=你的工号
+# PA_UM_PASSWORD=你的密码
 ```
 
 > [!CAUTION]

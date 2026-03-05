@@ -84,8 +84,8 @@ class EQCTransport:
             self.session: requests.Session = PACSession(
                 pac_url=self.settings.pac_url,
                 proxy_auth=requests.auth.HTTPProxyAuth(
-                    self.settings.pac_proxy_user,
-                    self.settings.pac_proxy_password,
+                    self.settings.pa_um_account,
+                    self.settings.pa_um_password,
                 ),
             )
             self.session.verify = False  # type: ignore[assignment]

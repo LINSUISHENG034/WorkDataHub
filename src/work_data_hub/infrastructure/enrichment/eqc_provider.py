@@ -142,8 +142,8 @@ def validate_eqc_token(token: str, base_url: str) -> bool:
         session = PACSession(
             pac_url=settings.pac_url,
             proxy_auth=requests.auth.HTTPProxyAuth(
-                settings.pac_proxy_user,
-                settings.pac_proxy_password,
+                settings.pa_um_account,
+                settings.pa_um_password,
             ),
         )
         session.verify = False

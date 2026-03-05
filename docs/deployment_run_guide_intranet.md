@@ -146,8 +146,8 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH='C:\Program Files (x86)\Microsoft\Edge\Appli
 
 # 【内网必须】内网模式（启用后 EQC 请求将通过 PAC 代理）
 WDH_INTRANET=true
-WDH_PAC_PROXY_USER=你的工号
-WDH_PAC_PROXY_PASSWORD=你的密码
+PA_UM_ACCOUNT=你的工号
+PA_UM_PASSWORD=你的密码
 # WDH_PAC_URL 默认值：http://proxy.paic.com.cn/proxyformwg.pac（一般无需修改）
 ```
 

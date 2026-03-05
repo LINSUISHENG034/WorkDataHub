@@ -191,13 +191,15 @@ class Settings(BaseSettings):
         default="http://proxy.paic.com.cn/proxyformwg.pac",
         description="PAC proxy URL for intranet HTTP requests",
     )
-    pac_proxy_user: str = Field(
+    pa_um_account: str = Field(
         default="",
-        description="Proxy auth username for PAC session",
+        validation_alias=AliasChoices("PA_UM_ACCOUNT", "WDH_PA_UM_ACCOUNT"),
+        description="PA UM account (shared: PAC proxy auth, OTP login)",
     )
-    pac_proxy_password: str = Field(
+    pa_um_password: str = Field(
         default="",
-        description="Proxy auth password for PAC session",
+        validation_alias=AliasChoices("PA_UM_PASSWORD", "WDH_PA_UM_PASSWORD"),
+        description="PA UM password (shared: PAC proxy auth, OTP login)",
     )
 
     # EQC Configuration - Enterprise Query Center API settings

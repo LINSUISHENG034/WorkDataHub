@@ -60,8 +60,8 @@ class TestEqcProviderInit:
 
     def test_init_with_validate_on_init_valid_token(self) -> None:
         """Provider validates token on init when validate_on_init=True."""
-        with patch(
-            "work_data_hub.infrastructure.enrichment.eqc_provider.requests.get"
+        with patch.object(
+            requests.Session, "get"
         ) as mock_get:
             mock_get.return_value.status_code = 200
 
@@ -73,8 +73,8 @@ class TestEqcProviderInit:
 
     def test_init_with_validate_on_init_invalid_token(self) -> None:
         """Provider raises EqcTokenInvalidError when token is invalid."""
-        with patch(
-            "work_data_hub.infrastructure.enrichment.eqc_provider.requests.get"
+        with patch.object(
+            requests.Session, "get"
         ) as mock_get:
             mock_get.return_value.status_code = 401
 
@@ -464,8 +464,8 @@ class TestValidateEqcToken:
 
     def test_validate_token_valid(self) -> None:
         """Returns True for valid token."""
-        with patch(
-            "work_data_hub.infrastructure.enrichment.eqc_provider.requests.get"
+        with patch.object(
+            requests.Session, "get"
         ) as mock_get:
             mock_get.return_value.status_code = 200
 
@@ -475,8 +475,8 @@ class TestValidateEqcToken:
 
     def test_validate_token_invalid_401(self) -> None:
         """Returns False for 401 response."""
-        with patch(
-            "work_data_hub.infrastructure.enrichment.eqc_provider.requests.get"
+        with patch.object(
+            requests.Session, "get"
         ) as mock_get:
             mock_get.return_value.status_code = 401
 
@@ -486,8 +486,8 @@ class TestValidateEqcToken:
 
     def test_validate_token_network_error(self) -> None:
         """Returns True on network error (not token issue)."""
-        with patch(
-            "work_data_hub.infrastructure.enrichment.eqc_provider.requests.get"
+        with patch.object(
+            requests.Session, "get"
         ) as mock_get:
             mock_get.side_effect = requests.RequestException("Network error")
 
