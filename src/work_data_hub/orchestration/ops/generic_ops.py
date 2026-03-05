@@ -17,6 +17,7 @@ class GenericDomainOpConfig(Config):
     domain: str
     plan_only: bool = True
     session_id: Optional[str] = None
+    enrichment_sync_budget: int = 0
 
 
 @op
@@ -58,6 +59,7 @@ def process_domain_op_v2(
     if service.requires_enrichment:
         enrichment_ctx = EnrichmentServiceFactory.create(
             plan_only=config.plan_only,
+            sync_lookup_budget=config.enrichment_sync_budget,
         )
 
     try:

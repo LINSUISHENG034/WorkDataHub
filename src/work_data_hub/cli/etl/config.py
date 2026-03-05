@@ -203,6 +203,7 @@ def build_run_config(args: argparse.Namespace, domain: str) -> Dict[str, Any]:  
             "domain": domain,
             "plan_only": effective_plan_only,
             "session_id": session_id,
+            "enrichment_sync_budget": getattr(args, "enrichment_sync_budget", 0),
         }
     }
 

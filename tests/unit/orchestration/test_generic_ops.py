@@ -27,6 +27,12 @@ class TestGenericOpExists:
 
         assert GenericDomainOpConfig is not None
 
+    def test_config_has_enrichment_sync_budget(self):
+        from work_data_hub.orchestration.ops.generic_ops import GenericDomainOpConfig
+
+        cfg = GenericDomainOpConfig(domain="annuity_performance")
+        assert cfg.enrichment_sync_budget == 0
+
 
 class TestGenericOpBehavior:
     """验证 Generic Op 行为."""

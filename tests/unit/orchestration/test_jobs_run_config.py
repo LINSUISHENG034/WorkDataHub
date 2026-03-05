@@ -74,3 +74,37 @@ def test_build_run_config_skip_facts_flag_defaults_false():
     # Verify skip flag defaults to False
     load_cfg = run_config["ops"]["load_op"]["config"]
     assert load_cfg["skip"] is False
+
+
+def test_build_run_config_enrichment_sync_budget():
+    """Test that enrichment_sync_budget is passed to process_domain_op_v2."""
+    args = SimpleNamespace(
+        mode="delete_insert",
+        execute=True,
+        sheet=0,
+        max_files=1,
+        pk=None,
+        backfill_refs=None,
+        backfill_mode="insert_missing",
+        enrichment_sync_budget=300,
+    )
+    run_config = build_run_config(args, domain="annuity_performance")
+    op_cfg = run_config["ops"]["process_domain_op_v2"]["config"]
+    assert op_cfg["enrichment_sync_budget"] == 300
+
+
+def test_build_run_config_enrichment_sync_budget_defaults_zero():
+    """Test that enrichment_sync_budget defaults to 0 when not in args."""
+    args = SimpleNamespace(
+        mode="delete_insert",
+        execute=False,
+        sheet=0,
+        max_files=1,
+        pk=None,
+        backfill_refs=None,
+        backfill_mode="insert_missing",
+        # no enrichment_sync_budget attribute
+    )
+    run_config = build_run_config(args, domain="annuity_performance")
+    op_cfg = run_config["ops"]["process_domain_op_v2"]["config"]
+    assert op_cfg["enrichment_sync_budget"] == 0
