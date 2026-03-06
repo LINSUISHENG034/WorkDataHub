@@ -101,9 +101,11 @@ def export_unknown_names_csv(
 
     try:
         df = pd.DataFrame({"unknown_company_name": unknown_names})
+        # Extract filename from full path to avoid invalid path concatenation
+        source_filename = Path(data_source).name if data_source else "unknown"
         csv_path = export_error_csv(
             df,
-            filename_prefix=f"unknown_companies_{data_source}",
+            filename_prefix=f"unknown_companies_{source_filename}",
             output_dir=Path("logs"),
         )
         event_logger.bind(

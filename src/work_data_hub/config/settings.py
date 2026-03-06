@@ -26,9 +26,9 @@ from work_data_hub.infrastructure.settings.data_source_schema import (
 
 logger = structlog.get_logger(__name__)
 
-# Determine project root for resolving .env by default
+# Determine project root for resolving .wdh_env by default
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_ENV_FILE = PROJECT_ROOT / ".env"
+DEFAULT_ENV_FILE = PROJECT_ROOT / ".wdh_env"
 ENV_FILE_OVERRIDE = os.getenv("WDH_ENV_FILE")
 if ENV_FILE_OVERRIDE:
     env_file_candidate = Path(ENV_FILE_OVERRIDE).expanduser()
