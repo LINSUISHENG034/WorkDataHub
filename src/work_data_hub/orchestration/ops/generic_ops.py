@@ -56,10 +56,25 @@ def process_domain_op_v2(
 
     # Create enrichment context using Factory
     enrichment_ctx = None
+    eqc_config = None
     if service.requires_enrichment:
+        from work_data_hub.infrastructure.enrichment import EqcLookupConfig
+
+        context.log.info(
+            f"enrichment.budget_config domain={domain} "
+            f"sync_lookup_budget={config.enrichment_sync_budget} "
+            f"plan_only={config.plan_only}"
+        )
         enrichment_ctx = EnrichmentServiceFactory.create(
             plan_only=config.plan_only,
             sync_lookup_budget=config.enrichment_sync_budget,
+        )
+        eqc_config = EqcLookupConfig(
+            enabled=config.enrichment_sync_budget > 0,
+            sync_budget=config.enrichment_sync_budget,
+            auto_create_provider=True,
+            export_unknown_names=True,
+            auto_refresh_token=True,
         )
 
     try:
@@ -69,6 +84,7 @@ def process_domain_op_v2(
             session_id=config.session_id or str(uuid.uuid4()),
             plan_only=config.plan_only,
             enrichment_service=(enrichment_ctx.service if enrichment_ctx else None),
+            eqc_config=eqc_config,
         )
 
         # Call unified interface
