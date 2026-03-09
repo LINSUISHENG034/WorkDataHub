@@ -223,6 +223,27 @@ data/
 >
 > 📌 如使用 pip 方式部署（已激活虚拟环境），则直接用 `python -m ...` 替代 `uv run --no-sync --env-file .wdh_env python -m ...`（需先 `set PYTHONPATH=src`）。
 
+### 6.0 内网传输打包 GUI
+
+当部署机器无法直接访问 GitHub，且不允许整仓库直接复制时，可先在外网机器运行以下 GUI 工具生成 `.7z` 传输包，再把压缩包拷贝到内网目标机组装：
+
+```bash
+uv run --no-sync python -m work_data_hub.cli intranet-deploy-gui
+```
+
+工具默认提供两项能力：
+
+- 打包：通过 GUI 复选框按需选择内容，默认全选；并将仓库主体代码、`vendor/`、`config/seeds/`、`data/backups/` 分别打成独立 `.7z` 文件。
+- 组装：从用户指定的压缩包目录读取上述多个 `.7z` 文件，逐个解压并覆盖到正确项目路径下，自动重建完整仓库结构。
+
+默认跳过覆盖以下文件，以保留目标机器上的本地自定义配置：
+
+- `config/data_sources.yml`
+- `.wdh_env`
+
+> [!IMPORTANT]
+> 该 GUI 依赖系统已安装 **7-Zip**，并要求 `7z` 可执行文件可从 PATH 或默认安装路径中找到。
+
 ### 6.1 常用诊断命令
 
 **Bash / PowerShell：**

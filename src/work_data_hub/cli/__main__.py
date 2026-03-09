@@ -13,6 +13,7 @@ Available commands:
     eqc-refresh  - EQC data refresh operations
     eqc-gui      - Launch EQC quick query GUI (Tkinter)
     eqc-gui-fluent - Launch EQC quick query GUI (Fluent/Modern)
+    intranet-deploy-gui - Launch intranet deployment packaging GUI
     cleanse      - Data cleansing operations
     customer-mdm - Customer Master Data Management operations
 
@@ -39,6 +40,9 @@ Examples:
 
     # EQC quick query GUI (Fluent/Modern)
     python -m work_data_hub.cli eqc-gui-fluent
+
+    # Intranet deployment packaging GUI
+    python -m work_data_hub.cli intranet-deploy-gui
 
     # Data cleansing
     python -m work_data_hub.cli cleanse --table business_info --domain eqc_business_info
@@ -81,6 +85,9 @@ Examples:
 
   # EQC refresh
   python -m work_data_hub.cli eqc-refresh --status
+
+  # Intranet deployment packaging GUI
+  python -m work_data_hub.cli intranet-deploy-gui
 
   # Data cleansing
   python -m work_data_hub.cli cleanse --table business_info \\
@@ -133,6 +140,15 @@ Examples:
         "eqc-gui-fluent",
         help="Launch EQC quick query GUI (Fluent/Modern version)",
         description="Launch modern Fluent-style GUI with dark mode support",
+    )
+
+    # Intranet deployment bundle GUI command (Tkinter)
+    subparsers.add_parser(
+        "intranet-deploy-gui",
+        help="Launch intranet deployment packaging GUI",
+        description=(
+            "Package remote code into .7z and assemble bundles on target machines"
+        ),
     )
 
     # Cleanse command (delegate to existing module)
@@ -189,6 +205,13 @@ Examples:
     elif args.command == "eqc-gui-fluent":
         # Launch EQC Query GUI (Fluent/PyQt)
         from work_data_hub.gui.eqc_query_fluent.app import launch_gui
+
+        launch_gui()
+        return 0
+
+    elif args.command == "intranet-deploy-gui":
+        # Launch intranet deployment packaging GUI (Tkinter)
+        from work_data_hub.gui.intranet_deploy.app import launch_gui
 
         launch_gui()
         return 0
