@@ -1,55 +1,52 @@
 # Developer Guides
 
-This directory contains all developer guides for WorkDataHub.
+This section holds implementation and support guides for the current repository layout.
+
+## Start Here
+
+- [Documentation Home](../index.md)
+- [Active Domain Documentation](../domains/)
+- [Active Runbooks](../runbooks/)
+- [Reference Notes](../reference/README.md)
 
 ## Guide Categories
 
 ### Domain Migration
 
-Guides for migrating legacy domains to the new architecture.
-
 | Guide | Description |
 |-------|-------------|
-| [Domain Migration Workflow](./domain-migration/workflow.md) | **Start here** - End-to-end migration process |
-| [Development Guide](./domain-migration/development-guide.md) | Implementation patterns and code templates |
-| [Code Mapping](./domain-migration/code-mapping.md) | Document → Code translation |
-
-**[View all domain migration guides →](./domain-migration/)**
+| [Domain Migration Workflow](./domain-migration/workflow.md) | End-to-end migration process for a new domain |
+| [Development Guide](./domain-migration/development-guide.md) | Implementation patterns, templates, and checklists |
+| [Code Mapping](./domain-migration/code-mapping.md) | Legacy-to-current code translation notes |
 
 ### Infrastructure
 
-Guides for infrastructure components and services.
+| Guide | Description |
+|-------|-------------|
+| [Infrastructure Index](./infrastructure/index.md) | Entry point for infrastructure-focused guides |
+| [Company Enrichment Service](./infrastructure/company-enrichment-service.md) | EQC resolution and enrichment behavior |
+| [Database Connection Usage](./infrastructure/database-connection-usage.md) | Database connection and session handling |
+
+### Validation
 
 | Guide | Description |
 |-------|-------------|
-| [Company Enrichment Service](./infrastructure/company-enrichment-service.md) | Company ID resolution and enrichment |
-| [Database Connection Usage](./infrastructure/database-connection-usage.md) | Database connection patterns |
-| [EQC Token Guide](./infrastructure/eqc-token-guide.md) | EQC API token management |
+| [Cleaner Comparison Usage Guide](./validation/cleaner-comparison-usage-guide.md) | CLI validation helper for cleaner comparisons |
+| [Legacy Parity Validation](./validation/legacy-parity-validation.md) | Historical parity-validation workflow kept as an active validation reference |
+| [Intranet Migration Verification](./validation/intranet-migration-verification.md) | Validation steps used by the deployment packaging flow |
 
-**[View all infrastructure guides →](./infrastructure/)**
+### Troubleshooting
+
+| Guide | Description |
+|-------|-------------|
+| [Data Restoration Procedure](./troubleshooting/data-restoration-procedure.md) | Recovery and restoration notes for damaged or cleared data |
 
 ## Quick Links
 
 | Task | Guide |
 |------|-------|
-| Migrate a new domain | [Domain Migration Workflow](./domain-migration/workflow.md) |
-| Understand company ID resolution | [Company Enrichment Service](./infrastructure/company-enrichment-service.md) |
-| Create cleansing rules document | [Cleansing Rules Template](../templates/cleansing-rules-template.md) |
-| Validate parity with legacy | [Legacy Parity Validation](../runbooks/legacy-parity-validation.md) |
-
-## Directory Structure
-
-```
-docs/guides/
-├── index.md                          # This file
-├── domain-migration/                 # Domain migration guides
-│   ├── index.md
-│   ├── workflow.md
-│   ├── development-guide.md
-│   └── code-mapping.md
-└── infrastructure/                   # Infrastructure guides
-    ├── index.md
-    ├── company-enrichment-service.md
-    ├── database-connection-usage.md
-    └── eqc-token-guide.md
-```
+| Run or verify an active ETL domain | [Runbooks](../runbooks/) |
+| Understand required docs for a domain | [Documentation Standards](../engineering/documentation-standards.md) |
+| Create or update cleansing rules | [Cleansing Rules Index](../cleansing-rules/index.md) |
+| Find schema and processing reference | [Reference Notes](../reference/README.md) |
+| Run validation-specific procedures | [Validation Guides](./validation/) |

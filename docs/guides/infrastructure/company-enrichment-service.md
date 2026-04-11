@@ -497,7 +497,7 @@ uv run pytest tests/domain/company_enrichment/test_enrichment_service.py -v
 
 ```bash
 # 干运行测试
-uv run python -m work_data_hub etl annuity_performance --dry-run
+uv run --env-file .wdh_env python -m work_data_hub.cli etl --domains annuity_performance --plan-only
 
 # 查看解析统计
 uv run python -m work_data_hub etl annuity_performance --verbose
@@ -520,7 +520,7 @@ uv run python -m work_data_hub etl annuity_performance --verbose
 
 - Epic 定义: `docs/epics/epic-6-company-enrichment-service.md`
 - Story 文件: `docs/sprint-artifacts/stories/6-*.md`
-- 架构决策: `docs/architecture/architectural-decisions.md` (AD-002, AD-010)
+- 架构与实现入口: `docs/engineering/`, `src/work_data_hub/infrastructure/enrichment/`
 
 ### B. 代码位置
 

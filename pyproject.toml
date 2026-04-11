@@ -133,6 +133,7 @@ quote-style = "double"
 testpaths = ["tests"]
 norecursedirs = [
     ".git",
+    ".worktrees",
     ".venv",
     "node_modules",
 ]

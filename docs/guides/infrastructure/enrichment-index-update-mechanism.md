@@ -110,7 +110,7 @@ EnrichmentIndexRecord(
     confidence=Decimal("0.95"),              # 置信度
     source=SourceType.DOMAIN_LEARNING,       # 来源 = 领域学习
     source_domain="annuity_performance",     # 源领域
-    source_table="annuity_performance_new",  # 源表名
+    source_table="规模明细",                   # 源表名
 )
 ```
 

@@ -1,5 +1,9 @@
 # AnnuityPerformance Domain Cleansing Rules
 
+> Source of truth: `config/data_sources.yml`, `src/work_data_hub/domain/annuity_performance/pipeline_builder.py`
+> Last verified: `2026-04-11`
+> Scope: Domain-specific cleansing and migration notes
+
 ## 1. Domain Overview
 
 | Item | Value |
@@ -7,7 +11,7 @@
 | Legacy Cleaner Class | `AnnuityPerformanceCleaner` |
 | Source File | `legacy/annuity_hub/data_handler/data_cleaner.py` (lines 194-293) |
 | Excel Sheet Name | `规模明细` |
-| Target Database Table | `business.annuity_performance` (confirmed in Epic 4) |
+| Target Database Table | `business."规模明细"` |
 
 ## 2. Dependency Table Inventory
 
@@ -354,3 +358,9 @@ ls -la tests/fixtures/validation_results/annuity_performance/
 
 **Last Updated:** 2025-12-16
 **Status:** 90% Complete (Story 6.2-P11: Added 年金账户号 derivation rule CR-011)
+
+## Related Active Docs
+
+- [Domain Contract](../domains/annuity_performance.md)
+- [Runbook](../runbooks/annuity_performance.md)
+- [Documentation Standards](../engineering/documentation-standards.md)

@@ -1,7 +1,7 @@
 """Programmatic helpers for invoking Alembic migrations (Story 1.7).
 
 Critical Issue 001 Fix: Added multi-layer defense against accidental
-production database operations. See docs/specific/critical/001_downgrade_db.md
+production database operations. See docs/reference/critical/001_downgrade_db.md
 """
 
 from __future__ import annotations

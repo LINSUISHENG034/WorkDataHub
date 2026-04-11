@@ -433,3 +433,5 @@ export LC_ALL=en_US.UTF-8
 ---
 
 _This addendum was created as part of the Implementation Readiness Check (2025-11-09) to satisfy mandatory conditions before Phase 4 implementation._
+> Historical document.
+> This file is retained for context and may reference paths or structures that no longer exist in the active repository layout.

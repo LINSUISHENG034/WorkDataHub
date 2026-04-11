@@ -1,5 +1,9 @@
 # AnnuityIncome Domain Cleansing Rules
 
+> Source of truth: `config/data_sources.yml`, `src/work_data_hub/domain/annuity_income/pipeline_builder.py`
+> Last verified: `2026-04-11`
+> Scope: Domain-specific cleansing and migration notes
+
 ## 1. Domain Overview
 
 | Item | Value |
@@ -7,7 +11,7 @@
 | Legacy Cleaner Class | `AnnuityIncomeCleaner` |
 | Source File | `legacy/annuity_hub/data_handler/data_cleaner.py` (lines 237-274) |
 | Excel Sheet Name | `收入明细` |
-| Target Database Table | `business.annuity_income` (TODO: confirm schema/table in Story 5.5.2) |
+| Target Database Table | `business."收入明细"` |
 
 ## 2. Dependency Table Inventory
 
@@ -395,7 +399,7 @@ DEFAULT_PORTFOLIO_CODE_MAPPING = {
 - **Story 5.5.1:** Documentation only - no deployment
 - **Story 5.5.2:** Implement pipeline + Dagster orchestration using this spec
 - **Story 5.5.3:** Parity validation outputs to `tests/fixtures/validation_results/`
-- **Runbook:** Reference `docs/runbooks/legacy-parity-validation.md`
+- **Guide:** Reference `docs/guides/validation/legacy-parity-validation.md`
 
 ---
 
@@ -452,7 +456,7 @@ DEFAULT_PORTFOLIO_CODE_MAPPING = {
 
 ### Technology Stack Alignment
 
-Per `docs/architecture/technology-stack.md`:
+Per the current repository toolchain and validation stack:
 
 | Component | Version | Notes |
 |-----------|---------|-------|
@@ -495,8 +499,14 @@ Per `docs/architecture/technology-stack.md`:
 - [Tech Spec: Epic 5.5](../sprint-artifacts/tech-spec-epic-5.5-pipeline-architecture-validation.md)
 - [Infrastructure Layer](../architecture/infrastructure-layer.md)
 - [Technology Stack](../architecture/technology-stack.md)
-- [Parity Validation Runbook](../runbooks/legacy-parity-validation.md)
+- [Parity Validation Guide](../guides/validation/legacy-parity-validation.md)
 
 ---
 
 **Reviewer Sign-off:** _________________ Date: _________
+
+## Related Active Docs
+
+- [Domain Contract](../domains/annuity_income.md)
+- [Runbook](../runbooks/annuity_income.md)
+- [Documentation Standards](../engineering/documentation-standards.md)

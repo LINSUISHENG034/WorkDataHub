@@ -1,61 +1,30 @@
 # Cleansing Rules Documentation Index
 
-This directory contains documented cleansing rules for each domain migrated from the legacy system.
-
-## Purpose
-
-- Provide reference for Pipeline configuration
-- Enable parity validation against legacy behavior
-- Capture tribal knowledge before it's lost
-- Establish standard documentation process for domain migrations
+This directory tracks the status of cleansing-rule coverage for active ETL domains.
 
 ## Template
 
-Use [cleansing-rules-template.md](../templates/cleansing-rules-template.md) when documenting a new domain.
+Use [cleansing-rules-template.md](../templates/cleansing-rules-template.md) when documenting or expanding a domain.
 
-## Documented Domains
+## Coverage Status
 
-| Domain | Status | Document | Legacy Class | Dependencies Migrated |
-|--------|--------|----------|--------------|----------------------|
-| annuity_performance | Partial (85% - 2 tables missing) | [annuity-performance.md](./annuity-performance.md) | `AnnuityPerformanceCleaner` | Partial (5/7 tables migrated) |
-| annuity_income | Pending (Epic 5.5) | [annuity-income.md](./annuity-income.md) | `AnnuityIncomeCleaner` | Yes (company_id_mapping, eqc_search_result) |
+| Domain | Status | Notes |
+|--------|--------|-------|
+| `annuity_performance` | Present but partial | [annuity-performance.md](./annuity-performance.md) exists, but parts of the migration-era detail still need verification against current code. |
+| `annuity_income` | Present but partial | [annuity-income.md](./annuity-income.md) exists but still contains stale migration-era assumptions and needs verification updates. |
+| `annual_award` | Missing | No domain-specific cleansing-rules document is checked in yet. |
+| `annual_loss` | Missing | No domain-specific cleansing-rules document is checked in yet. |
+| `sandbox_trustee_performance` | Missing | No sandbox-specific cleansing-rules document is checked in yet. |
 
-## Pending Domains (Epic 6+)
+## Status Definitions
 
-The following domains are candidates for future migration. Each should be documented using the template before implementation.
+- `Active and verified`: references current code/config behavior and can be used operationally.
+- `Present but partial`: file exists but needs verification or structural cleanup.
+- `Missing`: active domain has no dedicated cleansing-rules document yet.
+- `Historical only`: retained for traceability and excluded from active onboarding paths.
 
-| Legacy Class | Chinese Name | Sheet Name | Priority | Dependencies Migrated |
-|--------------|--------------|------------|----------|----------------------|
-| `GroupRetirementCleaner` | 团养缴费 | 团养缴费 | TBD | No |
-| `HealthCoverageCleaner` | 企康缴费 | 企康缴费 | TBD | No |
-| `YLHealthCoverageCleaner` | 养老险承保 | 养老险 | TBD | No |
-| `JKHealthCoverageCleaner` | 健康险承保 | 健康险 | TBD | No |
-| `IFECCleaner` | 提费扩面 | 提费扩面 | TBD | No |
-| `APMACleaner` | 手工调整 | 灌入数据 | TBD | No |
-| `TrusteeAwardCleaner` | 企年受托中标 | 企年受托中标(空白) | TBD | No |
-| `TrusteeLossCleaner` | 企年受托流失 | 企年受托流失(解约) | TBD | No |
-| `InvesteeAwardCleaner` | 企年投资中标 | 企年投资中标(空白) | TBD | No |
-| `InvesteeLossCleaner` | 企年投资流失 | 企年投资流失(解约) | TBD | No |
-| `PInvesteeNIPCleaner` | 职年投资新增组合 | 职年投资新增组合 | TBD | No |
-| `InvestmentPortfolioCleaner` | 组合业绩 | 组合业绩 | TBD | No |
-| `GRAwardCleaner` | 团养中标 | 团养中标 | TBD | No |
-| `RenewalPendingCleaner` | 续签客户清单 | 续签客户清单 | TBD | No |
-| `RiskProvisionBalanceCleaner` | 风准金余额 | 风准金 | TBD | No |
-| `HistoryFloatingFeesCleaner` | 历史浮费 | 历史浮费 | TBD | No |
-| `AssetImpairmentCleaner` | 减值计提 | 减值计提 | TBD | No |
-| `RevenueDetailsCleaner` | 利润达成 | 公司利润数据 | TBD | No |
-| `RevenueBudgetCleaner` | 利润预算 | 预算_2024 | TBD | No |
-| `AnnuityRateStatisticsData` | 年金费率统计 | Sheet 0 | TBD | No |
+## Active Domain References
 
-## Documentation Workflow
-
-1. **Before Migration:** Create cleansing rules document using template
-2. **During Migration:** Reference document for Pipeline configuration
-3. **After Migration:** Update document with any discovered edge cases
-4. **Parity Validation:** Use document as checklist for validation
-
-## References
-
-- [Legacy Data Cleaner Source](../../legacy/annuity_hub/data_handler/data_cleaner.py)
-- [Legacy Parity Validation Guide](../runbooks/legacy-parity-validation.md)
-- [Epic 5.5: Pipeline Architecture Validation](../epics/epic-5.5-pipeline-architecture-validation.md)
+- Domain contracts live under [docs/domains](../domains/).
+- Operator procedures live under [docs/runbooks](../runbooks/).
+- Repository-wide standards live in [Documentation Standards](../engineering/documentation-standards.md).

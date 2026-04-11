@@ -358,3 +358,5 @@ Include performance metrics in Dev Agent Record:
 **Document Version**: 1.0
 **Mandatory Compliance**: ALL Epic 2 stories
 **Non-Compliance**: Story cannot be marked "Done" until performance criteria met
+> Historical document.
+> This file is retained for context and may reference paths or structures that no longer exist in the active repository layout.

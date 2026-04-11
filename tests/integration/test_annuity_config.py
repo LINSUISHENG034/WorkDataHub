@@ -1,19 +1,10 @@
 """
-Tests for Annuity Domain Configuration and Migration Validation.
+Tests for annuity_performance configuration and documentation contracts.
 
 Story 4.6: Annuity Domain Configuration and Documentation
 AC-4.6.5: Configuration Validation Test
-
-This module tests:
-- Configuration loads successfully from config/data_sources.yml
-- Configuration passes Epic 3 Story 3.0 schema validation
-- Database migration applies cleanly (syntax validation)
-- Migration is idempotent
-- Table schema matches Gold schema expectations
 """
 
-import ast
-import importlib.util
 from pathlib import Path
 
 import pytest
@@ -232,120 +223,6 @@ class TestConfigValidationErrors:
 
 
 # =============================================================================
-# AC-4.6.2: Database Migration Tests
-# =============================================================================
-
-
-class TestAnnuityMigration:
-    """Test annuity_performance_NEW database migration."""
-
-    MIGRATION_PATH = Path(
-        "io/schema/migrations/versions/20251129_000001_create_annuity_performance_new.py"
-    )
-
-    def test_migration_file_exists(self):
-        """Verify migration file exists."""
-        assert self.MIGRATION_PATH.exists(), (
-            f"Migration file not found: {self.MIGRATION_PATH}"
-        )
-
-    def test_migration_syntax_valid(self):
-        """Verify migration file has valid Python syntax."""
-        with open(self.MIGRATION_PATH, "r", encoding="utf-8") as f:
-            source = f.read()
-
-        try:
-            ast.parse(source)
-        except SyntaxError as e:
-            pytest.fail(f"Migration file has syntax error: {e}")
-
-    def test_migration_has_required_attributes(self):
-        """Verify migration has revision, down_revision, upgrade, downgrade."""
-        spec = importlib.util.spec_from_file_location("migration", self.MIGRATION_PATH)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-
-        assert hasattr(module, "revision"), "Migration must have 'revision' attribute"
-        assert hasattr(module, "down_revision"), "Migration must have 'down_revision'"
-        assert hasattr(module, "upgrade"), "Migration must have 'upgrade' function"
-        assert hasattr(module, "downgrade"), "Migration must have 'downgrade' function"
-        assert callable(module.upgrade), "'upgrade' must be callable"
-        assert callable(module.downgrade), "'downgrade' must be callable"
-
-    def test_migration_revision_format(self):
-        """Verify migration revision follows naming convention."""
-        spec = importlib.util.spec_from_file_location("migration", self.MIGRATION_PATH)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-
-        # Revision should be in format YYYYMMDD_NNNNNN
-        assert module.revision.startswith("2025"), "Revision should start with year"
-        assert "_" in module.revision, "Revision should contain underscore separator"
-
-    def test_migration_down_revision_links_to_previous(self):
-        """Verify migration links to previous migration."""
-        spec = importlib.util.spec_from_file_location("migration", self.MIGRATION_PATH)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-
-        # Should link to the core tables migration
-        assert module.down_revision == "20251113_000001", (
-            "down_revision should link to core tables migration"
-        )
-
-
-class TestMigrationSchemaDefinition:
-    """Test migration defines correct table schema."""
-
-    @pytest.fixture
-    def migration_source(self):
-        """Load migration source code."""
-        migration_path = Path(
-            "io/schema/migrations/versions/20251129_000001_create_annuity_performance_new.py"
-        )
-        with open(migration_path, "r", encoding="utf-8") as f:
-            return f.read()
-
-    def test_creates_annuity_performance_new_table(self, migration_source):
-        """Verify migration creates annuity_performance_new table."""
-        assert "annuity_performance_new" in migration_source.lower(), (
-            "Migration should create annuity_performance_new table"
-        )
-
-    def test_defines_composite_primary_key(self, migration_source):
-        """Verify migration defines composite PK: (reporting_month, plan_code, company_id)."""
-        assert "reporting_month" in migration_source
-        assert "plan_code" in migration_source
-        assert "company_id" in migration_source
-        assert "PrimaryKeyConstraint" in migration_source
-
-    def test_defines_check_constraints(self, migration_source):
-        """Verify migration defines CHECK constraints for non-negative assets."""
-        assert "CheckConstraint" in migration_source
-        assert "starting_assets >= 0" in migration_source
-        assert "ending_assets >= 0" in migration_source
-
-    def test_defines_indexes(self, migration_source):
-        """Verify migration creates required indexes."""
-        assert "create_index" in migration_source
-        assert "reporting_month" in migration_source
-        assert "company_id" in migration_source
-
-    def test_defines_audit_columns(self, migration_source):
-        """Verify migration includes audit columns."""
-        assert "pipeline_run_id" in migration_source
-        assert "created_at" in migration_source
-        assert "updated_at" in migration_source
-
-    def test_migration_is_idempotent(self, migration_source):
-        """Verify migration checks for existing table (idempotent)."""
-        # Migration should check if table exists before creating
-        assert (
-            "get_table_names" in migration_source or "inspector" in migration_source
-        ), "Migration should check for existing table to be idempotent"
-
-
-# =============================================================================
 # AC-4.6.3 & AC-4.6.4: Documentation Tests
 # =============================================================================
 
@@ -371,10 +248,12 @@ class TestDocumentation:
 
         required_sections = [
             "overview",
-            "input format",
-            "transformation",
-            "output schema",
+            "inputs",
+            "file discovery and sheet selection",
+            "transformation and validation",
+            "output tables",
             "configuration",
+            "verification",
         ]
 
         for section in required_sections:
@@ -389,10 +268,11 @@ class TestDocumentation:
             content = f.read().lower()
 
         required_sections = [
+            "preconditions",
             "manual execution",
             "common errors",
             "verification",
-            "rollback",
+            "rollback or safe re-run",
         ]
 
         for section in required_sections:

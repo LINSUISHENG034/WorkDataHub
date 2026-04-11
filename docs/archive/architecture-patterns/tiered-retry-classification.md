@@ -605,3 +605,5 @@ adaptive_limits = calculate_adaptive_limits(
 **Reusable**: YES (Epic 2, 3, 4, future projects)
 **Production Tested**: Epic 1 Story 1.10, Epic 4 deployment (May 2026)
 **Recommended**: Adopt as standard retry strategy for all data pipelines
+> Historical document.
+> This file is retained for context and may reference paths or structures that no longer exist in the active repository layout.

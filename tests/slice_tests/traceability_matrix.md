@@ -1,6 +1,6 @@
 # Slice Tests Traceability Matrix
 
-来源文档：`docs/data_processing_guide.md`
+来源文档：`docs/reference/data_processing_guide.md`
 
 | 流程阶段 | 核心行为 | 主要测试覆盖 |
 |---|---|---|

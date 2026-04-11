@@ -137,6 +137,11 @@ jobs:
           echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/testdb" >> $GITHUB_ENV
           echo "WDH_TEST_DATABASE_URI=postgresql://postgres:postgres@localhost:5432/testdb" >> $GITHUB_ENV
 
+      - name: Check docs alignment
+        shell: bash
+        run: |
+          PYTHONPATH=src uv run python scripts/quality/check_docs_alignment.py
+
       - name: Run pytest (${{ matrix.suite }})
         shell: bash
         run: |

@@ -151,7 +151,7 @@ async def _fill_login_form(page) -> bool:
 
     Returns True if the form was filled and login clicked; otherwise False.
     """
-    # Selectors from docs/company_id/EQC/login_page_elements.md
+    # Selectors from docs/reference/automation/EQC/login_page_elements.md
     # 使用占位符定位更稳，CSS 作为回退
     sel_user = (
         "#app > div > div.login-input-wrap > div.login-content > "

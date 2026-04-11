@@ -137,14 +137,14 @@ If legacy database is not available, rebuild enrichment_index by re-processing d
 
 ```bash
 # Re-run enrichment for annuity_performance domain
-uv run --env-file .wdh_env python -m work_data_hub.cli.etl \
-  --domain annuity_performance \
+uv run --env-file .wdh_env python -m work_data_hub.cli etl \
+  --domains annuity_performance \
   --execute \
   --period 2025-12
 
 # Re-run for annuity_income domain  
-uv run --env-file .wdh_env python -m work_data_hub.cli.etl \
-  --domain annuity_income \
+uv run --env-file .wdh_env python -m work_data_hub.cli etl \
+  --domains annuity_income \
   --execute \
   --period 2025-12
 ```
@@ -152,7 +152,7 @@ uv run --env-file .wdh_env python -m work_data_hub.cli.etl \
 **Notes:**
 - This will trigger EQC API calls for unresolved companies
 - May consume EQC API budget
-- Use `--dry-run` first to preview impact
+- Use `--plan-only` first to preview impact
 
 ### Option 3: Restore from Database Backup (If Available)
 
@@ -197,13 +197,13 @@ After restoration, verify data integrity:
 
 - [ ] **ETL Pipeline Runs Successfully**
   ```bash
-  uv run --env-file .wdh_env python -m work_data_hub.cli.etl \
-    --domain annuity_performance --dry-run --period 2025-12
+  uv run --env-file .wdh_env python -m work_data_hub.cli etl \
+    --domains annuity_performance --plan-only --period 202512
   ```
   - Should complete without errors
 
 - [ ] **Cross-Reference with Source Data**
-  - Compare enrichment_index entries with `config/company_mapping.yml`
+  - Compare enrichment_index entries with the active YAML/company mapping sources under `config/mappings/company_id/`
   - Verify key companies are present in `base_info`
 
 ---
@@ -238,9 +238,9 @@ If you encounter data loss that cannot be resolved using this procedure:
 ## Related Documentation
 
 - [Investigation Report](../sprint-artifacts/reviews/7.1-1-data-clearing-investigation.md)
-- [Database Schema Panorama](../database-schema-panorama.md)
+- [Database Schema Panorama](../../reference/database-schema-panorama.md)
 - [Restoration Scripts README](../../scripts/migrations/enrichment_index/README.md)
-- [Project Context](../project-context.md)
+- [Documentation Home](../../index.md)
 
 ---
 

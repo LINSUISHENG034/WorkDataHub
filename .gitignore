@@ -163,6 +163,7 @@ temp.md
 # ============================================================================
 
 # Data directories
+.worktrees/
 data/*
 !data/mappings/
 storage/
@@ -179,6 +180,8 @@ config/seeds/**
 reference/
 reference/claude-code-full-guide/
 reference/patoken/
+!docs/reference/
+!docs/reference/**
 
 # Test fixtures
 
@@ -188,6 +191,8 @@ db_migration/
 deprecated/
 /legacy/docs/
 archive/
+!docs/archive/
+!docs/archive/**
 
 # Temporary files
 /temp.txt

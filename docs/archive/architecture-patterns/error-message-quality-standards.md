@@ -519,3 +519,5 @@ else:  # "bilingual"
 **Document Version**: 1.0
 **Mandatory Compliance**: ALL Epic 2 validation stories
 **Quality Target**: 90% of errors fixable by business users without developer help
+> Historical document.
+> This file is retained for context and may reference paths or structures that no longer exist in the active repository layout.

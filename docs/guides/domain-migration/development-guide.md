@@ -14,7 +14,7 @@
 | [Cleansing Rules to Code Mapping](./code-mapping.md) | How to translate documentation to code |
 | [Troubleshooting Guide](./troubleshooting.md) | Common issues and solutions |
 | [Cleansing Rules Template](../../templates/cleansing-rules-template.md) | Template for creating cleansing rules documents |
-| [Legacy Parity Validation Guide](../../runbooks/legacy-parity-validation.md) | Validation procedures |
+| [Legacy Parity Validation Guide](../../guides/validation/legacy-parity-validation.md) | Validation procedures |
 
 ---
 
