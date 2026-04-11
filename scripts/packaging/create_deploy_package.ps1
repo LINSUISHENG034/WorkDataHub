@@ -34,7 +34,7 @@ try {
         "alembic.ini",
         ".env.example",
         ".python-version",
-        "docs/runbooks/intranet-migration-verification.md"
+        "docs/guides/validation/intranet-migration-verification.md"
     )
 
     # Define exclusion patterns (directories and file patterns to remove after copy)
@@ -95,7 +95,7 @@ Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 2. Copy `.env.example` to `.wdh_env` and configure database connection
 3. Install uv (if not available): pip install uv
 4. Run: uv sync
-5. Follow verification steps in docs/runbooks/intranet-migration-verification.md
+5. Follow verification steps in docs/guides/validation/intranet-migration-verification.md
 
 ## Included Files
 

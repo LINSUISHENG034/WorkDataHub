@@ -11,7 +11,7 @@ temporary ID generation across different name variants.
 
 Architecture Reference:
 - AD-002: Legacy-Compatible Temporary Company ID Generation
-- Refactor: docs/specific/customer/customer-name-normalization-refactor.md
+- Refactor: docs/reference/customer/customer-name-normalization-refactor.md
 """
 
 import base64
@@ -23,7 +23,8 @@ from work_data_hub.infrastructure.cleansing.normalizers import (
     normalize_customer_name,
 )
 
-# Legacy constants kept for backwards compatibility (some external code may reference them)
+# Legacy constants kept for backwards compatibility.
+# Some external code may still reference them.
 # These are now defined in infrastructure.cleansing.normalizers.customer_name
 
 
@@ -49,7 +50,8 @@ def normalize_for_temp_id(company_name: str) -> str:
     """
     warnings.warn(
         "normalize_for_temp_id is deprecated. "
-        "Use normalize_customer_name from infrastructure.cleansing.normalizers instead.",
+        "Use normalize_customer_name from "
+        "infrastructure.cleansing.normalizers instead.",
         DeprecationWarning,
         stacklevel=2,
     )

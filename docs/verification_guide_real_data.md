@@ -37,9 +37,9 @@
 
 ```bash
 # 推荐按此顺序执行，确保快照刷新时所有事实表数据已就绪
-uv run --env-file .wdh_env python -m work_data_hub.cli etl --domain annual_award --period 202510 --file-selection newest --execute
-uv run --env-file .wdh_env python -m work_data_hub.cli etl --domain annual_loss --period 202510 --file-selection newest --execute
-uv run --env-file .wdh_env python -m work_data_hub.cli etl --domain annuity_performance --period 202510 --file-selection newest --execute
+uv run --env-file .wdh_env python -m work_data_hub.cli etl --domains annual_award --period 202510 --file-selection newest --execute
+uv run --env-file .wdh_env python -m work_data_hub.cli etl --domains annual_loss --period 202510 --file-selection newest --execute
+uv run --env-file .wdh_env python -m work_data_hub.cli etl --domains annuity_performance --period 202510 --file-selection newest --execute
 
 # 或：一次性执行所有受支持领域 (--all-domains) 触发完整的处理流水线
 uv run --env-file .wdh_env python -m work_data_hub.cli etl --all-domains --period 202510 --file-selection newest --execute

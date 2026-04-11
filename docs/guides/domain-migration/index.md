@@ -80,4 +80,4 @@ Phase 1: Dependency Preparation
 |----------|----------|
 | Cleansing Rules Template | [templates/cleansing-rules-template.md](../../templates/cleansing-rules-template.md) |
 | Example: annuity-income | [cleansing-rules/annuity-income.md](../../cleansing-rules/annuity-income.md) |
-| Parity Validation Guide | [runbooks/legacy-parity-validation.md](../../runbooks/legacy-parity-validation.md) |
+| Parity Validation Guide | [guides/validation/legacy-parity-validation.md](../../guides/validation/legacy-parity-validation.md) |

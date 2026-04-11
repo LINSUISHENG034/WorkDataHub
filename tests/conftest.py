@@ -291,7 +291,7 @@ def postgres_db_with_migrations() -> Generator[str, None, None]:
     """Use a temporary PostgreSQL database, apply migrations, and yield DSN.
 
     Layer 4: Enhanced test isolation with explicit safety assertions.
-    See docs/specific/critical/001_downgrade_db.md
+    See docs/reference/critical/001_downgrade_db.md
     """
     from work_data_hub.io.schema import migration_runner
 

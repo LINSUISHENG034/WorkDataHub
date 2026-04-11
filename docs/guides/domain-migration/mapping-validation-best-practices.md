@@ -156,6 +156,6 @@ Total: XX mappings (complete parity with Legacy system)
 
 ## 📚 相关资源
 
-- [Legacy Parity Validation Guide](../../runbooks/legacy-parity-validation.md)
+- [Legacy Parity Validation Guide](../../guides/validation/legacy-parity-validation.md)
 - [Domain Development Guide](./development-guide.md)
 - [Cleansing Rules Template](../../templates/cleansing-rules-template.md)

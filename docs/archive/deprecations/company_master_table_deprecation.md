@@ -121,3 +121,5 @@ For questions about this deprecation, refer to:
 - [Enterprise Schema Overview](../architecture/architectural-decisions.md)
 - [Epic 6: Company Enrichment Service](../epics/epic-6-company-enrichment-service.md)
 - [Legacy Database Integration](../brownfield-architecture.md)
+> Historical document.
+> This file is retained for context and may reference paths or structures that no longer exist in the active repository layout.

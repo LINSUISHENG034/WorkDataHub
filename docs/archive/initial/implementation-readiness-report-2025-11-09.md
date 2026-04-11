@@ -1799,3 +1799,5 @@ _Minor items for consideration_
 ---
 
 _This readiness assessment was generated using the BMad Method Implementation Ready Check workflow (v6-alpha)_
+> Historical document.
+> This file is retained for context and may reference paths or structures that no longer exist in the active repository layout.

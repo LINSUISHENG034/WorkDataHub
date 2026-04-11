@@ -195,7 +195,7 @@ Standard template for documenting legacy cleansing rules before domain migration
 
 ## 10. Parity Validation Checklist
 
-> **Implementation:** Create validation script at `scripts/tools/parity/validate_{domain}_parity.py`. See [Legacy Parity Validation Guide](../runbooks/legacy-parity-validation.md)
+> **Implementation:** Create validation script at `scripts/tools/parity/validate_{domain}_parity.py`. See [Legacy Parity Validation Guide](../guides/validation/legacy-parity-validation.md)
 
 - [ ] Row count matches legacy output
 - [ ] Column names match (considering renames)

@@ -512,7 +512,7 @@ Use the parity validation CLI to compare legacy and new pipeline outputs:
 PYTHONPATH=src uv run python scripts/validation/CLI/cleaner_compare.py {domain} --month 202401 --export
 ```
 
-For detailed validation procedures, see [Legacy Parity Validation Guide](../../runbooks/legacy-parity-validation.md).
+For detailed validation procedures, see [Legacy Parity Validation Guide](../../guides/validation/legacy-parity-validation.md).
 
 ---
 

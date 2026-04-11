@@ -496,7 +496,7 @@ def debug_domain(domain, month):
 - [Domain Migration Workflow](./workflow.md)
 - [Domain Development Guide](./development-guide.md)
 - [Cleansing Rules Template](../../templates/cleansing-rules-template.md)
-- [Legacy Parity Validation Guide](../../runbooks/legacy-parity-validation.md)
+- [Legacy Parity Validation Guide](../../guides/validation/legacy-parity-validation.md)
 
 ---
 

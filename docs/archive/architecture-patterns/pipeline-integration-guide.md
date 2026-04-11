@@ -689,3 +689,5 @@ result = pipeline.execute(df)
 **Last Updated**: 2025-11-16
 **Authors**: Bob (Scrum Master) + Development Team
 **Target Epic**: Epic 2 - Multi-Layer Data Quality Framework
+> Historical document.
+> This file is retained for context and may reference paths or structures that no longer exist in the active repository layout.

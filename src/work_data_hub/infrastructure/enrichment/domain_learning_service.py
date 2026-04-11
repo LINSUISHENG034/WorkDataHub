@@ -7,7 +7,7 @@ cache for future lookups.
 
 Architecture Reference:
 - AD-010: Infrastructure Layer
-- docs/guides/company-enrichment-service.md#2.3 Domain Self-Learning
+- docs/guides/infrastructure/company-enrichment-service.md#2.3 Domain Self-Learning
 
 Key Features:
 - Multi-type learning: Extracts lookup types (plan_code, customer_name, plan_customer,

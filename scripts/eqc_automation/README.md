@@ -83,4 +83,4 @@
 ## References
 
 - Current manual auth handler: `src/work_data_hub/io/auth/eqc_auth_handler.py`
-- Login page elements doc: `docs/company_id/EQC/login_page_elements.md`
+- Login page elements doc: `docs/reference/automation/EQC/login_page_elements.md`

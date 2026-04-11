@@ -7,7 +7,7 @@ that consolidates the logic from three legacy functions:
 - clean_company_name (pipelines/steps/customer_name_cleansing.py)
 
 Architecture Reference:
-- docs/specific/customer/customer-name-normalization-refactor.md
+- docs/reference/customer/customer-name-normalization-refactor.md
 
 Usage:
     from work_data_hub.infrastructure.cleansing.normalizers import (

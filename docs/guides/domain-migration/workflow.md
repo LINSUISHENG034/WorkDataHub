@@ -265,7 +265,7 @@ This document provides a complete end-to-end workflow for migrating a legacy dom
 
 | Document | Purpose |
 |----------|---------|
-| [Legacy Parity Validation Guide](../../runbooks/legacy-parity-validation.md) | Validation procedures |
+| [Legacy Parity Validation Guide](../../guides/validation/legacy-parity-validation.md) | Validation procedures |
 | Parity CLI: `scripts/validation/CLI/cleaner_compare.py` | Automated comparison |
 
 ### Exit Criteria
@@ -329,7 +329,7 @@ See [Cleansing Rules Index](../../cleansing-rules/index.md) for full list of pen
 | [Cleansing Rules to Code Mapping](./code-mapping.md) | How to translate documentation to code |
 | [Troubleshooting Guide](./troubleshooting.md) | Common issues and solutions |
 | [Cleansing Rules Template](../../templates/cleansing-rules-template.md) | Template for creating cleansing rules documents |
-| [Legacy Parity Validation Guide](../../runbooks/legacy-parity-validation.md) | Validation procedures and troubleshooting |
+| [Legacy Parity Validation Guide](../../guides/validation/legacy-parity-validation.md) | Validation procedures and troubleshooting |
 
 ---
 

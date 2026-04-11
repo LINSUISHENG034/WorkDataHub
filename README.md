@@ -57,7 +57,7 @@ tests/
 - Company ID resolution and normalization
 - Validation error handling and report generation
 - NO imports from `io/` or `orchestration/` layers
-- Architecture diagram & narrative: see `docs/architecture/infrastructure-layer.md`
+- Active documentation entry point: see `docs/index.md`
 
 **I/O Layer** (`io/`)
 - File reading, database writes, external API calls
@@ -122,7 +122,12 @@ tests/
    uv sync --no-dev
    ```
 
-3. **Configure environment:**
+3. **Read the active documentation set:**
+   ```text
+   docs/index.md
+   ```
+
+4. **Configure environment:**
    ```bash
    # Copy environment template
    cp .env.example .env
@@ -541,10 +546,7 @@ The project enforces strict architectural boundaries:
 
 For a detailed matrix of responsibilities, medallion mapping, and the
 Story 1.6 `transform_annuity_data` dependency-injection example, see
-`docs/architecture-boundaries.md`. That document also cites the Story 1.5
-pipeline contracts (`domain/pipelines/{core,types}.py`), Story 1.4 settings
-singleton, and Story 1.3 structlog helpers so future stories reference the same
-infrastructure instead of recreating it.
+`docs/index.md`.
 
 🚧 **Boundary guardrail:** `uv run ruff check` now fails with `TID251` if any
 `work_data_hub/domain` module imports `work_data_hub.io` or
@@ -578,12 +580,11 @@ outer layers, so a clean lint run is proof that Story 1.6 dependency rules hol
 - Integration tests can depend on the `test_db_with_migrations` fixture defined
   in `tests/conftest.py`; it provisions a temporary SQLite database and applies
   the latest migrations automatically.
-- Refer to `docs/database-migrations.md` for the complete workflow, naming
-  conventions, and troubleshooting steps introduced in Story 1.7.
+- Current operator and schema references live under `docs/index.md`.
 
 ## Project Status
 
-This project is under active development. See `docs/sprint-artifacts/sprint-status.yaml` for current progress across all epics and stories.
+This project is under active development. Use `docs/index.md` for the current documentation entry point.
 
 ## License
 
