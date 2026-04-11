@@ -21,7 +21,7 @@ Customer MDM implementation in Epic 7.6 has identified optimization opportunitie
 
 ### 1.2 Discovery Context
 
-- **Trigger:** Business analysis document `docs/business-background/customer-mdm-backfill-analysis.md`
+- **Trigger:** Business analysis document `docs/business-background/客户主数据回填与状态来源分析.md`
 - **Timing:** During Epic 7.6 implementation (Story 7.6-11 in progress)
 - **Evidence:** Documented in analysis with scenario simulations and confirmed business decisions
 
@@ -278,7 +278,7 @@ CREATE VIEW customer."年金客户" AS SELECT * FROM customer."年金关联公�
 
 | Document | Path |
 |----------|------|
-| Business Analysis | `docs/business-background/customer-mdm-backfill-analysis.md` |
+| Business Analysis | `docs/business-background/客户主数据回填与状态来源分析.md` |
 | Contract Specification | `docs/specific/customer-mdm/customer-plan-contract-specification.md` |
 | Snapshot Specification | `docs/specific/customer-mdm/customer-monthly-snapshot-specification.md` |
 | FK Config | `config/foreign_keys.yml` |

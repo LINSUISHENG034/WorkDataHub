@@ -75,7 +75,7 @@ domains:
 
     # File patterns to match (glob syntax)
     file_patterns:
-      - "*规模收入数据*.xlsx"
+      - "*年金规模收入*.xlsx"
       - "*规模*收入数据*.xlsx"  # 202511+ uses 规模及收入数据 naming
 
     # Extend default exclusions with domain-specific pattern
@@ -102,7 +102,7 @@ domains:
 
     # File patterns to match (glob syntax)
     file_patterns:
-      - "*规模收入数据*.xlsx"
+      - "*年金规模收入*.xlsx"
       - "*规模*收入数据*.xlsx"  # 202511+ uses 规模及收入数据 naming
 
     # Extend default exclusions
