@@ -8,6 +8,10 @@
 
 `annual_loss` merges the trustee and investee loss sheets from the monthly business workbook and loads the result to the customer schema. The domain is registered in `src/work_data_hub/domain/registry.py` and uses the shared ETL CLI.
 
+业务口径说明：
+- `customer."流失客户明细"` 属于申报口径。
+- 该表会在实际系统数据中展现，但它表达的是“申报流失事实”，不等同于基于 `规模明细` 判定的已流失状态。
+
 ## Inputs
 
 - Base path: `data/real_data/{YYYYMM}/收集数据/业务收集`
@@ -29,7 +33,10 @@ The loss pipeline performs:
 - product-line and plan-type derivation
 - date parsing for `上报月份` and `流失日期`
 - branch-code mapping and customer-name cleanup
-- domain cleansing and optional company ID resolution
+- domain cleansing and company ID resolution
+  - runtime note: the standard adapter path always passes an `EqcLookupConfig`
+    object into the pipeline; when no explicit EQC settings are provided, it
+    uses a disabled config rather than omitting the step entirely
 - plan-code enrichment from `客户年金计划`
 - fallback plan-code defaulting plus legacy-column drop
 
@@ -68,4 +75,5 @@ uv run python scripts/quality/check_docs_alignment.py
 
 - [Runbook](../runbooks/annual_loss.md)
 - [Cleansing Rules Index](../cleansing-rules/index.md)
+- [Capability And Mechanism Map](./annual_loss-capability-map.md)
 - [Documentation Standards](../engineering/documentation-standards.md)

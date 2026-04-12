@@ -29,6 +29,7 @@ uv run --env-file .wdh_env python -m work_data_hub.cli etl --domains annuity_inc
 | No files discovered | Wrong period folder or workbook name | Verify the discovery path and workbook patterns. |
 | Customer or fee defaults look wrong | Workbook structure changed | Compare the incoming sheet against the expected `收入明细` columns. |
 | Enrichment failure | EQC path unavailable | Retry with a healthy environment or use `--no-enrichment` if approved. |
+| Temporary `IN*` company IDs appear | Resolver could not match a company in the standard path | Review the unresolved names export and decide whether mappings or source data need correction. |
 
 ## Verification
 
@@ -42,3 +43,4 @@ uv run python scripts/quality/check_docs_alignment.py
 - Re-run in `--plan-only` mode first if the prior load is in doubt.
 - Replace data only within the configured refresh key scope: `月度`, `业务类型`, `计划类型`.
 - Use the same period and command shape for a clean re-run.
+- If `unknown_names_csv` is emitted, inspect it before treating the run as fully reconciled.

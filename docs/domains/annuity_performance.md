@@ -69,4 +69,5 @@ uv run pytest tests/integration/test_annuity_config.py -v
 
 - [Runbook](../runbooks/annuity_performance.md)
 - [Cleansing Rules](../cleansing-rules/annuity-performance.md)
+- [Capability And Mechanism Map](./annuity_performance-capability-map.md)
 - [Documentation Standards](../engineering/documentation-standards.md)

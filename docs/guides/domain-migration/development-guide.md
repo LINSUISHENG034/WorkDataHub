@@ -1264,8 +1264,8 @@ The `requires_backfill` adapter property and the FK backfill configuration in `c
 |--------|-------------------|---------------|
 | `annuity_performance` | `True` | Yes (5 FK rules) |
 | `annuity_income` | `True` | Yes (5 FK rules) |
-| `annual_award` | `False` | Yes (1 FK rule: `fk_customer`) |
-| `annual_loss` | `False` | Yes (1 FK rule: `fk_customer`) |
+| `annual_award` | `True` | Yes (1 FK rule: `fk_customer`) |
+| `annual_loss` | `True` | Yes (1 FK rule: `fk_customer`) |
 | `sandbox_trustee_performance` | `False` | No |
 
 ---

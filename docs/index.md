@@ -11,6 +11,7 @@
 - [Documentation Standards](./engineering/documentation-standards.md)
 - [Cleansing Rules](./cleansing-rules/index.md)
 - [Business Background](./business-background/)
+- [Templates](./templates/README.md)
 
 ## Historical Material
 - [Archive](./archive/README.md)

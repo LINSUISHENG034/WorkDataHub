@@ -267,8 +267,9 @@ FROM customer."客户年金计划";
 | `is_strategic` | `BOOL_OR` 聚合 | 来自合约维表 `客户年金计划.is_strategic`，多合约取"或" |
 | `is_existing` | `BOOL_OR` 聚合 | 来自合约维表 `客户年金计划.is_existing`，多合约取"或" |
 | `is_winning_this_year` | `StatusEvaluator` | EXISTS 子查询检查 `customer."中标客户明细"` 当年是否有记录 |
-| `is_churned_this_year` | `StatusEvaluator` | EXISTS 子查询检查 `customer."流失客户明细"` 当年是否有记录 |
-| `is_new` | `StatusEvaluator` 组合 | `is_winning_this_year = True AND NOT BOOL_OR(is_existing)` |
+| `is_loss_reported` | `StatusEvaluator` | EXISTS 子查询检查 `customer."流失客户明细"` 当年是否有记录 |
+| `is_churned_this_year` | `StatusEvaluator` | 检查 `business."规模明细"` 在当月的规模汇总是否为 0（含当月无记录） |
+| `is_new` | `StatusEvaluator` 组合 | 新到账客户口径，仅客户 / 产品线粒度：`is_winning_this_year = True AND NOT BOOL_OR(is_existing)` |
 | `aum_balance` | SUM 子查询 | `SELECT SUM(期末资产规模) FROM business."规模明细"` 按 company_id + 产品线代码 + 当月聚合 |
 | `plan_count` | COUNT DISTINCT | 按 company_id + product_line_code 下的不同 plan_code 计数 |
 
@@ -294,7 +295,8 @@ SELECT DISTINCT company_id, "产品线代码"
 FROM customer."中标客户明细"
 WHERE EXTRACT(YEAR FROM "上报月份") = 2025;
 
--- ④ 验证 is_new = is_winning_this_year AND NOT is_existing 的组合逻辑
+-- ④ 验证 is_new（新到账客户）= is_winning_this_year AND NOT is_existing
+-- 注意：is_new 当前仅存在于客户 / 产品线粒度，不存在计划层字段
 -- is_new = true 的记录必须满足 is_winning_this_year = true 且 is_existing = false
 SELECT company_id, product_line_code, is_new, is_winning_this_year, is_existing
 FROM customer."客户业务月度快照"
@@ -303,14 +305,21 @@ WHERE snapshot_month = '2025-10-31'
   AND (is_winning_this_year = false OR is_existing = true);
 -- ↑ 期望结果：0行 (如有行则说明 is_new 逻辑异常)
 
--- ⑤ 验证 is_churned_this_year — 对照流失明细
+-- ⑤ 验证 is_loss_reported — 对照流失明细
+SELECT f.company_id, f.product_line_code, f.customer_name,
+       f.is_loss_reported
+FROM customer."客户业务月度快照" f
+WHERE f.snapshot_month = '2025-10-31'
+  AND f.is_loss_reported = true;
+
+-- ⑥ 验证 is_churned_this_year — 对照规模明细当月 AUM 是否为 0
 SELECT f.company_id, f.product_line_code, f.customer_name,
        f.is_churned_this_year
 FROM customer."客户业务月度快照" f
 WHERE f.snapshot_month = '2025-10-31'
   AND f.is_churned_this_year = true;
 
--- ⑥ 验证 aum_balance 与规模明细的一致性
+-- ⑦ 验证 aum_balance 与规模明细的一致性
 -- 从快照表取到的 aum 应与规模明细表 SUM 吻合
 SELECT f.company_id, f.product_line_code, f.aum_balance AS 快照规模,
        COALESCE(SUM(s."期末资产规模"), 0) AS 明细规模
@@ -325,14 +334,14 @@ GROUP BY f.company_id, f.product_line_code, f.aum_balance
 HAVING f.aum_balance != COALESCE(SUM(s."期末资产规模"), 0);
 -- ↑ 期望结果：0行 (如有行则说明 aum_balance 汇总不一致)
 
--- ⑦ 验证 is_strategic 和 is_existing 聚合
+-- ⑧ 验证 is_strategic 和 is_existing 聚合
 SELECT is_strategic, is_existing, COUNT(*)
 FROM customer."客户业务月度快照"
 WHERE snapshot_month = '2025-10-31'
 GROUP BY is_strategic, is_existing
 ORDER BY is_strategic DESC, is_existing DESC;
 
--- ⑧ 验证 plan_count
+-- ⑨ 验证 plan_count
 SELECT f.company_id, f.product_line_code, f.plan_count AS 快照计划数,
        COUNT(DISTINCT c.plan_code) AS 维表计划数
 FROM customer."客户业务月度快照" f
@@ -354,9 +363,12 @@ LIMIT 10;
 
 | 字段 | 生成方式 | 数据来源/逻辑说明 |
 |---|---|---|
-| `is_churned_this_year` | `StatusEvaluator` | EXISTS 子查询按 `company_id + 年金计划号` 匹配 `流失客户明细` |
+| `is_churned_this_year` | `StatusEvaluator` | 检查 `business."规模明细"` 在当月按 `company_id + 计划代码 + 产品线代码` 汇总的规模是否为 0 |
 | `contract_status` | 直取 | 来自合约维表 `客户年金计划.contract_status` |
 | `aum_balance` | SUM 子查询 | `SELECT SUM(期末资产规模) FROM business."规模明细"` 按 company_id + 计划代码 + 产品线代码 + 当月聚合 |
+
+> **注意**：当前计划级快照没有 `is_new` 字段。
+> “新到账”目前只定义在客户 / 产品线粒度。
 
 #### 验证 SQL
 
@@ -367,7 +379,7 @@ SELECT COUNT(*) AS 记录数,
 FROM customer."客户计划月度快照"
 WHERE snapshot_month = '2025-10-31';
 
--- ② 验证 is_churned_this_year_plan — 按 plan_code 级别判定流失
+-- ② 验证 is_churned_this_year_plan — 按 plan_code + product_line 级别判定当月规模是否为 0
 SELECT snapshot_month, company_id, plan_code, product_line_code,
        is_churned_this_year, contract_status, aum_balance
 FROM customer."客户计划月度快照"
@@ -375,10 +387,12 @@ WHERE is_churned_this_year = true
   AND snapshot_month = '2025-10-31'
 LIMIT 10;
 
--- ③ 交叉核验：上面查出来的 plan_code 在流失明细中是否确实存在
-SELECT "年金计划号", company_id, "客户名称"
-FROM customer."流失客户明细"
-WHERE EXTRACT(YEAR FROM "上报月份") = 2025;
+-- ③ 交叉核验：上面查出来的 plan_code 在规模明细当月汇总应为 0
+SELECT s.company_id, s."计划代码", s."产品线代码", SUM(s."期末资产规模") AS aum_sum
+FROM business."规模明细" s
+WHERE s."月度" = '2025-10-01'
+GROUP BY s.company_id, s."计划代码", s."产品线代码"
+HAVING SUM(s."期末资产规模") = 0;
 
 -- ④ 验证 contract_status 与维表一致
 SELECT f.company_id, f.plan_code, f.contract_status AS 快照合约状态,
@@ -408,6 +422,7 @@ LIMIT 10;
 -- ① 中标明细中有记录
 -- ② 客户明细 tags 列包含 "中标" 标签
 -- ③ 快照表 is_winning_this_year = true
+-- ④ 如同时满足 NOT is_existing，则客户 / 产品线粒度快照中 is_new = true
 SELECT a."客户名称", a.company_id, a."产品线代码",
        c.tags, c.年金客户类型,
        f.is_winning_this_year, f.is_new
@@ -421,16 +436,16 @@ WHERE EXTRACT(YEAR FROM a."上报月份") = 2025
 LIMIT 10;
 ```
 
-### 8.2 流失客户全链路追踪
+### 8.2 流失申报客户链路追踪
 
 ```sql
--- 一个当年流失的客户, 应同时满足:
+-- 一个当年流失申报的客户, 当前至少应满足:
 -- ① 流失明细中有记录
 -- ② 客户明细 tags 列包含 "流失" 标签
--- ③ 快照表 is_churned_this_year = true
+-- ③ 客户 / 产品线粒度快照中 is_loss_reported = true
 SELECT l."客户名称", l.company_id, l."产品线代码",
        c.tags, c.年金客户类型,
-       f.is_churned_this_year
+       f.is_loss_reported
 FROM customer."流失客户明细" l
 JOIN customer."客户明细" c ON l.company_id = c.company_id
 LEFT JOIN customer."客户业务月度快照" f
@@ -476,11 +491,13 @@ SELECT
 |---|---|---|---|---|
 | `is_winning_this_year` | `exists_in_year` | `customer."中标客户明细"` | ProductLine | `company_id` + `产品线代码` |
 | `is_loss_reported` | `exists_in_year` | `customer."流失客户明细"` | ProductLine | `company_id` + `产品线代码` |
-| `is_churned_this_year` | `exists_in_year` | `customer."流失客户明细"` | ProductLine | `company_id` + `产品线代码` |
-| `is_churned_this_year_plan` | `exists_in_year` | `customer."流失客户明细"` | Plan | `company_id` + `年金计划号` |
-| `is_new` | `status_reference` + `negation` | 派生 | ProductLine | `is_winning_this_year AND NOT BOOL_OR(is_existing)` |
+| `is_churned_this_year` | `current_period_sum_zero` | `business."规模明细"` | ProductLine | `company_id` + `产品线代码` |
+| `is_churned_this_year_plan` | `current_period_sum_zero` | `business."规模明细"` | Plan | `company_id` + `计划代码` + `产品线代码` |
+| `is_new` | `status_reference` + `negation` | 派生 | ProductLine | 新到账客户：`is_winning_this_year AND NOT BOOL_OR(is_existing)` |
 
-> **注意**: `is_loss_reported` 已在规则配置中定义但当前快照表 `客户业务月度快照` 尚未包含此列，其 SQL 生成逻辑已就绪于 `StatusEvaluator`，待后续需求可直接启用。
+> **注意**:
+> 1. `is_loss_reported` 当前已落地到 `客户业务月度快照`，但计划级快照没有对应字段。
+> 2. `is_new` 当前只存在于 ProductLine 粒度，不存在计划层版本。
 
 ### `foreign_keys.yml` 聚合算子对照表
 

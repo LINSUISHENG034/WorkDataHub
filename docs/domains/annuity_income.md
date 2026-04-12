@@ -31,6 +31,7 @@ The income pipeline performs:
 - portfolio and product-line derivation
 - preservation of account-name fields before cleansing
 - domain cleansing plus company ID resolution
+  - unresolved rows currently fall back to generated temporary `IN*` company IDs
 - removal of legacy columns before load
 
 Validation and output modeling live under `src/work_data_hub/domain/annuity_income/`.
@@ -41,6 +42,8 @@ Validation and output modeling live under `src/work_data_hub/domain/annuity_inco
 - Target table: `收入明细`
 - Delete/refresh key: `月度`, `业务类型`, `计划类型`
 - Backfill: required for this domain
+- Additional operator artifact: when unresolved company names exist and export is
+  enabled, the service may return an `unknown_names_csv` path for manual review
 
 ## CLI And Operational Entry Points
 
@@ -70,4 +73,5 @@ uv run python scripts/quality/check_docs_alignment.py
 
 - [Runbook](../runbooks/annuity_income.md)
 - [Cleansing Rules](../cleansing-rules/annuity-income.md)
+- [Capability And Mechanism Map](./annuity_income-capability-map.md)
 - [Documentation Standards](../engineering/documentation-standards.md)
