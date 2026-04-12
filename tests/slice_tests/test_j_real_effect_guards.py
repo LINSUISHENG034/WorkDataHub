@@ -188,6 +188,39 @@ def test_j2_annual_award_plan_code_enrichment_uses_db_lookup(
     assert company_ids == ["COMP_A"]
 
 
+def test_j2b_annual_award_plan_code_enrichment_queries_current_contract_rows(
+    make_pipeline_context,
+) -> None:
+    from work_data_hub.domain.annual_award.pipeline_builder import (
+        PlanCodeEnrichmentStep,
+    )
+
+    connection = _CaptureConnection(
+        rows=[
+            SimpleNamespace(
+                company_id="COMP_A", product_line_code="PL202", plan_code="P200"
+            )
+        ]
+    )
+
+    df = pd.DataFrame(
+        {
+            "company_id": ["COMP_A"],
+            "产品线代码": ["PL202"],
+            "计划类型": ["集合计划"],
+            "年金计划号": [""],
+        }
+    )
+
+    PlanCodeEnrichmentStep(db_connection=connection).apply(
+        df,
+        make_pipeline_context(domain="annual_award"),
+    )
+
+    assert len(connection.calls) == 1
+    assert "valid_to = '9999-12-31'" in connection.calls[0]["sql"]
+
+
 def test_j3_annual_loss_plan_code_enrichment_uses_db_lookup(
     make_pipeline_context,
 ) -> None:
@@ -221,6 +254,37 @@ def test_j3_annual_loss_plan_code_enrichment_uses_db_lookup(
     assert result.loc[0, "年金计划号"] == "P700"
     assert result.loc[1, "年金计划号"] == "S800"
     assert len(connection.calls) == 1
+
+
+def test_j3b_annual_loss_plan_code_enrichment_queries_current_contract_rows(
+    make_pipeline_context,
+) -> None:
+    from work_data_hub.domain.annual_loss.pipeline_builder import PlanCodeEnrichmentStep
+
+    connection = _CaptureConnection(
+        rows=[
+            SimpleNamespace(
+                company_id="COMP_X", product_line_code="PL201", plan_code="P700"
+            )
+        ]
+    )
+
+    df = pd.DataFrame(
+        {
+            "company_id": ["COMP_X"],
+            "产品线代码": ["PL201"],
+            "计划类型": ["集合计划"],
+            "年金计划号": [None],
+        }
+    )
+
+    PlanCodeEnrichmentStep(db_connection=connection).apply(
+        df,
+        make_pipeline_context(domain="annual_loss"),
+    )
+
+    assert len(connection.calls) == 1
+    assert "valid_to = '9999-12-31'" in connection.calls[0]["sql"]
 
 
 @pytest.mark.parametrize(

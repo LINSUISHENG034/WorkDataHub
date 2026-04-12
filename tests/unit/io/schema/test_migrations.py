@@ -24,8 +24,8 @@ def test_core_tables_exist(test_db_with_migrations: str) -> None:
         ).scalar_one()
         # Updated to latest migration revision
         assert (
-            revision == "20260228_000012"
-        )  # 012_drop_customer_legacy_label_column (head)
+            revision == "20260411_000013"
+        )  # 013_add_is_loss_reported_to_customer_monthly_snapshot (head)
 
 
 @pytest.mark.integration

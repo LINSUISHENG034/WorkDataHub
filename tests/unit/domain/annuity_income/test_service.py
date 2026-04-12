@@ -283,6 +283,90 @@ class TestProcessWithEnrichment:
 
         assert result.enrichment_stats.total_records == 1
 
+    @patch("work_data_hub.domain.annuity_income.service.load_plan_override_mapping")
+    @patch("work_data_hub.domain.annuity_income.service.get_settings")
+    def test_default_service_path_generates_temp_id_for_unresolved_name(
+        self,
+        mock_get_settings,
+        mock_load_plan_override,
+    ):
+        """Default service path should generate temp IDs when unresolved."""
+        mock_get_settings.side_effect = Exception("No DB settings in unit test")
+        mock_load_plan_override.return_value = {}
+
+        rows = [
+            {
+                "月度": "202412",
+                "计划代码": "UNKNOWN_PLAN",
+                "计划名称": "完全未知公司A企业年金计划",
+                "客户名称": "完全未知公司A",
+                "业务类型": "企年投资",
+                "计划类型": "单一计划",
+                "机构名称": "北京",
+                "组合类型": "固定收益类",
+                "组合名称": "测试组合A",
+                "固费": 100.0,
+                "浮费": 50.0,
+                "回补": 25.0,
+                "税": 10.0,
+            }
+        ]
+
+        result = process_with_enrichment(
+            rows,
+            data_source="test.xlsx",
+            export_unknown_names=False,
+        )
+
+        assert len(result.records) == 1
+        assert result.records[0].company_id.startswith("IN")
+        assert result.enrichment_stats is not None
+        assert result.enrichment_stats.temp_assigned == 1
+        assert result.unknown_names_csv is None
+
+    @patch("work_data_hub.domain.annuity_income.service.export_unknown_names_csv")
+    @patch("work_data_hub.domain.annuity_income.service.load_plan_override_mapping")
+    @patch("work_data_hub.domain.annuity_income.service.get_settings")
+    def test_unknown_names_csv_is_returned_as_operator_output(
+        self,
+        mock_get_settings,
+        mock_load_plan_override,
+        mock_export_unknown_names_csv,
+    ):
+        """unknown_names_csv should be part of the service result contract."""
+        mock_get_settings.side_effect = Exception("No DB settings in unit test")
+        mock_load_plan_override.return_value = {}
+        mock_export_unknown_names_csv.return_value = "logs/unknown_companies_test.csv"
+
+        rows = [
+            {
+                "月度": "202412",
+                "计划代码": "UNKNOWN_PLAN",
+                "计划名称": "完全未知公司B企业年金计划",
+                "客户名称": "完全未知公司B",
+                "业务类型": "企年投资",
+                "计划类型": "单一计划",
+                "机构名称": "北京",
+                "组合类型": "固定收益类",
+                "组合名称": "测试组合B",
+                "固费": 100.0,
+                "浮费": 50.0,
+                "回补": 25.0,
+                "税": 10.0,
+            }
+        ]
+
+        result = process_with_enrichment(
+            rows,
+            data_source="test.xlsx",
+            export_unknown_names=True,
+        )
+
+        assert len(result.records) == 1
+        assert result.records[0].company_id.startswith("IN")
+        assert result.unknown_names_csv == "logs/unknown_companies_test.csv"
+        mock_export_unknown_names_csv.assert_called_once()
+
 
 class TestRecordsToDataframe:
     """Tests for _records_to_dataframe helper function."""

@@ -280,6 +280,35 @@ class TestDeriveCandidates:
         assert len(candidates_df) == 2
         assert set(candidates_df["年金计划号"]) == {"P001", "P002"}
 
+    def test_skip_blank_values_filters_temp_company_ids(self):
+        """skip_blank_values should filter temp IN* company IDs for customer FK use."""
+        service = GenericBackfillService("test_domain")
+
+        config = ForeignKeyConfig(
+            name="fk_customer",
+            source_column="company_id",
+            target_table="客户明细",
+            target_key="company_id",
+            skip_blank_values=True,
+            backfill_columns=[
+                BackfillColumnMapping(source="company_id", target="company_id"),
+            ],
+        )
+
+        df = pd.DataFrame(
+            [
+                {"company_id": "COMP001"},
+                {"company_id": "INABCDEFG1234567"},
+                {"company_id": ""},
+                {"company_id": None},
+            ]
+        )
+
+        candidates_df = service.derive_candidates(df, config)
+
+        assert len(candidates_df) == 1
+        assert candidates_df.iloc[0]["company_id"] == "COMP001"
+
 
 class TestBackfillTable:
     """Test table backfill operations."""

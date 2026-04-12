@@ -164,6 +164,40 @@ class TestCustomerMdmEndToEnd:
                 "P006": 250000.00,
             }
 
+    def test_snapshot_refresh_surfaces_is_loss_reported(
+        self,
+        customer_mdm_test_db: str,
+        test_period: str,
+    ):
+        """ProductLine snapshot should expose reported-loss semantics separately."""
+        _validate_test_database(customer_mdm_test_db)
+
+        from work_data_hub.customer_mdm import (
+            refresh_monthly_snapshot,
+            sync_contract_status,
+        )
+
+        with use_test_database(customer_mdm_test_db):
+            sync_contract_status(period=test_period, dry_run=False)
+            refresh_monthly_snapshot(period=test_period, dry_run=False)
+
+        engine = create_engine(customer_mdm_test_db)
+        with engine.connect() as conn:
+            result = conn.execute(
+                text(
+                    """
+                    SELECT is_loss_reported, is_churned_this_year
+                    FROM customer."客户业务月度快照"
+                    WHERE company_id = 'TEST_C003'
+                      AND product_line_code = 'PL202'
+                    """
+                )
+            ).fetchone()
+
+        assert result is not None
+        assert result[0] is True
+        assert result[1] is True
+
     def test_bi_views_reflect_snapshot_data(
         self, customer_mdm_test_db: str, test_period: str
     ):

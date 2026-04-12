@@ -424,21 +424,26 @@ class TestRequiresBackfillField:
         assert config.requires_backfill is False
 
     def test_real_config_domains_inherit_requires_backfill(self):
-        """Test that real data_sources.yml domains inherit requires_backfill from defaults."""
+        """Real config should align sandbox with explicit no-backfill semantics."""
         from src.work_data_hub.infrastructure.settings.data_source_schema import (
             get_domain_config_v2,
         )
 
-        # All 3 domains should inherit requires_backfill=True from defaults
         for domain in [
             "annuity_performance",
             "annuity_income",
-            "sandbox_trustee_performance",
         ]:
             config = get_domain_config_v2(domain, "config/data_sources.yml")
             assert config.requires_backfill is True, (
                 f"{domain} should have requires_backfill=True"
             )
+
+        sandbox_config = get_domain_config_v2(
+            "sandbox_trustee_performance", "config/data_sources.yml"
+        )
+        assert sandbox_config.requires_backfill is False, (
+            "sandbox_trustee_performance should explicitly disable backfill"
+        )
 
     def test_schema_version_1_2_supported(self):
         """Test that schema version 1.2 is accepted (Story 7.4-2 requirement)."""

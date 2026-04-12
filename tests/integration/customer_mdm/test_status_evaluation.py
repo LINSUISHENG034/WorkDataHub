@@ -8,6 +8,9 @@ identical results to the original hardcoded implementation.
 
 import pytest
 
+from work_data_hub.infrastructure.settings.customer_status_schema import (
+    load_customer_status_config,
+)
 from work_data_hub.customer_mdm.status_evaluator import StatusEvaluator
 
 
@@ -47,40 +50,33 @@ class TestStatusEvaluatorSQLGeneration:
         sql = evaluator.generate_sql_fragment(
             "is_churned_this_year",
             table_alias="c",
-            params={"snapshot_year": 2026},
+            params={"snapshot_year": 2026, "snapshot_month": "2026-01-31"},
         )
 
-        # Original SQL pattern:
-        # EXISTS (
-        #     SELECT 1 FROM customer."流失客户明细" l
-        #     WHERE l.company_id = c.company_id
-        #       AND l.产品线代码 = c.product_line_code
-        #       AND EXTRACT(YEAR FROM l.上报月份) = %(snapshot_year)s
-        # )
-        assert "EXISTS" in sql
-        assert "customer" in sql
-        assert "流失客户明细" in sql
+        # Current business rule:
+        # COALESCE(SUM(期末资产规模), 0) = 0 for the current snapshot month
+        # on business."规模明细", matched by company_id + 产品线代码.
+        assert "business" in sql
+        assert "规模明细" in sql
+        assert "SUM(sub.期末资产规模)" in sql
         assert "company_id" in sql
         assert "产品线代码" in sql
+        assert "DATE_TRUNC('month', %(snapshot_month)s::date)" in sql
 
     def test_plan_level_churned_sql_matches_original(self, evaluator: StatusEvaluator):
         """Verify plan-level churn SQL matches original hardcoded version."""
         sql = evaluator.generate_sql_fragment(
             "is_churned_this_year_plan",
             table_alias="c",
-            params={"snapshot_year": 2026},
+            params={"snapshot_year": 2026, "snapshot_month": "2026-01-31"},
         )
 
-        # Original SQL pattern:
-        # EXISTS (
-        #     SELECT 1 FROM customer."流失客户明细" l
-        #     WHERE l.company_id = c.company_id
-        #       AND l.年金计划号 = c.plan_code
-        #       AND EXTRACT(YEAR FROM l.上报月份) = %(snapshot_year)s
-        # )
-        assert "EXISTS" in sql
-        assert "流失客户明细" in sql
-        assert "年金计划号" in sql
+        # Current business rule:
+        # COALESCE(SUM(期末资产规模), 0) = 0 for the current snapshot month
+        # on business."规模明细", matched by company_id + plan_code (+ product line).
+        assert "规模明细" in sql
+        assert "SUM(sub.期末资产规模)" in sql
+        assert "计划代码" in sql
         assert "plan_code" in sql
 
     def test_is_new_combines_winning_and_existing(self, evaluator: StatusEvaluator):
@@ -128,6 +124,28 @@ class TestStatusEvaluatorConfigConsistency:
 
         # annual_loss -> 流失客户明细
         churned_sql = evaluator.generate_sql_fragment(
-            "is_churned_this_year", "c", {"snapshot_year": 2026}
+            "is_churned_this_year",
+            "c",
+            {"snapshot_year": 2026, "snapshot_month": "2026-01-31"},
         )
-        assert "流失客户明细" in churned_sql
+        assert "规模明细" in churned_sql
+
+    def test_status_definitions_align_with_exists_in_year_rules(self):
+        """Definition metadata should match the rule style in config."""
+        config = load_customer_status_config("config/customer_status_rules.yml")
+
+        for status_name, definition in config.status_definitions.items():
+            if definition.source == "derived":
+                continue
+
+            rule = config.evaluation_rules[status_name]
+            if len(rule.conditions) != 1:
+                continue
+
+            condition = rule.conditions[0]
+            if condition.type == "exists_in_year":
+                assert definition.source == condition.source
+                assert definition.time_scope == "yearly"
+            elif condition.type == "current_period_sum_zero":
+                assert definition.source == condition.source
+                assert definition.time_scope == "monthly"

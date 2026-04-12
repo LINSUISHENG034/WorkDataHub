@@ -123,11 +123,11 @@ class TestG6PlanSnapshot:
         assert "is_churned_this_year_plan" in names
 
     def test_churned_plan_sql_fragment(self, evaluator):
-        params = {"snapshot_year": 2025}
+        params = {"snapshot_year": 2025, "snapshot_month": "2025-10-31"}
         sql = evaluator.generate_sql_fragment(
             "is_churned_this_year_plan",
             table_alias="c",
             params=params,
         )
-        assert "EXISTS" in sql.upper()
-        assert "snapshot_year" in sql or "EXTRACT" in sql.upper()
+        assert "SUM(sub.期末资产规模)" in sql
+        assert "DATE_TRUNC('month', %(snapshot_month)s::date)" in sql

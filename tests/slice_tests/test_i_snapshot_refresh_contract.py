@@ -42,6 +42,8 @@ def test_i1_product_line_snapshot_sql_contract() -> None:
     assert 'FROM customer."客户年金计划" c' in sql
     assert "FROM business.规模明细 s" in sql
     assert "SUM(s.期末资产规模)" in sql
+    assert "is_loss_reported" in sql
+    assert "流失客户明细" in sql
     assert "DATE_TRUNC('month', %(snapshot_month)s::date)" in sql
     assert "EXISTS (" in sql  # config-driven status SQL fragments are embedded
 
@@ -69,7 +71,8 @@ def test_i2_plan_snapshot_sql_contract() -> None:
     assert "FROM business.规模明细 s" in sql
     assert "s.计划代码 = c.plan_code" in sql
     assert "SUM(s.期末资产规模)" in sql
-    assert "EXISTS (" in sql
+    assert "SUM(sub.期末资产规模)" in sql
+    assert "DATE_TRUNC('month', %(snapshot_month)s::date)" in sql
 
     assert params["snapshot_month"] == "2025-10-31"
     assert params["snapshot_year"] == 2025

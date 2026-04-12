@@ -73,3 +73,12 @@ class TestCustomerStatusRulesConfig:
         for status in required_statuses:
             assert status in config.status_definitions, f"Missing: {status}"
             assert status in config.evaluation_rules, f"Missing rule: {status}"
+
+    def test_is_new_is_product_line_only(self):
+        """is_new should currently only exist at product-line granularity."""
+        config = load_customer_status_config("config/customer_status_rules.yml")
+
+        assert config.evaluation_rules["is_new"].granularity == "product_line"
+        assert "is_new" in config.status_definitions
+        assert "is_churned_this_year_plan" in config.evaluation_rules
+        assert "is_new_plan" not in config.evaluation_rules

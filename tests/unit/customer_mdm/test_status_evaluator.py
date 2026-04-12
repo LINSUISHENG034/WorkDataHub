@@ -65,11 +65,12 @@ class TestStatusEvaluator:
         sql = evaluator.generate_sql_fragment(
             "is_churned_this_year",
             table_alias="c",
-            params={"snapshot_year": 2026},
+            params={"snapshot_year": 2026, "snapshot_month": "2026-01-31"},
         )
 
-        assert "EXISTS" in sql
-        assert "流失客户明细" in sql
+        assert "规模明细" in sql
+        assert "SUM(sub.期末资产规模)" in sql
+        assert "DATE_TRUNC('month', %(snapshot_month)s::date)" in sql
 
     def test_generate_is_new_sql(self, evaluator: StatusEvaluator):
         """Test is_new generates combined SQL with AND."""
@@ -96,11 +97,12 @@ class TestStatusEvaluator:
         sql = evaluator.generate_sql_fragment(
             "is_churned_this_year_plan",
             table_alias="c",
-            params={"snapshot_year": 2026},
+            params={"snapshot_year": 2026, "snapshot_month": "2026-01-31"},
         )
 
-        assert "EXISTS" in sql
-        assert "年金计划号" in sql
+        assert "规模明细" in sql
+        assert "SUM(sub.期末资产规模)" in sql
+        assert "计划代码" in sql
 
 
 class TestDisappearedCondition:

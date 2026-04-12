@@ -28,6 +28,13 @@ from src.work_data_hub.domain.sandbox_trustee_performance.service import (
 )
 
 
+def test_validate_input_batch_not_exported_from_package_api():
+    """validate_input_batch is an internal helper, not part of package API."""
+    import work_data_hub.domain.sandbox_trustee_performance as sandbox_pkg
+
+    assert not hasattr(sandbox_pkg, "validate_input_batch")
+
+
 @pytest.fixture
 def valid_row_chinese():
     """Sample valid row with Chinese field names."""
