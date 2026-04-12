@@ -32,7 +32,7 @@ class AnnualAwardService:
 
     @property
     def requires_backfill(self) -> bool:
-        return False
+        return True
 
     def process(
         self,
@@ -84,9 +84,7 @@ class AnnualAwardService:
 
             # Build EQC config from context
             eqc_config = (
-                context.eqc_config
-                if context.eqc_config
-                else EqcLookupConfig.disabled()
+                context.eqc_config if context.eqc_config else EqcLookupConfig.disabled()
             )
 
             # Build and execute pipeline

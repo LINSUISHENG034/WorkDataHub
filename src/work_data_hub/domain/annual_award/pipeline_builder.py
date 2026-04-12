@@ -317,6 +317,7 @@ class PlanCodeEnrichmentStep(TransformStep):
             SELECT company_id, product_line_code, plan_code
             FROM customer."客户年金计划"
             WHERE company_id = ANY(:company_ids)
+              AND valid_to = '9999-12-31'
             ORDER BY company_id, product_line_code, plan_code
         """)
 

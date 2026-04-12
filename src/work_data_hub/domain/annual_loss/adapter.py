@@ -32,7 +32,7 @@ class AnnualLossService:
 
     @property
     def requires_backfill(self) -> bool:
-        return False
+        return True
 
     def process(
         self,
