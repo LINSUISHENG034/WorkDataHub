@@ -269,6 +269,17 @@ class GenericBackfillService:
         # Filter rows where source column is not null/blank
         source_series = df[config.source_column]
         source_mask = self._non_blank_mask(source_series)
+        if config.skip_blank_values and (
+            source_series.dtype == object
+            or str(source_series.dtype).startswith("string")
+        ):
+            normalized_source = source_series.astype("string").str.strip()
+            source_mask &= normalized_source != "(空白)"
+            if config.source_column == "company_id":
+                # Customer-master backfill should not materialize unresolved temp IDs.
+                source_mask &= ~normalized_source.str.upper().str.startswith(
+                    "IN", na=False
+                )
         source_df = df[source_mask].copy()
 
         if source_df.empty:
