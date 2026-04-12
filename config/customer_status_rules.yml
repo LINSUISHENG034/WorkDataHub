@@ -44,7 +44,7 @@ status_definitions:
     time_scope: monthly
 
   is_new:
-    description: "新到账 - Winning this year AND NOT existing"
+    description: "新到账客户 - Customer/ProductLine winning this year AND NOT existing"
     source: derived
     time_scope: yearly
 
@@ -77,31 +77,35 @@ evaluation_rules:
           - source_field: product_line_code
             target_field: 产品线代码
 
-  # ProductLine-level: EXISTS check on 流失客户明细 (aggregated)
+  # ProductLine-level: current-month AUM zero or missing in 规模明细
   is_churned_this_year:
     granularity: product_line
     conditions:
-      - type: exists_in_year
-        source: annual_loss
-        year_field: 上报月份
+      - type: current_period_sum_zero
+        source: annuity_performance
+        period_field: 月度
+        field: 期末资产规模
         match_fields:
           - source_field: company_id
             target_field: company_id
           - source_field: product_line_code
             target_field: 产品线代码
 
-  # Plan-level: EXISTS check on 流失客户明细 with plan_code match
+  # Plan-level: current-month AUM zero or missing in 规模明细
   is_churned_this_year_plan:
     granularity: plan
     conditions:
-      - type: exists_in_year
-        source: annual_loss
-        year_field: 上报月份
+      - type: current_period_sum_zero
+        source: annuity_performance
+        period_field: 月度
+        field: 期末资产规模
         match_fields:
           - source_field: company_id
             target_field: company_id
           - source_field: plan_code
-            target_field: 年金计划号
+            target_field: 计划代码
+          - source_field: product_line_code
+            target_field: 产品线代码
 
   # Derived status: is_winning AND NOT is_existing
   is_new:

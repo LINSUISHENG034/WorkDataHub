@@ -64,6 +64,9 @@ domains:
       table: "sandbox_trustee_performance"
       schema_name: "sandbox"  # Override: sandbox instead of business
 
+    # Sandbox domain does not participate in FK backfill.
+    requires_backfill: false
+
   # Annuity Performance Domain
   # ✅ VALIDATED with real 202411 data (Epic 3 Tech Spec Action Item #2)
   # Path structure: tests/fixtures/real_data/202411/收集数据/数据采集/*.xlsx

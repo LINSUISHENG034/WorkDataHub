@@ -47,6 +47,7 @@ class ConditionConfig(BaseModel):
 
     type: Literal[
         "exists_in_year",
+        "current_period_sum_zero",
         "field_equals",
         "disappeared",
         "first_appearance",
