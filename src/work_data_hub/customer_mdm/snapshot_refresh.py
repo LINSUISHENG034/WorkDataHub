@@ -14,7 +14,9 @@ ProductLine Table ("客户业务月度快照"):
     - is_strategic: Aggregated from contract attributes (BOOL_OR)
     - is_existing: Aggregated from contract attributes (BOOL_OR)
     - is_winning_this_year: Derived from customer.中标客户明细 (config-driven)
-    - is_churned_this_year: Derived from customer.流失客户明细 (config-driven)
+    - is_loss_reported: Derived from customer.流失客户明细 (config-driven)
+    - is_churned_this_year: Derived from business.规模明细 current-month AUM
+      (zero or missing -> churned)
     - is_new: is_winning AND NOT is_existing (config-driven)
     - aum_balance: Aggregated from business.规模明细
     - plan_count: COUNT DISTINCT plan_code
@@ -22,7 +24,8 @@ ProductLine Table ("客户业务月度快照"):
 Plan Table ("客户计划月度快照"):
   Granularity: Customer + Plan + Product Line
   Status derivation:
-    - is_churned_this_year: Plan-level churn from customer.流失客户明细 (config-driven)
+    - is_churned_this_year: Plan-level churn from business.规模明细 current-month AUM
+      (zero or missing -> churned)
     - contract_status: Current contract status
     - aum_balance: Plan-level AUM from business.规模明细
 """
@@ -126,11 +129,14 @@ def _refresh_product_line_snapshot(
         Number of records upserted
     """
     evaluator = get_status_evaluator()
-    params = {"snapshot_year": snapshot_year}
+    params = {"snapshot_year": snapshot_year, "snapshot_month": snapshot_month}
 
     # Generate config-driven SQL fragments
     is_winning_sql = evaluator.generate_sql_fragment(
         "is_winning_this_year", "c", params
+    )
+    is_loss_reported_sql = evaluator.generate_sql_fragment(
+        "is_loss_reported", "c", params
     )
     is_churned_sql = evaluator.generate_sql_fragment(
         "is_churned_this_year", "c", params
@@ -158,6 +164,7 @@ def _refresh_product_line_snapshot(
             is_existing,
             is_new,
             is_winning_this_year,
+            is_loss_reported,
             is_churned_this_year,
             aum_balance,
             plan_count
@@ -178,6 +185,9 @@ def _refresh_product_line_snapshot(
 
             -- Config-driven is_winning_this_year (Story 7.6-18)
             {is_winning_sql} as is_winning_this_year,
+
+            -- Config-driven is_loss_reported (Story 7.6-18)
+            {is_loss_reported_sql} as is_loss_reported,
 
             -- Config-driven is_churned_this_year (Story 7.6-18)
             {is_churned_sql} as is_churned_this_year,
@@ -205,6 +215,7 @@ def _refresh_product_line_snapshot(
             is_existing = EXCLUDED.is_existing,
             is_new = EXCLUDED.is_new,
             is_winning_this_year = EXCLUDED.is_winning_this_year,
+            is_loss_reported = EXCLUDED.is_loss_reported,
             is_churned_this_year = EXCLUDED.is_churned_this_year,
             aum_balance = EXCLUDED.aum_balance,
             plan_count = EXCLUDED.plan_count,
@@ -234,7 +245,7 @@ def _refresh_plan_snapshot(
         Number of records upserted
     """
     evaluator = get_status_evaluator()
-    params = {"snapshot_year": snapshot_year}
+    params = {"snapshot_year": snapshot_year, "snapshot_month": snapshot_month}
 
     # Generate config-driven SQL fragment for plan-level churn
     is_churned_plan_sql = evaluator.generate_sql_fragment(

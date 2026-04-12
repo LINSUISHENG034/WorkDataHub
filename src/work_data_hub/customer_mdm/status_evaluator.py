@@ -55,6 +55,7 @@ class StatusEvaluator:
         self.config = load_customer_status_config(config_path)
         self._sql_generators = {
             "exists_in_year": self._generate_exists_in_year,
+            "current_period_sum_zero": self._generate_current_period_sum_zero,
             "field_equals": self._generate_field_equals,
             "status_reference": self._generate_status_reference,
             "negation": self._generate_negation,
@@ -168,6 +169,49 @@ class StatusEvaluator:
             WHERE {match_sql}
               AND EXTRACT(YEAR FROM sub.{year_field}) = %(snapshot_year)s
         )"""
+
+    def _generate_current_period_sum_zero(
+        self,
+        condition: ConditionConfig,
+        table_alias: str,
+        params: Dict[str, object],
+        rule: EvaluationRule,
+    ) -> str:
+        """Generate current-period SUM(...) = 0 check.
+
+        This treats both "AUM became zero" and "record disappeared in current
+        month" as churn by using COALESCE(SUM(...), 0) = 0.
+        """
+        source_name = condition.source
+        source_config = self.config.sources[source_name]
+
+        schema = source_config.schema_name
+        table = source_config.table
+        period_field = self._validate_identifier(
+            condition.period_field, "current_period_sum_zero.period_field"
+        )
+        value_field = self._validate_identifier(
+            condition.field, "current_period_sum_zero.field"
+        )
+
+        match_conditions = []
+        for match in condition.match_fields:
+            src_field = self._validate_identifier(
+                match.source_field, "current_period_sum_zero.source_field"
+            )
+            tgt_field = self._validate_identifier(
+                match.target_field, "current_period_sum_zero.target_field"
+            )
+            match_conditions.append(f"sub.{tgt_field} = {table_alias}.{src_field}")
+
+        match_sql = " AND ".join(match_conditions)
+
+        return f"""COALESCE((
+            SELECT SUM(sub.{value_field})
+            FROM {schema}."{table}" sub
+            WHERE {match_sql}
+              AND sub.{period_field} = DATE_TRUNC('month', %(snapshot_month)s::date)
+        ), 0) = 0"""
 
     def _generate_field_equals(
         self,
