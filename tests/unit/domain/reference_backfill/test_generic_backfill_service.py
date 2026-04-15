@@ -13,6 +13,9 @@ import pandas as pd
 from unittest.mock import Mock, MagicMock, patch
 from sqlalchemy.engine import Connection
 
+from work_data_hub.domain.reference_backfill.config_loader import (
+    load_foreign_keys_config,
+)
 from work_data_hub.domain.reference_backfill.generic_service import (
     GenericBackfillService,
     BackfillResult,
@@ -308,6 +311,31 @@ class TestDeriveCandidates:
 
         assert len(candidates_df) == 1
         assert candidates_df.iloc[0]["company_id"] == "COMP001"
+
+    def test_annuity_performance_fk_organization_uses_canonical_institution_name(self):
+        """annuity_performance organization backfill should derive `机构` from canonical `机构名称`."""
+        service = GenericBackfillService("annuity_performance")
+        fk_configs = load_foreign_keys_config(domain="annuity_performance")
+        config = next(fk for fk in fk_configs if fk.name == "fk_organization")
+
+        df = pd.DataFrame(
+            [
+                {"机构代码": "G01", "机构名称": "北京"},
+                {"机构代码": "G02", "机构名称": "上海"},
+            ]
+        )
+
+        candidates_df = service.derive_candidates(df, config)
+
+        assert len(candidates_df) == 2
+        assert (
+            candidates_df.loc[candidates_df["机构代码"] == "G01", "机构"].iloc[0]
+            == "北京"
+        )
+        assert (
+            candidates_df.loc[candidates_df["机构代码"] == "G02", "机构"].iloc[0]
+            == "上海"
+        )
 
 
 class TestBackfillTable:

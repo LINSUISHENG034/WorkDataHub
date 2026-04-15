@@ -8,12 +8,14 @@ hierarchical resolution strategy used by CompanyIdResolver.
 Story 6.3: Internal Mapping Tables and Database Schema
 Architecture Reference: AD-010 Infrastructure Layer
 
-Priority Levels (New Pipeline Order):
-1. plan - Plan code mappings (highest priority)
-2. account_name - Account name mappings (年金账户名)
-3. account - Account number mappings (年金账户号)
-4. name - Customer name mappings (客户名称)
-5. hardcode - Hardcoded special cases (lowest priority)
+Compatibility Mapping File Inventory:
+1. plan - active YAML override tier for plan code mappings
+2. account_name - compatibility-era file, not used by the active
+   annuity-performance YAML strategy
+3. account - compatibility-era file, not used by the active
+   annuity-performance YAML strategy
+4. name - active YAML override tier for customer name mappings
+5. hardcode - active YAML override tier for special-case plan mappings
 """
 
 import os
@@ -29,13 +31,8 @@ logger = structlog.get_logger(__name__)
 # Story 7.x: Migrated from data/mappings to config/mappings
 DEFAULT_MAPPINGS_DIR = Path("config/mappings/company_id")
 
-# Priority level file suffixes (in priority order)
-# New Pipeline Priority Order (per company-enrichment-service.md):
-#   P1: plan_code → company_id
-#   P2: account_name → company_id (年金账户名)
-#   P3: account_number → company_id (年金账户号)
-#   P4: customer_name → company_id (客户名称)
-#   P5: plan_code + customer_name → company_id (hardcode组合映射)
+# Compatibility file suffixes. Active annuity-performance YAML execution is
+# narrowed in resolver/yaml_strategy.py to plan -> hardcode -> name.
 PRIORITY_LEVELS = ["plan", "account_name", "account", "name", "hardcode"]
 
 # Environment variable for custom mappings directory
@@ -158,7 +155,7 @@ def load_company_id_overrides(
     mappings_dir: Optional[Path] = None,
 ) -> Dict[str, Dict[str, str]]:
     """
-    Load all company_id mapping configurations (5 priority levels).
+    Load all compatibility-era company_id mapping files.
 
     Loads YAML files from the mappings directory following the naming
     convention: company_id_overrides_{priority}.yml
@@ -169,7 +166,10 @@ def load_company_id_overrides(
             data/mappings.
 
     Returns:
-        Dict with priority level keys mapping to their respective mappings:
+        Dict with priority level keys mapping to their respective mappings.
+        Active annuity-performance YAML execution currently consumes only
+        `plan`, `hardcode`, and `name`; the remaining keys are loaded for
+        compatibility-aware callers and migration visibility.
         {
             "plan": {"FP0001": "614810477", ...},         # Priority 1
             "account_name": {"平安年金账户": "600866980", ...},  # Priority 2

@@ -35,6 +35,7 @@ from .pipeline_builder import (
     build_bronze_to_silver_pipeline,
     load_plan_override_mapping,
 )
+from .schemas import validate_gold_dataframe
 
 if TYPE_CHECKING:
     from work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
@@ -251,8 +252,9 @@ def process_with_enrichment(
         start_time = time.perf_counter()
         input_df = pd.DataFrame(rows)
         result_df = pipeline.execute(input_df.copy(), context)
+        validated_df, _ = validate_gold_dataframe(result_df)
         # Keep all original records - no aggregation for business detail data
-        records, unknown_names = convert_dataframe_to_models(result_df)
+        records, unknown_names = convert_dataframe_to_models(validated_df)
     finally:
         if repo_connection is not None:
             try:

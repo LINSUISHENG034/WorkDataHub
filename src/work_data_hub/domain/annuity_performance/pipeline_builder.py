@@ -45,6 +45,16 @@ logger = structlog.get_logger(__name__)
 # and _clean_portfolio_code removed - now using shared helpers from infrastructure.transforms
 
 
+def _clean_group_enterprise_customer_number(df: pd.DataFrame) -> pd.Series:
+    """Preserve true nulls while stripping legacy `C` prefixes."""
+    if "集团企业客户号" not in df.columns:
+        return pd.Series([None] * len(df))
+
+    cleaned = df["集团企业客户号"].astype("string").str.lstrip("C")
+    cleaned = cleaned.replace("", pd.NA)
+    return cleaned.astype(object).where(cleaned.notna(), None)
+
+
 class CompanyIdResolutionStep(TransformStep):
     """Batch company ID resolution using CompanyIdResolver."""
 
@@ -185,15 +195,12 @@ def build_bronze_to_silver_pipeline(
             }
         ),
         # Step 9: Clean Group Enterprise Customer Number (lstrip "C")
-        # Fix: Convert to string first to handle NaN-only columns (float64)
+        # Preserve null semantics so Step 10 doesn't materialize literal "None".
         CalculationStep(
             {
-                "集团企业客户号": lambda df: df["集团企业客户号"]
-                .astype(str)
-                .replace("nan", None)
-                .str.lstrip("C")
-                if "集团企业客户号" in df.columns
-                else pd.Series([None] * len(df)),
+                "集团企业客户号": lambda df: _clean_group_enterprise_customer_number(
+                    df
+                ),
             }
         ),
         # Step 10: Derive 年金账户号 from cleaned 集团企业客户号 (Story 6.2-P11)

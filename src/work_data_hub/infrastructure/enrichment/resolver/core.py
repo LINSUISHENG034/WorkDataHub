@@ -14,14 +14,13 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 
 import pandas as pd
 
-from work_data_hub.utils.logging import get_logger
-
-from ..eqc_lookup_config import EqcLookupConfig
-from ..types import (
+from work_data_hub.infrastructure.enrichment.eqc_lookup_config import EqcLookupConfig
+from work_data_hub.infrastructure.enrichment.types import (
     ResolutionResult,
     ResolutionStatistics,
     ResolutionStrategy,
 )
+from work_data_hub.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from work_data_hub.domain.company_enrichment.service import CompanyEnrichmentService
@@ -41,7 +40,8 @@ if _stdlib_logger.level == logging.NOTSET:
 DEFAULT_SALT = "default_dev_salt_change_in_prod"
 SALT_ENV_VAR = "WDH_ALIAS_SALT"
 
-# YAML priority levels in resolution order
+# Compatibility inventory for loaded YAML override tiers. Active execution is
+# narrowed in resolver/yaml_strategy.py to plan -> hardcode -> name.
 YAML_PRIORITY_ORDER = ["plan", "account", "hardcode", "name", "account_name"]
 
 
@@ -52,7 +52,7 @@ class CompanyIdResolver:
     This class provides vectorized company ID resolution for DataFrames,
     supporting multiple resolution strategies in priority order:
 
-    1. YAML overrides (5 priority levels)
+    1. YAML overrides (active execution path: plan -> hardcode -> name)
     2. Database cache lookup
     3. Existing company_id column (passthrough) + backflow
     4. EQC sync lookup (budgeted, cached)
@@ -70,9 +70,11 @@ class CompanyIdResolver:
 
     Example:
         >>> from work_data_hub.config import load_company_id_overrides
-        >>> from work_data_hub.infrastructure.enrichment.eqc_lookup_config import EqcLookupConfig
+        >>> from work_data_hub.infrastructure.enrichment.eqc_lookup_config import (
+        ...     EqcLookupConfig,
+        ... )
         >>> resolver = CompanyIdResolver(
-        ...     eqc_config=EqcLookupConfig.disabled(),  # Required param (Story 6.2-P17)
+        ...     eqc_config=EqcLookupConfig.disabled(),
         ...     yaml_overrides=load_company_id_overrides()
         ... )
         >>> df = pd.DataFrame({
@@ -103,7 +105,8 @@ class CompanyIdResolver:
             eqc_config: EqcLookupConfig controlling EQC lookup behavior.
                 REQUIRED parameter (no default). Use EqcLookupConfig.disabled()
                 for tests or domains that don't need enrichment.
-            enrichment_service: Optional CompanyEnrichmentService for EQC lookup (legacy).
+            enrichment_service:
+                Optional CompanyEnrichmentService for EQC lookup (legacy).
                 Deprecated in favor of eqc_provider + eqc_config.
             yaml_overrides: Dict of priority level -> {alias: company_id} mappings.
                 If not provided, auto-loads from load_company_id_overrides().
@@ -138,7 +141,9 @@ class CompanyIdResolver:
             if mapping_repository is None:
                 logger.warning(
                     "company_id_resolver.cannot_auto_create_eqc_provider",
-                    msg="eqc_config allows auto-creation but mapping_repository is None",
+                    msg=(
+                        "eqc_config allows auto-creation but mapping_repository is None"
+                    ),
                 )
                 self.eqc_provider = None
             else:
@@ -159,7 +164,10 @@ class CompanyIdResolver:
                         )
                         logger.info(
                             "company_id_resolver.eqc_provider_created",
-                            msg="Created EqcProvider per eqc_config.should_auto_create_provider",
+                            msg=(
+                                "Created EqcProvider per "
+                                "eqc_config.should_auto_create_provider"
+                            ),
                         )
                     else:
                         self.eqc_provider = None
@@ -251,7 +259,7 @@ class CompanyIdResolver:
         company IDs and statistics about the resolution process.
 
         Resolution Priority (Story 6.4):
-        1. YAML overrides (5 levels: plan → account → hardcode → name → account_name)
+        1. YAML overrides (active execution path: plan -> hardcode -> name)
         2. Database cache lookup
         3. Existing company_id column passthrough + backflow
         4. EQC sync lookup (budgeted, cached)
@@ -295,7 +303,7 @@ class CompanyIdResolver:
         result_df = df.copy()
         stats = ResolutionStatistics(
             total_rows=len(df),
-            # Story 6.2-P17: Budget is controlled by EqcLookupConfig (SSOT), not strategy.
+            # Story 6.2-P17: EqcLookupConfig is the SSOT for budget control.
             budget_remaining=self.eqc_config.sync_budget,
         )
 
@@ -306,8 +314,7 @@ class CompanyIdResolver:
         resolution_mask = pd.Series(False, index=result_df.index)
 
         # Story 7.1-14: Cache Warming (Task 2 - Highest ROI)
-        # Pre-batch cache warming: extract unique customer names and query enrichment_index once
-        # This reduces EQC API calls by proactively populating an in-memory cache
+        # Warm the cache once per batch to reduce downstream EQC API pressure.
         cache_stats: dict[str, int] = {}
         if self.mapping_repository:
             from .cache_warming import CacheWarmer
@@ -327,7 +334,7 @@ class CompanyIdResolver:
                     **cache_stats,
                 )
 
-        # Step 1: YAML overrides lookup (5 priority levels)
+        # Step 1: YAML overrides lookup (active yaml_strategy subset)
         yaml_resolved, yaml_hits = resolve_via_yaml_overrides(
             result_df, strategy, self.yaml_overrides
         )
@@ -462,11 +469,8 @@ class CompanyIdResolver:
                 mask_still_missing, strategy.customer_name_column
             ].apply(lambda x: generate_temp_id(x, self.salt))
 
-            # Story 7.5-3 CRITICAL FIX: Only include rows that actually received a temp ID
-            # generate_temp_id() now returns None for empty customer names, so we must
-            # re-check the mask after generation to exclude those rows from async queue.
-            # Before this fix, all rows in mask_still_missing were added to temp_id_indices,
-            # even if generate_temp_id() returned None (empty names).
+            # Only queue rows that actually received a temp ID. Empty names can
+            # still resolve to None and must not be treated as queued temp IDs.
             mask_received_temp_id = result_df[mask_still_missing][
                 strategy.output_column
             ].notna()

@@ -151,7 +151,7 @@ domains:
         backfill_columns:
           - source: "机构代码"
             target: "机构代码"
-          - source: "机构"
+          - source: "机构名称"
             target: "机构"
             optional: true
 
