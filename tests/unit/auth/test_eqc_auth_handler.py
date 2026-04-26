@@ -27,10 +27,10 @@ class TestAuthTokenResult:
         """Test creating AuthTokenResult with valid token."""
         result = AuthTokenResult(
             token="valid_token_12345678901234567890",
-            source_url="https://eqc.pingan.com/",
+            source_url="https://hfd.pingan.com/",
         )
         assert result.token == "valid_token_12345678901234567890"
-        assert result.source_url == "https://eqc.pingan.com/"
+        assert result.source_url == "https://hfd.pingan.com/"
         assert result.validated is False
         assert isinstance(result.captured_at, datetime)
 
@@ -120,7 +120,7 @@ class TestEqcAuthHandler:
                 mock_route = AsyncMock()
                 mock_request = MagicMock()
                 mock_request.url = (
-                    "https://eqc.pingan.com/kg-api-hfd/api/search/?key=test"
+                    "https://hfd.pingan.com/kg-api-hfd/api/search/?key=test"
                 )
                 mock_request.headers = {"token": captured_token}
                 mock_route.request = mock_request
@@ -144,7 +144,7 @@ class TestEqcAuthHandler:
             mock_browser.new_context.assert_called_once()
             mock_context.new_page.assert_called_once()
             mock_page.goto.assert_called_once_with(
-                "https://eqc.pingan.com/", wait_until="domcontentloaded"
+                "https://hfd.pingan.com/", wait_until="domcontentloaded"
             )
             mock_browser.close.assert_called_once()
 
@@ -264,7 +264,7 @@ class TestEqcAuthHandler:
 
             assert isinstance(result, AuthTokenResult)
             assert result.token == test_token
-            assert result.source_url == "https://eqc.pingan.com/"
+            assert result.source_url == "https://hfd.pingan.com/"
             assert result.validated is False
             assert isinstance(result.captured_at, datetime)
 
@@ -296,7 +296,7 @@ class TestEqcAuthHandler:
         with patch("work_data_hub.io.auth.eqc_auth_handler.asyncio.run") as mock_run:
             test_result = AuthTokenResult(
                 token="sync_validation_token_1234567890",
-                source_url="https://eqc.pingan.com/",
+                source_url="https://hfd.pingan.com/",
             )
             mock_run.return_value = test_result
 

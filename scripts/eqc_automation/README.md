@@ -40,7 +40,7 @@
   - `EQC_REUSE_SESSION`, `EQC_CLEAR_SESSION`, `EQC_RESET_STORAGE`
   - `EQC_STORAGE_STATE`, `EQC_CAPTURE_URL_SUBSTR`
 - For clean runs, `EQC_RESET_STORAGE=true` and `EQC_REUSE_SESSION=false` should remove session influence.
-- Login URL commonly used: `https://eqc.pingan.com/#/login?redirect=%2Fhome`
+- Login URL commonly used: `https://hfd.pingan.com/#/login?redirect=%2Fhome`
 
 ---
 

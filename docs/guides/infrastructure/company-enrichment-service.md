@@ -344,7 +344,7 @@ ON enterprise.enrichment_requests(status, next_retry_at);
 | `WDH_ALIAS_SALT` | (必填) | 临时 ID 生成的 HMAC 密钥 |
 | `WDH_MAPPINGS_DIR` | `data/mappings` | YAML 配置文件目录 |
 | `WDH_EQC_TOKEN` | (可选) | EQC 平台 API Token |
-| `WDH_EQC_API_BASE_URL` | `https://eqc.pingan.com/` | EQC API 地址 |
+| `WDH_EQC_API_BASE_URL` | `https://hfd.pingan.com/` | EQC API 地址 |
 | `WDH_ENRICH_ENABLED` | `true` | 是否启用富化服务 |
 | `WDH_ASYNC_ENRICHMENT_ENABLED` | `true` | 是否启用异步队列调度 |
 | `DATABASE_URL` | (必填) | PostgreSQL 连接字符串 |

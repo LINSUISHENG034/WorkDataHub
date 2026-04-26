@@ -38,7 +38,7 @@ class TestEQCClientInitialization:
         client = EQCClient(token="test_token")
         assert client.token == "test_token"
         assert client.session.headers["token"] == "test_token"
-        assert client.session.headers["Referer"] == "https://eqc.pingan.com/"
+        assert client.session.headers["Referer"] == "https://hfd.pingan.com/"
         assert "WorkDataHub EQC Client" in client.session.headers["User-Agent"]
 
     def test_client_initialization_with_env_token(self):
@@ -195,7 +195,7 @@ class TestEQCClientSearchMethod:
         # Verify request was made correctly (actual implementation uses /search/ endpoint with 'key' param)
         mock_make_request.assert_called_once_with(
             "GET",
-            "https://eqc.pingan.com/kg-api-hfd/api/search/",
+            "https://hfd.pingan.com/kg-api-hfd/api/search/",
             params={
                 "key": "测试",
             },
@@ -301,7 +301,7 @@ class TestEQCClientDetailMethod:
         # Verify request was made correctly
         mock_make_request.assert_called_once_with(
             "GET",
-            "https://eqc.pingan.com/kg-api-hfd/api/search/findDepart",
+            "https://hfd.pingan.com/kg-api-hfd/api/search/findDepart",
             params={"targetId": "123456789"},
         )
 
@@ -604,7 +604,7 @@ class TestEQCClientUrlSanitization:
         client = EQCClient(token="test_token")
 
         url_with_token = (
-            "https://eqc.pingan.com/api/search?keyword=test&token=secret123&other=param"
+            "https://hfd.pingan.com/api/search?keyword=test&token=secret123&other=param"
         )
         sanitized = client._sanitize_url_for_logging(url_with_token)
 
@@ -616,7 +616,7 @@ class TestEQCClientUrlSanitization:
         """Test URL sanitization leaves URLs without tokens unchanged."""
         client = EQCClient(token="test_token")
 
-        clean_url = "https://eqc.pingan.com/api/search?keyword=test&page=1"
+        clean_url = "https://hfd.pingan.com/api/search?keyword=test&page=1"
         sanitized = client._sanitize_url_for_logging(clean_url)
 
         assert sanitized == clean_url
@@ -840,7 +840,7 @@ class TestEQCClientBusinessInfo:
             # Verify request was made correctly
             mock_request.assert_called_once_with(
                 "GET",
-                "https://eqc.pingan.com/kg-api-hfd/api/search/findDepart",
+                "https://hfd.pingan.com/kg-api-hfd/api/search/findDepart",
                 timeout=client.timeout,
                 params={"targetId": "1000065057"},
             )
@@ -999,7 +999,7 @@ class TestEQCClientLabelInfo:
             # Verify request was made correctly
             mock_request.assert_called_once_with(
                 "GET",
-                "https://eqc.pingan.com/kg-api-hfd/api/search/findLabels",
+                "https://hfd.pingan.com/kg-api-hfd/api/search/findLabels",
                 timeout=client.timeout,
                 params={"targetId": "1000065057"},
             )

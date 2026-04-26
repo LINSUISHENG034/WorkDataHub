@@ -53,10 +53,10 @@ class EqcCrawler:
 
     def get_base_info(self, key_info):
         try:
-            url = f"https://eqc.pingan.com/kg-api-hfd/api/search/?key={quote(str(key_info))}"
+            url = f"https://hfd.pingan.com/kg-api-hfd/api/search/?key={quote(str(key_info))}"
             headers = dict(
                 self.headers,
-                **{"Referer": "https://eqc.pingan.com/", "token": self.token},
+                **{"Referer": "https://hfd.pingan.com/", "token": self.token},
             )
             logger.info("scrape CompanyID of key word [ %s ]", key_info)
             response = self.session.get(url=url, headers=headers)
@@ -81,10 +81,10 @@ class EqcCrawler:
 
     def get_business_info(self, company_id):
         try:
-            url = f"https://eqc.pingan.com/kg-api-hfd/api/search/findDepart?targetId={company_id}"
+            url = f"https://hfd.pingan.com/kg-api-hfd/api/search/findDepart?targetId={company_id}"
             headers = dict(
                 self.headers,
-                **{"Referer": "https://eqc.pingan.com/", "token": self.token},
+                **{"Referer": "https://hfd.pingan.com/", "token": self.token},
             )
             logger.info("scrape BusinessInfo of CompanyID [ %s ]", company_id)
             response = self.session.get(url=url, headers=headers)
@@ -110,10 +110,10 @@ class EqcCrawler:
 
     def get_label_info(self, company_id):
         try:
-            url = f"https://eqc.pingan.com/kg-api-hfd/api/search/findLabels?targetId={company_id}"
+            url = f"https://hfd.pingan.com/kg-api-hfd/api/search/findLabels?targetId={company_id}"
             headers = dict(
                 self.headers,
-                **{"Referer": "https://eqc.pingan.com/", "token": self.token},
+                **{"Referer": "https://hfd.pingan.com/", "token": self.token},
             )
             logger.info("scrape LabelInfo of CompanyID [ %s ]", company_id)
             response = self.session.get(url=url, headers=headers)

@@ -34,7 +34,7 @@ from typing import Any, Dict, List
 from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
 
-LOGIN_URL = os.getenv("EQC_LOGIN_URL", "https://eqc.pingan.com/")
+LOGIN_URL = os.getenv("EQC_LOGIN_URL", "https://hfd.pingan.com/")
 OUT_DIR = Path(os.getenv("EQC_RECORD_OUT", "logs/eqc_login_record"))
 
 
@@ -347,7 +347,7 @@ def generate_replay_script(events: List[Dict[str, Any]], out_dir: Path) -> None:
     lines.append("import asyncio, os")
     lines.append("from playwright.async_api import async_playwright")
     lines.append("")
-    lines.append("LOGIN_URL = os.getenv('EQC_LOGIN_URL', 'https://eqc.pingan.com/')")
+    lines.append("LOGIN_URL = os.getenv('EQC_LOGIN_URL', 'https://hfd.pingan.com/')")
     lines.append("")
     lines.append("async def main():")
     lines.append("    async with async_playwright() as pw:")

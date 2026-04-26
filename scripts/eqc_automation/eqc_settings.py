@@ -19,7 +19,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class EQCAuthSettings(BaseSettings):
     # Core endpoints
     login_url: str = Field(
-        default="https://eqc.pingan.com/#/login?redirect=%2Fhome",
+        default="https://hfd.pingan.com/#/login?redirect=%2Fhome",
         description="EQC login page URL",
     )
 

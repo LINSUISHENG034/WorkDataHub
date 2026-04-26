@@ -22,7 +22,7 @@ from pydantic import ValidationError
 from work_data_hub.io.auth.models import AuthTimeoutError, AuthTokenResult, BrowserError
 
 # Configuration constants - make these configurable for easy maintenance
-LOGIN_URL = "https://eqc.pingan.com/"
+LOGIN_URL = "https://hfd.pingan.com/"
 TARGET_API_PATH = "/kg-api-hfd/api/search/"
 DEFAULT_TIMEOUT_SECONDS = 300  # 5 minutes
 DEFAULT_ENV_FILE = ".wdh_env"

@@ -48,7 +48,7 @@ def test_eqc_full_acquisition_persists_raw_responses() -> None:
     if url.startswith("postgres://"):
         url = "postgresql://" + url[len("postgres://") :]
 
-    base_url = os.environ.get("WDH_EQC_BASE_URL") or "https://eqc.pingan.com"
+    base_url = os.environ.get("WDH_EQC_BASE_URL") or "https://hfd.pingan.com"
     keyword = os.environ.get("WDH_EQC_TEST_COMPANY_KEYWORD") or "中国平安"
 
     if not validate_eqc_token(token, base_url):

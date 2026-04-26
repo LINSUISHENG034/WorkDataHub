@@ -41,6 +41,7 @@ GOLD_NUMERIC_COLUMNS: Sequence[str] = (
     "流失",
     "待遇支付",
     "投资收益",
+    "当期收益率",
     "年化收益率",
 )
 GOLD_REQUIRED_COLUMNS: Sequence[str] = (
@@ -84,27 +85,20 @@ GoldAnnuitySchema = pa.DataFrameSchema(
         "组合名称": pa.Column(pa.String, nullable=True, coerce=True),
         "company_id": pa.Column(
             pa.String,
-            nullable=False,
+            nullable=True,
             coerce=True,
             checks=pa.Check.str_length(min_value=1),
         ),
-        "客户名称": pa.Column(pa.String, nullable=False, coerce=True),
-        "期初资产规模": pa.Column(
-            pa.Float, nullable=False, coerce=True, checks=pa.Check.ge(0)
-        ),
-        "期末资产规模": pa.Column(
-            pa.Float, nullable=False, coerce=True, checks=pa.Check.ge(0)
-        ),
-        "投资收益": pa.Column(pa.Float, nullable=False, coerce=True),
-        "供款": pa.Column(pa.Float, nullable=True, coerce=True, checks=pa.Check.ge(0)),
-        "流失_含待遇支付": pa.Column(
-            pa.Float, nullable=True, coerce=True, checks=pa.Check.ge(0)
-        ),
-        "流失": pa.Column(pa.Float, nullable=True, coerce=True, checks=pa.Check.ge(0)),
-        "待遇支付": pa.Column(
-            pa.Float, nullable=True, coerce=True, checks=pa.Check.ge(0)
-        ),
-        "年化收益率": pa.Column(pa.Float, nullable=True, coerce=True),
+        "客户名称": pa.Column(pa.String, nullable=True, coerce=True),
+        "期初资产规模": pa.Column(pa.Float, nullable=True, coerce=True),
+        "期末资产规模": pa.Column(pa.Float, nullable=True, coerce=True),
+        "投资收益": pa.Column(pa.Float, nullable=True, coerce=True),
+        "供款": pa.Column(pa.Float, nullable=True, coerce=True),
+        "流失_含待遇支付": pa.Column(pa.Float, nullable=True, coerce=True),
+        "流失": pa.Column(pa.Float, nullable=True, coerce=True),
+        "待遇支付": pa.Column(pa.Float, nullable=True, coerce=True),
+        "当期收益率": pa.Column(pa.Float, nullable=True, coerce=True, required=False),
+        "年化收益率": pa.Column(pa.Float, nullable=True, coerce=True, required=False),
         "机构代码": pa.Column(pa.String, nullable=True, coerce=True),
         "机构名称": pa.Column(pa.String, nullable=True, coerce=True),
         "产品线代码": pa.Column(pa.String, nullable=True, coerce=True),

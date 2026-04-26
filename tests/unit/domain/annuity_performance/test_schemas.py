@@ -415,17 +415,34 @@ class TestGoldSchemaValidation:
 
     def test_null_required_field_fails_validation(self):
         df = _build_gold_df()
-        df.loc[0, "期初资产规模"] = None
+        df.loc[0, "计划代码"] = None
         with pytest.raises(SchemaError) as excinfo:
             validate_gold_dataframe(df)
-        assert "期初资产规模" in str(excinfo.value)
+        assert "计划代码" in str(excinfo.value)
 
-    def test_negative_asset_values_rejected(self):
+    def test_negative_asset_values_allowed_for_adjustments(self):
         df = _build_gold_df()
         df.loc[0, "期末资产规模"] = -1.0
-        with pytest.raises(SchemaError) as excinfo:
-            validate_gold_dataframe(df)
-        assert "期末资产规模" in str(excinfo.value)
+        df.loc[0, "供款"] = -100.0
+        validated, _ = validate_gold_dataframe(df)
+        assert validated.loc[0, "期末资产规模"] == -1.0
+        assert validated.loc[0, "供款"] == -100.0
+
+    def test_nullable_business_fields_allowed(self):
+        df = _build_gold_df()
+        df.loc[0, "客户名称"] = None
+        df.loc[0, "company_id"] = None
+        df.loc[0, "投资收益"] = None
+        validated, _ = validate_gold_dataframe(df)
+        assert pd.isna(validated.loc[0, "客户名称"])
+        assert pd.isna(validated.loc[0, "company_id"])
+        assert pd.isna(validated.loc[0, "投资收益"])
+
+    def test_current_return_rate_column_allowed(self):
+        df = _build_gold_df().drop(columns=["年化收益率"])
+        df["当期收益率"] = 0.05
+        validated, _ = validate_gold_dataframe(df)
+        assert validated.loc[0, "当期收益率"] == 0.05
 
     def test_extra_columns_rejected_in_strict_mode(self):
         df = _build_gold_df()

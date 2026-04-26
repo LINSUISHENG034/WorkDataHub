@@ -99,7 +99,7 @@ class EQCTransport:
         self.session.headers.update(
             {
                 "token": self.token,
-                "Referer": "https://eqc.pingan.com/",
+                "Referer": "https://hfd.pingan.com/",
                 "User-Agent": "Mozilla/5.0 (WorkDataHub EQC Client)",
                 "Accept": "application/json",
                 "Content-Type": "application/json; charset=utf-8",

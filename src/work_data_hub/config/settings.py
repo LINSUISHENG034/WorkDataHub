@@ -226,7 +226,7 @@ class Settings(BaseSettings):
     )
 
     eqc_base_url: str = Field(
-        default="https://eqc.pingan.com", description="EQC API base URL"
+        default="https://hfd.pingan.com", description="EQC API base URL"
     )
 
     # Company Enrichment Configuration - service and queue settings
